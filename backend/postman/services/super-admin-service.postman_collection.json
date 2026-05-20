@@ -1,0 +1,289 @@
+{
+  "info": {
+    "_postman_id": "65c95516-cdfb-493a-a2db-87d62dc76fd1-super-admin-service",
+    "name": "Cafe System - Super Admin Service",
+    "description": "Super Admin API testing collection. Login as SUPER_ADMIN, list restaurants, create restaurant + owner, and toggle restaurant status.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://YOUR_BACKEND_API_URL"
+    },
+    {
+      "key": "jwt_token",
+      "value": ""
+    },
+    {
+      "key": "restaurant_id",
+      "value": ""
+    },
+    {
+      "key": "restaurant_slug",
+      "value": "test-cafe"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Login - Super Admin",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('login returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "if (json && json.token) pm.environment.set('jwt_token', json.token);",
+              "if (json && json.user && json.user.role) pm.environment.set('current_role', json.user.role);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{super_admin_email}}\",\n  \"password\": \"{{super_admin_password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "login"
+          ]
+        },
+        "description": "Logs in as SUPER_ADMIN and stores jwt_token in environment."
+      }
+    },
+    {
+      "name": "2. List Restaurants",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('list restaurants returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "if (json && Array.isArray(json.restaurants) && json.restaurants.length) {",
+              "  pm.environment.set('restaurant_id', String(json.restaurants[0].id));",
+              "  pm.environment.set('restaurant_slug', json.restaurants[0].slug);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/super-admin/restaurants",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "super-admin",
+            "restaurants"
+          ]
+        },
+        "description": "Lists every restaurant under the application with owner, counts, and revenue."
+      }
+    },
+    {
+      "name": "3. Search Restaurants",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/super-admin/restaurants?q={{restaurant_search}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "super-admin",
+            "restaurants"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "{{restaurant_search}}"
+            }
+          ]
+        },
+        "description": "Search by restaurant name, slug, owner, email, phone, or city."
+      }
+    },
+    {
+      "name": "4. Create Restaurant + Owner",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('create restaurant returns 201', function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "const json = pm.response.json();",
+              "if (json && json.restaurant) {",
+              "  pm.environment.set('restaurant_id', String(json.restaurant.id));",
+              "  pm.environment.set('restaurant_slug', json.restaurant.slug);",
+              "}",
+              "if (json && json.owner) {",
+              "  pm.environment.set('owner_email', json.owner.email);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{new_restaurant_name}}\",\n  \"slug\": \"{{new_restaurant_slug}}\",\n  \"legalName\": \"{{new_restaurant_legal_name}}\",\n  \"ownerName\": \"{{new_owner_name}}\",\n  \"ownerEmail\": \"{{new_owner_email}}\",\n  \"ownerPhone\": \"{{new_owner_phone}}\",\n  \"ownerPassword\": \"{{new_owner_password}}\",\n  \"city\": \"{{new_restaurant_city}}\",\n  \"state\": \"{{new_restaurant_state}}\",\n  \"pincode\": \"{{new_restaurant_pincode}}\",\n  \"gstNumber\": \"{{new_restaurant_gst}}\",\n  \"invoicePrefix\": \"{{new_restaurant_invoice_prefix}}\",\n  \"defaultTaxPercent\": 5,\n  \"taxEnabled\": true,\n  \"taxType\": \"EXCLUSIVE\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/super-admin/restaurants",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "super-admin",
+            "restaurants"
+          ]
+        },
+        "description": "Creates a new restaurant and an OWNER user with full access."
+      }
+    },
+    {
+      "name": "5. Disable Restaurant",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"isActive\": false\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/super-admin/restaurants/{{restaurant_id}}/status",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "super-admin",
+            "restaurants",
+            "{{restaurant_id}}",
+            "status"
+          ]
+        },
+        "description": "Disables the restaurant and its non-super-admin users."
+      }
+    },
+    {
+      "name": "6. Activate Restaurant",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"isActive\": true\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/super-admin/restaurants/{{restaurant_id}}/status",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "super-admin",
+            "restaurants",
+            "{{restaurant_id}}",
+            "status"
+          ]
+        },
+        "description": "Activates the restaurant and its non-super-admin users."
+      }
+    },
+    {
+      "name": "7. Login - Created Owner",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('owner login returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "if (json && json.token) pm.environment.set('jwt_token', json.token);",
+              "if (json && json.user && json.user.restaurantId) pm.environment.set('restaurant_id', String(json.user.restaurantId));",
+              "if (json && json.user && json.user.restaurant && json.user.restaurant.slug) pm.environment.set('restaurant_slug', json.user.restaurant.slug);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{new_owner_email}}\",\n  \"password\": \"{{new_owner_password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "login"
+          ]
+        },
+        "description": "Logs in with the owner created by the Super Admin flow."
+      }
+    }
+  ]
+}

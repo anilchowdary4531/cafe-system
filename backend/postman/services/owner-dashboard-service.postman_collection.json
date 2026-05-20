@@ -1,0 +1,69 @@
+{
+  "info": {
+    "_postman_id": "65c95516-cdfb-493a-a2db-87d62dc76fd1-owner-dashboard-service",
+    "name": "Cafe System - Owner Dashboard Service",
+    "description": "Service collection split from Cafe System master collection: Owner Dashboard Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://YOUR_BACKEND_API_URL"
+    },
+    {
+      "key": "restaurant_slug",
+      "value": "cafeking"
+    },
+    {
+      "key": "restaurant_id",
+      "value": "11"
+    },
+    {
+      "key": "menu_id",
+      "value": "1101"
+    },
+    {
+      "key": "table_id",
+      "value": "3101"
+    },
+    {
+      "key": "jwt_token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Owner Dashboard Service",
+      "item": [
+        {
+          "name": "GET /owner/dashboard/:restaurantId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/owner/dashboard/{{restaurant_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "dashboard",
+                "{{restaurant_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

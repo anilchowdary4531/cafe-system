@@ -1,0 +1,632 @@
+{
+  "info": {
+    "_postman_id": "65c95516-cdfb-493a-a2db-87d62dc76fd1",
+    "name": "Cafe System APIs",
+    "description": "Collection for all backend services in cafe-system (auth, menu, owner, tables, orders). Importable in Postman and Insomnia.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://YOUR_BACKEND_API_URL"
+    },
+    {
+      "key": "restaurant_slug",
+      "value": "cafeking"
+    },
+    {
+      "key": "restaurant_id",
+      "value": "11"
+    },
+    {
+      "key": "menu_id",
+      "value": "1101"
+    },
+    {
+      "key": "table_id",
+      "value": "3101"
+    },
+    {
+      "key": "jwt_token",
+      "value": ""
+    },
+    {
+      "key": "super_admin_email",
+      "value": "admin@suretra.com"
+    },
+    {
+      "key": "super_admin_password",
+      "value": ""
+    },
+    {
+      "key": "new_restaurant_name",
+      "value": "Test Cafe"
+    },
+    {
+      "key": "new_restaurant_slug",
+      "value": "test-cafe"
+    },
+    {
+      "key": "new_owner_email",
+      "value": "owner.testcafe@suretra.local"
+    },
+    {
+      "key": "new_owner_password",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                ""
+              ]
+            },
+            "description": "Service health/root endpoint"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth Service",
+      "item": [
+        {
+          "name": "POST /login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json && json.token) pm.environment.set('jwt_token', json.token);",
+                  "if (json && json.user && json.user.restaurantId) pm.environment.set('restaurant_id', String(json.user.restaurantId));",
+                  "if (json && json.user && json.user.restaurant && json.user.restaurant.slug) pm.environment.set('restaurant_slug', json.user.restaurant.slug);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@cafeking.com\",\n  \"password\": \"owner123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "Login and automatically store jwt_token in environment"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Super Admin Service",
+      "item": [
+        {
+          "name": "POST /login - Super Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json && json.token) pm.environment.set('jwt_token', json.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{super_admin_email}}\",\n  \"password\": \"{{super_admin_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "Login as SUPER_ADMIN and store jwt_token."
+          }
+        },
+        {
+          "name": "GET /super-admin/restaurants",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json && Array.isArray(json.restaurants) && json.restaurants.length) {",
+                  "  pm.environment.set('restaurant_id', String(json.restaurants[0].id));",
+                  "  pm.environment.set('restaurant_slug', json.restaurants[0].slug);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/super-admin/restaurants",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "super-admin",
+                "restaurants"
+              ]
+            },
+            "description": "List all restaurants with owner, counts, and revenue."
+          }
+        },
+        {
+          "name": "POST /super-admin/restaurants",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json && json.restaurant) {",
+                  "  pm.environment.set('restaurant_id', String(json.restaurant.id));",
+                  "  pm.environment.set('restaurant_slug', json.restaurant.slug);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{new_restaurant_name}}\",\n  \"slug\": \"{{new_restaurant_slug}}\",\n  \"legalName\": \"Test Cafe Pvt Ltd\",\n  \"ownerName\": \"Test Cafe Owner\",\n  \"ownerEmail\": \"{{new_owner_email}}\",\n  \"ownerPhone\": \"9000000090\",\n  \"ownerPassword\": \"{{new_owner_password}}\",\n  \"city\": \"Hyderabad\",\n  \"state\": \"Telangana\",\n  \"pincode\": \"500001\",\n  \"gstNumber\": \"36ABCDE1234F1Z5\",\n  \"invoicePrefix\": \"TC\",\n  \"defaultTaxPercent\": 5,\n  \"taxEnabled\": true,\n  \"taxType\": \"EXCLUSIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/super-admin/restaurants",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "super-admin",
+                "restaurants"
+              ]
+            },
+            "description": "Create a restaurant and OWNER user."
+          }
+        },
+        {
+          "name": "PATCH /super-admin/restaurants/:restaurantId/status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/super-admin/restaurants/{{restaurant_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "super-admin",
+                "restaurants",
+                "{{restaurant_id}}",
+                "status"
+              ]
+            },
+            "description": "Activate or disable a restaurant and its users."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public Menu Service",
+      "auth": {
+        "type": "noauth"
+      },
+      "item": [
+        {
+          "name": "GET /menu",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/menu",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menu"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /r/:slug/menu",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/r/{{restaurant_slug}}/menu",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "r",
+                "{{restaurant_slug}}",
+                "menu"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Owner Dashboard Service",
+      "item": [
+        {
+          "name": "GET /owner/dashboard/:restaurantId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/owner/dashboard/{{restaurant_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "dashboard",
+                "{{restaurant_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Owner Menu Service",
+      "item": [
+        {
+          "name": "GET /owner/:restaurantId/menu",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/owner/{{restaurant_id}}/menu",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "{{restaurant_id}}",
+                "menu"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /owner/:restaurantId/menu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.id) pm.environment.set('menu_id', String(json.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Masala Dosa\",\n  \"description\": \"Crispy dosa with potato filling\",\n  \"category\": \"Food\",\n  \"image\": \"https://images.unsplash.com/photo-1589308078055-9189c55a2f8f\",\n  \"price\": 129,\n  \"isAvailable\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/owner/{{restaurant_id}}/menu",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "{{restaurant_id}}",
+                "menu"
+              ]
+            }
+          }
+        },
+        {
+          "name": "PUT /owner/:restaurantId/menu/:menuId",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Masala Dosa (Updated)\",\n  \"price\": 139,\n  \"isAvailable\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/owner/{{restaurant_id}}/menu/{{menu_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "{{restaurant_id}}",
+                "menu",
+                "{{menu_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /owner/:restaurantId/menu/:menuId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/owner/{{restaurant_id}}/menu/{{menu_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "{{restaurant_id}}",
+                "menu",
+                "{{menu_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Owner Tables Service",
+      "item": [
+        {
+          "name": "GET /owner/:restaurantId/tables",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/owner/{{restaurant_id}}/tables",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "{{restaurant_id}}",
+                "tables"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /owner/:restaurantId/tables",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.id) pm.environment.set('table_id', String(json.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tableNo\": \"T9\",\n  \"seats\": 4,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/owner/{{restaurant_id}}/tables",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "{{restaurant_id}}",
+                "tables"
+              ]
+            }
+          }
+        },
+        {
+          "name": "PUT /owner/:restaurantId/tables/:tableId",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tableNo\": \"T9\",\n  \"seats\": 6,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/owner/{{restaurant_id}}/tables/{{table_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "{{restaurant_id}}",
+                "tables",
+                "{{table_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /owner/:restaurantId/tables/:tableId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/owner/{{restaurant_id}}/tables/{{table_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "{{restaurant_id}}",
+                "tables",
+                "{{table_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Order Service",
+      "auth": {
+        "type": "noauth"
+      },
+      "item": [
+        {
+          "name": "POST /r/:slug/order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"Walkin Customer\",\n  \"phone\": \"9999999999\",\n  \"tableNumber\": \"T1\",\n  \"notes\": \"No onion\",\n  \"items\": [\n    {\n      \"id\": 1101,\n      \"qty\": 2\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/r/{{restaurant_slug}}/order",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "r",
+                "{{restaurant_slug}}",
+                "order"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /r/:slug/orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/r/{{restaurant_slug}}/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "r",
+                "{{restaurant_slug}}",
+                "orders"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

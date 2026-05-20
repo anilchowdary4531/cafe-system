@@ -1,0 +1,92 @@
+{
+  "info": {
+    "_postman_id": "65c95516-cdfb-493a-a2db-87d62dc76fd1-order-service",
+    "name": "Cafe System - Order Service",
+    "description": "Service collection split from Cafe System master collection: Order Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://YOUR_BACKEND_API_URL"
+    },
+    {
+      "key": "restaurant_slug",
+      "value": "cafeking"
+    },
+    {
+      "key": "restaurant_id",
+      "value": "11"
+    },
+    {
+      "key": "menu_id",
+      "value": "1101"
+    },
+    {
+      "key": "table_id",
+      "value": "3101"
+    },
+    {
+      "key": "jwt_token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Order Service",
+      "auth": {
+        "type": "noauth"
+      },
+      "item": [
+        {
+          "name": "POST /r/:slug/order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"Walkin Customer\",\n  \"phone\": \"9999999999\",\n  \"tableNumber\": \"T1\",\n  \"notes\": \"No onion\",\n  \"items\": [\n    {\n      \"id\": 1101,\n      \"qty\": 2\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/r/{{restaurant_slug}}/order",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "r",
+                "{{restaurant_slug}}",
+                "order"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /r/:slug/orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/r/{{restaurant_slug}}/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "r",
+                "{{restaurant_slug}}",
+                "orders"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

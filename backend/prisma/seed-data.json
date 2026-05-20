@@ -1,0 +1,114 @@
+{
+  "passwords": {
+    "admin": "admin123",
+    "cafeKingOwner": "ioVa3hRmNqQvTF",
+    "cafeKingManager": "dbVvrdeL6YZ9K5",
+    "cafeKingChef": "PACrQ1F6T1jnQ6",
+    "cafeKingChefR14": "fdfzCC8x8lTV7Q",
+    "cafeKingCashier": "IVBzlTRiJ3bcln",
+    "beanHouseOwner": "LAVt6Pqmt1TP9p",
+    "beanHouseManager": "JSD2iOxRcGTpmQ",
+    "beanHouseChef": "5GByUscLFOxMM5",
+    "beanHouseWaiter": "7w7dXVvDBmfI4T"
+  },
+  "accessByRole": {
+    "OWNER": { "dashboard": true, "orders": true, "menu": true, "tables": true, "kitchen": true, "analytics": true, "finance": true, "staff": true, "settings": true },
+    "MANAGER": { "dashboard": true, "orders": true, "menu": true, "tables": true, "kitchen": true, "analytics": true, "finance": false, "staff": false, "settings": false },
+    "CHEF": { "dashboard": true, "orders": true, "menu": false, "tables": false, "kitchen": true, "analytics": false, "finance": false, "staff": false, "settings": false },
+    "WAITER": { "dashboard": true, "orders": true, "menu": true, "tables": true, "kitchen": false, "analytics": false, "finance": false, "staff": false, "settings": false },
+    "CASHIER": { "dashboard": true, "orders": true, "menu": false, "tables": false, "kitchen": false, "analytics": true, "finance": true, "staff": false, "settings": false },
+    "STAFF": { "dashboard": true, "orders": false, "menu": false, "tables": false, "kitchen": false, "analytics": false, "finance": false, "staff": false, "settings": false }
+  },
+  "admin": {
+    "name": "Super Admin",
+    "email": "admin@suretra.com",
+    "passwordKey": "admin",
+    "role": "SUPER_ADMIN"
+  },
+  "restaurants": [
+    {
+      "name": "Cafe King",
+      "legalName": "Cafe King Pvt Ltd",
+      "slug": "cafeking",
+      "ownerName": "Anil Kumar",
+      "email": "owner@cafeking.com",
+      "phone": "9999999999",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "country": "India",
+      "pincode": "560001",
+      "gstNumber": "29ABCDE1234F1Z5",
+      "taxEnabled": true,
+      "taxType": "EXCLUSIVE",
+      "defaultTaxPercent": 5,
+      "serviceChargeEnabled": false,
+      "serviceChargePercent": 0,
+      "invoicePrefix": "CK",
+      "nextInvoiceNumber": 1001,
+      "users": [
+        { "name": "Cafe King Owner", "email": "owner@cafeking.com", "phone": "9999999999", "passwordKey": "cafeKingOwner", "role": "OWNER" },
+        { "name": "Cafe King Manager", "email": "manager.cafeking@suretra.com", "phone": "9000000010", "passwordKey": "cafeKingManager", "role": "MANAGER" },
+        { "name": "Cafe King Chef", "email": "chef.cafeking@suretra.com", "phone": "9000000011", "passwordKey": "cafeKingChef", "role": "CHEF" },
+        { "name": "Cafe King Chef R14", "email": "chef1.r14@cafeking.com", "phone": "9000000099", "passwordKey": "cafeKingChefR14", "role": "CHEF" },
+        { "name": "Cafe King Cashier", "email": "cashier.cafeking@suretra.com", "phone": "9000000012", "passwordKey": "cafeKingCashier", "role": "CASHIER" }
+      ],
+      "menuItems": [
+        { "name": "Veg Biryani", "price": 150, "category": "Food", "image": "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d", "rating": 4.7, "reviewCount": 122, "orderCount": 820 },
+        { "name": "Pizza", "price": 220, "category": "Food", "image": "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3", "rating": 4.8, "reviewCount": 154, "orderCount": 960 },
+        { "name": "Burger", "price": 140, "category": "Food", "image": "https://images.unsplash.com/photo-1550547660-d9450f859349", "rating": 4.6, "reviewCount": 99, "orderCount": 720 },
+        { "name": "Cold Coffee", "price": 180, "category": "Coffee", "image": "https://images.unsplash.com/photo-1461023058943-07fcbe16d735", "rating": 4.9, "reviewCount": 188, "orderCount": 1400 },
+        { "name": "Cappuccino", "price": 160, "category": "Coffee", "image": "https://images.unsplash.com/photo-1509042239860-f550ce710b93", "rating": 4.8, "reviewCount": 143, "orderCount": 1100 }
+      ],
+      "tables": [
+        { "tableNo": "T1", "seats": 4 },
+        { "tableNo": "T2", "seats": 4 },
+        { "tableNo": "T3", "seats": 2 },
+        { "tableNo": "T4", "seats": 6 }
+      ],
+      "orders": [
+        { "orderNo": "ORD-CK-1001", "invoiceNo": "CK-1001", "customerName": "Rahul", "phone": "9000000001", "tableNo": "T1", "notes": "Less spicy", "status": "PLACED", "minutesAgo": 3, "items": [{ "name": "Veg Biryani", "qty": 1 }, { "name": "Cold Coffee", "qty": 1 }] },
+        { "orderNo": "ORD-CK-1002", "invoiceNo": "CK-1002", "customerName": "Nisha", "phone": "9000000002", "tableNo": "T2", "notes": "No onion", "status": "PREPARING", "minutesAgo": 9, "items": [{ "name": "Pizza", "qty": 1 }, { "name": "Burger", "qty": 2 }] },
+        { "orderNo": "ORD-CK-1003", "invoiceNo": "CK-1003", "customerName": "Arjun", "phone": "9000000003", "tableNo": "T3", "notes": "", "status": "READY", "minutesAgo": 14, "items": [{ "name": "Cappuccino", "qty": 2 }] },
+        { "orderNo": "ORD-CK-1004", "invoiceNo": "CK-1004", "customerName": "Priya", "phone": "9000000004", "tableNo": "T4", "notes": "", "status": "DELIVERED", "minutesAgo": 24, "items": [{ "name": "Veg Biryani", "qty": 2 }] }
+      ]
+    },
+    {
+      "name": "Bean House",
+      "legalName": "Bean House LLP",
+      "slug": "beanhouse",
+      "ownerName": "Ravi Kumar",
+      "email": "owner@beanhouse.com",
+      "phone": "8888888888",
+      "city": "Hyderabad",
+      "state": "Telangana",
+      "country": "India",
+      "pincode": "500001",
+      "gstNumber": "36ABCDE1234F1Z5",
+      "taxEnabled": true,
+      "taxType": "INCLUSIVE",
+      "defaultTaxPercent": 5,
+      "invoicePrefix": "BH",
+      "nextInvoiceNumber": 1001,
+      "users": [
+        { "name": "Bean House Owner", "email": "owner@beanhouse.com", "phone": "8888888888", "passwordKey": "beanHouseOwner", "role": "OWNER" },
+        { "name": "Bean House Manager", "email": "manager.beanhouse@suretra.com", "phone": "9000000020", "passwordKey": "beanHouseManager", "role": "MANAGER" },
+        { "name": "Bean House Chef", "email": "chef.beanhouse@suretra.com", "phone": "9000000021", "passwordKey": "beanHouseChef", "role": "CHEF" },
+        { "name": "Bean House Waiter", "email": "waiter.beanhouse@suretra.com", "phone": "9000000022", "passwordKey": "beanHouseWaiter", "role": "WAITER" }
+      ],
+      "menuItems": [
+        { "name": "Latte", "price": 170, "category": "Coffee", "image": "https://images.unsplash.com/photo-1461023058943-07fcbe16d735", "rating": 4.8, "reviewCount": 140, "orderCount": 870 },
+        { "name": "Espresso", "price": 130, "category": "Coffee", "image": "https://images.unsplash.com/photo-1511920170033-f8396924c348", "rating": 4.7, "reviewCount": 102, "orderCount": 620 },
+        { "name": "Brownie", "price": 190, "category": "Dessert", "image": "https://images.unsplash.com/photo-1606313564200-e75d5e30476c", "rating": 4.9, "reviewCount": 118, "orderCount": 540 }
+      ],
+      "tables": [
+        { "tableNo": "A1", "seats": 2 },
+        { "tableNo": "A2", "seats": 4 },
+        { "tableNo": "A3", "seats": 4 }
+      ],
+      "orders": [
+        { "orderNo": "ORD-BH-1001", "invoiceNo": "BH-1001", "customerName": "Kiran", "phone": "9111111111", "tableNo": "A1", "notes": "Extra hot", "status": "PLACED", "minutesAgo": 4, "items": [{ "name": "Latte", "qty": 1 }, { "name": "Brownie", "qty": 1 }] },
+        { "orderNo": "ORD-BH-1002", "invoiceNo": "BH-1002", "customerName": "Meera", "phone": "9222222222", "tableNo": "A2", "notes": "", "status": "PREPARING", "minutesAgo": 11, "items": [{ "name": "Espresso", "qty": 2 }] }
+      ]
+    }
+  ]
+}

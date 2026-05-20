@@ -1,0 +1,155 @@
+{
+  "info": {
+    "_postman_id": "65c95516-cdfb-493a-a2db-87d62dc76fd1-owner-tables-service",
+    "name": "Cafe System - Owner Tables Service",
+    "description": "Service collection split from Cafe System master collection: Owner Tables Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://YOUR_BACKEND_API_URL"
+    },
+    {
+      "key": "restaurant_slug",
+      "value": "cafeking"
+    },
+    {
+      "key": "restaurant_id",
+      "value": "11"
+    },
+    {
+      "key": "menu_id",
+      "value": "1101"
+    },
+    {
+      "key": "table_id",
+      "value": "3101"
+    },
+    {
+      "key": "jwt_token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Owner Tables Service",
+      "item": [
+        {
+          "name": "GET /owner/:restaurantId/tables",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/owner/{{restaurant_id}}/tables",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "{{restaurant_id}}",
+                "tables"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /owner/:restaurantId/tables",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.id) pm.environment.set('table_id', String(json.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tableNo\": \"T9\",\n  \"seats\": 4,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/owner/{{restaurant_id}}/tables",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "{{restaurant_id}}",
+                "tables"
+              ]
+            }
+          }
+        },
+        {
+          "name": "PUT /owner/:restaurantId/tables/:tableId",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tableNo\": \"T9\",\n  \"seats\": 6,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/owner/{{restaurant_id}}/tables/{{table_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "{{restaurant_id}}",
+                "tables",
+                "{{table_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /owner/:restaurantId/tables/:tableId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/owner/{{restaurant_id}}/tables/{{table_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "owner",
+                "{{restaurant_id}}",
+                "tables",
+                "{{table_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
