@@ -10,7 +10,6 @@ import Cart from "./pages/Cart";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import ThankYou from "./pages/ThankYou";
-import Landing from "./pages/Landing";
 
 // ============================
 // ADMIN PAGES
@@ -40,6 +39,7 @@ import OwnerAnalytics from "./pages/admin/OwnerAnalytics";
 import OwnerFinance from "./pages/admin/OwnerFinance";
 import OwnerStaff from "./pages/admin/OwnerStaff";
 import OwnerSettings from "./pages/admin/OwnerSettings";
+import OwnerNotifications from "./pages/admin/OwnerNotifications";
 import RestaurantMenu from "./pages/restaurant/RestaurantMenu";
 import SuperAdminDashboard from "./pages/super-admin/SuperAdminDashboard";
 import NewOrder from "./pages/admin/NewOrder.jsx";
@@ -62,13 +62,7 @@ export default function App() {
 
                     <Route
                         path="/"
-                        element={
-                            <>
-                                <Navbar />
-                                <Landing />
-                                <Footer />
-                            </>
-                        }
+                        element={<Navigate to="/r/cafeking" replace />}
                     />
 
                     <Route
@@ -92,19 +86,81 @@ export default function App() {
                         }
                     />
 
+                    <Route path="/profile" element={<Navigate to="/profile/overview" replace />} />
                     <Route
-                        path="/profile/*"
+                        path="/profile/overview"
                         element={
                             <>
                                 <Navbar />
-                                <Profile />
+                                <Profile section="overview" />
+                                <Footer />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/profile/order-history"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="orders" />
+                                <Footer />
+                            </>
+                        }
+                    />
+                    <Route path="/profile/orders" element={<Navigate to="/profile/order-history" replace />} />
+                    <Route
+                        path="/profile/orders/:id"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="ordersdetail" />
+                                <Footer />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/profile/wallet"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="wallet" />
+                                <Footer />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/profile/edit"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="edit" />
+                                <Footer />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/profile/favorites"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="favorites" />
+                                <Footer />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/profile/settings"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="settings" />
                                 <Footer />
                             </>
                         }
                     />
 
                     {/* Backward compatible alias */}
-                    <Route path="/orders/history" element={<Navigate to="/profile/orders" replace />} />
+                    <Route path="/orders/history" element={<Navigate to="/profile/order-history" replace />} />
 
                     <Route
                         path="/orders/thank-you"
@@ -197,6 +253,7 @@ export default function App() {
                         <Route path="finance" element={<OwnerFinance />} />
                         <Route path="staff" element={<OwnerStaff />} />
                         <Route path="settings" element={<OwnerSettings />} />
+                        <Route path="notifications" element={<OwnerNotifications />} />
                     </Route>
 
 

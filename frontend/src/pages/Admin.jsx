@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, cachedGet, invalidateGetCache } from "../utils/apiClient";
+import { resolveImageUrl } from "../utils/resolveImageUrl";
+
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
 
 export default function Admin() {
     const [items, setItems] = useState([]);
@@ -115,7 +118,7 @@ export default function Admin() {
                         className="bg-[#1a2333] p-4 rounded-xl"
                     >
                         <img
-                            src={item.image}
+                            src={resolveImageUrl(item.image) || FALLBACK_IMAGE}
                             className="h-32 w-full object-cover rounded mb-2"
                         />
 

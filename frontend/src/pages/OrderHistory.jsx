@@ -35,6 +35,8 @@ const toDayKey = (raw) => {
     return `${y}-${m}-${day}`;
 };
 
+const getTodayKey = () => toDayKey(new Date());
+
 const formatDayLabel = (dayKey) => {
     // dayKey is YYYY-MM-DD, safe for new Date().
     const d = new Date(`${dayKey}T00:00:00`);
@@ -93,6 +95,7 @@ export default function OrderHistory({ embedded = false } = {}) {
 
     const groups = useMemo(() => (Array.isArray(data?.groups) ? data.groups : []), [data?.groups]);
     const [selectedSlug, setSelectedSlug] = useState(() => String(restaurantContext?.slug || ""));
+    const [dateFilter, setDateFilter] = useState(() => getTodayKey());
     const [statusFilter, setStatusFilter] = useState("");
     const [tableFilter, setTableFilter] = useState("");
 
@@ -143,7 +146,9 @@ export default function OrderHistory({ embedded = false } = {}) {
             const filtered = orders.filter((o) => {
                 const status = String(o?.status || "").toUpperCase();
                 const tableNo = String(o?.tableNo || "").trim();
+                const orderDay = toDayKey(o?.createdAt);
 
+                if (dateFilter && orderDay !== dateFilter) return false;
                 if (statusFilter && status !== statusFilter) return false;
                 if (tableFilter) {
                     if (tableFilter === "__none__") {
@@ -160,7 +165,7 @@ export default function OrderHistory({ embedded = false } = {}) {
                 orders: filtered,
             };
         });
-    }, [statusFilter, tableFilter, visibleGroups]);
+    }, [dateFilter, statusFilter, tableFilter, visibleGroups]);
 
     const filteredOrders = useMemo(() => {
         return filteredVisibleGroups.flatMap((g) => g?.orders || []);
@@ -297,14 +302,16 @@ export default function OrderHistory({ embedded = false } = {}) {
     };
 
     return (
-        <div className={embedded ? "space-y-6" : "theme-page min-h-screen px-4 py-10 md:px-8"}>
-            <div className={embedded ? "space-y-6" : "mx-auto w-full max-w-6xl space-y-6"}>
-                <header className="theme-panel rounded-[32px] p-6 md:p-8">
+        <div className={embedded ? "space-y-4" : "theme-page min-h-screen px-4 py-10 md:px-8"}>
+            <div className={embedded ? "space-y-4" : "mx-auto w-full max-w-6xl space-y-6"}>
+                <header className={embedded ? "space-y-4" : "theme-panel rounded-[32px] p-6 md:p-8"}>
                     <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                         <div>
                             <p className="theme-accent-text text-xs font-semibold uppercase tracking-[0.32em]">Orders</p>
-                            <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">Order history by restaurant</h1>
-                            <p className="theme-muted mt-3 max-w-2xl text-sm md:text-base">
+                            <h1 className={embedded ? "mt-2 text-2xl font-bold tracking-tight md:text-[2rem]" : "mt-3 text-3xl font-bold tracking-tight md:text-4xl"}>
+                                Order history by restaurant
+                            </h1>
+                            <p className={embedded ? "theme-muted mt-2 max-w-2xl text-xs md:text-sm" : "theme-muted mt-3 max-w-2xl text-sm md:text-base"}>
                                 Logged in as <span className="font-semibold">{phone || "customer"}</span>
                             </p>
                         </div>
@@ -312,7 +319,9 @@ export default function OrderHistory({ embedded = false } = {}) {
                         <div className="flex flex-wrap items-center gap-2">
                             <button
                                 onClick={() => refresh({ force: true })}
-                                className="theme-soft-button inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold"
+                                className={embedded
+                                    ? "theme-soft-button inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold"
+                                    : "theme-soft-button inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold"}
                                 disabled={!enabled}
                             >
                                 <RefreshCcw size={16} />
@@ -360,20 +369,39 @@ export default function OrderHistory({ embedded = false } = {}) {
 
                     {enabled && !loading && !error && (
                         <>
-                            <div className="mt-6 grid gap-4 md:grid-cols-4">
-                                <HistoryStat icon={<ReceiptText size={18} />} label="Orders" value={String(derivedStats.totalOrders)} />
-                                <HistoryStat icon={<IndianRupee size={18} />} label="Spend" value={formatMoney(derivedStats.totalSpend)} />
-                                <HistoryStat icon={<IndianRupee size={18} />} label="Avg Order" value={formatMoney(derivedStats.averageOrderValue)} />
-                                <HistoryStat icon={<Activity size={18} />} label="Active" value={String(derivedStats.activeOrders)} />
-                            </div>
+                            {embedded ? (
+                                <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+                                    <p><span className="theme-muted">Orders:</span> <span className="font-semibold">{derivedStats.totalOrders}</span></p>
+                                    <p><span className="theme-muted">Spend:</span> <span className="font-semibold">{formatMoney(derivedStats.totalSpend)}</span></p>
+                                    <p><span className="theme-muted">Avg:</span> <span className="font-semibold">{formatMoney(derivedStats.averageOrderValue)}</span></p>
+                                    <p><span className="theme-muted">Active:</span> <span className="font-semibold">{derivedStats.activeOrders}</span></p>
+                                </div>
+                            ) : (
+                                <div className="mt-6 grid gap-4 md:grid-cols-4">
+                                    <HistoryStat icon={<ReceiptText size={18} />} label="Orders" value={String(derivedStats.totalOrders)} />
+                                    <HistoryStat icon={<IndianRupee size={18} />} label="Spend" value={formatMoney(derivedStats.totalSpend)} />
+                                    <HistoryStat icon={<IndianRupee size={18} />} label="Avg Order" value={formatMoney(derivedStats.averageOrderValue)} />
+                                    <HistoryStat icon={<Activity size={18} />} label="Active" value={String(derivedStats.activeOrders)} />
+                                </div>
+                            )}
 
-                            <div className="mt-6 grid gap-3 md:grid-cols-3">
-                                <label className="theme-card rounded-2xl p-4 md:col-span-1">
-                                    <span className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">Restaurant</span>
+                            <div className={embedded ? "mt-4 grid gap-2 sm:grid-cols-4" : "mt-6 grid gap-3 md:grid-cols-4"}>
+                                <label className={embedded ? "space-y-1" : "theme-card rounded-2xl p-4 md:col-span-1"}>
+                                    <span className={embedded ? "theme-muted text-[11px] font-semibold uppercase tracking-[0.2em]" : "theme-muted text-xs font-semibold uppercase tracking-[0.22em]"}>Date</span>
+                                    <input
+                                        type="date"
+                                        value={dateFilter}
+                                        onChange={(e) => setDateFilter(e.target.value)}
+                                        className={embedded ? "theme-input mt-1 w-full rounded-xl px-3 py-2 text-xs outline-none" : "theme-input mt-3 w-full rounded-2xl px-4 py-3 outline-none"}
+                                    />
+                                </label>
+
+                                <label className={embedded ? "space-y-1" : "theme-card rounded-2xl p-4 md:col-span-1"}>
+                                    <span className={embedded ? "theme-muted text-[11px] font-semibold uppercase tracking-[0.2em]" : "theme-muted text-xs font-semibold uppercase tracking-[0.22em]"}>Restaurant</span>
                                     <select
                                         value={selectedSlug}
                                         onChange={(e) => handleRestaurantChange(e.target.value)}
-                                        className="theme-input mt-3 w-full rounded-2xl px-4 py-3 outline-none"
+                                        className={embedded ? "theme-input mt-1 w-full rounded-xl px-3 py-2 text-xs outline-none" : "theme-input mt-3 w-full rounded-2xl px-4 py-3 outline-none"}
                                     >
                                         <option value="">All restaurants</option>
                                         {groupOptions.map((r) => (
@@ -384,12 +412,12 @@ export default function OrderHistory({ embedded = false } = {}) {
                                     </select>
                                 </label>
 
-                                <label className="theme-card rounded-2xl p-4 md:col-span-1">
-                                    <span className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">Status</span>
+                                <label className={embedded ? "space-y-1" : "theme-card rounded-2xl p-4 md:col-span-1"}>
+                                    <span className={embedded ? "theme-muted text-[11px] font-semibold uppercase tracking-[0.2em]" : "theme-muted text-xs font-semibold uppercase tracking-[0.22em]"}>Status</span>
                                     <select
                                         value={statusFilter}
                                         onChange={(e) => setStatusFilter(e.target.value)}
-                                        className="theme-input mt-3 w-full rounded-2xl px-4 py-3 outline-none"
+                                        className={embedded ? "theme-input mt-1 w-full rounded-xl px-3 py-2 text-xs outline-none" : "theme-input mt-3 w-full rounded-2xl px-4 py-3 outline-none"}
                                     >
                                         <option value="">All statuses</option>
                                         {statusOptions.map((s) => (
@@ -400,12 +428,12 @@ export default function OrderHistory({ embedded = false } = {}) {
                                     </select>
                                 </label>
 
-                                <label className="theme-card rounded-2xl p-4 md:col-span-1">
-                                    <span className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">Table</span>
+                                <label className={embedded ? "space-y-1" : "theme-card rounded-2xl p-4 md:col-span-1"}>
+                                    <span className={embedded ? "theme-muted text-[11px] font-semibold uppercase tracking-[0.2em]" : "theme-muted text-xs font-semibold uppercase tracking-[0.22em]"}>Table</span>
                                     <select
                                         value={tableFilter}
                                         onChange={(e) => setTableFilter(e.target.value)}
-                                        className="theme-input mt-3 w-full rounded-2xl px-4 py-3 outline-none"
+                                        className={embedded ? "theme-input mt-1 w-full rounded-xl px-3 py-2 text-xs outline-none" : "theme-input mt-3 w-full rounded-2xl px-4 py-3 outline-none"}
                                     >
                                         <option value="">All tables</option>
                                         <option value="__none__">Takeaway / No table</option>
@@ -418,7 +446,7 @@ export default function OrderHistory({ embedded = false } = {}) {
                                 </label>
                             </div>
 
-                            {selectedSlug && (
+                            {!embedded && selectedSlug && (
                                 <div className="mt-6 theme-card rounded-2xl p-5">
                                     <p className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">Insights</p>
                                     <p className="mt-2 text-lg font-semibold">
@@ -447,7 +475,7 @@ export default function OrderHistory({ embedded = false } = {}) {
                                 </div>
                             )}
 
-                            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                            {!embedded && <div className="mt-6 grid gap-4 lg:grid-cols-2">
                                 <div className="theme-card rounded-2xl p-5">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
@@ -507,9 +535,9 @@ export default function OrderHistory({ embedded = false } = {}) {
                                         </div>
                                     )}
                                 </div>
-                            </div>
+                            </div>}
 
-                            {restaurantBreakdown.length > 0 && (
+                            {!embedded && restaurantBreakdown.length > 0 && (
                                 <div className="mt-4 theme-card rounded-2xl p-5">
                                     <p className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">Restaurant-wise Spend</p>
                                     <p className="mt-2 text-lg font-semibold">Spend by restaurant</p>
@@ -555,7 +583,7 @@ export default function OrderHistory({ embedded = false } = {}) {
                 {enabled && !loading && !error && (
                     <div className="space-y-6">
                         {filteredVisibleGroups.length === 0 && (
-                            <div className="theme-empty rounded-[32px] p-8">No orders found.</div>
+                            <div className={embedded ? "theme-muted rounded-2xl px-1 py-3 text-sm" : "theme-empty rounded-[32px] p-8"}>No orders found.</div>
                         )}
 
                         {filteredVisibleGroups.map((group) => (
@@ -564,6 +592,7 @@ export default function OrderHistory({ embedded = false } = {}) {
                                 group={group}
                                 highlightOrderId={highlightOrderIdFromState || customer?.latestOrderId || null}
                                 onReorder={handleReorder}
+                                embedded={embedded}
                             />
                         ))}
                     </div>
@@ -585,7 +614,7 @@ function HistoryStat({ icon, label, value }) {
     );
 }
 
-function RestaurantOrders({ group, highlightOrderId, onReorder }) {
+function RestaurantOrders({ group, highlightOrderId, onReorder, embedded = false }) {
     const restaurant = group?.restaurant || null;
     const orders = Array.isArray(group?.orders) ? group.orders : [];
     const visibleSpend = useMemo(() => orders.reduce((sum, o) => sum + Number(o?.total || 0), 0), [orders]);
@@ -600,34 +629,34 @@ function RestaurantOrders({ group, highlightOrderId, onReorder }) {
     const addressBits = [restaurant?.city, restaurant?.state].filter(Boolean).join(", ");
 
     return (
-        <section className="theme-panel rounded-[32px] p-6">
+        <section className={embedded ? "rounded-2xl px-1 py-2" : "theme-panel rounded-[32px] p-6"}>
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div className="flex items-start gap-3">
-                    <div className="theme-card flex h-12 w-12 items-center justify-center rounded-2xl">
+                    <div className={embedded ? "flex h-10 w-10 items-center justify-center rounded-xl bg-black/10" : "theme-card flex h-12 w-12 items-center justify-center rounded-2xl"}>
                         <Store size={20} />
                     </div>
                     <div>
-                        <h2 className="text-xl font-semibold">{restaurantName}</h2>
-                        {addressBits && <p className="theme-muted mt-1 text-sm">{addressBits}</p>}
-                        <p className="theme-muted mt-2 text-xs uppercase tracking-[0.22em]">
+                        <h2 className={embedded ? "text-lg font-semibold" : "text-xl font-semibold"}>{restaurantName}</h2>
+                        {addressBits && <p className={embedded ? "theme-muted mt-1 text-xs" : "theme-muted mt-1 text-sm"}>{addressBits}</p>}
+                        <p className={embedded ? "theme-muted mt-1 text-[11px] uppercase tracking-[0.18em]" : "theme-muted mt-2 text-xs uppercase tracking-[0.22em]"}>
                             {orders.length} order{orders.length === 1 ? "" : "s"}
-                            {orders.length ? ` • ${formatMoney(visibleSpend)}` : ""}
-                            {lastOrderAtMs ? ` • Last: ${new Date(lastOrderAtMs).toLocaleDateString()}` : ""}
+                            {orders.length ? ` | ${formatMoney(visibleSpend)}` : ""}
+                            {lastOrderAtMs ? ` | Last: ${new Date(lastOrderAtMs).toLocaleDateString()}` : ""}
                         </p>
                     </div>
                 </div>
 
                 {restaurant?.slug && (
-                    <Link to={`/r/${restaurant.slug}`} className="theme-button inline-flex justify-center rounded-2xl px-5 py-3 text-sm font-semibold">
+                    <Link to={`/r/${restaurant.slug}`} className={embedded ? "theme-button inline-flex justify-center rounded-xl px-3 py-2 text-xs font-semibold" : "theme-button inline-flex justify-center rounded-2xl px-5 py-3 text-sm font-semibold"}>
                         Continue Ordering
                     </Link>
                 )}
             </div>
 
             {!orders.length ? (
-                <div className="theme-empty mt-6 rounded-3xl p-6">No orders for this restaurant.</div>
+                <div className={embedded ? "theme-muted mt-4 text-sm" : "theme-empty mt-6 rounded-3xl p-6"}>No orders for this restaurant.</div>
             ) : (
-                <div className="mt-6 space-y-4">
+                <div className={embedded ? "mt-4 space-y-0" : "mt-6 space-y-4"}>
                     {orders.map((order) => (
                         <OrderCard
                             key={order.id}
@@ -636,6 +665,7 @@ function RestaurantOrders({ group, highlightOrderId, onReorder }) {
                             restaurantSlug={restaurant?.slug || ""}
                             highlight={highlightOrderId === order.id}
                             onReorder={onReorder}
+                            embedded={embedded}
                         />
                     ))}
                 </div>
@@ -644,34 +674,36 @@ function RestaurantOrders({ group, highlightOrderId, onReorder }) {
     );
 }
 
-function OrderCard({ order, restaurantName, restaurantSlug, onReorder, highlight = false }) {
+function OrderCard({ order, restaurantName, restaurantSlug, onReorder, highlight = false, embedded = false }) {
     const createdAt = useMemo(() => new Date(order?.createdAt), [order?.createdAt]);
     const status = String(order?.status || "PLACED").toUpperCase();
     const tableNoRaw = String(order?.tableNo || "").trim();
 
-    const highlightStyle = highlight ? { boxShadow: "0 0 0 2px var(--app-primary)" } : undefined;
+    const highlightStyle = !embedded && highlight ? { boxShadow: "0 0 0 2px var(--app-primary)" } : undefined;
 
     return (
-        <article className="theme-card rounded-3xl p-5" style={highlightStyle}>
+        <article className={embedded ? "border-b border-[var(--app-border)] py-3 last:border-b-0" : "theme-card rounded-3xl p-5"} style={highlightStyle}>
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                    <p className="theme-muted text-xs uppercase tracking-[0.2em]">{restaurantName}</p>
-                    <h3 className="mt-2 text-lg font-semibold">Order #{order?.orderNo || order?.id}</h3>
-                    <p className="theme-muted mt-1 text-sm">
+                    <p className={embedded ? "theme-muted text-[11px] uppercase tracking-[0.16em]" : "theme-muted text-xs uppercase tracking-[0.2em]"}>{restaurantName}</p>
+                    <h3 className={embedded ? "mt-1 text-base font-semibold" : "mt-2 text-lg font-semibold"}>Order #{order?.orderNo || order?.id}</h3>
+                    <p className={embedded ? "theme-muted mt-1 text-xs" : "theme-muted mt-1 text-sm"}>
                         {Number.isNaN(createdAt.getTime()) ? "Unknown time" : createdAt.toLocaleString()}
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                        <span className="theme-pill rounded-full px-3 py-1">Status: {formatStatus(status)}</span>
-                        <span className="theme-pill rounded-full px-3 py-1">Table: {tableNoRaw ? tableNoRaw : "Takeaway"}</span>
-                        <span className="theme-pill rounded-full px-3 py-1">Total: {formatMoney(order?.total)}</span>
+                    <div className={embedded ? "mt-2 flex flex-wrap gap-1.5 text-[11px]" : "mt-3 flex flex-wrap gap-2 text-xs"}>
+                        <span className={embedded ? "theme-pill rounded-full px-2 py-1" : "theme-pill rounded-full px-3 py-1"}>Status: {formatStatus(status)}</span>
+                        <span className={embedded ? "theme-pill rounded-full px-2 py-1" : "theme-pill rounded-full px-3 py-1"}>Table: {tableNoRaw ? tableNoRaw : "Takeaway"}</span>
+                        <span className={embedded ? "theme-pill rounded-full px-2 py-1" : "theme-pill rounded-full px-3 py-1"}>Total: {formatMoney(order?.total)}</span>
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-3 md:w-[280px]">
+                <div className={embedded ? "flex gap-2 md:w-[220px]" : "flex flex-col gap-3 md:w-[280px]"}>
                     <Link
                         to={`/profile/orders/${encodeURIComponent(String(order?.id || ""))}`}
                         state={{ order, restaurant: { name: restaurantName, slug: restaurantSlug } }}
-                        className="theme-soft-button inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold"
+                        className={embedded
+                            ? "theme-soft-button inline-flex items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold"
+                            : "theme-soft-button inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold"}
                     >
                         View Details
                     </Link>
@@ -680,7 +712,7 @@ function OrderCard({ order, restaurantName, restaurantSlug, onReorder, highlight
                         <button
                             type="button"
                             onClick={() => onReorder && onReorder(restaurantSlug, order)}
-                            className="theme-button rounded-2xl px-4 py-3 text-sm font-semibold"
+                            className={embedded ? "theme-button rounded-xl px-3 py-2 text-xs font-semibold" : "theme-button rounded-2xl px-4 py-3 text-sm font-semibold"}
                         >
                             Reorder
                         </button>

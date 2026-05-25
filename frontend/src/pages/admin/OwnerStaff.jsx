@@ -24,6 +24,7 @@ const ACCESS_LABELS = {
     finance: "Finance",
     staff: "Staff",
     settings: "Settings",
+    notifications: "Notifications",
 };
 
 const defaultAccessByRole = (role) => {
@@ -39,6 +40,7 @@ const defaultAccessByRole = (role) => {
             finance: false,
             staff: false,
             settings: false,
+            notifications: true,
         };
     }
     if (normalizedRole === "CHEF") {
@@ -52,6 +54,7 @@ const defaultAccessByRole = (role) => {
             finance: false,
             staff: false,
             settings: false,
+            notifications: true,
         };
     }
     if (normalizedRole === "WAITER") {
@@ -65,6 +68,7 @@ const defaultAccessByRole = (role) => {
             finance: false,
             staff: false,
             settings: false,
+            notifications: true,
         };
     }
     if (normalizedRole === "CASHIER") {
@@ -78,6 +82,7 @@ const defaultAccessByRole = (role) => {
             finance: true,
             staff: false,
             settings: false,
+            notifications: true,
         };
     }
     return {
@@ -90,6 +95,7 @@ const defaultAccessByRole = (role) => {
         finance: false,
         staff: false,
         settings: false,
+        notifications: true,
     };
 };
 

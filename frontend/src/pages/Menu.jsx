@@ -15,6 +15,7 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import { cachedGet } from "../utils/apiClient";
+import { resolveImageUrl } from "../utils/resolveImageUrl";
 
 const categoryData = [
     { name: "All", image: "https://cdn-icons-png.flaticon.com/512/3075/3075977.png" },
@@ -37,7 +38,8 @@ const STATUS_STYLES = {
 const ACTIVE_STATUSES = new Set(["PLACED", "ACCEPTED", "PREPARING", "READY"]);
 
 const getImage = (item) => {
-    if (item.image) return item.image;
+    const resolved = resolveImageUrl(item?.image);
+    if (resolved) return resolved;
 
     const map = {
         "veg biryani": "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d",

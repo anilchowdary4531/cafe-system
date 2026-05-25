@@ -24,6 +24,68 @@ export default function OrderTrackingTimeline({ status, steps = DEFAULT_STEPS, c
         return idx >= 0 ? idx : 0;
     }, [currentKey, steps]);
 
+    if (compact) {
+        return (
+            <div className="w-full pb-1">
+                <ol className="grid w-full grid-cols-4 gap-1.5">
+                    {steps.map((step, idx) => {
+                        const isDone = idx < currentIndex;
+                        const isActive = idx === currentIndex;
+                        const isLast = idx === steps.length - 1;
+
+                        const markerClass = isDone
+                            ? "border-emerald-500/45 bg-emerald-500/18 text-emerald-200"
+                            : isActive
+                                ? "border-amber-400/60 bg-amber-400/14 text-amber-100 ring-2 ring-amber-400/20"
+                                : "border-white/10 bg-black/10 theme-muted";
+
+                        const connectorClass = isDone
+                            ? "bg-emerald-400/45"
+                            : isActive
+                                ? "bg-amber-400/35"
+                                : "bg-white/12";
+
+                        return (
+                            <li key={step.key} className="relative min-w-0 flex flex-col items-center pt-1 text-center">
+                                {!isLast && (
+                                    <span
+                                        className={["absolute top-4 left-1/2 right-[-50%] h-[2px] rounded-full", connectorClass].join(" ")}
+                                        aria-hidden="true"
+                                    />
+                                )}
+
+                                <div
+                                    className={[
+                                        "relative z-10 flex h-8 w-8 items-center justify-center rounded-2xl border",
+                                        markerClass,
+                                        isActive ? "animate-[pulse_1.8s_ease-in-out_infinite]" : "",
+                                    ].join(" ")}
+                                    aria-hidden="true"
+                                >
+                                    {isDone ? (
+                                        <Check size={16} className="text-emerald-200" />
+                                    ) : (
+                                        <span className="text-xs font-extrabold tabular-nums">{idx + 1}</span>
+                                    )}
+                                </div>
+
+                                <p
+                                    className={[
+                                        "mt-2 truncate px-1 text-sm font-semibold",
+                                        isDone ? "text-emerald-100" : isActive ? "text-amber-100" : "",
+                                    ].join(" ")}
+                                    title={step.label}
+                                >
+                                    {step.label}
+                                </p>
+                            </li>
+                        );
+                    })}
+                </ol>
+            </div>
+        );
+    }
+
     return (
         <ol className={compact ? "space-y-3" : "space-y-4"}>
             {steps.map((step, idx) => {
@@ -80,4 +142,3 @@ export default function OrderTrackingTimeline({ status, steps = DEFAULT_STEPS, c
         </ol>
     );
 }
-

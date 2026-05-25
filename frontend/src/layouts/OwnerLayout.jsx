@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+﻿import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
     ShoppingBag,
@@ -16,9 +16,16 @@ import {
     ClipboardPlus,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import { resolveRestaurantName } from "../utils/restaurantContext";
 import ThemeSelector from "../components/ThemeSelector";
+import BrandLogo from "../components/BrandLogo";
 import { useAuth } from "../context/AuthContext";
+import {
+    getOwnerUnreadCount,
+    subscribeOwnerNotifications,
+} from "../utils/ownerNotifications";
+import { API } from "../config";
 
 const MODULES = [
     "dashboard",
@@ -30,6 +37,7 @@ const MODULES = [
     "finance",
     "staff",
     "settings",
+    "notifications",
 ];
 
 const defaultAccessByRole = (role) => {
@@ -49,6 +57,7 @@ const defaultAccessByRole = (role) => {
         finance: false,
         staff: false,
         settings: false,
+        notifications: true,
     };
 };
 
@@ -69,8 +78,16 @@ export default function OwnerLayout() {
     const location = useLocation();
 
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(() => getOwnerUnreadCount());
+    const [tableOverview, setTableOverview] = useState({
+        loading: true,
+        total: 0,
+        occupied: 0,
+        tables: [],
+    });
 
     const { user, logout } = useAuth();
+    const restaurantId = Number(user?.restaurantId || 0);
 
     const restaurantName = resolveRestaurantName(user, "Restaurant");
 
@@ -142,6 +159,12 @@ export default function OwnerLayout() {
             icon: <Settings size={18} />,
             accessKey: "settings",
         },
+        {
+            label: "Notifications",
+            path: "/owner/notifications",
+            icon: <Bell size={18} />,
+            accessKey: "notifications",
+        },
     ];
 
     const visibleNavItems = navItems.filter((item) => access[item.accessKey]);
@@ -173,12 +196,80 @@ export default function OwnerLayout() {
         setSidebarOpen(false);
     }, [location.pathname]);
 
+    useEffect(() => {
+        const syncUnread = () => setUnreadCount(getOwnerUnreadCount());
+        syncUnread();
+        const unsubscribe = subscribeOwnerNotifications(syncUnread);
+        return unsubscribe;
+    }, []);
+
+    useEffect(() => {
+        let mounted = true;
+
+        const loadTableOverview = async () => {
+            if (!restaurantId) {
+                if (!mounted) return;
+                setTableOverview({
+                    loading: false,
+                    total: 0,
+                    occupied: 0,
+                    tables: [],
+                });
+                return;
+            }
+
+            try {
+                const res = await axios.get(`${API}/owner/${restaurantId}/tables`);
+                if (!mounted) return;
+
+                const tables = (Array.isArray(res.data) ? res.data : [])
+                    .map((table, index) => ({
+                        ...table,
+                        tableNo: String(table?.tableNo || "").trim(),
+                        isOccupied: Boolean(table?.isOccupied),
+                        key: table?.id || `${table?.tableNo || "table"}-${index}`,
+                    }))
+                    .sort((a, b) =>
+                        String(a.tableNo || "").localeCompare(String(b.tableNo || ""), undefined, {
+                            numeric: true,
+                            sensitivity: "base",
+                        })
+                    );
+
+                const occupied = tables.filter((table) => table.isOccupied).length;
+
+                setTableOverview({
+                    loading: false,
+                    total: tables.length,
+                    occupied,
+                    tables,
+                });
+            } catch (err) {
+                if (!mounted) return;
+                setTableOverview((prev) => ({
+                    ...prev,
+                    loading: false,
+                }));
+            }
+        };
+
+        loadTableOverview();
+        const intervalId = setInterval(loadTableOverview, 20000);
+
+        return () => {
+            mounted = false;
+            clearInterval(intervalId);
+        };
+    }, [restaurantId]);
+
+    const freeTables = Math.max(0, tableOverview.total - tableOverview.occupied);
+
     return (
         <div className="theme-page flex min-h-screen overflow-x-hidden">
-            {/* Mobile Overlay */}
+            {/* Backdrop Overlay */}
             {sidebarOpen && (
                 <div
-                    className="fixed inset-0 z-40 bg-black/70 lg:hidden"
+                    className="fixed inset-0 z-40 bg-black/70"
                     onClick={() => setSidebarOpen(false)}
                 />
             )}
@@ -191,18 +282,18 @@ export default function OwnerLayout() {
           theme-sidebar border-r
           transition-all duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:translate-x-0 lg:static lg:flex-shrink-0
         `}
             >
                 <div className="h-full flex flex-col p-5 overflow-y-auto">
                     {/* Logo */}
                     <div className="flex items-center justify-between mb-8">
-                        <h1 className="theme-accent-text text-2xl font-bold sm:text-3xl">
-                            Suretra
-                        </h1>
+                        <div className="flex items-center gap-2">
+                            <BrandLogo className="theme-brand-logo h-9 w-9" title="Tiffzy logo" />
+                            <h1 className="theme-brand-text text-2xl font-bold sm:text-3xl">Tiffzy</h1>
+                        </div>
 
                         <button
-                            className="theme-icon-button block rounded-xl p-2 lg:hidden"
+                            className="theme-icon-button block rounded-xl p-2"
                             onClick={() => setSidebarOpen(false)}
                         >
                             <X size={20} />
@@ -224,7 +315,14 @@ export default function OwnerLayout() {
                                     }`
                                 }
                             >
-                                {item.icon}
+                                <span className="relative">
+                                    {item.icon}
+                                    {item.path === "/owner/notifications" && unreadCount > 0 && (
+                                        <span className="theme-count-badge absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none">
+                                            {unreadCount > 99 ? "99+" : unreadCount}
+                                        </span>
+                                    )}
+                                </span>
                                 <span className="text-sm sm:text-base">{item.label}</span>
                             </NavLink>
                         ))}
@@ -249,8 +347,8 @@ export default function OwnerLayout() {
                         {/* Left */}
                         <div className="flex items-center gap-3 min-w-0">
                             <button
-                                className="theme-icon-button theme-icon-button-primary block shrink-0 rounded-xl p-2.5 shadow-lg lg:hidden"
-                                onClick={() => setSidebarOpen(true)}
+                                className="theme-icon-button theme-icon-button-primary block shrink-0 rounded-xl p-2.5 shadow-lg"
+                                onClick={() => setSidebarOpen((prev) => !prev)}
                             >
                                 <Menu size={20} />
                             </button>
@@ -268,13 +366,61 @@ export default function OwnerLayout() {
                         {/* Right */}
                         <div className="flex shrink-0 items-center gap-2">
                             <ThemeSelector variant="compact" />
-                            <button className="theme-icon-button relative rounded-2xl p-2.5 sm:p-3">
-                                <Bell size={18} />
-                                <span className="theme-count-badge absolute right-2 top-2 h-2 w-2 rounded-full"></span>
-                            </button>
+                            {access.notifications && (
+                                <button
+                                    onClick={() => navigate("/owner/notifications")}
+                                    className="theme-icon-button relative rounded-2xl p-2.5 sm:p-3"
+                                >
+                                    <Bell size={18} />
+                                    {unreadCount > 0 && (
+                                        <span className="theme-count-badge absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none">
+                                            {unreadCount > 99 ? "99+" : unreadCount}
+                                        </span>
+                                    )}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </header>
+
+                <div className="theme-nav border-b px-3 py-2 sm:px-4 md:px-6">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                            <span className="rounded-full border border-white/20 bg-white px-3 py-1 font-semibold text-black">
+                                Tables: {tableOverview.total}
+                            </span>
+                            <span className="rounded-full border border-emerald-700 bg-emerald-500 px-3 py-1 font-semibold text-white">
+                                Occupied: {tableOverview.occupied}
+                            </span>
+                            <span className="rounded-full border border-white/20 bg-white px-3 py-1 font-semibold text-black">
+                                Free: {freeTables}
+                            </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5">
+                            {tableOverview.loading ? (
+                                <span className="theme-muted text-xs">Loading tables...</span>
+                            ) : tableOverview.tables.length === 0 ? (
+                                <span className="theme-muted text-xs">No tables found.</span>
+                            ) : (
+                                tableOverview.tables.map((table) => (
+                                    <span
+                                        key={table.key}
+                                        title={`Table ${table.tableNo || "--"} - ${table.isOccupied ? "Occupied" : "Free"}`}
+                                        className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold ${
+                                            table.isOccupied
+                                                ? "border-emerald-700 bg-emerald-500 text-white"
+                                                : "border-gray-300 bg-white text-gray-900"
+                                        }`}
+                                    >
+                                        <TableProperties size={12} />
+                                        <span>{table.tableNo || "--"}</span>
+                                    </span>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
 
                 {/* Page */}
                 <main className="p-3 sm:p-4 md:p-6">
@@ -290,3 +436,5 @@ export default function OwnerLayout() {
         </div>
     );
 }
+
+

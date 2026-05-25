@@ -4,6 +4,9 @@ import CheckoutPrompt from "../components/CheckoutPrompt";
 import { useCart } from "../context/CartContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import useCachedGet from "../hooks/useCachedGet";
+import { resolveImageUrl } from "../utils/resolveImageUrl";
+
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
 
 export default function Cart() {
     const {
@@ -66,7 +69,7 @@ export default function Cart() {
                                     className="theme-panel flex items-center gap-4 rounded-3xl p-4 backdrop-blur-xl"
                                 >
                                     <img
-                                        src={item.image}
+                                        src={resolveImageUrl(item.image) || FALLBACK_IMAGE}
                                         alt={item.name}
                                         className="h-24 w-24 rounded-2xl object-cover"
                                     />

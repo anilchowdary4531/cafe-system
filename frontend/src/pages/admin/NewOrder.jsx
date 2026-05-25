@@ -25,6 +25,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useStaffSocket } from "../../context/StaffSocketContext";
 import useCachedGet from "../../hooks/useCachedGet";
 import TableSelector from "../../components/TableSelector";
+import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { showToast } from "../../utils/toast";
 
 const ORDER_TYPES = /** @type {const} */ (["DINE_IN", "TAKEAWAY", "DELIVERY"]);
@@ -61,6 +62,8 @@ const categoryIconFor = (category) => {
     if (c.includes("dessert") || c.includes("ice") || c.includes("sweet")) return IceCream;
     return Tags;
 };
+
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
 
 const mergeQty = (prev, menuItem, delta) => {
     const next = { ...(prev || {}) };
@@ -167,12 +170,22 @@ const CategorySidebar = memo(function CategorySidebar({ categories, activeKey, o
 });
 
 const ItemCard = memo(function ItemCard({ item, qty, onAdd }) {
+    const imageSrc = resolveImageUrl(item.image) || FALLBACK_IMAGE;
     return (
         <button
             type="button"
             onClick={() => onAdd(item)}
             className="group relative overflow-hidden rounded-3xl border border-white/10 bg-black/10 p-4 text-left transition active:scale-[0.99] hover:bg-black/20"
         >
+            <img
+                src={imageSrc}
+                alt={item.name}
+                loading="lazy"
+                className="mb-3 h-28 w-full rounded-2xl object-cover transition duration-300 group-hover:scale-[1.02]"
+                onError={(event) => {
+                    event.currentTarget.src = FALLBACK_IMAGE;
+                }}
+            />
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <p className="truncate text-sm font-semibold sm:text-base">{item.name}</p>

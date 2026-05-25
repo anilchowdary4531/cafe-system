@@ -1,4 +1,4 @@
-import {
+﻿import {
     Link,
     Outlet,
     useLocation,
@@ -8,6 +8,7 @@ import { useAuth } from "../context/AuthContext";
 import { useState } from "react";
 import { resolveRestaurantName } from "../utils/restaurantContext";
 import ThemeSelector from "../components/ThemeSelector";
+import BrandLogo from "../components/BrandLogo";
 
 export default function AdminLayout() {
     const { logout, user } = useAuth();
@@ -17,10 +18,10 @@ export default function AdminLayout() {
     const restaurantName = resolveRestaurantName(user, "All Restaurants");
 
     const menus = [
-        { name: "Dashboard", path: "/admin", icon: "📊" },
-        { name: "Menu", path: "/admin/menu", icon: "🍔" },
-        { name: "Orders", path: "/admin/orders", icon: "📦" },
-        { name: "Tables", path: "/admin/tables", icon: "🪑" },
+        { name: "Dashboard", path: "/admin", icon: "ðŸ“Š" },
+        { name: "Menu", path: "/admin/menu", icon: "ðŸ”" },
+        { name: "Orders", path: "/admin/orders", icon: "ðŸ“¦" },
+        { name: "Tables", path: "/admin/tables", icon: "ðŸª‘" },
     ];
 
     const handleLogout = () => {
@@ -51,9 +52,10 @@ export default function AdminLayout() {
 
                 {/* LOGO */}
                 <div className="theme-border border-b p-6">
-                    <h1 className="theme-accent-text text-3xl font-bold">
-                        ☕ Cafe Admin
-                    </h1>
+                    <div className="flex items-center gap-3">
+                        <BrandLogo className="theme-brand-logo h-10 w-10" title="Tiffzy logo" />
+                        <h1 className="theme-brand-text text-3xl font-bold">Tiffzy Admin</h1>
+                    </div>
                 </div>
 
                 {/* USER CARD */}
@@ -125,7 +127,7 @@ export default function AdminLayout() {
                         onClick={() => setOpen(true)}
                         className="lg:hidden text-3xl"
                     >
-                        ☰
+                        â˜°
                     </button>
 
                     <div>
@@ -156,3 +158,5 @@ export default function AdminLayout() {
         </div>
     );
 }
+
+

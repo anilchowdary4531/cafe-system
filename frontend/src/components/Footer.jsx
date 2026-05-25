@@ -1,17 +1,17 @@
+﻿import BrandLogo from "./BrandLogo";
+
 export default function Footer() {
     return (
         <footer className="theme-footer mt-20 border-t">
-
-            <div className="max-w-7xl mx-auto px-8 py-16">
-
+            <div className="mx-auto max-w-7xl px-8 py-16">
                 {/* TOP GRID */}
-                <div className="grid md:grid-cols-5 gap-10">
-
+                <div className="grid gap-10 md:grid-cols-5">
                     {/* LOGO */}
                     <div>
-                        <h1 className="text-5xl font-bold tracking-tight">
-                            ☕ Cafe
-                        </h1>
+                        <div className="flex items-center gap-3">
+                            <BrandLogo className="theme-brand-logo h-12 w-12" title="Tiffzy logo" />
+                            <h1 className="theme-brand-text text-5xl font-bold tracking-tight">Tiffzy</h1>
+                        </div>
 
                         <p className="theme-muted mt-4 leading-7">
                             Smart ordering platform for restaurants,
@@ -21,108 +21,68 @@ export default function Footer() {
 
                     {/* COMPANY */}
                     <div>
-                        <h3 className="text-xl font-semibold mb-5">
-                            Company
-                        </h3>
+                        <h3 className="mb-5 text-xl font-semibold">Company</h3>
 
                         <ul className="theme-muted space-y-3">
-                            <li className="cursor-pointer hover:opacity-80">
-                                About Us
-                            </li>
-                            <li className="cursor-pointer hover:opacity-80">
-                                Careers
-                            </li>
-                            <li className="cursor-pointer hover:opacity-80">
-                                Blog
-                            </li>
-                            <li className="cursor-pointer hover:opacity-80">
-                                Investors
-                            </li>
+                            <li className="cursor-pointer hover:opacity-80">About Us</li>
+                            <li className="cursor-pointer hover:opacity-80">Careers</li>
+                            <li className="cursor-pointer hover:opacity-80">Blog</li>
+                            <li className="cursor-pointer hover:opacity-80">Investors</li>
                         </ul>
                     </div>
 
                     {/* PRODUCTS */}
                     <div>
-                        <h3 className="text-xl font-semibold mb-5">
-                            Products
-                        </h3>
+                        <h3 className="mb-5 text-xl font-semibold">Products</h3>
 
                         <ul className="theme-muted space-y-3">
-                            <li className="cursor-pointer hover:opacity-80">
-                                QR Ordering
-                            </li>
-                            <li className="cursor-pointer hover:opacity-80">
-                                POS Dashboard
-                            </li>
-                            <li className="cursor-pointer hover:opacity-80">
-                                Analytics
-                            </li>
-                            <li className="cursor-pointer hover:opacity-80">
-                                Inventory
-                            </li>
+                            <li className="cursor-pointer hover:opacity-80">QR Ordering</li>
+                            <li className="cursor-pointer hover:opacity-80">POS Dashboard</li>
+                            <li className="cursor-pointer hover:opacity-80">Analytics</li>
+                            <li className="cursor-pointer hover:opacity-80">Inventory</li>
                         </ul>
                     </div>
 
                     {/* SUPPORT */}
                     <div>
-                        <h3 className="text-xl font-semibold mb-5">
-                            Support
-                        </h3>
+                        <h3 className="mb-5 text-xl font-semibold">Support</h3>
 
                         <ul className="theme-muted space-y-3">
-                            <li className="cursor-pointer hover:opacity-80">
-                                Help Center
-                            </li>
-                            <li className="cursor-pointer hover:opacity-80">
-                                Terms
-                            </li>
-                            <li className="cursor-pointer hover:opacity-80">
-                                Privacy
-                            </li>
-                            <li className="cursor-pointer hover:opacity-80">
-                                Contact Us
-                            </li>
+                            <li className="cursor-pointer hover:opacity-80">Help Center</li>
+                            <li className="cursor-pointer hover:opacity-80">Terms</li>
+                            <li className="cursor-pointer hover:opacity-80">Privacy</li>
+                            <li className="cursor-pointer hover:opacity-80">Contact Us</li>
                         </ul>
                     </div>
 
-                    {/* SOCIAL */}
+                    {/* APP */}
                     <div>
-                        <h3 className="text-xl font-semibold mb-5">
-                            Get Our App
-                        </h3>
+                        <h3 className="mb-5 text-xl font-semibold">Get Our App</h3>
 
                         <div className="space-y-4">
-
                             <button className="theme-soft-button w-full rounded-xl px-4 py-3 transition">
-                                🍎 Download for iOS
+                                Download for iOS
                             </button>
 
                             <button className="theme-soft-button w-full rounded-xl px-4 py-3 transition">
-                                ▶ Download for Android
+                                Download for Android
                             </button>
-
                         </div>
 
-                        <div className="flex gap-3 mt-6 text-2xl">
-                            <span className="cursor-pointer hover:opacity-80">📘</span>
-                            <span className="cursor-pointer hover:opacity-80">📷</span>
-                            <span className="cursor-pointer hover:opacity-80">🐦</span>
-                            <span className="cursor-pointer hover:opacity-80">💼</span>
+                        <div className="mt-6 flex gap-3 text-2xl">
+                            <span className="cursor-pointer hover:opacity-80">FB</span>
+                            <span className="cursor-pointer hover:opacity-80">IG</span>
+                            <span className="cursor-pointer hover:opacity-80">X</span>
+                            <span className="cursor-pointer hover:opacity-80">LI</span>
                         </div>
-
                     </div>
-
                 </div>
 
                 {/* LINE */}
-                <div className="theme-muted mt-12 border-t pt-6 text-sm theme-border">
-
-                    © 2026 Cafe Technologies Pvt Ltd. All rights reserved.
-
+                <div className="theme-muted theme-border mt-12 border-t pt-6 text-sm">
+                    © 2026 Tiffzy Technologies Pvt Ltd. All rights reserved.
                 </div>
-
             </div>
-
         </footer>
     );
 }
