@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from "react";
-import { ChevronDown, TableProperties } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, TableProperties } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import useCachedGet from "../hooks/useCachedGet";
@@ -7,6 +7,8 @@ import useCachedGet from "../hooks/useCachedGet";
 export default function TableSelector({ slug, variant = "default", className = "", disabled = false }) {
     const compact = variant === "compact";
     const pos = variant === "pos";
+    const dropdownRef = useRef(null);
+    const [open, setOpen] = useState(false);
     const [searchParams, setSearchParams] = useSearchParams();
     const { restaurantContext, setRestaurantContext } = useRestaurantContext();
 
@@ -33,6 +35,7 @@ export default function TableSelector({ slug, variant = "default", className = "
 
     const tableFromUrl = String(searchParams.get("table") || "").trim();
     const selectedTableNo = disabled ? "" : tableFromUrl || String(restaurantContext?.tableNo || "").trim();
+    const isDisabled = disabled || !enabled || tables.length === 0;
 
     useEffect(() => {
         // If URL has `?table=`, prefer it as the source of truth.
@@ -42,6 +45,34 @@ export default function TableSelector({ slug, variant = "default", className = "
         if (tableFromUrl === restaurantContext?.tableNo) return;
         setRestaurantContext({ tableNo: tableFromUrl });
     }, [disabled, enabled, restaurantContext?.tableNo, setRestaurantContext, tableFromUrl]);
+
+    useEffect(() => {
+        const closeOnOutsideClick = (event) => {
+            if (!dropdownRef.current) return;
+            if (!dropdownRef.current.contains(event.target)) {
+                setOpen(false);
+            }
+        };
+
+        const closeOnEscape = (event) => {
+            if (event.key === "Escape") {
+                setOpen(false);
+            }
+        };
+
+        window.addEventListener("pointerdown", closeOnOutsideClick);
+        window.addEventListener("keydown", closeOnEscape);
+
+        return () => {
+            window.removeEventListener("pointerdown", closeOnOutsideClick);
+            window.removeEventListener("keydown", closeOnEscape);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!isDisabled) return;
+        setOpen(false);
+    }, [isDisabled]);
 
     const handleChange = (nextTableNo) => {
         const value = String(nextTableNo || "").trim();
@@ -56,16 +87,71 @@ export default function TableSelector({ slug, variant = "default", className = "
             },
             { replace: true }
         );
+
+        setOpen(false);
     };
 
-    const isDisabled = disabled || !enabled || tables.length === 0;
+    const selectedTable = useMemo(
+        () => tables.find((table) => table.tableNo === selectedTableNo) || null,
+        [selectedTableNo, tables]
+    );
+
+    const triggerLabel = selectedTable
+        ? `${selectedTable.tableNo}${selectedTable.seats ? ` (${selectedTable.seats} seats)` : ""}`
+        : selectedTableNo || "Takeaway / No table";
+
+    const options = useMemo(
+        () => [
+            {
+                key: "__takeaway__",
+                value: "",
+                label: "Takeaway / No table",
+                meta: "No table assigned",
+            },
+            ...tables.map((table) => ({
+                key: table.id || `table-${table.tableNo}`,
+                value: table.tableNo,
+                label: table.tableNo,
+                meta: table.seats ? `${table.seats} seats` : "",
+            })),
+        ],
+        [tables]
+    );
+
+    const renderOptions = (ariaLabel) => (
+        <div className="theme-dropdown-panel" role="listbox" aria-label={ariaLabel}>
+            {options.map((option) => {
+                const isActive = String(option.value) === selectedTableNo;
+                return (
+                    <button
+                        key={option.key}
+                        type="button"
+                        role="option"
+                        aria-selected={isActive}
+                        className={`theme-dropdown-option ${isActive ? "is-active" : ""}`}
+                        onClick={() => handleChange(option.value)}
+                    >
+                        <span className="theme-dropdown-option-main">
+                            <span className="theme-dropdown-option-name">{option.label}</span>
+                            {option.meta ? <span className="theme-dropdown-option-meta">{option.meta}</span> : null}
+                        </span>
+                        {isActive ? (
+                            <Check size={16} className="theme-dropdown-option-check" aria-hidden="true" />
+                        ) : null}
+                    </button>
+                );
+            })}
+        </div>
+    );
 
     if (pos) {
         return (
-            <label
+            <div
+                ref={dropdownRef}
                 className={[
-                    "flex items-center gap-3 rounded-3xl border border-white/10 bg-black/10 px-4 py-3 shadow-sm backdrop-blur transition",
+                    "relative flex items-center gap-3 rounded-3xl border border-white/10 bg-black/10 px-4 py-3 shadow-sm backdrop-blur transition",
                     isDisabled ? "cursor-not-allowed opacity-70" : "hover:bg-black/20",
+                    open ? "theme-dropdown-open" : "",
                     className,
                 ]
                     .filter(Boolean)
@@ -76,54 +162,68 @@ export default function TableSelector({ slug, variant = "default", className = "
                     Table
                 </span>
 
-                <div className="relative min-w-0 flex-1">
-                    <select
-                        value={selectedTableNo}
-                        onChange={(event) => handleChange(event.target.value)}
-                        aria-label="Select table"
-                        disabled={isDisabled}
-                        className="w-full appearance-none bg-transparent pr-8 text-base font-bold outline-none sm:text-lg"
-                    >
-                        <option value="">Takeaway / No table</option>
-                        {tables.map((t) => (
-                            <option key={t.id} value={t.tableNo}>
-                                {t.tableNo}
-                                {t.seats ? ` (${t.seats} seats)` : ""}
-                            </option>
-                        ))}
-                    </select>
-                    <ChevronDown
-                        size={18}
-                        className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 theme-muted"
-                        aria-hidden="true"
-                    />
-                </div>
-            </label>
+                <button
+                    type="button"
+                    className="theme-dropdown-trigger min-w-0 flex-1 text-base font-bold sm:text-lg"
+                    aria-label="Select table"
+                    aria-haspopup="listbox"
+                    aria-expanded={open}
+                    disabled={isDisabled}
+                    onClick={() => {
+                        if (isDisabled) return;
+                        setOpen((prev) => !prev);
+                    }}
+                >
+                    <span className="theme-dropdown-trigger-text">{triggerLabel}</span>
+                    <ChevronDown size={18} className="theme-dropdown-chevron" aria-hidden="true" />
+                </button>
+
+                {open ? (
+                    <div className="absolute left-auto right-0 top-[calc(100%+8px)] z-50 w-[280px] max-w-[calc(100vw-2rem)]">
+                        {renderOptions("Tables")}
+                    </div>
+                ) : null}
+            </div>
         );
     }
 
     return (
-        <label className={`theme-dropdown ${compact ? "theme-dropdown-compact" : ""} ${className}`.trim()}>
+        <div
+            ref={dropdownRef}
+            className={[
+                "theme-dropdown theme-dropdown-menu",
+                compact ? "theme-dropdown-compact" : "",
+                open ? "theme-dropdown-open" : "",
+                isDisabled ? "theme-dropdown-disabled" : "",
+                className,
+            ]
+                .filter(Boolean)
+                .join(" ")}
+        >
             <span className="theme-dropdown-label">
                 <TableProperties size={15} />
                 <span>{compact ? "Table" : "Select Table"}</span>
             </span>
 
-            <select
-                value={selectedTableNo}
-                onChange={(event) => handleChange(event.target.value)}
+            <button
+                type="button"
+                className="theme-dropdown-trigger"
                 aria-label="Select table"
+                aria-haspopup="listbox"
+                aria-expanded={open}
                 disabled={isDisabled}
+                onClick={() => {
+                    if (isDisabled) return;
+                    setOpen((prev) => !prev);
+                }}
             >
-                <option value="">Takeaway / No table</option>
-                {tables.map((t) => (
-                    <option key={t.id} value={t.tableNo}>
-                        {t.tableNo}{t.seats ? ` (${t.seats} seats)` : ""}
-                    </option>
-                ))}
-            </select>
+                <span className="theme-dropdown-trigger-text">{triggerLabel}</span>
+                <ChevronDown size={16} className="theme-dropdown-chevron" aria-hidden="true" />
+            </button>
 
             <span className="theme-dropdown-swatch" aria-hidden="true" />
-        </label>
+
+            {open ? renderOptions("Tables") : null}
+        </div>
     );
 }

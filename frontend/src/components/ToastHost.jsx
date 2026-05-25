@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
+import { appendOwnerNotification } from "../utils/ownerNotifications";
 
 const DEFAULT_DURATION_MS = 2600;
 
@@ -39,6 +40,15 @@ export default function ToastHost() {
 
             setToasts((prev) => [...prev.slice(-2), toast]); // keep max 3
 
+            const pathname = String(window.location?.pathname || "");
+            if (pathname.startsWith("/owner")) {
+                appendOwnerNotification({
+                    title: toast.title || "Notification",
+                    message: toast.message || toast.title || "New update available.",
+                    type: toast.variant || "info",
+                });
+            }
+
             if (durationMs > 0) {
                 window.setTimeout(() => {
                     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -56,9 +66,9 @@ export default function ToastHost() {
             return (
                 <motion.div
                     key={toast.id}
-                    initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                    initial={{ opacity: 0, y: -16, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 12, scale: 0.98 }}
+                    exit={{ opacity: 0, y: -12, scale: 0.98 }}
                     transition={{ type: "spring", stiffness: 180, damping: 18 }}
                     className={`theme-panel pointer-events-auto w-full max-w-md overflow-hidden rounded-2xl border px-4 py-3 shadow-2xl ${classFor(
                         toast.variant
@@ -102,9 +112,11 @@ export default function ToastHost() {
     }, [toasts]);
 
     return (
-        <div className="pointer-events-none fixed bottom-4 left-0 right-0 z-[90] flex flex-col items-center gap-3 px-4">
+        <div
+            className="pointer-events-none fixed left-0 right-0 z-[90] flex flex-col items-center gap-3 px-4"
+            style={{ top: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
+        >
             <AnimatePresence>{rendered}</AnimatePresence>
         </div>
     );
 }
-

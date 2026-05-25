@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { LoaderCircle, Save } from "lucide-react";
 import { API } from "../../config";
+import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { uploadToS3Presigned } from "../../utils/s3Upload";
 
 const emptyForm = {
@@ -159,7 +160,7 @@ export default function OwnerSettings() {
                                 <div className="flex items-center gap-3">
                                     <div className="h-12 w-12 overflow-hidden rounded-xl border border-white/10 bg-white/5">
                                         {form.logo ? (
-                                            <img src={form.logo} alt="Logo" className="h-full w-full object-cover" />
+                                            <img src={resolveImageUrl(form.logo)} alt="Logo" className="h-full w-full object-cover" />
                                         ) : (
                                             <div className="h-full w-full bg-gradient-to-br from-white/10 to-transparent" />
                                         )}

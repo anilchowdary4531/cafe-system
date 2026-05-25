@@ -11,7 +11,7 @@ export default function Login() {
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
-    const { setRestaurantContext } = useRestaurantContext();
+    const { restaurantContext, setRestaurantContext } = useRestaurantContext();
 
     const initialMode = useMemo(() => {
         const mode = String(searchParams.get("mode") || "").trim().toLowerCase();
@@ -35,6 +35,11 @@ export default function Login() {
     const [customerDevOtp, setCustomerDevOtp] = useState("");
     const [customerLoading, setCustomerLoading] = useState(false);
     const [customerError, setCustomerError] = useState("");
+
+    const customerMenuPath = useMemo(() => {
+        const slug = String(restaurantContext?.slug || "").trim();
+        return slug ? `/r/${encodeURIComponent(slug)}` : "/";
+    }, [restaurantContext?.slug]);
 
     const getRedirectPath = (role) => {
         const normalizedRole = String(role || "").toUpperCase();
@@ -176,7 +181,7 @@ export default function Login() {
                 verified: true,
             });
 
-            navigate("/profile/orders", { replace: true });
+            navigate(customerMenuPath, { replace: true });
         } catch (err) {
             setCustomerError(err.response?.data?.message || err.message || "Invalid OTP");
         } finally {

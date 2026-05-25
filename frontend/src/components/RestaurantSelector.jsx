@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { MapPin } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, MapPin } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import { cachedGet } from "../utils/apiClient";
@@ -9,9 +9,11 @@ export default function RestaurantSelector({ variant = "default" }) {
     const navigate = useNavigate();
     const location = useLocation();
     const { restaurantContext, setRestaurantContext } = useRestaurantContext();
+    const dropdownRef = useRef(null);
 
     const [restaurants, setRestaurants] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [open, setOpen] = useState(false);
 
     const selectedSlug = String(restaurantContext?.slug || "");
 
@@ -41,6 +43,33 @@ export default function RestaurantSelector({ variant = "default" }) {
         };
     }, []);
 
+    useEffect(() => {
+        const closeOnOutsideClick = (event) => {
+            if (!dropdownRef.current) return;
+            if (!dropdownRef.current.contains(event.target)) {
+                setOpen(false);
+            }
+        };
+
+        const closeOnEscape = (event) => {
+            if (event.key === "Escape") {
+                setOpen(false);
+            }
+        };
+
+        window.addEventListener("pointerdown", closeOnOutsideClick);
+        window.addEventListener("keydown", closeOnEscape);
+
+        return () => {
+            window.removeEventListener("pointerdown", closeOnOutsideClick);
+            window.removeEventListener("keydown", closeOnEscape);
+        };
+    }, []);
+
+    useEffect(() => {
+        setOpen(false);
+    }, [location.pathname, location.search]);
+
     const handleChange = (slug) => {
         const next = restaurants.find((r) => String(r.slug) === String(slug));
         if (!next) return;
@@ -61,32 +90,83 @@ export default function RestaurantSelector({ variant = "default" }) {
         }
     };
 
+    const selectedName = selected?.name || "";
+    const triggerLabel = (() => {
+        if (loading) return "Loading restaurants...";
+        if (selectedName) return selectedName;
+        if (!restaurants.length) return "No restaurants";
+        return "Select restaurant";
+    })();
+
+    const listDisabled = loading || restaurants.length === 0;
+
     return (
-        <label className={`theme-dropdown ${compact ? "theme-dropdown-compact" : ""}`}>
+        <div
+            ref={dropdownRef}
+            className={[
+                "theme-dropdown theme-dropdown-menu",
+                compact ? "theme-dropdown-compact" : "",
+                open ? "theme-dropdown-open" : "",
+                listDisabled ? "theme-dropdown-disabled" : "",
+            ]
+                .filter(Boolean)
+                .join(" ")}
+        >
             <span className="theme-dropdown-label">
                 <MapPin size={15} />
                 <span>{compact ? "Restaurant" : "Restaurant"}</span>
             </span>
 
-            <select
-                value={selected ? selected.slug : selectedSlug}
-                onChange={(event) => handleChange(event.target.value)}
+            <button
+                type="button"
+                className="theme-dropdown-trigger"
                 aria-label="Select restaurant"
-                disabled={loading || restaurants.length === 0}
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                disabled={listDisabled}
+                onClick={() => {
+                    if (listDisabled) return;
+                    setOpen((prev) => !prev);
+                }}
             >
-                {!selectedSlug && (
-                    <option value="" disabled>
-                        Select...
-                    </option>
-                )}
-                {restaurants.map((restaurant) => (
-                    <option key={restaurant.id} value={restaurant.slug}>
-                        {restaurant.name}
-                    </option>
-                ))}
-            </select>
+                <span className="theme-dropdown-trigger-text">{triggerLabel}</span>
+                <ChevronDown size={16} className="theme-dropdown-chevron" aria-hidden="true" />
+            </button>
 
             <span className="theme-dropdown-swatch" aria-hidden="true" />
-        </label>
+
+            {open && (
+                <div className="theme-dropdown-panel" role="listbox" aria-label="Restaurants">
+                    {restaurants.map((restaurant) => {
+                        const isActive = String(restaurant.slug) === String(selected?.slug || selectedSlug);
+                        const placeText = [restaurant.city, restaurant.state].filter(Boolean).join(", ");
+
+                        return (
+                            <button
+                                key={restaurant.id}
+                                type="button"
+                                role="option"
+                                aria-selected={isActive}
+                                className={`theme-dropdown-option ${isActive ? "is-active" : ""}`}
+                                onClick={() => {
+                                    handleChange(restaurant.slug);
+                                    setOpen(false);
+                                }}
+                            >
+                                <span className="theme-dropdown-option-main">
+                                    <span className="theme-dropdown-option-name">{restaurant.name}</span>
+                                    {placeText ? (
+                                        <span className="theme-dropdown-option-meta">{placeText}</span>
+                                    ) : null}
+                                </span>
+                                {isActive ? (
+                                    <Check size={16} className="theme-dropdown-option-check" aria-hidden="true" />
+                                ) : null}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
     );
 }

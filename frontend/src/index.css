@@ -165,6 +165,30 @@ body {
     font-family: Inter, system-ui, sans-serif;
 }
 
+html,
+body {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+/* Hide visible scrollbar rails globally while preserving scroll behavior. */
+* {
+    scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
 body,
 .theme-adaptive {
     background: var(--app-bg);
@@ -220,6 +244,20 @@ body,
 .theme-price,
 .theme-accent-text {
     color: var(--app-primary);
+}
+
+.theme-brand-text {
+    color: #e8dfcf;
+}
+
+.theme-brand-logo {
+    filter: drop-shadow(0 6px 14px color-mix(in srgb, #e8dfcf 28%, transparent));
+    transition: transform 180ms ease, filter 180ms ease;
+}
+
+.theme-brand-logo:hover {
+    transform: scale(1.06);
+    filter: drop-shadow(0 10px 22px color-mix(in srgb, #e8dfcf 40%, transparent));
 }
 
 .theme-border {
@@ -421,8 +459,8 @@ body,
 
 .theme-dropdown:hover,
 .theme-dropdown:focus-within {
-    border-color: var(--app-border-strong);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-primary) 16%, transparent);
+    border-color: color-mix(in srgb, var(--app-text) 18%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-text) 10%, transparent);
 }
 
 .theme-dropdown-label {
@@ -489,6 +527,125 @@ body,
 
 .theme-dropdown-compact .theme-dropdown-label span {
     display: none;
+}
+
+.theme-dropdown-menu::after {
+    display: none;
+}
+
+.theme-dropdown-disabled {
+    opacity: 0.72;
+}
+
+.theme-dropdown-trigger {
+    display: inline-flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 0;
+    background: transparent;
+    color: var(--app-text);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-align: left;
+    outline: none;
+}
+
+.theme-dropdown-trigger:disabled {
+    cursor: not-allowed;
+}
+
+.theme-dropdown-trigger-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.theme-dropdown-chevron {
+    flex: 0 0 auto;
+    color: var(--app-muted-strong);
+    transition: transform 180ms ease;
+}
+
+.theme-dropdown-open .theme-dropdown-chevron {
+    transform: rotate(180deg);
+}
+
+.theme-dropdown-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 10px);
+    z-index: 60;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid color-mix(in srgb, var(--app-text) 14%, transparent);
+    border-radius: 14px;
+    background: linear-gradient(180deg, #080b11 0%, #05070c 100%);
+    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(8px);
+    padding: 4px;
+}
+
+.theme-dropdown-option {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.01);
+    color: var(--app-text);
+    padding: 7px 9px;
+    text-align: left;
+    transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.theme-dropdown-option:hover,
+.theme-dropdown-option:focus-visible {
+    border-color: color-mix(in srgb, var(--app-text) 20%, transparent);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%);
+    outline: none;
+}
+
+.theme-dropdown-option.is-active {
+    border-color: color-mix(in srgb, var(--app-text) 26%, transparent);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.07) 100%);
+}
+
+.theme-dropdown-option-main {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+
+.theme-dropdown-option-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.theme-dropdown-option-meta {
+    margin-top: 2px;
+    color: var(--app-muted);
+    font-size: 0.66rem;
+    line-height: 1.35;
+}
+
+.theme-dropdown-option-check {
+    color: var(--app-primary);
+    flex: 0 0 auto;
+}
+
+.theme-dropdown-compact .theme-dropdown-trigger {
+    font-size: 0.82rem;
 }
 
 .theme-options-grid {

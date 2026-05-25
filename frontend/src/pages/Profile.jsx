@@ -1,16 +1,24 @@
 import { memo, useMemo } from "react";
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
-import { ClipboardList, Heart, LayoutGrid, Settings, UserCircle2, Wallet } from "lucide-react";
+import { Link, NavLink } from "react-router-dom";
+import { ArrowLeft, Gift, Heart, IndianRupee, Settings, Sparkles, Star, UserCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import useCustomerProfile from "../hooks/useCustomerProfile";
-import OverviewSection from "./customer/profile/OverviewSection";
+import useCachedGet from "../hooks/useCachedGet";
+import { getCustomerProfileExtras } from "../utils/customerProfileExtras";
 import OrdersSection from "./customer/profile/OrdersSection";
 import OrderDetailsPage from "./customer/profile/OrderDetailsPage";
 import WalletSection from "./customer/profile/WalletSection";
 import FavoritesSection from "./customer/profile/FavoritesSection";
 import SettingsSection from "./customer/profile/SettingsSection";
+import EditProfileSection from "./customer/profile/EditProfileSection";
 
-export default function Profile() {
+const formatMoney = (value) => `Rs ${Math.round(Number(value || 0))}`;
+const formatStatus = (status) => {
+    const value = String(status || "PLACED").toUpperCase();
+    return value.charAt(0) + value.slice(1).toLowerCase();
+};
+
+export default function Profile({ section = "overview" }) {
     const { user, customer } = useAuth();
 
     if (user) {
@@ -34,10 +42,10 @@ export default function Profile() {
         );
     }
 
-    return <CustomerProfileLayout />;
+    return <CustomerProfileLayout section={section} />;
 }
 
-function CustomerProfileLayout() {
+function CustomerProfileLayout({ section }) {
     const profileState = useCustomerProfile();
     const { profile, customerToken, loading, saving, error, updateProfile, setError } = profileState;
 
@@ -47,15 +55,73 @@ function CustomerProfileLayout() {
         const subtitle = profile?.email ? String(profile.email) : phone;
         return { title, subtitle, phone };
     }, [profile?.email, profile?.name, profile?.phone]);
+    const profileExtras = useMemo(() => getCustomerProfileExtras(sidebarMeta.phone), [sidebarMeta.phone]);
+    const avatarDataUrl = String(profileExtras?.avatarDataUrl || "").trim();
 
-    return (
-        <div className="theme-page min-h-screen px-4 py-10 md:px-8">
-            <div className="mx-auto w-full max-w-6xl">
-                <div className="grid gap-6 lg:grid-cols-[280px,1fr]">
-                    <aside className="theme-panel rounded-[32px] p-6">
+    const activeSection = String(section || "overview").toLowerCase();
+    const isOverviewPage = activeSection === "overview";
+    const sectionLabel =
+        activeSection === "ordersdetail"
+            ? "Order details"
+            : activeSection === "orders"
+            ? "Orders"
+            : activeSection === "wallet"
+            ? "Wallet"
+            : activeSection === "edit"
+            ? "Edit profile"
+            : activeSection === "favorites"
+            ? "Favorites"
+            : activeSection === "settings"
+            ? "Settings"
+            : "Profile";
+
+    const sectionNode = (() => {
+        if (activeSection === "ordersdetail") return <OrderDetailsPage />;
+        if (activeSection === "orders") return <OrdersSection />;
+        if (activeSection === "wallet") return <WalletSection profile={profile} customerToken={customerToken} />;
+        if (activeSection === "edit") {
+            return (
+                <EditProfileSection
+                    profile={profile}
+                    customerToken={customerToken}
+                    loading={loading}
+                    saving={saving}
+                    error={error}
+                    updateProfile={updateProfile}
+                    setError={setError}
+                />
+            );
+        }
+        if (activeSection === "favorites") return <FavoritesSection />;
+        if (activeSection === "settings") {
+            return (
+                <SettingsSection
+                    profile={profile}
+                    customerToken={customerToken}
+                    loading={loading}
+                    saving={saving}
+                    error={error}
+                    updateProfile={updateProfile}
+                    setError={setError}
+                />
+            );
+        }
+
+        return null;
+    })();
+
+    if (isOverviewPage) {
+        return (
+            <div className="theme-page min-h-screen px-4 py-10 md:px-8">
+                <div className="mx-auto w-full max-w-6xl space-y-6">
+                    <header className="theme-panel rounded-[32px] p-6">
                         <div className="flex items-start gap-4">
-                            <div className="theme-button flex h-12 w-12 items-center justify-center rounded-2xl">
-                                <UserCircle2 size={26} />
+                            <div className="theme-button flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl">
+                                {avatarDataUrl ? (
+                                    <img src={avatarDataUrl} alt="Profile avatar" className="h-full w-full object-cover" />
+                                ) : (
+                                    <UserCircle2 size={26} />
+                                )}
                             </div>
                             <div className="min-w-0">
                                 <p className="truncate text-lg font-semibold">{sidebarMeta.title}</p>
@@ -63,77 +129,238 @@ function CustomerProfileLayout() {
                             </div>
                         </div>
 
-                        <nav className="mt-6 space-y-2">
-                            <SidebarLink to="/profile" end icon={<LayoutGrid size={18} />} label="Overview" />
-                            <SidebarLink to="/profile/orders" icon={<ClipboardList size={18} />} label="Orders" />
-                            <SidebarLink to="/profile/wallet" icon={<Wallet size={18} />} label="Wallet" />
-                            <SidebarLink to="/profile/favorites" icon={<Heart size={18} />} label="Favorites" />
-                            <SidebarLink to="/profile/settings" icon={<Settings size={18} />} label="Settings" />
+                        <nav className="mt-4 flex flex-wrap items-center gap-2.5">
+                            <OverviewActionCard
+                                to="/profile/edit"
+                                icon={<UserCircle2 size={19} />}
+                                label="Edit profile"
+                                caption="Photo, name, number"
+                            />
+                            <OverviewActionCard
+                                to="/profile/favorites"
+                                icon={<Heart size={19} />}
+                                label="Favorites"
+                                caption="Your liked dishes"
+                            />
+                            <OverviewActionCard
+                                to="/profile/settings"
+                                icon={<Settings size={19} />}
+                                label="Settings"
+                                caption="Profile preferences"
+                            />
                         </nav>
 
+                        <RecentOrdersSection profile={profile} customerToken={customerToken} />
+
+                        <section className="mt-4 rounded-3xl p-1">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <p className="theme-accent-text text-[11px] font-semibold uppercase tracking-[0.26em]">
+                                        Wallet preview
+                                    </p>
+                                    <h2 className="mt-1 text-lg font-semibold">Rewards at a glance</h2>
+                                </div>
+                                <span className="theme-soft-button inline-flex items-center gap-1 rounded-xl px-3 py-1 text-xs font-semibold">
+                                    <Sparkles size={14} />
+                                    Coming soon
+                                </span>
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-3 gap-2 sm:mt-4 sm:gap-3">
+                                <ProfileValueCard
+                                    icon={<IndianRupee size={18} />}
+                                    label="Wallet balance"
+                                    hint="Coming soon"
+                                    value="Rs 0"
+                                    toneClass="from-orange-500/18 to-amber-500/8"
+                                />
+                                <ProfileValueCard
+                                    icon={<Star size={18} />}
+                                    label="Reward points"
+                                    hint="1 point per Rs 10"
+                                    value="399"
+                                    toneClass="from-yellow-500/18 to-lime-500/8"
+                                />
+                                <ProfileValueCard
+                                    icon={<Gift size={18} />}
+                                    label="Offers"
+                                    hint="Coming soon"
+                                    value="Coming soon"
+                                    toneClass="from-fuchsia-500/14 to-rose-500/8"
+                                />
+                            </div>
+                        </section>
+
                         {error && (
-                            <div className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                            <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                                 {error}
                             </div>
                         )}
-                    </aside>
-
-                    <main className="min-w-0">
-                        <Routes>
-                            <Route
-                                index
-                                element={
-                                    <OverviewSection
-                                        profile={profile}
-                                        customerToken={customerToken}
-                                        profileLoading={loading}
-                                        profileError={error}
-                                    />
-                                }
-                            />
-                            <Route path="orders/:id" element={<OrderDetailsPage />} />
-                            <Route path="orders" element={<OrdersSection />} />
-                            <Route path="wallet" element={<WalletSection profile={profile} customerToken={customerToken} />} />
-                            <Route path="favorites" element={<FavoritesSection />} />
-                            <Route
-                                path="settings"
-                                element={
-                                    <SettingsSection
-                                        profile={profile}
-                                        customerToken={customerToken}
-                                        loading={loading}
-                                        saving={saving}
-                                        error={error}
-                                        updateProfile={updateProfile}
-                                        setError={setError}
-                                    />
-                                }
-                            />
-                            <Route path="*" element={<Navigate to="/profile" replace />} />
-                        </Routes>
-                    </main>
+                    </header>
                 </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="theme-page min-h-screen px-4 py-10 md:px-8">
+            <div className="mx-auto w-full max-w-6xl space-y-6">
+                <header className="flex items-center gap-3 px-1">
+                    <NavLink
+                        to="/profile/overview"
+                        reloadDocument
+                        aria-label="Back to overview"
+                        title="Back to overview"
+                        className="theme-soft-button inline-flex h-10 w-10 items-center justify-center rounded-2xl hover:opacity-95"
+                    >
+                        <ArrowLeft size={18} />
+                    </NavLink>
+                    <p className="theme-muted text-sm font-semibold">{sectionLabel}</p>
+                </header>
+
+                <main className="min-w-0">{sectionNode}</main>
             </div>
         </div>
     );
 }
 
-const SidebarLink = memo(function SidebarLink({ to, icon, label, end }) {
+const OverviewActionCard = memo(function OverviewActionCard({ to, icon, label, caption, end }) {
     return (
         <NavLink
             to={to}
+            reloadDocument
             end={Boolean(end)}
             className={({ isActive }) =>
-                `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
-                    isActive ? "theme-button" : "theme-soft-button hover:opacity-95"
+                `theme-soft-button inline-flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left shadow-[0_8px_18px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 hover:shadow-[0_10px_22px_rgba(0,0,0,0.22)] ${
+                    isActive ? "ring-1 ring-[var(--app-border-strong)]" : "opacity-95 hover:opacity-100"
                 }`
             }
         >
-            <span className="shrink-0">{icon}</span>
-            <span className="min-w-0 truncate">{label}</span>
+            <span className="theme-soft-button inline-flex h-8 w-8 items-center justify-center rounded-lg">{icon}</span>
+            <span className="min-w-0">
+                <p className="text-sm font-semibold leading-tight">{label}</p>
+                <p className="theme-muted text-[11px] leading-tight">{caption}</p>
+            </span>
         </NavLink>
     );
 });
+
+function ProfileValueCard({ icon, label, hint, value, toneClass }) {
+    return (
+        <article
+            className={`rounded-2xl bg-gradient-to-br ${toneClass} px-3 py-3 shadow-[0_8px_20px_rgba(0,0,0,0.18)] backdrop-blur-sm`}
+        >
+            <div className="theme-soft-button inline-flex h-7 w-7 items-center justify-center rounded-lg">{icon}</div>
+            <p className="theme-muted mt-2 text-[10px] font-semibold uppercase tracking-[0.2em]">{label}</p>
+            <p className="theme-muted mt-1 text-[11px]">{hint}</p>
+            <p className="mt-2 text-base font-semibold tabular-nums md:text-lg">{value}</p>
+        </article>
+    );
+}
+
+function RecentOrdersSection({ profile, customerToken }) {
+    const phone = String(profile?.phone || "").trim();
+    const enabled = Boolean(phone || customerToken);
+    const params = useMemo(() => (phone ? { phone } : undefined), [phone]);
+
+    const { data, loading, error } = useCachedGet("/customer/orders", {
+        enabled,
+        params,
+        ttlMs: 15_000,
+        staleMs: 2 * 60_000,
+        scope: phone ? `customer:${phone}` : "customer:session",
+    });
+
+    const recentOrders = useMemo(() => {
+        const groups = Array.isArray(data?.groups) ? data.groups : [];
+        return groups
+            .flatMap((group) => {
+                const restaurant = group?.restaurant || null;
+                const orders = Array.isArray(group?.orders) ? group.orders : [];
+                return orders.map((order) => ({ order, restaurant }));
+            })
+            .sort((a, b) => new Date(b?.order?.createdAt).getTime() - new Date(a?.order?.createdAt).getTime())
+            .slice(0, 3);
+    }, [data?.groups]);
+
+    return (
+        <section className="mt-5 rounded-2xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p className="theme-accent-text text-[11px] font-semibold uppercase tracking-[0.22em]">Recent orders</p>
+                    <h2 className="mt-1 text-lg font-semibold">Latest activity</h2>
+                </div>
+                <NavLink
+                    to="/profile/order-history"
+                    reloadDocument
+                    className="theme-soft-button inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold"
+                >
+                    <span className="inline-block h-2 w-2 rounded-full bg-[var(--app-accent)]" />
+                    Order History
+                </NavLink>
+            </div>
+
+            {!enabled && <p className="theme-muted mt-3 text-xs">Login session required to load recent orders.</p>}
+            {enabled && loading && <p className="theme-muted mt-3 text-xs">Loading recent orders...</p>}
+            {enabled && error && (
+                <div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>
+            )}
+
+            {enabled && !loading && !error && (
+                <>
+                    {!recentOrders.length ? (
+                        <p className="theme-muted mt-3 text-xs">No recent orders found.</p>
+                    ) : (
+                        <div className="mt-3 grid gap-2 md:grid-cols-3">
+                            {recentOrders.map(({ order, restaurant }) => {
+                                const createdAt = new Date(order?.createdAt);
+                                const createdLabel = Number.isNaN(createdAt.getTime()) ? "Unknown date" : createdAt.toLocaleString();
+                                const restaurantName = String(restaurant?.name || restaurant?.slug || "Restaurant");
+                                const table = String(order?.tableNo || "").trim() || "Takeaway";
+                                const orderId = String(order?.id || "").trim();
+                                const cardNode = (
+                                    <>
+                                        <p className="theme-muted text-[10px] font-semibold uppercase tracking-[0.18em]">{restaurantName}</p>
+                                        <p className="mt-1 text-sm font-semibold">Order #{order?.orderNo || order?.id}</p>
+                                        <p className="theme-muted mt-1 text-[11px]">{createdLabel}</p>
+                                        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+                                            <span className="theme-pill rounded-full px-2 py-1">{formatStatus(order?.status)}</span>
+                                            <span className="theme-pill rounded-full px-2 py-1">{table}</span>
+                                            <span className="theme-pill rounded-full px-2 py-1">{formatMoney(order?.total)}</span>
+                                        </div>
+                                    </>
+                                );
+
+                                return (
+                                    orderId ? (
+                                        <Link
+                                            key={String(order?.id)}
+                                            to={`/profile/orders/${encodeURIComponent(orderId)}`}
+                                            state={{
+                                                order,
+                                                restaurant: {
+                                                    name: restaurantName,
+                                                    slug: String(restaurant?.slug || ""),
+                                                },
+                                            }}
+                                            className="block rounded-xl bg-white/[0.03] px-3 py-3 transition hover:-translate-y-0.5 hover:bg-white/[0.05]"
+                                        >
+                                            {cardNode}
+                                        </Link>
+                                    ) : (
+                                        <article key={String(`${restaurantName}-${createdLabel}`)} className="rounded-xl bg-white/[0.03] px-3 py-3">
+                                            {cardNode}
+                                        </article>
+                                    )
+                                );
+                            })}
+                        </div>
+                    )}
+                </>
+            )}
+        </section>
+    );
+}
 
 function StaffProfile({ user }) {
     const role = String(user?.role || "STAFF").toUpperCase();

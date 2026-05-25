@@ -1,84 +1,76 @@
-import { useMemo } from "react";
-import { Gift, IndianRupee, Star } from "lucide-react";
-import useCachedGet from "../../../hooks/useCachedGet";
+import { Gift, IndianRupee, Sparkles, Star } from "lucide-react";
 
-const formatMoney = (value) => `₹${Math.round(Number(value || 0))}`;
+const METRICS = [
+    {
+        key: "wallet",
+        icon: <IndianRupee size={19} />,
+        label: "Wallet balance",
+        hint: "Coming soon",
+        value: "Rs 0",
+        toneClass: "from-orange-500/20 to-amber-500/10",
+    },
+    {
+        key: "points",
+        icon: <Star size={19} />,
+        label: "Reward points",
+        hint: "1 point per Rs 10",
+        value: "399",
+        toneClass: "from-yellow-500/20 to-lime-500/10",
+    },
+    {
+        key: "offers",
+        icon: <Gift size={19} />,
+        label: "Offers",
+        hint: "Coming soon",
+        value: "Coming soon",
+        toneClass: "from-fuchsia-500/15 to-rose-500/10",
+    },
+];
 
-export default function WalletSection({ profile, customerToken }) {
-    const phone = String(profile?.phone || "").trim();
-    const enabled = Boolean(phone || customerToken);
-    const params = useMemo(() => (phone ? { phone } : undefined), [phone]);
-
-    const { data, loading, error } = useCachedGet("/customer/orders", {
-        enabled,
-        params,
-        ttlMs: 20_000,
-        staleMs: 5 * 60_000,
-        scope: phone ? `customer:${phone}` : "customer:session",
-    });
-
-    const allOrders = useMemo(() => {
-        const groups = Array.isArray(data?.groups) ? data.groups : [];
-        return groups.flatMap((g) => g?.orders || []);
-    }, [data?.groups]);
-
-    const totalSpend = useMemo(() => allOrders.reduce((sum, o) => sum + Number(o?.total || 0), 0), [allOrders]);
-
-    // Loyalty placeholder: 1 point per ₹10 spent.
-    const points = Math.floor(totalSpend / 10);
-    const walletBalance = 0;
-    const offers = 0;
+export default function WalletSection() {
 
     return (
-        <div className="space-y-6">
-            <div className="theme-panel rounded-[32px] p-6 md:p-8">
-                <p className="theme-accent-text text-xs font-semibold uppercase tracking-[0.32em]">Wallet</p>
-                <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">Wallet & rewards</h1>
-                <p className="theme-muted mt-3 text-sm md:text-base">Points, offers and spending summary.</p>
-                {error && (
-                    <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                        {error}
-                    </div>
-                )}
+        <div className="space-y-4">
+            <div className="space-y-2 px-1">
+                <p className="theme-accent-text text-[11px] font-semibold uppercase tracking-[0.28em]">Wallet</p>
+                <h1 className="text-2xl font-bold tracking-tight md:text-[2rem]">Wallet & rewards</h1>
+                <p className="theme-muted text-xs md:text-sm">Track balance, points, and upcoming offers.</p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-                <WalletCard
-                    icon={<IndianRupee size={20} />}
-                    label="Wallet balance"
-                    value={formatMoney(walletBalance)}
-                    hint="Coming soon"
-                />
-                <WalletCard
-                    icon={<Star size={20} />}
-                    label="Reward points"
-                    value={loading ? "..." : String(points)}
-                    hint="1 point per ₹10"
-                />
-                <WalletCard
-                    icon={<Gift size={20} />}
-                    label="Offers"
-                    value={String(offers)}
-                    hint="Coming soon"
-                />
+            <div className="grid gap-3 px-1 md:grid-cols-3">
+                {METRICS.map((metric) => (
+                    <WalletCard
+                        key={metric.key}
+                        icon={metric.icon}
+                        label={metric.label}
+                        hint={metric.hint}
+                        value={metric.value}
+                        toneClass={metric.toneClass}
+                    />
+                ))}
+            </div>
+
+            <div className="theme-card mx-1 rounded-3xl border border-[var(--app-border)] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                    <Sparkles size={17} className="theme-accent-text" />
+                    Loyalty update
+                </div>
+                <p className="theme-muted mt-2 text-xs md:text-sm">
+                    You earn <span className="font-semibold">1 point for every Rs 10</span> spent. Redemption options will
+                    be unlocked soon.
+                </p>
             </div>
         </div>
     );
 }
 
-function WalletCard({ icon, label, value, hint }) {
+function WalletCard({ icon, label, value, hint, toneClass }) {
     return (
-        <div className="theme-panel rounded-[28px] p-6">
-            <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                    <p className="theme-muted text-xs font-semibold uppercase tracking-[0.24em]">{label}</p>
-                    <p className="mt-3 break-words text-3xl font-black">{value}</p>
-                    {hint && <p className="theme-muted mt-2 text-sm">{hint}</p>}
-                </div>
-                <div className="theme-card flex h-12 w-12 items-center justify-center rounded-2xl">
-                    <span className="theme-accent-text">{icon}</span>
-                </div>
-            </div>
-        </div>
+        <article className={`rounded-2xl border border-[var(--app-border)] bg-gradient-to-br ${toneClass} p-4`}>
+            <div className="theme-soft-button inline-flex h-9 w-9 items-center justify-center rounded-xl">{icon}</div>
+            <p className="theme-muted mt-3 text-[11px] font-semibold uppercase tracking-[0.2em]">{label}</p>
+            {hint && <p className="theme-muted mt-1 text-xs">{hint}</p>}
+            <p className="mt-3 text-lg font-semibold tabular-nums md:text-xl">{value}</p>
+        </article>
     );
 }

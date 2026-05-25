@@ -19,7 +19,7 @@ export const setStoredRestaurantContext = (context = {}) => {
     }
 };
 
-export const resolveRestaurantName = (user, fallback = "Suretra") => {
+export const resolveRestaurantName = (user, fallback = "Tiffzy") => {
     const fromUserRestaurant =
         user?.restaurant?.name ||
         user?.restaurantName ||

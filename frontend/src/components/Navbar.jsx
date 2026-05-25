@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import ThemeSelector from "./ThemeSelector";
 import RestaurantSelector from "./RestaurantSelector";
 import { useRestaurantContext } from "../context/RestaurantContext";
+import BrandLogo from "./BrandLogo";
 
 export default function Navbar() {
     const location = useLocation();
@@ -12,6 +13,8 @@ export default function Navbar() {
     const activeProfile = user || customer;
     const isStaff = Boolean(user);
     const normalizedRole = String(user?.role || "").toUpperCase();
+    const isProfilePage = String(location.pathname || "").startsWith("/profile");
+
     const loginPath = (() => {
         const path = String(location.pathname || "");
         if (path.startsWith("/owner") || path.startsWith("/admin") || path.startsWith("/super-admin")) {
@@ -28,7 +31,12 @@ export default function Navbar() {
             return "All Restaurants";
         }
 
-        return restaurantContext?.name || "Suretra";
+        return restaurantContext?.name || "Tiffzy";
+    })();
+
+    const customerMenuPath = (() => {
+        const slug = String(restaurantContext?.slug || "").trim();
+        return slug ? `/r/${encodeURIComponent(slug)}` : "/";
     })();
 
     const staffLinks = (() => {
@@ -62,18 +70,29 @@ export default function Navbar() {
 
     return (
         <div className="theme-nav flex w-full flex-col gap-4 border-b px-4 py-4 md:flex-row md:items-center md:justify-between md:px-8">
-            <div>
-                <Link to="/" className="text-3xl font-bold theme-accent-text">
-                    ☕ Cafe
-                </Link>
-                <p className="theme-muted text-xs">
-                    {isStaff ? restaurantName : customer?.phone || restaurantName}
-                </p>
-            </div>
+            {!isProfilePage && (
+                <div className="flex items-center gap-3">
+                    <Link
+                        to="/"
+                        className="inline-flex h-14 w-14 items-center justify-center"
+                        aria-label="Tiffzy Home"
+                    >
+                        <BrandLogo className="theme-brand-logo h-full w-full" title="Tiffzy logo" />
+                    </Link>
+                    <div>
+                        <Link to="/" className="theme-brand-text text-3xl font-bold leading-none">
+                            Tiffzy
+                        </Link>
+                        <p className="theme-muted text-xs">
+                            {isStaff ? restaurantName : customer?.phone || restaurantName}
+                        </p>
+                    </div>
+                </div>
+            )}
 
             <div className="flex w-full flex-wrap items-center justify-between gap-2 md:w-auto md:justify-end md:gap-4">
-                {!isStaff && <RestaurantSelector variant="compact" />}
-                <ThemeSelector />
+                {!isStaff && !isProfilePage && <RestaurantSelector variant="compact" />}
+                {isStaff && <ThemeSelector />}
 
                 {staffLinks.map((link) => (
                     <Link
@@ -115,8 +134,19 @@ export default function Navbar() {
 
                 {activeProfile ? (
                     <>
+                        {!isStaff && isProfilePage && (
+                            <Link
+                                to="/"
+                                className="inline-flex h-12 w-12 items-center justify-center"
+                                aria-label="Home"
+                                title="Home"
+                            >
+                                <BrandLogo className="theme-brand-logo h-10 w-10" title="Home" />
+                            </Link>
+                        )}
+
                         <Link
-                            to="/profile"
+                            to={isStaff ? "/profile" : customerMenuPath}
                             className="theme-soft-button inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm"
                         >
                             <UserCircle2 size={18} />

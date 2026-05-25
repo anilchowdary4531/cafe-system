@@ -12,12 +12,12 @@
     "beanHouseWaiter": "7w7dXVvDBmfI4T"
   },
   "accessByRole": {
-    "OWNER": { "dashboard": true, "orders": true, "menu": true, "tables": true, "kitchen": true, "analytics": true, "finance": true, "staff": true, "settings": true },
-    "MANAGER": { "dashboard": true, "orders": true, "menu": true, "tables": true, "kitchen": true, "analytics": true, "finance": false, "staff": false, "settings": false },
-    "CHEF": { "dashboard": true, "orders": true, "menu": false, "tables": false, "kitchen": true, "analytics": false, "finance": false, "staff": false, "settings": false },
-    "WAITER": { "dashboard": true, "orders": true, "menu": true, "tables": true, "kitchen": false, "analytics": false, "finance": false, "staff": false, "settings": false },
-    "CASHIER": { "dashboard": true, "orders": true, "menu": false, "tables": false, "kitchen": false, "analytics": true, "finance": true, "staff": false, "settings": false },
-    "STAFF": { "dashboard": true, "orders": false, "menu": false, "tables": false, "kitchen": false, "analytics": false, "finance": false, "staff": false, "settings": false }
+    "OWNER": { "dashboard": true, "orders": true, "menu": true, "tables": true, "kitchen": true, "analytics": true, "finance": true, "staff": true, "settings": true, "notifications": true },
+    "MANAGER": { "dashboard": true, "orders": true, "menu": true, "tables": true, "kitchen": true, "analytics": true, "finance": false, "staff": false, "settings": false, "notifications": true },
+    "CHEF": { "dashboard": true, "orders": true, "menu": false, "tables": false, "kitchen": true, "analytics": false, "finance": false, "staff": false, "settings": false, "notifications": true },
+    "WAITER": { "dashboard": true, "orders": true, "menu": true, "tables": true, "kitchen": false, "analytics": false, "finance": false, "staff": false, "settings": false, "notifications": true },
+    "CASHIER": { "dashboard": true, "orders": true, "menu": false, "tables": false, "kitchen": false, "analytics": true, "finance": true, "staff": false, "settings": false, "notifications": true },
+    "STAFF": { "dashboard": true, "orders": false, "menu": false, "tables": false, "kitchen": false, "analytics": false, "finance": false, "staff": false, "settings": false, "notifications": true }
   },
   "admin": {
     "name": "Super Admin",
