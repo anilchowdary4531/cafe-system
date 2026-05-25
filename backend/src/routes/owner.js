@@ -297,10 +297,31 @@ export default async function ownerRoutes(app, deps) {
     try {
       const restaurantId = Number(req.params.restaurantId);
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
-      return await prisma.diningTable.findMany({
-        where: { restaurantId },
-        orderBy: { id: "desc" },
-      });
+      const [tables, activeOrders] = await Promise.all([
+        prisma.diningTable.findMany({
+          where: { restaurantId },
+          orderBy: { id: "desc" },
+        }),
+        prisma.order.findMany({
+          where: {
+            restaurantId,
+            tableNo: { not: null },
+            status: { in: ["PLACED", "ACCEPTED", "PREPARING", "READY"] },
+          },
+          select: { tableNo: true },
+        }),
+      ]);
+
+      const occupiedTables = new Set(
+        activeOrders
+          .map((order) => String(order.tableNo || "").trim().toLowerCase())
+          .filter(Boolean)
+      );
+
+      return tables.map((table) => ({
+        ...table,
+        isOccupied: occupiedTables.has(String(table.tableNo || "").trim().toLowerCase()),
+      }));
     } catch (err) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to fetch tables" });
