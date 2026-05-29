@@ -117,8 +117,8 @@ const OrderTypeToggle = memo(function OrderTypeToggle({ value, onChange }) {
                         type="button"
                         onClick={() => onChange(type)}
                         className={[
-                            "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition",
-                            active ? "bg-amber-400/15 text-amber-200" : "theme-muted hover:bg-black/20 hover:text-amber-100",
+                            "theme-pos-choice inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition",
+                            active ? "is-active" : "",
                         ].join(" ")}
                         aria-pressed={active}
                     >
@@ -145,19 +145,17 @@ const CategorySidebar = memo(function CategorySidebar({ categories, activeKey, o
                             type="button"
                             onClick={() => onSelect(cat.key)}
                             className={[
-                                "flex items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-semibold transition",
-                                active
-                                    ? "border border-amber-400/30 bg-amber-400/10 text-amber-100"
-                                    : "border border-transparent theme-muted hover:bg-black/20 hover:text-amber-100",
+                                "theme-pos-choice flex items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-semibold transition",
+                                active ? "is-active" : "",
                             ].join(" ")}
                             aria-current={active ? "page" : undefined}
                         >
                             <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-white/10 bg-black/10">
-                                <Icon size={16} className={active ? "text-amber-200" : "theme-muted"} />
+                                <Icon size={16} className="theme-pos-choice-icon" />
                             </span>
                             <span className="min-w-0 flex-1 truncate">{cat.label}</span>
                             {typeof cat.count === "number" && (
-                                <span className="rounded-full border border-white/10 bg-black/10 px-2 py-0.5 text-xs tabular-nums">
+                                <span className="theme-pos-count-badge rounded-full px-2 py-0.5 text-xs tabular-nums">
                                     {cat.count}
                                 </span>
                             )}
@@ -190,11 +188,11 @@ const ItemCard = memo(function ItemCard({ item, qty, onAdd }) {
                 <div className="min-w-0">
                     <p className="truncate text-sm font-semibold sm:text-base">{item.name}</p>
                     <p className="theme-muted mt-1 truncate text-xs">
-                        {item.category || "General"} • ₹{toInr(item.price)}
+                        {item.category || "General"} - Rs {toInr(item.price)}
                     </p>
                 </div>
                 {qty > 0 && (
-                    <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-2xl bg-amber-400/15 px-2 text-sm font-bold text-amber-200 tabular-nums">
+                    <span className="theme-pos-qty-badge inline-flex h-8 min-w-8 items-center justify-center rounded-2xl px-2 text-sm font-bold tabular-nums">
                         {qty}
                     </span>
                 )}
@@ -208,47 +206,47 @@ const ItemCard = memo(function ItemCard({ item, qty, onAdd }) {
 const CartRow = memo(function CartRow({ item, onAdd, onSub, onRemove }) {
     const qty = Math.max(0, Number(item?.qty || 0));
     return (
-        <div className="rounded-2xl border border-white/10 bg-black/10 p-3">
-            <div className="flex items-start justify-between gap-3">
+        <div className="rounded-xl border border-white/10 bg-black/10 px-2.5 py-2">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-2">
                 <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{item?.name || "Item"}</p>
-                    <p className="theme-muted mt-0.5 text-xs">
-                        ₹{toInr(item?.price)} • Qty {qty}
+                    <p className="truncate text-[15px] font-semibold leading-tight">{item?.name || "Item"}</p>
+                    <p className="theme-muted mt-0.5 text-[11px]">
+                        Rs {toInr(item?.price)} - Qty {qty}
                     </p>
+                </div>
+
+                <div className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/10 p-0.5 justify-self-center">
+                    <button
+                        type="button"
+                        onClick={() => onSub(item)}
+                        className="theme-soft-button rounded-lg p-1.5"
+                        disabled={qty <= 0}
+                        aria-label="Decrease quantity"
+                    >
+                        <Minus size={13} />
+                    </button>
+                    <span className="w-7 text-center text-[15px] font-bold tabular-nums leading-none">{qty}</span>
+                    <button
+                        type="button"
+                        onClick={() => onAdd(item)}
+                        className="theme-button rounded-lg p-1.5"
+                        aria-label="Increase quantity"
+                    >
+                        <Plus size={13} />
+                    </button>
                 </div>
 
                 <button
                     type="button"
                     onClick={() => onRemove(item)}
-                    className="theme-soft-button rounded-2xl px-3 py-2 text-xs font-semibold"
+                    className="theme-soft-button justify-self-end rounded-xl px-2.5 py-1.5 text-[11px] font-semibold leading-none"
                 >
                     Remove
                 </button>
             </div>
 
-            <div className="mt-3 flex items-center justify-between gap-2">
-                <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/10 p-1">
-                    <button
-                        type="button"
-                        onClick={() => onSub(item)}
-                        className="theme-soft-button rounded-xl p-2"
-                        disabled={qty <= 0}
-                        aria-label="Decrease quantity"
-                    >
-                        <Minus size={14} />
-                    </button>
-                    <span className="w-8 text-center text-sm font-bold tabular-nums">{qty}</span>
-                    <button
-                        type="button"
-                        onClick={() => onAdd(item)}
-                        className="theme-button rounded-xl p-2"
-                        aria-label="Increase quantity"
-                    >
-                        <Plus size={14} />
-                    </button>
-                </div>
-
-                <p className="text-sm font-semibold tabular-nums">₹{toInr(Number(item?.price || 0) * qty)}</p>
+            <div className="mt-1 flex justify-end">
+                <p className="text-[15px] font-semibold tabular-nums leading-none">Rs {toInr(Number(item?.price || 0) * qty)}</p>
             </div>
         </div>
     );
@@ -538,7 +536,7 @@ export default function NewOrder() {
                             New Order
                         </h1>
                         <p className="theme-muted mt-1 text-xs sm:text-sm truncate">
-                            {user?.restaurant?.name || "Restaurant"} • {connected ? "Live" : "Offline"}
+                            {user?.restaurant?.name || "Restaurant"} - {connected ? "Live" : "Offline"}
                             {socketError ? ` (${socketError})` : ""}
                         </p>
                     </div>
@@ -586,7 +584,7 @@ export default function NewOrder() {
                             ref={searchRef}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search items, categories…"
+                            placeholder="Search items, categories..."
                             className="w-full bg-transparent text-sm font-semibold outline-none placeholder:opacity-60 sm:text-base"
                         />
                     </div>
@@ -620,7 +618,7 @@ export default function NewOrder() {
                             <p className="mt-1 text-lg font-semibold">Tap to add</p>
                         </div>
                         <p className="theme-muted text-xs">
-                            {filteredMenu.length} shown • {menu.length} total
+                            {filteredMenu.length} shown | {menu.length} total
                         </p>
                     </div>
 
@@ -646,7 +644,7 @@ export default function NewOrder() {
                                         className="rounded-2xl border border-white/10 bg-black/10 px-3 py-2 text-left transition active:scale-[0.99] hover:bg-black/20"
                                     >
                                         <p className="text-sm font-semibold truncate">{item.name}</p>
-                                        <p className="theme-muted text-xs">₹{toInr(item.price)}</p>
+                                        <p className="theme-muted text-xs">Rs {toInr(item.price)}</p>
                                     </button>
                                 ))}
                             </div>
@@ -655,7 +653,7 @@ export default function NewOrder() {
 
                     <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                         {menuLoading ? (
-                            <div className="theme-muted text-sm">Loading menu…</div>
+                            <div className="theme-muted text-sm">Loading menu...</div>
                         ) : (
                             filteredMenu.map((item) => (
                                 <ItemCard
@@ -677,10 +675,10 @@ export default function NewOrder() {
                                 {totalItems} item{totalItems === 1 ? "" : "s"}
                             </p>
                         </div>
-                        <p className="theme-muted text-sm tabular-nums">₹{toInr(subtotal)}</p>
+                        <p className="theme-muted text-sm tabular-nums">Rs {toInr(subtotal)}</p>
                     </div>
 
-                    <div className="mt-4 flex max-h-[calc(100vh-420px)] flex-col gap-2 overflow-auto pr-1">
+                    <div className="mt-4 flex max-h-[calc(100vh-360px)] flex-col gap-1.5 overflow-auto pr-1">
                         {cartItems.length === 0 ? (
                             <div className="rounded-2xl border border-white/10 bg-black/10 p-6 text-center">
                                 <p className="text-sm font-semibold">No items yet</p>
@@ -694,38 +692,38 @@ export default function NewOrder() {
                     </div>
 
                     <div className="mt-4 space-y-3">
-                        <div className="grid grid-cols-1 gap-2">
-                            <label className="block">
-                                <span className="theme-muted text-xs">Customer name (optional)</span>
-                                <input
-                                    value={customerName}
-                                    onChange={(e) => setCustomerName(e.target.value)}
-                                    className="theme-input mt-1 w-full rounded-2xl px-3 py-2 text-sm font-semibold outline-none"
-                                    placeholder="Walk-in / Guest"
-                                />
-                            </label>
+                        <div className="rounded-2xl border border-white/10 bg-black/10 p-3">
+                            <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.2em]">Receipt</p>
+                            {cartItems.length === 0 ? (
+                                <p className="theme-muted mt-2 text-xs">Tap items to generate a receipt preview.</p>
+                            ) : (
+                                <div className="mt-2 space-y-1">
+                                    {cartItems.map((it) => {
+                                        const qty = Math.max(1, Number(it?.qty || 1));
+                                        const lineTotal = Number(it?.price || 0) * qty;
+                                        return (
+                                            <div key={`receipt-${it.id}`} className="py-1">
+                                                <div className="flex items-start justify-between gap-2 text-xs">
+                                                    <p className="min-w-0 truncate font-semibold">{it?.name || "Item"}</p>
+                                                    <p className="font-semibold tabular-nums">Rs {toInr(lineTotal)}</p>
+                                                </div>
+                                                <p className="theme-muted text-[11px]">{qty} x Rs {toInr(it?.price)}</p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
 
-                            <label className="block">
-                                <span className="theme-muted text-xs">Phone (optional)</span>
-                                <input
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                    className="theme-input mt-1 w-full rounded-2xl px-3 py-2 text-sm font-semibold outline-none"
-                                    placeholder="Customer phone"
-                                    inputMode="tel"
-                                />
-                            </label>
-
-                            <label className="block">
-                                <span className="theme-muted text-xs">Item notes (optional)</span>
-                                <textarea
-                                    value={notes}
-                                    onChange={(e) => setNotes(e.target.value)}
-                                    className="theme-input mt-1 w-full rounded-2xl px-3 py-2 text-sm font-semibold outline-none"
-                                    rows={3}
-                                    placeholder="Allergies, preferences…"
-                                />
-                            </label>
+                            <div className="mt-3 border-t border-white/10 pt-2">
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="theme-muted">Items</span>
+                                    <span className="font-semibold tabular-nums">{totalItems}</span>
+                                </div>
+                                <div className="mt-1 flex items-center justify-between text-sm">
+                                    <span className="font-semibold">Total</span>
+                                    <span className="font-bold tabular-nums">Rs {toInr(subtotal)}</span>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-2">
@@ -746,7 +744,7 @@ export default function NewOrder() {
                                 {placing ? (
                                     <span className="inline-flex items-center gap-2">
                                         <LoaderCircle size={16} className="animate-spin" />
-                                        Placing…
+                                        Placing...
                                     </span>
                                 ) : (
                                     "Place Order"

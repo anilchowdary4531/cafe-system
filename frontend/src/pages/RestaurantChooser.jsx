@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapPin, Navigation, Store } from "lucide-react";
+import { MapPin, Navigation } from "lucide-react";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import { cachedGet } from "../utils/apiClient";
 import { getCustomerSettings } from "../utils/customerSettings";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
+import BrandLogo from "../components/BrandLogo";
 
 const toRad = (deg) => (Number(deg) * Math.PI) / 180;
 
@@ -172,7 +173,7 @@ export default function RestaurantChooser() {
                     <header className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
                         <div className="flex items-center gap-4">
                             <div className="theme-card flex h-14 w-14 items-center justify-center rounded-2xl">
-                                <Store size={26} />
+                                <BrandLogo className="h-9 w-9" title="Brand logo" />
                             </div>
                             <div>
                                 <p className="theme-accent-text text-xs font-semibold uppercase tracking-[0.28em]">Start Ordering</p>

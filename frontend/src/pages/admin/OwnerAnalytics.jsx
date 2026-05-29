@@ -11,27 +11,87 @@ import {
     Sparkles,
     TrendingUp,
 } from "lucide-react";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { API } from "../../config";
 
 const RANGE_OPTIONS = ["24h", "7d", "30d"];
 const REFRESH_MS = 15000;
 
-const formatMoney = (value) => `₹${Number(value || 0).toFixed(2)}`;
+const formatMoney = (value) => `\u20B9${Number(value || 0).toFixed(2)}`;
 const formatPct = (value) => `${Number(value || 0).toFixed(1)}%`;
 
 const insightClasses = {
-    warning: "border-amber-500/30 bg-amber-500/10 text-amber-200",
-    success: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-    info: "border-cyan-500/30 bg-cyan-500/10 text-cyan-200",
+    warning: "border-amber-300/40 bg-amber-400/10",
+    success: "border-emerald-300/40 bg-emerald-400/10",
+    info: "border-cyan-300/40 bg-cyan-400/10",
 };
 
 const statusColors = {
-    PLACED: "from-blue-400 to-blue-600",
-    ACCEPTED: "from-indigo-400 to-indigo-600",
-    PREPARING: "from-amber-400 to-amber-600",
-    READY: "from-lime-400 to-lime-600",
-    DELIVERED: "from-emerald-400 to-emerald-600",
-    CANCELLED: "from-rose-400 to-rose-600",
+    PLACED: "from-sky-400 to-blue-500",
+    ACCEPTED: "from-indigo-400 to-indigo-500",
+    PREPARING: "from-amber-400 to-orange-500",
+    READY: "from-lime-400 to-emerald-500",
+    DELIVERED: "from-emerald-400 to-teal-500",
+    CANCELLED: "from-rose-400 to-rose-500",
+};
+
+const panelClass = "theme-card rounded-[20px] border p-4 sm:p-5";
+const subPanelClass = "rounded-[14px] border p-3.5 sm:p-4";
+
+const PIE_COLORS = [
+    "var(--app-primary)",
+    "var(--app-accent)",
+    "var(--app-primary-hover)",
+    "#60a5fa",
+    "#a78bfa",
+    "#f472b6",
+];
+
+const subPanelStyle = {
+    borderColor: "var(--app-border)",
+    background: "var(--app-surface-2)",
+    color: "var(--app-text)",
+};
+
+const chartTrackStyle = {
+    background: "var(--app-border)",
+};
+
+const controlRailStyle = {
+    borderColor: "var(--app-border)",
+    background: "color-mix(in srgb, var(--app-surface) 72%, transparent)",
+    boxShadow: "0 8px 24px color-mix(in srgb, var(--app-bg) 28%, transparent)",
+};
+
+const getRangeButtonStyle = (active) =>
+    active
+        ? {
+              background: "var(--app-primary)",
+              color: "var(--app-primary-text)",
+              boxShadow: "0 8px 18px color-mix(in srgb, var(--app-primary) 30%, transparent)",
+          }
+        : {
+              background: "transparent",
+              color: "var(--app-muted-strong)",
+          };
+
+const getLiveButtonStyle = (active) =>
+    active
+        ? {
+              borderColor: "color-mix(in srgb, var(--app-primary) 70%, var(--app-border) 30%)",
+              background: "color-mix(in srgb, var(--app-primary) 20%, transparent)",
+              color: "var(--app-text)",
+          }
+        : {
+              borderColor: "var(--app-border)",
+              background: "color-mix(in srgb, var(--app-surface) 72%, transparent)",
+              color: "var(--app-muted-strong)",
+          };
+
+const refreshButtonStyle = {
+    borderColor: "color-mix(in srgb, var(--app-primary) 45%, var(--app-border) 55%)",
+    background: "color-mix(in srgb, var(--app-primary) 12%, transparent)",
+    color: "var(--app-text)",
 };
 
 export default function OwnerAnalytics() {
@@ -90,75 +150,98 @@ export default function OwnerAnalytics() {
     }, [autoRefresh, restaurantId, range]);
 
     const peakSlot = data?.charts?.peakWindows?.[0];
+    const series = (data?.charts?.timeseries || []).slice(-12);
+    const topItems = data?.charts?.topItems || [];
+    const categories = (data?.charts?.categories || []).slice(0, 6);
+    const tableHeatmap = data?.charts?.tableHeatmap || [];
+
+    const categoryPieData = categories.map((cat, index) => ({
+        name: cat.name,
+        value: Number(cat.revenue || 0),
+        color: PIE_COLORS[index % PIE_COLORS.length],
+    }));
+
     const maxSeriesOrders = Math.max(
         1,
-        ...(data?.charts?.timeseries || []).map((point) => Number(point.orders || 0))
+        ...series.map((point) => Number(point.orders || 0))
     );
     const maxTopQty = Math.max(
         1,
-        ...(data?.charts?.topItems || []).map((item) => Number(item.qty || 0))
+        ...topItems.map((item) => Number(item.qty || 0))
     );
     const maxCategoryRevenue = Math.max(
         1,
-        ...(data?.charts?.categories || []).map((item) => Number(item.revenue || 0))
+        ...categories.map((item) => Number(item.revenue || 0))
     );
     const maxTableOrders = Math.max(
         1,
-        ...(data?.charts?.tableHeatmap || []).map((table) => Number(table.orders || 0))
+        ...tableHeatmap.map((table) => Number(table.orders || 0))
     );
+    const totalOrders = Math.max(1, Number(data?.overview?.totalOrders || 0));
+
+    const totalCategoryRevenue = categoryPieData.reduce(
+        (sum, item) => sum + Number(item.value || 0),
+        0
+    );
+    const hasCategoryPieData = categoryPieData.some((item) => Number(item.value || 0) > 0);
+    const renderedPieData = hasCategoryPieData
+        ? categoryPieData
+        : [{ name: "No Data", value: 1, color: "var(--app-border-strong)" }];
 
     if (loading) {
         return (
-            <div className="rounded-3xl border border-white/10 bg-[#111827] p-7 text-gray-300">
-                Loading analytics engine...
+            <div className={panelClass}>
+                <p className="text-sm theme-muted-strong">Loading analytics engine...</p>
             </div>
         );
     }
 
     return (
-        <section className="space-y-5">
-            <article className="relative overflow-hidden rounded-3xl border border-cyan-400/20 bg-gradient-to-br from-[#0f172a] via-[#071a2d] to-[#10233c] p-6">
-                <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cyan-400/20 blur-3xl" />
-                <div className="pointer-events-none absolute -bottom-16 -left-12 h-48 w-48 rounded-full bg-orange-400/20 blur-3xl" />
+        <section className="space-y-4" style={{ color: "var(--app-text)" }}>
+            <article className="theme-hero-band relative overflow-hidden rounded-[28px] px-5 py-6 sm:px-7">
+                <div className="pointer-events-none absolute -right-20 -top-20 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-black/15 blur-3xl" />
 
                 <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                        <p className="text-xs uppercase tracking-[0.25em] text-cyan-300/80">
+                        <p className="theme-price text-[11px] uppercase tracking-[0.26em]">
                             Neural Analytics Grid
                         </p>
-                        <h3 className="mt-1 text-3xl font-bold text-white">
+                        <h3 className="mt-1.5 text-3xl font-extrabold sm:text-4xl">
                             {data?.restaurant?.name || "Restaurant"} Intelligence
                         </h3>
-                        <p className="mt-1 text-sm text-slate-300">
+                        <p className="theme-muted-strong mt-2 text-sm sm:text-base">
                             Real-time operations, demand prediction, and kitchen risk monitoring.
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        {RANGE_OPTIONS.map((option) => (
-                            <button
-                                key={option}
-                                type="button"
-                                onClick={() => setRange(option)}
-                                className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
-                                    range === option
-                                        ? "border-cyan-300 bg-cyan-300/20 text-cyan-200"
-                                        : "border-white/15 bg-white/5 text-slate-300"
-                                }`}
-                            >
-                                {option}
-                            </button>
-                        ))}
+                    <div className="flex flex-wrap items-center justify-end gap-2.5">
+                        <div
+                            className="inline-flex items-center gap-1 rounded-2xl border p-1"
+                            style={controlRailStyle}
+                        >
+                            {RANGE_OPTIONS.map((option) => (
+                                <button
+                                    key={option}
+                                    type="button"
+                                    onClick={() => setRange(option)}
+                                    className="min-w-[52px] whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-semibold transition-all duration-200"
+                                    style={getRangeButtonStyle(range === option)}
+                                >
+                                    {option}
+                                </button>
+                            ))}
+                        </div>
 
                         <button
                             type="button"
                             onClick={() => setAutoRefresh((prev) => !prev)}
-                            className={`rounded-lg border px-3 py-1.5 text-sm ${
-                                autoRefresh
-                                    ? "border-emerald-300 bg-emerald-300/20 text-emerald-200"
-                                    : "border-white/15 bg-white/5 text-slate-300"
-                            }`}
+                            className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-sm font-semibold transition-all duration-200"
+                            style={getLiveButtonStyle(autoRefresh)}
                         >
+                            <span
+                                className={`h-2 w-2 rounded-full ${autoRefresh ? "bg-emerald-400" : "bg-slate-400"}`}
+                            />
                             {autoRefresh ? "Live ON" : "Live OFF"}
                         </button>
 
@@ -166,7 +249,8 @@ export default function OwnerAnalytics() {
                             type="button"
                             onClick={() => fetchAnalytics({ silent: true })}
                             disabled={refreshing}
-                            className="inline-flex items-center gap-2 rounded-lg border border-orange-300/40 bg-orange-300/10 px-3 py-1.5 text-sm text-orange-200 disabled:opacity-60"
+                            className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-sm font-semibold transition-all duration-200 disabled:opacity-60"
+                            style={refreshButtonStyle}
                         >
                             {refreshing ? (
                                 <LoaderCircle size={14} className="animate-spin" />
@@ -180,101 +264,112 @@ export default function OwnerAnalytics() {
             </article>
 
             {error && (
-                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+                <div className="rounded-xl border border-red-300/40 bg-red-500/10 p-3 text-sm text-red-200">
                     {error}
                 </div>
             )}
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <article className="rounded-2xl border border-white/10 bg-[#111827] p-4">
-                    <p className="text-xs text-gray-400">Total Revenue</p>
-                    <p className="mt-2 text-2xl font-bold">{formatMoney(data?.overview?.totalRevenue)}</p>
-                    <p className="mt-1 text-xs text-cyan-300">
+                <article className={panelClass}>
+                    <p className="theme-muted-strong text-xl sm:text-2xl">Total Revenue</p>
+                    <p className="mt-2 text-[34px] font-black leading-none sm:text-[40px]">
+                        {formatMoney(data?.overview?.totalRevenue)}
+                    </p>
+                    <p className="theme-price mt-3 text-sm">
                         <TrendingUp size={12} className="mr-1 inline" />
                         Avg ticket {formatMoney(data?.overview?.avgOrderValue)}
                     </p>
                 </article>
 
-                <article className="rounded-2xl border border-white/10 bg-[#111827] p-4">
-                    <p className="text-xs text-gray-400">Kitchen Queue</p>
-                    <p className="mt-2 text-2xl font-bold">{data?.realtime?.activeQueue || 0}</p>
-                    <p className="mt-1 text-xs text-amber-300">
+                <article className={panelClass}>
+                    <p className="theme-muted-strong text-xl sm:text-2xl">Kitchen Queue</p>
+                    <p className="mt-2 text-[34px] font-black leading-none sm:text-[40px]">
+                        {data?.realtime?.activeQueue || 0}
+                    </p>
+                    <p className="theme-price mt-3 text-sm">
                         <AlarmClockCheck size={12} className="mr-1 inline" />
                         Delayed {data?.realtime?.delayedTickets || 0}
                     </p>
                 </article>
 
-                <article className="rounded-2xl border border-white/10 bg-[#111827] p-4">
-                    <p className="text-xs text-gray-400">Completion Rate</p>
-                    <p className="mt-2 text-2xl font-bold">
+                <article className={panelClass}>
+                    <p className="theme-muted-strong text-xl sm:text-2xl">Completion Rate</p>
+                    <p className="mt-2 text-[34px] font-black leading-none sm:text-[40px]">
                         {formatPct(data?.overview?.completionRate)}
                     </p>
-                    <p className="mt-1 text-xs text-rose-300">
+                    <p className="mt-3 text-sm text-rose-300">
                         Cancel {formatPct(data?.overview?.cancellationRate)}
                     </p>
                 </article>
 
-                <article className="rounded-2xl border border-white/10 bg-[#111827] p-4">
-                    <p className="text-xs text-gray-400">Forecast EOD</p>
-                    <p className="mt-2 text-2xl font-bold">
+                <article className={panelClass}>
+                    <p className="theme-muted-strong text-xl sm:text-2xl">Forecast EOD</p>
+                    <p className="mt-2 text-[34px] font-black leading-none sm:text-[40px]">
                         {formatMoney(data?.forecast?.projectedEodRevenue)}
                     </p>
-                    <p className="mt-1 text-xs text-violet-300">
+                    <p className="mt-3 text-sm text-violet-300">
                         Confidence: {String(data?.forecast?.confidence || "low").toUpperCase()}
                     </p>
                 </article>
             </div>
 
             <div className="grid gap-4 xl:grid-cols-3">
-                <article className="rounded-2xl border border-white/10 bg-[#111827] p-5 xl:col-span-2">
+                <article className={`${panelClass} xl:col-span-2`}>
                     <div className="flex items-center justify-between">
-                        <h4 className="text-lg font-semibold">Demand Waveform</h4>
-                        <span className="text-xs text-gray-400">{range} window</span>
+                        <h4 className="text-3xl font-extrabold sm:text-[34px]">Demand Waveform</h4>
+                        <span className="theme-muted-strong text-base">{range} window</span>
                     </div>
-                    <div className="mt-4 grid grid-cols-12 gap-2">
-                        {(data?.charts?.timeseries || []).slice(-12).map((point) => {
-                            const h = Math.max(
-                                10,
-                                Math.round((Number(point.orders || 0) / maxSeriesOrders) * 110)
+                    <div className="mt-5 flex flex-wrap gap-x-3 gap-y-4">
+                        {series.map((point) => {
+                            const pct = Math.min(
+                                100,
+                                Math.max(
+                                    18,
+                                    Math.round((Number(point.orders || 0) / maxSeriesOrders) * 100)
+                                )
                             );
+
                             return (
-                                <div key={point.ts} className="flex flex-col items-center gap-1">
-                                    <div
-                                        className="w-full rounded-md bg-gradient-to-t from-cyan-500/40 to-blue-500/80"
-                                        style={{ height: `${h}px` }}
-                                        title={`${point.label}: ${point.orders} order(s), ${formatMoney(
-                                            point.revenue
-                                        )}`}
-                                    />
-                                    <span className="text-[10px] text-gray-500">{point.label}</span>
+                                <div key={point.ts} className="w-[80px]">
+                                    <div className="h-3 rounded-full p-[1px]" style={chartTrackStyle}>
+                                        <div
+                                            className="h-full rounded-full bg-[var(--app-primary)]"
+                                            style={{ width: `${pct}%` }}
+                                            title={`${point.label}: ${point.orders} order(s), ${formatMoney(point.revenue)}`}
+                                        />
+                                    </div>
+                                    <p className="theme-muted mt-2 text-center text-xs">{point.label}</p>
                                 </div>
                             );
                         })}
+                        {series.length === 0 && (
+                            <p className="theme-muted text-sm">No demand data in this window.</p>
+                        )}
                     </div>
                 </article>
 
-                <article className="rounded-2xl border border-white/10 bg-[#111827] p-5">
-                    <h4 className="flex items-center gap-2 text-lg font-semibold">
-                        <BrainCircuit size={17} className="text-cyan-300" />
+                <article className={panelClass}>
+                    <h4 className="flex items-center gap-2 text-3xl font-extrabold sm:text-[34px]">
+                        <BrainCircuit size={18} className="theme-price" />
                         AI Radar
                     </h4>
-                    <div className="mt-4 space-y-3 text-sm">
-                        <div className="rounded-xl border border-white/10 bg-[#0f172a] p-3">
-                            <p className="text-xs text-gray-400">Today Revenue</p>
-                            <p className="mt-1 text-xl font-semibold">
+                    <div className="mt-5 space-y-3">
+                        <div className={subPanelClass} style={subPanelStyle}>
+                            <p className="theme-muted-strong text-xl">Today Revenue</p>
+                            <p className="mt-1.5 text-[32px] font-black leading-none sm:text-[36px]">
                                 {formatMoney(data?.forecast?.todayRevenue)}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="theme-muted mt-2 text-sm">
                                 Run-rate {formatMoney(data?.forecast?.runRatePerHour)}/hr
                             </p>
                         </div>
 
-                        <div className="rounded-xl border border-white/10 bg-[#0f172a] p-3">
-                            <p className="text-xs text-gray-400">Peak Demand Window</p>
-                            <p className="mt-1 font-semibold text-cyan-300">
+                        <div className={subPanelClass} style={subPanelStyle}>
+                            <p className="theme-muted-strong text-xl">Peak Demand Window</p>
+                            <p className="theme-price mt-1.5 text-2xl font-bold sm:text-[28px]">
                                 {peakSlot ? peakSlot.label : "No peak yet"}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="theme-muted mt-2 text-sm">
                                 {peakSlot ? `${peakSlot.orders} orders` : "Insufficient data"}
                             </p>
                         </div>
@@ -283,72 +378,74 @@ export default function OwnerAnalytics() {
             </div>
 
             <div className="grid gap-4 xl:grid-cols-3">
-                <article className="rounded-2xl border border-white/10 bg-[#111827] p-5">
-                    <h4 className="flex items-center gap-2 text-lg font-semibold">
-                        <Activity size={17} className="text-orange-300" />
+                <article className={panelClass}>
+                    <h4 className="flex items-center gap-2 text-3xl font-extrabold sm:text-[34px]">
+                        <Activity size={18} className="theme-price" />
                         Kitchen Flow
                     </h4>
-                    <div className="mt-4 space-y-3">
+                    <div className="mt-5 space-y-3.5">
                         {(data?.statusFunnel || []).map((row) => {
-                            const max = Math.max(1, data?.overview?.totalOrders || 1);
-                            const pct = (Number(row.count || 0) / max) * 100;
-                            const gradient = statusColors[row.status] || "from-slate-400 to-slate-600";
+                            const pct = (Number(row.count || 0) / totalOrders) * 100;
+                            const gradient = statusColors[row.status] || "from-slate-400 to-slate-500";
 
                             return (
                                 <div key={row.status}>
-                                    <div className="mb-1 flex items-center justify-between text-xs text-gray-300">
+                                    <div className="mb-1.5 flex items-center justify-between text-base sm:text-lg">
                                         <span>{row.status}</span>
                                         <span>{row.count}</span>
                                     </div>
-                                    <div className="h-2 rounded-full bg-white/10">
+                                    <div className="h-2.5 rounded-full" style={chartTrackStyle}>
                                         <div
-                                            className={`h-2 rounded-full bg-gradient-to-r ${gradient}`}
-                                            style={{ width: `${Math.max(5, pct)}%` }}
+                                            className={`h-2.5 rounded-full bg-gradient-to-r ${gradient}`}
+                                            style={{ width: `${Math.max(6, pct)}%` }}
                                         />
                                     </div>
                                 </div>
                             );
                         })}
+                        {(data?.statusFunnel || []).length === 0 && (
+                            <p className="theme-muted text-sm">No order flow yet.</p>
+                        )}
                     </div>
                 </article>
 
-                <article className="rounded-2xl border border-white/10 bg-[#111827] p-5 xl:col-span-2">
-                    <h4 className="flex items-center gap-2 text-lg font-semibold">
-                        <ChartColumnIncreasing size={17} className="text-emerald-300" />
+                <article className={`${panelClass} xl:col-span-2`}>
+                    <h4 className="flex items-center gap-2 text-3xl font-extrabold sm:text-[34px]">
+                        <ChartColumnIncreasing size={18} className="theme-price" />
                         Top Movers
                     </h4>
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                        {(data?.charts?.topItems || []).map((item, index) => {
+                    <div className="mt-5 grid gap-3 md:grid-cols-2">
+                        {topItems.map((item, index) => {
                             const width = (Number(item.qty || 0) / maxTopQty) * 100;
                             return (
-                                <div key={item.name} className="rounded-xl border border-white/10 bg-[#0f172a] p-3">
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-sm font-medium">
+                                <div key={item.name} className={subPanelClass} style={subPanelStyle}>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="text-base font-semibold sm:text-lg">
                                             {index + 1}. {item.name}
                                         </p>
-                                        <p className="text-xs text-orange-300">{formatMoney(item.revenue)}</p>
+                                        <p className="theme-price text-sm">{formatMoney(item.revenue)}</p>
                                     </div>
-                                    <div className="mt-2 h-2 rounded-full bg-white/10">
+                                    <div className="mt-2.5 h-2.5 rounded-full" style={chartTrackStyle}>
                                         <div
-                                            className="h-2 rounded-full bg-gradient-to-r from-orange-400 to-orange-600"
+                                            className="h-2.5 rounded-full bg-[var(--app-primary)]"
                                             style={{ width: `${Math.max(8, width)}%` }}
                                         />
                                     </div>
-                                    <p className="mt-1 text-xs text-gray-400">{item.qty} qty sold</p>
+                                    <p className="theme-muted mt-2 text-sm">{item.qty} qty sold</p>
                                 </div>
                             );
                         })}
-                        {(data?.charts?.topItems || []).length === 0 && (
-                            <p className="text-sm text-gray-400">No item movement data yet.</p>
+                        {topItems.length === 0 && (
+                            <p className="theme-muted text-base">No item movement data yet.</p>
                         )}
                     </div>
                 </article>
             </div>
 
             <div className="grid gap-4 xl:grid-cols-2">
-                <article className="rounded-2xl border border-white/10 bg-[#111827] p-5">
-                    <h4 className="flex items-center gap-2 text-lg font-semibold">
-                        <Bot size={17} className="text-fuchsia-300" />
+                <article className={panelClass}>
+                    <h4 className="flex items-center gap-2 text-2xl font-extrabold sm:text-3xl">
+                        <Bot size={17} className="theme-price" />
                         Smart Alerts
                     </h4>
                     <div className="mt-4 space-y-3">
@@ -358,69 +455,118 @@ export default function OwnerAnalytics() {
                                 className={`rounded-xl border p-3 ${insightClasses[insight.level] || insightClasses.info}`}
                             >
                                 <p className="text-sm font-semibold">{insight.title}</p>
-                                <p className="mt-1 text-xs opacity-90">{insight.description}</p>
+                                <p className="theme-muted mt-1 text-xs">{insight.description}</p>
                             </div>
                         ))}
                         {(data?.insights || []).length === 0 && (
-                            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+                            <div className="rounded-xl border border-emerald-300/40 bg-emerald-400/10 p-3 text-sm">
                                 No major risks detected right now.
                             </div>
                         )}
                     </div>
                 </article>
 
-                <article className="rounded-2xl border border-white/10 bg-[#111827] p-5">
-                    <h4 className="flex items-center gap-2 text-lg font-semibold">
-                        <Sparkles size={17} className="text-cyan-300" />
+                <article className={panelClass}>
+                    <h4 className="flex items-center gap-2 text-2xl font-extrabold sm:text-3xl">
+                        <Sparkles size={17} className="theme-price" />
                         Category Intelligence
                     </h4>
+                    <div className={`${subPanelClass} mt-4`} style={subPanelStyle}>
+                        <div className="relative h-[220px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={renderedPieData}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={52}
+                                        outerRadius={84}
+                                        paddingAngle={hasCategoryPieData ? 2 : 0}
+                                        stroke="var(--app-surface)"
+                                        strokeWidth={3}
+                                    >
+                                        {renderedPieData.map((entry, index) => (
+                                            <Cell
+                                                key={`${entry.name}-${index}`}
+                                                fill={entry.color || PIE_COLORS[index % PIE_COLORS.length]}
+                                            />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        formatter={(value, name) => {
+                                            if (!hasCategoryPieData) return ["No revenue yet", name];
+                                            return [formatMoney(value), name];
+                                        }}
+                                        contentStyle={{
+                                            borderRadius: "10px",
+                                            border: "1px solid var(--app-border)",
+                                            background: "var(--app-surface)",
+                                            color: "var(--app-text)",
+                                        }}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                            <div className="pointer-events-none absolute inset-0 grid place-items-center">
+                                <div className="text-center">
+                                    <p className="theme-muted text-[11px] uppercase tracking-[0.12em]">
+                                        {hasCategoryPieData ? "Revenue Mix" : "Awaiting Data"}
+                                    </p>
+                                    <p className="mt-1 text-base font-semibold">
+                                        {hasCategoryPieData ? formatMoney(totalCategoryRevenue) : "--"}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div className="mt-4 space-y-3">
-                        {(data?.charts?.categories || []).slice(0, 6).map((cat) => {
-                            const width =
-                                (Number(cat.revenue || 0) / maxCategoryRevenue) * 100;
+                        {categories.map((cat) => {
+                            const width = (Number(cat.revenue || 0) / maxCategoryRevenue) * 100;
                             return (
                                 <div key={cat.name}>
-                                    <div className="mb-1 flex items-center justify-between text-xs text-gray-300">
+                                    <div className="mb-1.5 flex items-center justify-between text-sm">
                                         <span>{cat.name}</span>
-                                        <span>{formatMoney(cat.revenue)}</span>
+                                        <span className="theme-price">{formatMoney(cat.revenue)}</span>
                                     </div>
-                                    <div className="h-2 rounded-full bg-white/10">
+                                    <div className="h-2.5 rounded-full" style={chartTrackStyle}>
                                         <div
-                                            className="h-2 rounded-full bg-gradient-to-r from-cyan-400 to-teal-500"
-                                            style={{ width: `${Math.max(6, width)}%` }}
+                                            className="h-2.5 rounded-full bg-[var(--app-primary)]"
+                                            style={{ width: `${Math.max(8, width)}%` }}
                                         />
                                     </div>
                                 </div>
                             );
                         })}
-                        {(data?.charts?.categories || []).length === 0 && (
-                            <p className="text-sm text-gray-400">No category analytics yet.</p>
+                        {categories.length === 0 && (
+                            <p className="theme-muted text-sm">No category analytics yet.</p>
                         )}
                     </div>
                 </article>
             </div>
 
-            <article className="rounded-2xl border border-white/10 bg-[#111827] p-5">
-                <h4 className="text-lg font-semibold">Table Heatmap</h4>
+            <article className={panelClass}>
+                <h4 className="text-2xl font-extrabold sm:text-3xl">Table Heatmap</h4>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    {(data?.charts?.tableHeatmap || []).map((table) => {
+                    {tableHeatmap.map((table) => {
                         const glow = (Number(table.orders || 0) / maxTableOrders) * 100;
                         return (
                             <div
                                 key={table.tableNo}
-                                className="rounded-xl border border-white/10 bg-[#0f172a] p-3"
+                                className={subPanelClass}
                                 style={{
-                                    boxShadow: `inset 0 0 ${Math.max(8, glow / 3)}px rgba(34,211,238,0.12)`,
+                                    ...subPanelStyle,
+                                    boxShadow: `inset 0 0 ${Math.max(8, glow / 3)}px color-mix(in srgb, var(--app-primary) 24%, transparent)`,
                                 }}
                             >
-                                <p className="text-sm font-semibold">{table.tableNo}</p>
-                                <p className="mt-1 text-xs text-gray-400">{table.orders} orders</p>
-                                <p className="text-xs text-cyan-300">{formatMoney(table.revenue)} revenue</p>
+                                <p className="text-base font-semibold sm:text-lg">{table.tableNo}</p>
+                                <p className="theme-muted mt-1 text-sm">{table.orders} orders</p>
+                                <p className="theme-price text-sm">{formatMoney(table.revenue)} revenue</p>
                             </div>
                         );
                     })}
-                    {(data?.charts?.tableHeatmap || []).length === 0 && (
-                        <p className="text-sm text-gray-400">No table usage data for selected range.</p>
+                    {tableHeatmap.length === 0 && (
+                        <p className="theme-muted text-sm">No table usage data for selected range.</p>
                     )}
                 </div>
             </article>

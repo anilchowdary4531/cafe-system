@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Activity, IndianRupee, ReceiptText, RefreshCcw, Store } from "lucide-react";
+import { Activity, IndianRupee, ReceiptText, RefreshCcw } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import useCachedGet from "../hooks/useCachedGet";
 import { useCart } from "../context/CartContext";
 import { showToast } from "../utils/toast";
+import BrandLogo from "../components/BrandLogo";
 import {
     Area,
     AreaChart,
@@ -633,7 +634,7 @@ function RestaurantOrders({ group, highlightOrderId, onReorder, embedded = false
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div className="flex items-start gap-3">
                     <div className={embedded ? "flex h-10 w-10 items-center justify-center rounded-xl bg-black/10" : "theme-card flex h-12 w-12 items-center justify-center rounded-2xl"}>
-                        <Store size={20} />
+                        <BrandLogo className="h-5 w-5" title="Restaurant logo" />
                     </div>
                     <div>
                         <h2 className={embedded ? "text-lg font-semibold" : "text-xl font-semibold"}>{restaurantName}</h2>

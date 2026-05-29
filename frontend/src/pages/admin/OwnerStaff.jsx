@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
+    MoreVertical,
+    Pencil,
     KeyRound,
     LoaderCircle,
-    RefreshCcw,
     Search,
     ShieldCheck,
     Trash2,
@@ -13,7 +14,23 @@ import {
 } from "lucide-react";
 import { API } from "../../config";
 
-const STAFF_ROLES = ["MANAGER", "WAITER", "CHEF", "CASHIER", "STAFF"];
+const DESIGNATION_OPTIONS = [
+    "Chef",
+    "Senior Chef",
+    "Server",
+    "Swiper",
+    "Manager",
+    "Cashier",
+    "Steward",
+    "Cleaner",
+];
+const DEFAULT_DESIGNATION_BY_ROLE = {
+    MANAGER: "Manager",
+    WAITER: "Server",
+    CHEF: "Chef",
+    CASHIER: "Cashier",
+    STAFF: "Staff",
+};
 const ACCESS_LABELS = {
     dashboard: "Dashboard",
     orders: "Orders",
@@ -99,12 +116,20 @@ const defaultAccessByRole = (role) => {
     };
 };
 
+const getRoleDesignationFallback = (role) =>
+    DEFAULT_DESIGNATION_BY_ROLE[String(role || "STAFF").toUpperCase()] || "Staff";
+
+const resolveDesignation = (staffUser) => {
+    const customDesignation = String(staffUser?.designation || "").trim();
+    if (customDesignation) return customDesignation;
+    return getRoleDesignationFallback(staffUser?.role);
+};
+
 export default function OwnerStaff() {
     const [users, setUsers] = useState([]);
     const [modules, setModules] = useState(Object.keys(ACCESS_LABELS));
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
     const [creating, setCreating] = useState(false);
     const [savingAccessFor, setSavingAccessFor] = useState(null);
     const [updatingStatusFor, setUpdatingStatusFor] = useState(null);
@@ -112,6 +137,16 @@ export default function OwnerStaff() {
     const [error, setError] = useState("");
     const [selectedAccessUserId, setSelectedAccessUserId] = useState(null);
     const [accessDraft, setAccessDraft] = useState({});
+    const [showAddStaffForm, setShowAddStaffForm] = useState(false);
+    const [openActionMenuFor, setOpenActionMenuFor] = useState(null);
+    const [editingStaffId, setEditingStaffId] = useState(null);
+    const [savingEditFor, setSavingEditFor] = useState(null);
+    const [editDraft, setEditDraft] = useState({
+        name: "",
+        email: "",
+        phone: "",
+        designation: "",
+    });
 
     const [form, setForm] = useState({
         name: "",
@@ -119,6 +154,8 @@ export default function OwnerStaff() {
         phone: "",
         password: "",
         role: "STAFF",
+        designationOption: getRoleDesignationFallback("STAFF"),
+        customDesignation: "",
         isActive: true,
         access: defaultAccessByRole("STAFF"),
     });
@@ -141,8 +178,7 @@ export default function OwnerStaff() {
         }
 
         try {
-            if (silent) setRefreshing(true);
-            else setLoading(true);
+            setLoading((prev) => (silent ? prev : true));
 
             const res = await axios.get(`${API}/owner/${restaurantId}/staff`, {
                 params: query ? { q: query } : {},
@@ -155,7 +191,6 @@ export default function OwnerStaff() {
             setError(err?.response?.data?.message || "Failed to load staff users.");
         } finally {
             setLoading(false);
-            setRefreshing(false);
         }
     };
 
@@ -170,10 +205,28 @@ export default function OwnerStaff() {
         return () => clearTimeout(timer);
     }, [query]);
 
+    useEffect(() => {
+        if (!openActionMenuFor) return undefined;
+        const handleOutsideClick = (event) => {
+            if (event.target.closest("[data-staff-actions-menu]")) return;
+            setOpenActionMenuFor(null);
+        };
+        document.addEventListener("mousedown", handleOutsideClick);
+        return () => document.removeEventListener("mousedown", handleOutsideClick);
+    }, [openActionMenuFor]);
+
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!form.name || !form.email || !form.phone || !form.password) {
             setError("Name, email, phone, and password are required.");
+            return;
+        }
+        const designation =
+            form.designationOption === "OTHER"
+                ? String(form.customDesignation || "").trim()
+                : String(form.designationOption || "").trim();
+        if (!designation) {
+            setError("Designation is required.");
             return;
         }
 
@@ -184,6 +237,7 @@ export default function OwnerStaff() {
             await axios.post(`${API}/owner/${restaurantId}/staff`, {
                 ...form,
                 role: String(form.role).toUpperCase(),
+                designation,
             });
 
             setForm({
@@ -192,6 +246,8 @@ export default function OwnerStaff() {
                 phone: "",
                 password: "",
                 role: "STAFF",
+                designationOption: getRoleDesignationFallback("STAFF"),
+                customDesignation: "",
                 isActive: true,
                 access: defaultAccessByRole("STAFF"),
             });
@@ -241,6 +297,58 @@ export default function OwnerStaff() {
         setAccessDraft(staffUser.access || defaultAccessByRole(staffUser.role));
     };
 
+    const startEditRow = (staffUser) => {
+        setOpenActionMenuFor(null);
+        setSelectedAccessUserId(null);
+        setEditingStaffId(staffUser.id);
+        setEditDraft({
+            name: String(staffUser?.name || ""),
+            email: String(staffUser?.email || ""),
+            phone: String(staffUser?.phone || ""),
+            designation: String(resolveDesignation(staffUser) || ""),
+        });
+    };
+
+    const cancelEditRow = () => {
+        setEditingStaffId(null);
+        setEditDraft({
+            name: "",
+            email: "",
+            phone: "",
+            designation: "",
+        });
+    };
+
+    const saveEditedRow = async (staffUser) => {
+        const name = String(editDraft.name || "").trim();
+        const email = String(editDraft.email || "").trim().toLowerCase();
+        const phone = String(editDraft.phone || "").trim();
+        const designation = String(editDraft.designation || "").trim();
+
+        if (!name || !email) {
+            setError("Name and email are required to update staff.");
+            return;
+        }
+
+        try {
+            setSavingEditFor(staffUser.id);
+            setError("");
+            await axios.put(`${API}/owner/${restaurantId}/staff/${staffUser.id}`, {
+                name,
+                email,
+                phone,
+                designation,
+            });
+            cancelEditRow();
+            await loadStaff({ silent: true });
+        } catch (err) {
+            console.log(err);
+            setError(err?.response?.data?.message || "Failed to update staff user.");
+        } finally {
+            setSavingEditFor(null);
+        }
+    };
+
     const saveAccess = async (staffUserId) => {
         try {
             setSavingAccessFor(staffUserId);
@@ -258,215 +366,322 @@ export default function OwnerStaff() {
 
     return (
         <section className="space-y-5">
-            <article className="rounded-3xl border border-violet-400/20 bg-gradient-to-br from-[#121426] via-[#1a1d33] to-[#10253a] p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                        <p className="text-xs uppercase tracking-[0.24em] text-violet-300">
-                            Staff Control Center
-                        </p>
-                        <h3 className="mt-1 text-3xl font-bold">Staff & Access</h3>
-                        <p className="mt-1 text-sm text-slate-300">
-                            Create staff, manage active state, delegate module-level access, and monitor all users.
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => loadStaff({ silent: true })}
-                        className="inline-flex items-center gap-2 rounded-lg border border-cyan-300/40 bg-cyan-300/10 px-3 py-1.5 text-sm text-cyan-200"
-                        disabled={refreshing}
-                    >
-                        {refreshing ? (
-                            <LoaderCircle size={14} className="animate-spin" />
-                        ) : (
-                            <RefreshCcw size={14} />
-                        )}
-                        Refresh
-                    </button>
-                </div>
-            </article>
-
             {error && (
                 <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
                     {error}
                 </div>
             )}
 
-            <article className="rounded-2xl border border-white/10 bg-[#111827] p-5">
-                <h4 className="mb-3 flex items-center gap-2 text-lg font-semibold">
-                    <UserPlus size={18} className="text-orange-300" />
-                    Add New Staff
-                </h4>
-                <form onSubmit={handleCreate} className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                    <input
-                        placeholder="Full name"
-                        value={form.name}
-                        onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                        className="rounded-lg bg-[#0f172a] px-3 py-2 outline-none"
-                    />
-                    <input
-                        type="email"
-                        placeholder="Email"
-                        value={form.email}
-                        onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-                        className="rounded-lg bg-[#0f172a] px-3 py-2 outline-none"
-                    />
-                    <input
-                        placeholder="Phone number"
-                        value={form.phone}
-                        onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
-                        className="rounded-lg bg-[#0f172a] px-3 py-2 outline-none"
-                    />
-                    <input
-                        type="password"
-                        placeholder="Password"
-                        value={form.password}
-                        onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-                        className="rounded-lg bg-[#0f172a] px-3 py-2 outline-none"
-                    />
-                    <select
-                        value={form.role}
-                        onChange={(e) => {
-                            const role = e.target.value;
-                            setForm((prev) => ({
-                                ...prev,
-                                role,
-                                access: defaultAccessByRole(role),
-                            }));
-                        }}
-                        className="rounded-lg bg-[#0f172a] px-3 py-2 outline-none"
-                    >
-                        {STAFF_ROLES.map((role) => (
-                            <option key={role} value={role}>{role}</option>
-                        ))}
-                    </select>
-                    <label className="flex items-center gap-2 rounded-lg bg-[#0f172a] px-3 py-2 text-sm text-gray-300">
-                        <input
-                            type="checkbox"
-                            checked={form.isActive}
-                            onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))}
-                        />
-                        Active account
-                    </label>
-                    <button
-                        type="submit"
-                        disabled={creating}
-                        className="rounded-lg bg-orange-500 px-4 py-2 font-semibold text-black disabled:opacity-70"
-                    >
-                        {creating ? "Creating..." : "Create Staff User"}
-                    </button>
-                </form>
-
-                <div className="mt-3 rounded-lg border border-white/10 bg-[#0f172a] p-3">
-                    <p className="mb-2 text-xs uppercase tracking-wide text-gray-400">
-                        Initial Access Template
-                    </p>
-                    <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
-                        {Object.keys(form.access).map((key) => (
-                            <label key={key} className="flex items-center gap-2 text-xs text-gray-300">
+            {showAddStaffForm && (
+                <article className="p-1">
+                    <>
+                        <h4 className="mb-3 mt-4 flex items-center gap-2 text-lg font-semibold">
+                            <UserPlus size={18} className="text-orange-300" />
+                            Add New Staff
+                        </h4>
+                        <form onSubmit={handleCreate} className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                            <input
+                                placeholder="Full name"
+                                value={form.name}
+                                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                                className="rounded-lg bg-[#0f172a] px-3 py-2 outline-none"
+                            />
+                            <input
+                                type="email"
+                                placeholder="Email"
+                                value={form.email}
+                                onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                                className="rounded-lg bg-[#0f172a] px-3 py-2 outline-none"
+                            />
+                            <input
+                                placeholder="Phone number"
+                                value={form.phone}
+                                onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                                className="rounded-lg bg-[#0f172a] px-3 py-2 outline-none"
+                            />
+                            <input
+                                type="password"
+                                placeholder="Password"
+                                value={form.password}
+                                onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                                className="rounded-lg bg-[#0f172a] px-3 py-2 outline-none"
+                            />
+                            <select
+                                value={form.designationOption}
+                                onChange={(e) =>
+                                    setForm((prev) => ({
+                                        ...prev,
+                                        designationOption: e.target.value,
+                                    }))
+                                }
+                                className="rounded-lg bg-[#0f172a] px-3 py-2 outline-none"
+                            >
+                                {DESIGNATION_OPTIONS.map((designation) => (
+                                    <option key={designation} value={designation}>
+                                        {designation}
+                                    </option>
+                                ))}
+                                <option value="OTHER">Other (Custom)</option>
+                            </select>
+                            {form.designationOption === "OTHER" && (
                                 <input
-                                    type="checkbox"
-                                    checked={Boolean(form.access[key])}
+                                    placeholder="Custom designation"
+                                    value={form.customDesignation}
                                     onChange={(e) =>
                                         setForm((prev) => ({
                                             ...prev,
-                                            access: { ...prev.access, [key]: e.target.checked },
+                                            customDesignation: e.target.value,
                                         }))
                                     }
+                                    className="rounded-lg bg-[#0f172a] px-3 py-2 outline-none"
                                 />
-                                {ACCESS_LABELS[key] || key}
+                            )}
+                            <label className="flex items-center gap-2 rounded-lg bg-[#0f172a] px-3 py-2 text-sm text-gray-300">
+                                <input
+                                    type="checkbox"
+                                    checked={form.isActive}
+                                    onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))}
+                                />
+                                Active account
                             </label>
-                        ))}
-                    </div>
-                </div>
-            </article>
+                            <button
+                                type="submit"
+                                disabled={creating}
+                                className="rounded-lg bg-orange-500 px-4 py-2 font-semibold text-black disabled:opacity-70"
+                            >
+                                {creating ? "Creating..." : "Create Staff User"}
+                            </button>
+                        </form>
 
-            <article className="rounded-2xl border border-white/10 bg-[#111827] p-5">
+                        <div className="mt-3 p-1">
+                            <p className="mb-2 text-xs uppercase tracking-wide text-gray-400">
+                                Initial Access Template
+                            </p>
+                            <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+                                {Object.keys(form.access).map((key) => (
+                                    <label key={key} className="flex items-center gap-2 text-xs text-gray-300">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(form.access[key])}
+                                            onChange={(e) =>
+                                                setForm((prev) => ({
+                                                    ...prev,
+                                                    access: { ...prev.access, [key]: e.target.checked },
+                                                }))
+                                            }
+                                        />
+                                        {ACCESS_LABELS[key] || key}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                </article>
+            )}
+
+            <article className="p-1">
                 <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <h4 className="text-lg font-semibold">Staff Directory</h4>
-                    <div className="flex items-center gap-2 rounded-lg bg-[#0f172a] px-3 py-2 md:w-96">
-                        <Search size={15} className="text-gray-400" />
-                        <input
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Search by name, email, phone, role..."
-                            className="w-full bg-transparent text-sm outline-none"
-                        />
+                    <div className="flex w-full items-center gap-2">
+                        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-[#0f172a] px-3 py-2">
+                            <Search size={15} className="text-gray-400" />
+                            <input
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                placeholder="Search by name, email, phone, role, designation..."
+                                className="w-full bg-transparent text-sm outline-none"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowAddStaffForm((prev) => !prev)}
+                            className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-black"
+                        >
+                            <UserPlus size={16} />
+                            {showAddStaffForm ? "Hide Add New Staff" : "Add New Staff"}
+                        </button>
                     </div>
                 </div>
 
                 {loading ? (
-                    <div className="rounded-xl border border-white/10 bg-[#0f172a] p-4 text-sm text-gray-400">
+                    <div className="p-1 text-sm text-gray-400">
                         Loading staff...
                     </div>
                 ) : (
                     <div className="space-y-3">
                         {users.map((staffUser) => {
                             const open = selectedAccessUserId === staffUser.id;
+                            const isEditing = editingStaffId === staffUser.id;
                             return (
-                                <div key={staffUser.id} className="rounded-xl border border-white/10 bg-[#0f172a] p-4">
-                                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                <div key={staffUser.id} className="relative p-4 pr-14">
+                                    <div className="flex flex-col gap-3">
                                         <div>
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-base font-semibold">{staffUser.name}</p>
-                                                <span className="rounded bg-violet-500/20 px-2 py-0.5 text-xs text-violet-200">
-                                                    {staffUser.role}
-                                                </span>
-                                                <span
-                                                    className={`rounded px-2 py-0.5 text-xs ${
-                                                        staffUser.isActive
-                                                            ? "bg-emerald-500/20 text-emerald-200"
-                                                            : "bg-gray-500/20 text-gray-300"
-                                                    }`}
-                                                >
-                                                    {staffUser.isActive ? "ACTIVE" : "DISABLED"}
-                                                </span>
-                                            </div>
-                                            <p className="mt-1 text-sm text-gray-400">{staffUser.email}</p>
-                                            <p className="text-xs text-gray-400">{staffUser.phone || "-"}</p>
-                                            <p className="text-xs text-gray-500">
-                                                Created {new Date(staffUser.createdAt).toLocaleString()}
-                                            </p>
+                                            {isEditing ? (
+                                                <div className="space-y-2">
+                                                    <div className="grid gap-2 md:grid-cols-2">
+                                                        <input
+                                                            value={editDraft.name}
+                                                            onChange={(e) =>
+                                                                setEditDraft((prev) => ({
+                                                                    ...prev,
+                                                                    name: e.target.value,
+                                                                }))
+                                                            }
+                                                            placeholder="Full name"
+                                                            className="rounded-lg bg-[#0f172a] px-3 py-2 text-sm outline-none"
+                                                        />
+                                                        <input
+                                                            value={editDraft.designation}
+                                                            onChange={(e) =>
+                                                                setEditDraft((prev) => ({
+                                                                    ...prev,
+                                                                    designation: e.target.value,
+                                                                }))
+                                                            }
+                                                            placeholder="Designation"
+                                                            className="rounded-lg bg-[#0f172a] px-3 py-2 text-sm outline-none"
+                                                        />
+                                                        <input
+                                                            type="email"
+                                                            value={editDraft.email}
+                                                            onChange={(e) =>
+                                                                setEditDraft((prev) => ({
+                                                                    ...prev,
+                                                                    email: e.target.value,
+                                                                }))
+                                                            }
+                                                            placeholder="Email"
+                                                            className="rounded-lg bg-[#0f172a] px-3 py-2 text-sm outline-none"
+                                                        />
+                                                        <input
+                                                            value={editDraft.phone}
+                                                            onChange={(e) =>
+                                                                setEditDraft((prev) => ({
+                                                                    ...prev,
+                                                                    phone: e.target.value,
+                                                                }))
+                                                            }
+                                                            placeholder="Phone"
+                                                            className="rounded-lg bg-[#0f172a] px-3 py-2 text-sm outline-none"
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => saveEditedRow(staffUser)}
+                                                            disabled={savingEditFor === staffUser.id}
+                                                            className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-60"
+                                                        >
+                                                            {savingEditFor === staffUser.id ? "Saving..." : "Save"}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={cancelEditRow}
+                                                            className="rounded-lg border border-white/20 px-3 py-1.5 text-xs"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-base font-semibold">{staffUser.name}</p>
+                                                        <span className="rounded bg-cyan-500/20 px-2 py-0.5 text-xs text-cyan-100">
+                                                            {resolveDesignation(staffUser)}
+                                                        </span>
+                                                        <span
+                                                            className={`rounded px-2 py-0.5 text-xs ${
+                                                                staffUser.isActive
+                                                                    ? "bg-emerald-500/20 text-emerald-200"
+                                                                    : "bg-gray-500/20 text-gray-300"
+                                                            }`}
+                                                        >
+                                                            {staffUser.isActive ? "ACTIVE" : "DISABLED"}
+                                                        </span>
+                                                    </div>
+                                                    <p className="mt-1 text-sm text-gray-400">{staffUser.email}</p>
+                                                    <p className="text-xs text-gray-400">{staffUser.phone || "-"}</p>
+                                                    <p className="text-xs text-gray-500">
+                                                        Created {new Date(staffUser.createdAt).toLocaleString()}
+                                                    </p>
+                                                </>
+                                            )}
                                         </div>
 
-                                        <div className="flex flex-wrap gap-2">
+                                        <div className="absolute right-4 top-4" data-staff-actions-menu>
                                             <button
                                                 type="button"
-                                                onClick={() => toggleStaffStatus(staffUser)}
-                                                disabled={
-                                                    updatingStatusFor === staffUser.id ||
-                                                    staffUser.role === "OWNER"
+                                                onClick={() =>
+                                                    setOpenActionMenuFor((prev) =>
+                                                        prev === staffUser.id ? null : staffUser.id
+                                                    )
                                                 }
-                                                className="inline-flex items-center gap-1 rounded-lg bg-cyan-500/20 px-3 py-1.5 text-xs text-cyan-200 disabled:opacity-60"
+                                                className="inline-flex items-center justify-center rounded-lg bg-[#111827] p-2 text-gray-200 hover:bg-[#1b2438]"
+                                                aria-label="Open staff actions"
                                             >
-                                                {staffUser.isActive ? (
-                                                    <UserRoundX size={13} />
-                                                ) : (
-                                                    <UserRoundCheck size={13} />
-                                                )}
-                                                {staffUser.isActive ? "Disable" : "Enable"}
+                                                <MoreVertical size={16} />
                                             </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => openAccessPanel(staffUser)}
-                                                className="inline-flex items-center gap-1 rounded-lg bg-indigo-500/20 px-3 py-1.5 text-xs text-indigo-200"
-                                            >
-                                                <ShieldCheck size={13} />
-                                                Delegate Access
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => deleteStaff(staffUser)}
-                                                disabled={deletingFor === staffUser.id || staffUser.role === "OWNER"}
-                                                className="inline-flex items-center gap-1 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs text-red-200 disabled:opacity-60"
-                                            >
-                                                <Trash2 size={13} />
-                                                Delete
-                                            </button>
+
+                                            {openActionMenuFor === staffUser.id && (
+                                                <div className="absolute right-0 z-20 mt-2 w-44 rounded-lg border border-white/10 bg-[#111827] p-1 shadow-xl">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => startEditRow(staffUser)}
+                                                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-amber-200 hover:bg-amber-500/10"
+                                                    >
+                                                        <Pencil size={13} />
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setOpenActionMenuFor(null);
+                                                            toggleStaffStatus(staffUser);
+                                                        }}
+                                                        disabled={
+                                                            updatingStatusFor === staffUser.id ||
+                                                            staffUser.role === "OWNER"
+                                                        }
+                                                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-cyan-200 hover:bg-cyan-500/10 disabled:opacity-60"
+                                                    >
+                                                        {staffUser.isActive ? (
+                                                            <UserRoundX size={13} />
+                                                        ) : (
+                                                            <UserRoundCheck size={13} />
+                                                        )}
+                                                        {staffUser.isActive ? "Disable" : "Enable"}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setOpenActionMenuFor(null);
+                                                            openAccessPanel(staffUser);
+                                                        }}
+                                                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-indigo-200 hover:bg-indigo-500/10"
+                                                    >
+                                                        <ShieldCheck size={13} />
+                                                        Delegate Access
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setOpenActionMenuFor(null);
+                                                            deleteStaff(staffUser);
+                                                        }}
+                                                        disabled={deletingFor === staffUser.id || staffUser.role === "OWNER"}
+                                                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-red-200 hover:bg-red-500/10 disabled:opacity-60"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
-                                    {open && (
-                                        <div className="mt-4 rounded-lg border border-white/10 bg-[#111827] p-3">
+                                    {open && !isEditing && (
+                                        <div className="mt-4 p-3">
                                             <p className="mb-2 text-xs uppercase tracking-wide text-gray-400">
                                                 Module Access
                                             </p>
@@ -517,7 +732,7 @@ export default function OwnerStaff() {
                         })}
 
                         {users.length === 0 && (
-                            <div className="rounded-xl border border-white/10 bg-[#0f172a] p-4 text-sm text-gray-400">
+                            <div className="p-1 text-sm text-gray-400">
                                 No staff users found.
                             </div>
                         )}

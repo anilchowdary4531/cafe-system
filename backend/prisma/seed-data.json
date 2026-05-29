@@ -21,7 +21,7 @@
   },
   "admin": {
     "name": "Super Admin",
-    "email": "admin@suretra.com",
+    "email": "admin@tiffzy.com",
     "passwordKey": "admin",
     "role": "SUPER_ADMIN"
   },
@@ -47,10 +47,10 @@
       "nextInvoiceNumber": 1001,
       "users": [
         { "name": "Cafe King Owner", "email": "owner@cafeking.com", "phone": "9999999999", "passwordKey": "cafeKingOwner", "role": "OWNER" },
-        { "name": "Cafe King Manager", "email": "manager.cafeking@suretra.com", "phone": "9000000010", "passwordKey": "cafeKingManager", "role": "MANAGER" },
-        { "name": "Cafe King Chef", "email": "chef.cafeking@suretra.com", "phone": "9000000011", "passwordKey": "cafeKingChef", "role": "CHEF" },
+        { "name": "Cafe King Manager", "email": "manager.cafeking@tiffzy.com", "phone": "9000000010", "passwordKey": "cafeKingManager", "role": "MANAGER" },
+        { "name": "Cafe King Chef", "email": "chef.cafeking@tiffzy.com", "phone": "9000000011", "passwordKey": "cafeKingChef", "role": "CHEF" },
         { "name": "Cafe King Chef R14", "email": "chef1.r14@cafeking.com", "phone": "9000000099", "passwordKey": "cafeKingChefR14", "role": "CHEF" },
-        { "name": "Cafe King Cashier", "email": "cashier.cafeking@suretra.com", "phone": "9000000012", "passwordKey": "cafeKingCashier", "role": "CASHIER" }
+        { "name": "Cafe King Cashier", "email": "cashier.cafeking@tiffzy.com", "phone": "9000000012", "passwordKey": "cafeKingCashier", "role": "CASHIER" }
       ],
       "menuItems": [
         { "name": "Veg Biryani", "price": 150, "category": "Food", "image": "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d", "rating": 4.7, "reviewCount": 122, "orderCount": 820 },
@@ -91,9 +91,9 @@
       "nextInvoiceNumber": 1001,
       "users": [
         { "name": "Bean House Owner", "email": "owner@beanhouse.com", "phone": "8888888888", "passwordKey": "beanHouseOwner", "role": "OWNER" },
-        { "name": "Bean House Manager", "email": "manager.beanhouse@suretra.com", "phone": "9000000020", "passwordKey": "beanHouseManager", "role": "MANAGER" },
-        { "name": "Bean House Chef", "email": "chef.beanhouse@suretra.com", "phone": "9000000021", "passwordKey": "beanHouseChef", "role": "CHEF" },
-        { "name": "Bean House Waiter", "email": "waiter.beanhouse@suretra.com", "phone": "9000000022", "passwordKey": "beanHouseWaiter", "role": "WAITER" }
+        { "name": "Bean House Manager", "email": "manager.beanhouse@tiffzy.com", "phone": "9000000020", "passwordKey": "beanHouseManager", "role": "MANAGER" },
+        { "name": "Bean House Chef", "email": "chef.beanhouse@tiffzy.com", "phone": "9000000021", "passwordKey": "beanHouseChef", "role": "CHEF" },
+        { "name": "Bean House Waiter", "email": "waiter.beanhouse@tiffzy.com", "phone": "9000000022", "passwordKey": "beanHouseWaiter", "role": "WAITER" }
       ],
       "menuItems": [
         { "name": "Latte", "price": 170, "category": "Coffee", "image": "https://images.unsplash.com/photo-1461023058943-07fcbe16d735", "rating": 4.8, "reviewCount": 140, "orderCount": 870 },

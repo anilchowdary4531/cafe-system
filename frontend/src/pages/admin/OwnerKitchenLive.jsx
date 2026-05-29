@@ -229,11 +229,11 @@ export default function OwnerKitchenLive() {
                 </button>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
                 {STATUS_COLUMNS.map((status) => (
                     <article
                         key={status}
-                        className="rounded-2xl border border-white/10 bg-[#111827] p-4"
+                        className="min-w-[150px] flex-1 rounded-2xl border border-white/10 bg-[#111827] p-4"
                     >
                         <p className="text-xs text-gray-400">{status}</p>
                         <p className="mt-1 text-3xl font-bold">{counts[status] || 0}</p>

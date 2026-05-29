@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ClipboardList, Store } from "lucide-react";
+import { ArrowLeft, ClipboardList } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import { useRestaurantContext } from "../../../context/RestaurantContext";
 import useCachedGet from "../../../hooks/useCachedGet";
 import { useCart } from "../../../context/CartContext";
 import { showToast } from "../../../utils/toast";
 import OrderTrackingTimeline from "../../../components/OrderTrackingTimeline";
+import BrandLogo from "../../../components/BrandLogo";
 import { reorderOrderToCart } from "../../OrderHistory";
 
 const formatMoney = (value) => `₹${Math.round(Number(value || 0))}`;
@@ -108,7 +109,7 @@ export default function OrderDetailsPage() {
                         </h1>
                         <p className="theme-muted mt-3 text-sm md:text-base">
                             <span className="inline-flex items-center gap-2">
-                                <Store size={16} />
+                                <BrandLogo className="h-4 w-4" title="Restaurant logo" />
                                 {restaurantName}
                             </span>
                             <span className="mx-2 opacity-50">•</span>

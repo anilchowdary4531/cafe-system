@@ -138,7 +138,7 @@ export default function SuperAdminDashboard() {
                         <div>
                             <p className="theme-muted text-xs uppercase tracking-[0.28em]">Super Admin</p>
                             <h1 className="text-2xl font-bold">Application Control Center</h1>
-                            <p className="theme-muted text-sm">{user?.email || "admin@suretra.com"}</p>
+                            <p className="theme-muted text-sm">{user?.email || "admin@tiffzy.com"}</p>
                         </div>
                     </div>
 

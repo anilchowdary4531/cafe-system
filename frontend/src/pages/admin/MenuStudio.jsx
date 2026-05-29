@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { MoreVertical } from "lucide-react";
 import { API } from "../../config";
 import { uploadToS3Presigned } from "../../utils/s3Upload";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
@@ -17,11 +18,14 @@ export default function MenuStudio() {
     const [items, setItems] = useState([]);
     const [search, setSearch] = useState("");
     const [form, setForm] = useState(emptyForm);
+    const [formOpen, setFormOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [imageUploading, setImageUploading] = useState(false);
     const [error, setError] = useState("");
+    const [openActionMenuId, setOpenActionMenuId] = useState(null);
+    const [openActionMenuPlacement, setOpenActionMenuPlacement] = useState("down");
 
     const user = useMemo(() => {
         try {
@@ -82,9 +86,53 @@ export default function MenuStudio() {
         loadMenu();
     }, [restaurantId]);
 
-    const resetForm = () => {
+    useEffect(() => {
+        if (!openActionMenuId) return undefined;
+
+        const onPointerDown = (event) => {
+            if (!event.target.closest("[data-item-action-menu='true']")) {
+                setOpenActionMenuId(null);
+            }
+        };
+
+        const onKeyDown = (event) => {
+            if (event.key === "Escape") setOpenActionMenuId(null);
+        };
+
+        window.addEventListener("mousedown", onPointerDown);
+        window.addEventListener("keydown", onKeyDown);
+        return () => {
+            window.removeEventListener("mousedown", onPointerDown);
+            window.removeEventListener("keydown", onKeyDown);
+        };
+    }, [openActionMenuId]);
+
+    const resetForm = ({ close = false } = {}) => {
         setForm(emptyForm);
         setEditingId(null);
+        if (close) setFormOpen(false);
+    };
+
+    const toggleActionMenu = (itemId, event) => {
+        if (openActionMenuId === itemId) {
+            setOpenActionMenuId(null);
+            return;
+        }
+
+        const triggerRect = event?.currentTarget?.getBoundingClientRect?.();
+        if (triggerRect) {
+            const viewportPadding = 12;
+            const estimatedMenuHeight = 176;
+            const gap = 8;
+            const spaceBelow = window.innerHeight - triggerRect.bottom - viewportPadding - gap;
+            const spaceAbove = triggerRect.top - viewportPadding - gap;
+            const shouldOpenUpward = spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow;
+            setOpenActionMenuPlacement(shouldOpenUpward ? "up" : "down");
+        } else {
+            setOpenActionMenuPlacement("down");
+        }
+
+        setOpenActionMenuId(itemId);
     };
 
     const handleSubmit = async (e) => {
@@ -111,7 +159,7 @@ export default function MenuStudio() {
             }
 
             await loadMenu();
-            resetForm();
+            resetForm({ close: true });
         } catch (err) {
             console.log(err);
             setError(getErrorMessage(err, "Could not save menu item."));
@@ -130,6 +178,7 @@ export default function MenuStudio() {
             isAvailable: item.isAvailable ?? true,
         });
         setEditingId(item.id);
+        setFormOpen(true);
     };
 
     const handleDelete = async (id) => {
@@ -176,6 +225,16 @@ export default function MenuStudio() {
         );
     });
 
+    const groupedItems = useMemo(() => {
+        const groups = new Map();
+        filteredItems.forEach((item) => {
+            const category = String(item?.category || "").trim() || "Uncategorized";
+            if (!groups.has(category)) groups.set(category, []);
+            groups.get(category).push(item);
+        });
+        return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], "en", { sensitivity: "base" }));
+    }, [filteredItems]);
+
     return (
         <section>
             <h3 className="text-3xl font-bold">Menu Studio</h3>
@@ -183,13 +242,23 @@ export default function MenuStudio() {
                 Create, edit, and control item availability for your restaurant menu.
             </p>
 
-            <div className="mt-4">
+            <div className="mt-4 flex items-center gap-3">
                 <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search by item name or category..."
                     className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 outline-none"
                 />
+                <button
+                    type="button"
+                    onClick={() => {
+                        setFormOpen((prev) => !prev);
+                        if (formOpen && !editingId) resetForm();
+                    }}
+                    className="shrink-0 rounded-xl bg-orange-500 px-4 py-3 font-semibold text-black"
+                >
+                    {formOpen ? "Hide Form" : "Add Item"}
+                </button>
             </div>
 
             {error && (
@@ -198,146 +267,209 @@ export default function MenuStudio() {
                 </div>
             )}
 
-            <form
-                onSubmit={handleSubmit}
-                className="mt-6 grid gap-3 rounded-2xl border border-white/10 bg-[#111827] p-5 md:grid-cols-2"
-            >
-                <input
-                    className="rounded-xl bg-[#0f172a] px-3 py-2 outline-none"
-                    placeholder="Item name"
-                    value={form.name}
-                    onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                />
-                <input
-                    className="rounded-xl bg-[#0f172a] px-3 py-2 outline-none"
-                    placeholder="Category"
-                    value={form.category}
-                    onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
-                />
-                <input
-                    className="rounded-xl bg-[#0f172a] px-3 py-2 outline-none"
-                    placeholder="Price"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.price}
-                    onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))}
-                />
-                <div className="flex flex-col gap-2 md:col-span-2">
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center">
-                        <input
-                            type="file"
-                            accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
-                            disabled={imageUploading}
-                            onChange={(e) => uploadMenuImage(e.target.files?.[0])}
-                            className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-slate-100 hover:file:bg-white/15 disabled:opacity-70 md:w-auto"
-                        />
-                        <input
-                            className="w-full rounded-xl bg-[#0f172a] px-3 py-2 outline-none"
-                            placeholder="Image URL"
-                            value={form.image}
-                            onChange={(e) => setForm((prev) => ({ ...prev, image: e.target.value }))}
-                        />
-                    </div>
-                    {imageUploading && <p className="text-xs text-slate-400">Uploading image...</p>}
-                </div>
-                <textarea
-                    className="rounded-xl bg-[#0f172a] px-3 py-2 outline-none md:col-span-2"
-                    placeholder="Description"
-                    value={form.description}
-                    onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                />
-
-                <label className="flex items-center gap-2 text-sm text-gray-300">
+            {formOpen && (
+                <form
+                    onSubmit={handleSubmit}
+                    className="mt-6 grid gap-3 rounded-2xl border border-white/10 bg-[#111827] p-5 md:grid-cols-2"
+                >
                     <input
-                        type="checkbox"
-                        checked={form.isAvailable}
-                        onChange={(e) => setForm((prev) => ({ ...prev, isAvailable: e.target.checked }))}
+                        className="rounded-xl bg-[#0f172a] px-3 py-2 outline-none"
+                        placeholder="Item name"
+                        value={form.name}
+                        onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                     />
-                    Available
-                </label>
+                    <input
+                        className="rounded-xl bg-[#0f172a] px-3 py-2 outline-none"
+                        placeholder="Category"
+                        value={form.category}
+                        onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+                    />
+                    <input
+                        className="rounded-xl bg-[#0f172a] px-3 py-2 outline-none"
+                        placeholder="Price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.price}
+                        onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))}
+                    />
+                    <div className="flex flex-col gap-2 md:col-span-2">
+                        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                            <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                                disabled={imageUploading}
+                                onChange={(e) => uploadMenuImage(e.target.files?.[0])}
+                                className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-slate-100 hover:file:bg-white/15 disabled:opacity-70 md:w-auto"
+                            />
+                            <input
+                                className="w-full rounded-xl bg-[#0f172a] px-3 py-2 outline-none"
+                                placeholder="Image URL"
+                                value={form.image}
+                                onChange={(e) => setForm((prev) => ({ ...prev, image: e.target.value }))}
+                            />
+                        </div>
+                        {imageUploading && <p className="text-xs text-slate-400">Uploading image...</p>}
+                    </div>
+                    <textarea
+                        className="rounded-xl bg-[#0f172a] px-3 py-2 outline-none md:col-span-2"
+                        placeholder="Description"
+                        value={form.description}
+                        onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                    />
 
-                <div className="flex gap-2 md:justify-end">
-                    {editingId && (
+                    <label className="flex items-center gap-2 text-sm text-gray-300">
+                        <input
+                            type="checkbox"
+                            checked={form.isAvailable}
+                            onChange={(e) => setForm((prev) => ({ ...prev, isAvailable: e.target.checked }))}
+                        />
+                        Available
+                    </label>
+
+                    <div className="flex gap-2 md:justify-end">
                         <button
                             type="button"
-                            onClick={resetForm}
+                            onClick={() => resetForm({ close: true })}
                             className="rounded-xl border border-white/20 px-4 py-2"
                         >
                             Cancel
                         </button>
-                    )}
-                    <button
-                        type="submit"
-                        disabled={submitting}
-                        className="rounded-xl bg-orange-500 px-4 py-2 font-semibold text-black disabled:opacity-60"
-                    >
-                        {submitting ? "Saving..." : editingId ? "Update Item" : "Add Item"}
-                    </button>
-                </div>
-            </form>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {!loading &&
-                    filteredItems.map((item) => (
-                        <article
-                            key={item.id}
-                            className="rounded-2xl border border-white/10 bg-[#111827] p-4"
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            className="rounded-xl bg-orange-500 px-4 py-2 font-semibold text-black disabled:opacity-60"
                         >
-                            <img
-                                src={resolveImageUrl(item.image) || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c"}
-                                alt={item.name}
-                                className="h-40 w-full rounded-xl object-cover"
-                            />
-                            <div className="mt-3">
-                                <p className="text-lg font-semibold">{item.name}</p>
-                                <p className="text-sm text-gray-400">{item.category}</p>
-                                <p className="mt-1 text-orange-300">₹{item.price}</p>
-                                {item.description && (
-                                    <p className="mt-2 text-sm text-gray-400">{item.description}</p>
-                                )}
+                            {submitting ? "Saving..." : editingId ? "Update Item" : "Add Item"}
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {!loading && groupedItems.length > 0 && (
+                <div className="mt-5 flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">Categories</span>
+                    {groupedItems.map(([category, categoryItems]) => (
+                        <span
+                            key={category}
+                            className="rounded-full border border-cyan-400/45 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-100"
+                        >
+                            {category} ({categoryItems.length})
+                        </span>
+                    ))}
+                </div>
+            )}
+
+            <div className="mt-6 space-y-5">
+                {!loading &&
+                    groupedItems.map(([category, categoryItems]) => (
+                        <section key={category} className="p-0">
+                            <div className="flex items-center justify-between gap-3">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-300">{category}</p>
+                                <p className="text-xs text-gray-400">{categoryItems.length} item(s)</p>
                             </div>
-                            <div className="mt-4 flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => startEdit(item)}
-                                    className="rounded-lg bg-yellow-500/20 px-3 py-1 text-yellow-300"
-                                >
-                                    Edit
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setAvailability(item, true)}
-                                    disabled={item.isAvailable}
-                                    className={`rounded-lg px-3 py-1 ${
-                                        item.isAvailable
-                                            ? "bg-green-500/25 text-green-200"
-                                            : "bg-green-500/10 text-green-300"
-                                    } disabled:cursor-not-allowed disabled:opacity-70`}
-                                >
-                                    Enable
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setAvailability(item, false)}
-                                    disabled={!item.isAvailable}
-                                    className={`rounded-lg px-3 py-1 ${
-                                        !item.isAvailable
-                                            ? "bg-gray-500/30 text-gray-200"
-                                            : "bg-gray-500/20 text-gray-300"
-                                    } disabled:cursor-not-allowed disabled:opacity-70`}
-                                >
-                                    Disable
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleDelete(item.id)}
-                                    className="rounded-lg bg-red-500/20 px-3 py-1 text-red-300"
-                                >
-                                    Delete
-                                </button>
+
+                            <div className="mt-3 flex gap-3 overflow-x-auto pb-1 pr-1">
+                                {categoryItems.map((item) => (
+                                    <article
+                                        key={item.id}
+                                        className="relative w-[230px] shrink-0 overflow-visible rounded-xl border border-white/15 bg-transparent"
+                                    >
+                                        <div className="relative">
+                                            <img
+                                                src={resolveImageUrl(item.image) || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c"}
+                                                alt={item.name}
+                                                className="h-28 w-full rounded-t-xl object-cover"
+                                            />
+                                            <div className="absolute right-3 top-3 z-10" data-item-action-menu="true">
+                                                <button
+                                                    type="button"
+                                                    onClick={(event) => toggleActionMenu(item.id, event)}
+                                                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-transparent text-white/95 transition hover:text-white"
+                                                    aria-label="Open item actions"
+                                                >
+                                                    <MoreVertical size={20} strokeWidth={2.4} />
+                                                </button>
+
+                                                {openActionMenuId === item.id && (
+                                                    <div
+                                                        className={`absolute right-0 z-30 w-40 overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#0b1222] p-1 shadow-[0_16px_40px_rgba(0,0,0,0.55)] touch-pan-y ${
+                                                            openActionMenuPlacement === "up"
+                                                                ? "bottom-full mb-2 max-h-[min(14rem,calc(100vh-2rem))]"
+                                                                : "mt-2 max-h-[min(14rem,calc(100vh-2rem))]"
+                                                        }`}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                startEdit(item);
+                                                                setOpenActionMenuId(null);
+                                                            }}
+                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-yellow-300 transition hover:bg-yellow-500/15"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setAvailability(item, true);
+                                                                setOpenActionMenuId(null);
+                                                            }}
+                                                            disabled={item.isAvailable}
+                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-green-300 transition hover:bg-green-500/15 disabled:cursor-not-allowed disabled:opacity-45"
+                                                        >
+                                                            Enable
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setAvailability(item, false);
+                                                                setOpenActionMenuId(null);
+                                                            }}
+                                                            disabled={!item.isAvailable}
+                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-gray-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+                                                        >
+                                                            Disable
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                handleDelete(item.id);
+                                                                setOpenActionMenuId(null);
+                                                            }}
+                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-red-300 transition hover:bg-red-500/15"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="p-3">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-lg font-semibold">{item.name}</p>
+                                                    {item.description && <p className="mt-1 text-xs text-gray-400">{item.description}</p>}
+                                                </div>
+                                                <div className="shrink-0 text-right">
+                                                    <p className="text-lg font-semibold text-orange-300">₹{item.price}</p>
+                                                    <span
+                                                        className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                                                            item.isAvailable
+                                                                ? "bg-emerald-500/20 text-emerald-200"
+                                                                : "bg-slate-500/30 text-slate-200"
+                                                        }`}
+                                                    >
+                                                        {item.isAvailable ? "Available" : "Disabled"}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </article>
+                                ))}
                             </div>
-                        </article>
+                        </section>
                     ))}
             </div>
 
@@ -347,7 +479,7 @@ export default function MenuStudio() {
                 </div>
             )}
 
-            {!loading && filteredItems.length === 0 && (
+            {!loading && groupedItems.length === 0 && (
                 <div className="mt-6 rounded-2xl border border-white/10 bg-[#111827] p-5 text-gray-300">
                     {items.length === 0
                         ? "No menu items yet. Add your first item above."

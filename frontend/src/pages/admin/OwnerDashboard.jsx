@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { IndianRupee, ShoppingBag, TableProperties, UtensilsCrossed } from "lucide-react";
 import { API } from "../../config";
 
 export default function OwnerDashboard() {
@@ -33,26 +32,28 @@ export default function OwnerDashboard() {
         );
     }
 
+    const formatAmount = (amount, decimals = 2) =>
+        Number(amount || 0).toLocaleString("en-IN", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: decimals,
+        });
+
     const stats = [
         {
             title: "Revenue",
-            value: `₹${data.revenue}`,
-            icon: <IndianRupee size={18} />,
+            value: `\u20B9${formatAmount(data.revenue)}`,
         },
         {
             title: "Orders",
-            value: data.ordersCount,
-            icon: <ShoppingBag size={18} />,
+            value: formatAmount(data.ordersCount, 0),
         },
         {
             title: "Menu Items",
-            value: data.menuCount,
-            icon: <UtensilsCrossed size={18} />,
+            value: formatAmount(data.menuCount, 0),
         },
         {
             title: "Tables",
-            value: data.tablesCount,
-            icon: <TableProperties size={18} />,
+            value: formatAmount(data.tablesCount, 0),
         },
     ];
 
@@ -60,20 +61,16 @@ export default function OwnerDashboard() {
 
     return (
         <section>
-            <p className="text-sm text-gray-400">Welcome back</p>
-            <h3 className="mt-1 text-3xl font-bold">{data.restaurantName}</h3>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-2 grid grid-cols-4 gap-2">
                 {stats.map((card) => (
                     <article
                         key={card.title}
-                        className="rounded-2xl border border-white/10 bg-[#111827] p-5"
+                        className="min-w-0 px-2 py-1"
                     >
-                        <div className="flex items-center justify-between text-gray-400">
-                            <span>{card.title}</span>
-                            {card.icon}
+                        <div className="text-gray-300">
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.16em]">{card.title}</span>
                         </div>
-                        <p className="mt-4 text-3xl font-bold">{card.value}</p>
+                        <p className="mt-2 text-[26px] font-bold leading-none">{card.value}</p>
                     </article>
                 ))}
             </div>
@@ -100,7 +97,7 @@ export default function OwnerDashboard() {
                                 <p className="text-sm text-gray-400">Table {order.tableNo || "--"}</p>
                             </div>
                             <div className="text-right">
-                                <p>₹{Number(order.total || 0).toFixed(2)}</p>
+                                <p>{`\u20B9${formatAmount(order.total)}`}</p>
                                 <p className="text-sm text-orange-300">{order.status}</p>
                             </div>
                         </div>
