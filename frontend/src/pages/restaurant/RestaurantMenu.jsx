@@ -366,12 +366,6 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
                     loading="lazy"
                 />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/55 to-transparent" />
-                <div className="absolute bottom-3 left-3 flex items-center gap-2">
-                    <span className="theme-pill rounded-full px-3 py-1 text-xs font-semibold">Rs {item?.price}</span>
-                    {item?.category ? (
-                        <span className="theme-pill rounded-full px-3 py-1 text-xs font-semibold">{item.category}</span>
-                    ) : null}
-                </div>
             </div>
 
             <div className="p-3">
@@ -398,7 +392,7 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
                 <p className="theme-muted mt-1.5 text-xs">Freshly prepared, premium quality ingredients.</p>
 
                 <div className="mt-3 flex items-center justify-between gap-2">
-                    <span className="theme-muted text-[11px]">Tap to add</span>
+                    <span className="theme-muted text-[11px]">Rs {item?.price}</span>
 
                     <button
                         onClick={() => onAdd && onAdd(item)}

@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://api.survetra.com/$1" },
+    { "source": "/api/(.*)", "destination": "https://api.tiffzy.com/$1" },
     { "source": "/(.*)", "destination": "/" }
   ]
 }

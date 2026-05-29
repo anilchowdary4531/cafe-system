@@ -4,6 +4,7 @@ import { LoaderCircle, Save } from "lucide-react";
 import { API } from "../../config";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { uploadToS3Presigned } from "../../utils/s3Upload";
+import ThemeSelector from "../../components/ThemeSelector";
 
 const emptyForm = {
     name: "",
@@ -135,6 +136,16 @@ export default function OwnerSettings() {
                 <p className="mt-1 text-sm text-slate-300">
                     Manage brand profile, tax/service charge, billing controls, and operations.
                 </p>
+            </article>
+
+            <article className="rounded-2xl border border-white/10 bg-[#111827] p-5">
+                <h4 className="text-lg font-semibold">Appearance</h4>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm text-slate-300">
+                        Choose the owner panel theme style for your workspace.
+                    </p>
+                    <ThemeSelector variant="compact" />
+                </div>
             </article>
 
             {error && (

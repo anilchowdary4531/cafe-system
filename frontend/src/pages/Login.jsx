@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff, Phone, Store, UserCircle2 } from "lucide-react";
+import { Eye, EyeOff, Phone, UserCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import ThemeSelector from "../components/ThemeSelector";
 import { api } from "../utils/apiClient";
+import BrandLogo from "../components/BrandLogo";
 
 export default function Login() {
     const { login, loginCustomer } = useAuth();
@@ -202,11 +203,11 @@ export default function Login() {
 
                 <div className="flex items-center gap-3 mb-6">
                     <div className="theme-card flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl">
-                        <Store size={28} />
+                        <BrandLogo className="h-10 w-10" title="Brand logo" />
                     </div>
 
                     <h1 className="text-5xl font-bold tracking-tight">
-                        Survetra
+                        Tiffzy
                     </h1>
                 </div>
 
@@ -253,8 +254,8 @@ export default function Login() {
 
                     {/* MOBILE LOGO */}
                     <div className="md:hidden flex items-center justify-center gap-2 mb-6">
-                        <Store className="theme-accent-text" size={26} />
-                        <h1 className="text-3xl font-bold">Survetra</h1>
+                        <BrandLogo className="h-7 w-7" title="Brand logo" />
+                        <h1 className="text-3xl font-bold">Tiffzy</h1>
                     </div>
 
                     {mode === "staff" ? (
@@ -428,7 +429,7 @@ export default function Login() {
 
                     {/* FOOTER */}
                     <p className="theme-muted mt-8 text-center text-sm">
-                        Powered by Survetra OS
+                        Powered by Tiffzy OS
                     </p>
                 </div>
             </div>
