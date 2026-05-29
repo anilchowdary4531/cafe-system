@@ -1,11 +1,47 @@
 import bcrypt from "bcryptjs";
-import { updateOrderStatus } from "../services/orderService.js";
+import { buildReadableOrderNo, updateOrderStatus } from "../services/orderService.js";
 import { buildUploadController } from "../controllers/uploadController.js";
 import { deleteAssetByKey, uploadRestaurantAsset } from "../services/storageService.js";
 
 export default async function ownerRoutes(app, deps) {
   const { prisma, buildQrTargetUrl, STAFF_ACCESS_MODULES, STAFF_ALLOWED_ROLES, normalizeAccess, normalizeDbPermissions, serializeAccess, realtime } = deps;
   const uploadController = buildUploadController();
+  const LEGACY_ORDER_NO_PATTERN = /^ORD-\d{12,}$/i;
+  const toDisplayOrderNo = (order, restaurant) => {
+    const existing = String(order?.orderNo || "").trim();
+    if (!existing) return "";
+    const withoutOrdPrefix = existing.replace(/^ORD-/i, "");
+    if (!LEGACY_ORDER_NO_PATTERN.test(existing)) return withoutOrdPrefix;
+    const invoiceTail = String(order?.invoiceNo || "")
+      .trim()
+      .split("-")
+      .pop();
+    const sequence = Number(invoiceTail);
+    return buildReadableOrderNo({
+      restaurantName: restaurant?.name,
+      restaurantSlug: restaurant?.slug,
+      restaurantCode: restaurant?.invoicePrefix,
+      tableNo: order?.tableNo,
+      date: order?.createdAt || new Date(),
+      sequence: Number.isFinite(sequence) ? sequence : order?.id,
+    });
+  };
+  const normalizeDesignation = (value) => String(value || "").trim().slice(0, 60);
+  const isDesignationArgError = (err) =>
+    /Unknown argument [`'"]?designation[`'"]?/i.test(String(err?.message || ""));
+  const buildStaffUserResponse = (user, access) => ({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone || "",
+    role: user.role,
+    designation: user.designation || "",
+    isActive: user.isActive,
+    restaurantId: user.restaurantId,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    access,
+  });
 
   app.post("/owner/:restaurantId/uploads/presign", uploadController.presign);
 
@@ -297,7 +333,8 @@ export default async function ownerRoutes(app, deps) {
     try {
       const restaurantId = Number(req.params.restaurantId);
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
-      const [tables, activeOrders] = await Promise.all([
+      const activeStatuses = ["PLACED", "ACCEPTED", "PREPARING", "READY"];
+      const [tables, activeOrders, latestTableOrders] = await Promise.all([
         prisma.diningTable.findMany({
           where: { restaurantId },
           orderBy: { id: "desc" },
@@ -306,21 +343,106 @@ export default async function ownerRoutes(app, deps) {
           where: {
             restaurantId,
             tableNo: { not: null },
-            status: { in: ["PLACED", "ACCEPTED", "PREPARING", "READY"] },
+            status: { in: activeStatuses },
           },
-          select: { tableNo: true },
+          select: {
+            id: true,
+            tableNo: true,
+            orderNo: true,
+            status: true,
+            createdAt: true,
+            total: true,
+            items: {
+              select: {
+                id: true,
+                itemName: true,
+                qty: true,
+                price: true,
+                total: true,
+              },
+              orderBy: { id: "asc" },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        }),
+        prisma.order.findMany({
+          where: {
+            restaurantId,
+            tableNo: { not: null },
+          },
+          select: {
+            tableNo: true,
+            status: true,
+            paymentStatus: true,
+            orderNo: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { createdAt: "desc" },
         }),
       ]);
 
-      const occupiedTables = new Set(
-        activeOrders
-          .map((order) => String(order.tableNo || "").trim().toLowerCase())
-          .filter(Boolean)
-      );
+      const activeOrdersByTable = activeOrders.reduce((acc, order) => {
+        const tableKey = String(order.tableNo || "").trim().toLowerCase();
+        if (!tableKey) return acc;
+
+        if (!acc[tableKey]) acc[tableKey] = [];
+        acc[tableKey].push({
+          id: order.id,
+          orderNo: order.orderNo,
+          status: order.status,
+          createdAt: order.createdAt,
+          total: Number(order.total || 0),
+          items: Array.isArray(order.items)
+            ? order.items.map((item) => ({
+                id: item.id,
+                itemName: item.itemName,
+                qty: Number(item.qty || 0),
+                price: Number(item.price || 0),
+                total: Number(item.total || 0),
+              }))
+            : [],
+        });
+        return acc;
+      }, {});
+
+      const latestOrderByTable = latestTableOrders.reduce((acc, order) => {
+        const tableKey = String(order.tableNo || "").trim().toLowerCase();
+        if (!tableKey) return acc;
+        if (!acc[tableKey]) acc[tableKey] = order;
+        return acc;
+      }, {});
 
       return tables.map((table) => ({
         ...table,
-        isOccupied: occupiedTables.has(String(table.tableNo || "").trim().toLowerCase()),
+        ...(function buildTableState() {
+          const tableKey = String(table.tableNo || "").trim().toLowerCase();
+          const tableActiveOrders = activeOrdersByTable[tableKey] || [];
+          const latestOrder = latestOrderByTable[tableKey] || null;
+          const activeItemCount = tableActiveOrders.reduce(
+            (sum, order) =>
+              sum +
+              (Array.isArray(order.items)
+                ? order.items.reduce(
+                    (itemSum, item) => itemSum + Number(item.qty || 0),
+                    0
+                  )
+                : 0),
+            0
+          );
+
+          return {
+            isOccupied: tableActiveOrders.length > 0,
+            occupiedSince: tableActiveOrders[0]?.createdAt || null,
+            activeOrderCount: tableActiveOrders.length,
+            activeItemCount,
+            activeOrders: tableActiveOrders,
+            lastOrderStatus: latestOrder?.status || null,
+            lastPaymentStatus: latestOrder?.paymentStatus || null,
+            lastOrderNo: latestOrder?.orderNo || null,
+            lastOrderAt: latestOrder?.updatedAt || latestOrder?.createdAt || null,
+          };
+        })(),
       }));
     } catch (err) {
       console.log(err);
@@ -598,7 +720,7 @@ export default async function ownerRoutes(app, deps) {
       const now = new Date();
       const fromDate = new Date(now.getTime() - (range === "24h" ? 1 : range === "7d" ? 7 : 30) * 24 * 60 * 60 * 1000);
       const [restaurant, orders, tables, menuItems, expenses] = await Promise.all([
-        prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { id: true, name: true, slug: true, upiId: true } }),
+        prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { id: true, name: true, slug: true, invoicePrefix: true, upiId: true } }),
         prisma.order.findMany({ where: { restaurantId, createdAt: { gte: fromDate } }, include: { items: true }, orderBy: { createdAt: "desc" } }),
         prisma.diningTable.findMany({ where: { restaurantId }, select: { id: true, isActive: true } }),
         prisma.menuItem.findMany({ where: { restaurantId }, select: { id: true, isAvailable: true } }),
@@ -638,10 +760,17 @@ export default async function ownerRoutes(app, deps) {
 
         return {
           id: order.id,
-          orderNo: order.orderNo,
+          orderNo: toDisplayOrderNo(order, restaurant),
           invoiceNo: order.invoiceNo,
+          invoiceS3Url: order.invoiceS3Url,
           customerName: order.customerName,
+          phone: order.phone,
+          email: order.email,
           tableNo: order.tableNo,
+          notes: order.notes,
+          orderSource: order.orderSource,
+          subtotal: Number(order.subtotal || 0),
+          discountAmount: discount,
           total,
           taxAmount,
           serviceCharge,
@@ -649,6 +778,13 @@ export default async function ownerRoutes(app, deps) {
           paymentStatus,
           status,
           createdAt: order.createdAt,
+          items: (Array.isArray(order.items) ? order.items : []).map((item) => ({
+            id: item.id,
+            itemName: item.itemName,
+            qty: Number(item.qty || 0),
+            price: Number(item.price || 0),
+            total: Number(item.total || 0),
+          })),
         };
       });
 
@@ -792,24 +928,19 @@ export default async function ownerRoutes(app, deps) {
       });
 
       const mapped = users
-        .map((user) => ({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone || "",
-          role: user.role,
-          isActive: user.isActive,
-          restaurantId: user.restaurantId,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
-          access: normalizeDbPermissions(user.staffAccess?.permissions, user.role),
-        }))
+        .map((user) =>
+          buildStaffUserResponse(
+            user,
+            normalizeDbPermissions(user.staffAccess?.permissions, user.role)
+          )
+        )
         .filter((user) => {
           if (!q) return true;
           return (
             String(user.name || "").toLowerCase().includes(q) ||
             String(user.email || "").toLowerCase().includes(q) ||
             String(user.phone || "").toLowerCase().includes(q) ||
+            String(user.designation || "").toLowerCase().includes(q) ||
             String(user.role || "").toLowerCase().includes(q)
           );
         });
@@ -824,7 +955,16 @@ export default async function ownerRoutes(app, deps) {
   app.post("/owner/:restaurantId/staff", async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
-      const { name, email, phone, password, role = "STAFF", isActive = true, access } = req.body || {};
+      const {
+        name,
+        email,
+        phone,
+        password,
+        role = "STAFF",
+        designation,
+        isActive = true,
+        access,
+      } = req.body || {};
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
       if (!name || !email || !phone || !password) {
         return reply.code(400).send({ message: "Name, email, phone, and password are required" });
@@ -837,6 +977,7 @@ export default async function ownerRoutes(app, deps) {
 
       const normalizedEmail = String(email).trim().toLowerCase();
       const normalizedPhone = String(phone).trim();
+      const normalizedDesignation = normalizeDesignation(designation);
       const normalizedAccess = normalizeAccess(access, normalizedRole);
 
       const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { id: true } });
@@ -846,17 +987,31 @@ export default async function ownerRoutes(app, deps) {
       if (existing) return reply.code(400).send({ message: "Email already exists" });
 
       const hashedPassword = bcrypt.hashSync(String(password), 10);
-      const user = await prisma.user.create({
-        data: {
-          name: String(name).trim(),
-          email: normalizedEmail,
-          phone: normalizedPhone,
-          password: hashedPassword,
-          role: normalizedRole,
-          isActive: Boolean(isActive),
-          restaurantId,
-        },
-      });
+      const createData = {
+        name: String(name).trim(),
+        email: normalizedEmail,
+        phone: normalizedPhone,
+        password: hashedPassword,
+        role: normalizedRole,
+        isActive: Boolean(isActive),
+        restaurantId,
+      };
+      if (designation !== undefined) {
+        createData.designation = normalizedDesignation || null;
+      }
+
+      let user;
+      try {
+        user = await prisma.user.create({ data: createData });
+      } catch (err) {
+        if (createData.designation !== undefined && isDesignationArgError(err)) {
+          const fallbackCreateData = { ...createData };
+          delete fallbackCreateData.designation;
+          user = await prisma.user.create({ data: fallbackCreateData });
+        } else {
+          throw err;
+        }
+      }
 
       await prisma.staffAccess.upsert({
         where: { userId: user.id },
@@ -866,18 +1021,7 @@ export default async function ownerRoutes(app, deps) {
 
       return {
         message: "Staff user created",
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone || "",
-          role: user.role,
-          isActive: user.isActive,
-          restaurantId: user.restaurantId,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
-          access: normalizedAccess,
-        },
+        user: buildStaffUserResponse(user, normalizedAccess),
       };
     } catch (err) {
       console.log(err);
@@ -889,7 +1033,7 @@ export default async function ownerRoutes(app, deps) {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const staffId = Number(req.params.staffId);
-      const { name, email, phone, role, password, isActive } = req.body || {};
+      const { name, email, phone, role, designation, password, isActive } = req.body || {};
       if (!restaurantId || !staffId) return reply.code(400).send({ message: "Invalid id values" });
 
       const staff = await prisma.user.findUnique({
@@ -923,28 +1067,38 @@ export default async function ownerRoutes(app, deps) {
         role: nextRole,
         isActive: isActive === undefined ? staff.isActive : Boolean(isActive),
       };
+      if (designation !== undefined) {
+        data.designation = normalizeDesignation(designation) || null;
+      }
       if (password) data.password = bcrypt.hashSync(String(password), 10);
 
-      const updated = await prisma.user.update({
-        where: { id: staffId },
-        data,
-        include: { staffAccess: { select: { permissions: true } } },
-      });
+      let updated;
+      try {
+        updated = await prisma.user.update({
+          where: { id: staffId },
+          data,
+          include: { staffAccess: { select: { permissions: true } } },
+        });
+      } catch (err) {
+        if (data.designation !== undefined && isDesignationArgError(err)) {
+          const fallbackData = { ...data };
+          delete fallbackData.designation;
+          updated = await prisma.user.update({
+            where: { id: staffId },
+            data: fallbackData,
+            include: { staffAccess: { select: { permissions: true } } },
+          });
+        } else {
+          throw err;
+        }
+      }
 
       return {
         message: "Staff user updated",
-        user: {
-          id: updated.id,
-          name: updated.name,
-          email: updated.email,
-          phone: updated.phone || "",
-          role: updated.role,
-          isActive: updated.isActive,
-          restaurantId: updated.restaurantId,
-          createdAt: updated.createdAt,
-          updatedAt: updated.updatedAt,
-          access: normalizeDbPermissions(updated.staffAccess?.permissions, updated.role),
-        },
+        user: buildStaffUserResponse(
+          updated,
+          normalizeDbPermissions(updated.staffAccess?.permissions, updated.role)
+        ),
       };
     } catch (err) {
       console.log(err);
@@ -975,18 +1129,10 @@ export default async function ownerRoutes(app, deps) {
 
       return {
         message: `Staff user ${isActive ? "enabled" : "disabled"}`,
-        user: {
-          id: updated.id,
-          name: updated.name,
-          email: updated.email,
-          phone: updated.phone || "",
-          role: updated.role,
-          isActive: updated.isActive,
-          restaurantId: updated.restaurantId,
-          createdAt: updated.createdAt,
-          updatedAt: updated.updatedAt,
-          access: normalizeDbPermissions(updated.staffAccess?.permissions, updated.role),
-        },
+        user: buildStaffUserResponse(
+          updated,
+          normalizeDbPermissions(updated.staffAccess?.permissions, updated.role)
+        ),
       };
     } catch (err) {
       console.log(err);

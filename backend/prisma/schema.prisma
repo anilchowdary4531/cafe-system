@@ -94,6 +94,7 @@ model User {
 
   // SUPER_ADMIN / OWNER / MANAGER / WAITER / CHEF / CASHIER
   role String @default("OWNER")
+  designation String?
 
   restaurantId Int?         @map("restaurant_id")
   restaurant   Restaurant?  @relation(fields: [restaurantId], references: [id], onDelete: SetNull)

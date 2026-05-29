@@ -31,7 +31,47 @@ const canSetStatus = (role, status) => {
   return false;
 };
 
-const buildOrderNo = (prefix = "ORD") => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+const pad = (value, size = 2) => String(value).padStart(size, "0");
+
+const compactToken = (value, fallback = "NA", maxLen = 12) => {
+  const token = String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "")
+    .slice(0, maxLen);
+  return token || fallback;
+};
+
+const formatOrderDateTimeToken = (value) => {
+  const date = value instanceof Date ? value : new Date(value || Date.now());
+  if (Number.isNaN(date.getTime())) return "000000000000";
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}${pad(
+    date.getHours()
+  )}${pad(date.getMinutes())}`;
+};
+
+export const buildReadableOrderNo = ({
+  restaurantName,
+  restaurantSlug,
+  restaurantCode,
+  tableNo,
+  date = new Date(),
+  sequence,
+  prefix = "",
+} = {}) => {
+  const shortRestaurantToken = compactToken(restaurantCode, "", 6);
+  const restaurantToken =
+    shortRestaurantToken || compactToken(restaurantSlug || restaurantName, "REST", 14);
+  const tableToken = compactToken(tableNo, "NA", 10);
+  const dateToken = formatOrderDateTimeToken(date);
+  const prefixToken = compactToken(prefix, "", 8);
+  const seqToken =
+    sequence === undefined || sequence === null || Number.isNaN(Number(sequence))
+      ? ""
+      : `-${String(Math.max(0, Number(sequence))).padStart(4, "0")}`;
+  const coreToken = `${restaurantToken}-${dateToken}-${tableToken}${seqToken}`;
+  return prefixToken ? `${prefixToken}-${coreToken}` : coreToken;
+};
 
 export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
   const restaurantId = Number(actor?.restaurantId || 0);
@@ -45,6 +85,8 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
     where: { id: restaurantId },
     select: {
       id: true,
+      name: true,
+      slug: true,
       invoicePrefix: true,
       nextInvoiceNumber: true,
       taxEnabled: true,
@@ -99,7 +141,15 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
     discountSubunit,
   });
 
-  const orderNo = buildOrderNo("POS");
+  const invoiceNumber = Number(restaurant.nextInvoiceNumber || 1001);
+  const orderNo = buildReadableOrderNo({
+    restaurantName: restaurant.name,
+    restaurantSlug: restaurant.slug,
+    restaurantCode: restaurant.invoicePrefix,
+    tableNo,
+    date: new Date(),
+    sequence: invoiceNumber,
+  });
   const invoiceNo = `${String(restaurant.invoicePrefix || "INV").toUpperCase()}-${Number(restaurant.nextInvoiceNumber || 1001)}`;
 
   const branchId = actor?.branchId ? Number(actor.branchId) : null;

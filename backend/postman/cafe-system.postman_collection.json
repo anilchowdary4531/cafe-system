@@ -42,7 +42,7 @@
     },
     {
       "key": "super_admin_email",
-      "value": "admin@suretra.com"
+      "value": "admin@tiffzy.com"
     },
     {
       "key": "super_admin_password",
@@ -58,7 +58,7 @@
     },
     {
       "key": "new_owner_email",
-      "value": "owner.testcafe@suretra.local"
+      "value": "owner.testcafe@tiffzy.com"
     },
     {
       "key": "new_owner_password",

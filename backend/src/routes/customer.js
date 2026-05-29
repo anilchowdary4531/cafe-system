@@ -1,4 +1,5 @@
 import { normalizePhone } from "../services/phoneService.js";
+import { buildReadableOrderNo } from "../services/orderService.js";
 import { requireCustomerPhoneFromJwt } from "../services/customerProfileService.js";
 import { buildCustomerOtpController } from "../controllers/customerOtpController.js";
 import { buildCustomerProfileController } from "../controllers/customerProfileController.js";
@@ -228,8 +229,16 @@ export default async function customerRoutes(app, deps) {
         : 0;
       const total = subtotal + taxAmount + serviceChargeAmount;
 
-      const orderNo = "ORD-" + Date.now();
-      const invoiceNo = `${restaurant.invoicePrefix}-${restaurant.nextInvoiceNumber}`;
+      const invoiceSequence = Number(restaurant.nextInvoiceNumber || 1001);
+      const orderNo = buildReadableOrderNo({
+        restaurantName: restaurant.name,
+        restaurantSlug: restaurant.slug,
+        restaurantCode: restaurant.invoicePrefix,
+        tableNo: normalizedTableNo,
+        date: new Date(),
+        sequence: invoiceSequence,
+      });
+      const invoiceNo = `${String(restaurant.invoicePrefix || "INV").toUpperCase()}-${invoiceSequence}`;
 
       let customerRecord = null;
       if (normalizedPhone) {

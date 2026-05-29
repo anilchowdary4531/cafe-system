@@ -6,7 +6,7 @@ export default async function publicRoutes(app, deps) {
   app.get("/", async () => {
     return {
       status: "ok",
-      message: "Suretra Backend Running 🚀",
+      message: "Tiffzy Backend Running",
     };
   });
 
