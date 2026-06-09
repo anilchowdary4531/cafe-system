@@ -15,7 +15,7 @@ export default async function staffRoutes(app, deps) {
   const invoiceController = buildInvoiceController({ prisma });
 
   const requireStaff = async (req, reply) => {
-    const actor = await requireStaffJwt(req, reply, { allowedRoles: STAFF_ALLOWED_ROLES });
+    const actor = await requireStaffJwt(req, reply, { prisma, allowedRoles: STAFF_ALLOWED_ROLES });
     if (!actor) return reply;
     req.staffActor = actor;
     return null;
@@ -74,7 +74,7 @@ export default async function staffRoutes(app, deps) {
       } catch {
         return reply.code(401).send({ message: "Authentication required" });
       }
-      const actor = await requireStaffJwt(req, reply, { allowedRoles: STAFF_ALLOWED_ROLES });
+      const actor = await requireStaffJwt(req, reply, { prisma, allowedRoles: STAFF_ALLOWED_ROLES });
       if (!actor) return reply;
       req.staffActor = actor;
       return paymentController.postVerify(req, reply);
@@ -107,9 +107,18 @@ export default async function staffRoutes(app, deps) {
     }
 
     const isCustomer = String(req.user?.type || "") === "customer";
-    const role = String(req.user?.role || "").toUpperCase();
-    const restaurantId = Number(req.user?.restaurantId || 0) || null;
+    const tokenRole = String(req.user?.role || "").toUpperCase();
+    let restaurantId = Number(req.user?.restaurantId || 0) || null;
+    let role = tokenRole;
     const staffAllowed = role === "SUPER_ADMIN" || (role && STAFF_ALLOWED_ROLES.includes(role));
+
+    if (staffAllowed) {
+      const actor = await requireStaffJwt(req, reply, { prisma, allowedRoles: STAFF_ALLOWED_ROLES });
+      if (!actor) return reply;
+      req.staffActor = actor;
+      role = String(actor.role || role).toUpperCase();
+      restaurantId = actor.restaurantId || restaurantId;
+    }
 
     let where = { id: orderId };
     if (isCustomer) {

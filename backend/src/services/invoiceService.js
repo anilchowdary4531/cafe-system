@@ -40,6 +40,10 @@ export const buildInvoicePdf = async ({ order } = {}) => {
   if (order?.phone) doc.fontSize(10).fillColor("#444").text(`Phone: ${order.phone}`);
   if (order?.email) doc.fontSize(10).fillColor("#444").text(`Email: ${order.email}`);
   if (order?.tableNo) doc.fontSize(10).fillColor("#444").text(`Table: ${order.tableNo}`);
+  if (order?.deliveryAddress) {
+    doc.fontSize(10).fillColor("#444").text("Delivery Address:");
+    doc.fontSize(10).fillColor("#444").text(String(order.deliveryAddress), { indent: 14 });
+  }
   doc.moveDown(0.75);
 
   doc.fillColor("#111").fontSize(11).text("Items");
@@ -96,4 +100,3 @@ export const buildInvoicePdf = async ({ order } = {}) => {
   doc.end();
   return doc;
 };
-

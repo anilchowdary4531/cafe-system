@@ -1,6 +1,6 @@
 {
   "passwords": {
-    "admin": "admin123",
+    "admin": "nanda@000",
     "cafeKingOwner": "ioVa3hRmNqQvTF",
     "cafeKingManager": "dbVvrdeL6YZ9K5",
     "cafeKingChef": "PACrQ1F6T1jnQ6",
@@ -21,7 +21,7 @@
   },
   "admin": {
     "name": "Super Admin",
-    "email": "admin@tiffzy.com",
+    "email": "jekkaramesh788@gmail.com",
     "passwordKey": "admin",
     "role": "SUPER_ADMIN"
   },

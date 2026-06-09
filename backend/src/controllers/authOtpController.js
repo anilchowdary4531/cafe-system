@@ -3,27 +3,15 @@ import { requestAuthOtp, verifyAuthOtp } from "../services/authOtpService.js";
 import { sendSmsOtp } from "../services/smsService.js";
 import { upsertCustomerAccount } from "../services/customerProfileService.js";
 import { extractVerifiedIdentifier, verifyMsg91AccessToken } from "../services/msg91OtpWidgetService.js";
+import {
+  buildStaffLoginPayload,
+  consumeStaffMagicLink,
+  issueStaffSession,
+} from "../services/staffSessionService.js";
 
 const ALLOWED_ACTOR_TYPES = new Set(["CUSTOMER", "OWNER", "STAFF", "SUPER_ADMIN"]);
 
 const normalizeActorType = (raw) => String(raw || "CUSTOMER").trim().toUpperCase();
-
-const buildStaffLoginPayload = ({ user, normalizeDbPermissions }) => {
-  const baseRole = String(user?.role || "STAFF").toUpperCase();
-  const accessRole = String(user?.staffAccess?.role || "").toUpperCase();
-  const effectiveRole = baseRole === "SUPER_ADMIN" ? "SUPER_ADMIN" : baseRole || accessRole || "STAFF";
-
-  let access = null;
-  if (effectiveRole !== "SUPER_ADMIN") {
-    access = normalizeDbPermissions(user?.staffAccess?.permissions, effectiveRole);
-  }
-
-  const userPayload = { ...user, role: effectiveRole, access };
-  delete userPayload.password;
-  if (userPayload.staffAccess !== undefined) delete userPayload.staffAccess;
-
-  return { userPayload, effectiveRole };
-};
 
 const resolveStaffUser = async ({ prisma, phone, actorType, restaurantId }) => {
   const where = {
@@ -156,12 +144,8 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions }) 
       if (!user) return reply.code(401).send({ message: "Account not found or inactive" });
 
       const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
-      const token = app.jwt.sign({
-        id: user.id,
-        role: effectiveRole,
-        restaurantId: user.restaurantId || null,
-        branchId: user.branchId || null,
-      });
+      const { token, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
+      userPayload.sessionVersion = sessionVersion;
 
       return { message: "Login success", actorType, token, user: userPayload, offlineMode: false };
     } catch (err) {
@@ -171,5 +155,28 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions }) 
     }
   };
 
-  return { sendOtp, verifyOtp: verifyOtpHandler };
+  const consumeStaffLink = async (req, reply) => {
+    try {
+      const body = req.body || {};
+      const token = String(body.token || body.staffLink || body.link || "").trim();
+      if (!token) return reply.code(400).send({ message: "Staff login link is required" });
+
+      const payload = await consumeStaffMagicLink({
+        app,
+        prisma,
+        token,
+        normalizeDbPermissions,
+      });
+
+      return payload;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.log(err);
+      return reply.code(err?.statusCode || 500).send({
+        message: err?.message || "Failed to open staff login link",
+      });
+    }
+  };
+
+  return { sendOtp, verifyOtp: verifyOtpHandler, consumeStaffLink };
 };

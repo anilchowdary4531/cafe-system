@@ -95,6 +95,7 @@ model User {
   // SUPER_ADMIN / OWNER / MANAGER / WAITER / CHEF / CASHIER
   role String @default("OWNER")
   designation String?
+  sessionVersion Int @default(0) @map("session_version")
 
   restaurantId Int?         @map("restaurant_id")
   restaurant   Restaurant?  @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
@@ -194,6 +195,7 @@ model Order {
 
   // POS / ONLINE / QR
   orderSource String? @default("QR") @map("order_source")
+  fulfillment String? @map("fulfillment")
 
   // ADMIN / STAFF / WAITER
   createdByRole   String? @map("created_by_role")
@@ -208,6 +210,9 @@ model Order {
 
   tableNo String? @map("table_no")
   notes   String?
+  deliveryAddress String? @map("delivery_address")
+  deliveryLatitude Float? @map("delivery_latitude")
+  deliveryLongitude Float? @map("delivery_longitude")
 
   // BILLING
   subtotal            Float
@@ -251,6 +256,7 @@ model OrderItem {
 
   menuItemId Int?   @map("menu_item_id")
   itemName   String @map("item_name")
+  preparedByName String? @map("prepared_by_name")
 
   qty   Int   @map("quantity")
   price Float
@@ -316,6 +322,8 @@ model CustomerAddress {
   city       String?
   state      String?
   postalCode String? @map("postal_code")
+  latitude   Float?
+  longitude  Float?
 
   notes     String?
   isDefault Boolean @default(false) @map("is_default")

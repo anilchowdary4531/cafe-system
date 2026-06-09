@@ -2,10 +2,16 @@ import bcrypt from "bcryptjs";
 import { buildReadableOrderNo, updateOrderStatus } from "../services/orderService.js";
 import { buildUploadController } from "../controllers/uploadController.js";
 import { deleteAssetByKey, uploadRestaurantAsset } from "../services/storageService.js";
+import {
+  buildStaffMagicLinkToken,
+  buildStaffMagicLinkUrl,
+  inferRoleFromDesignation,
+} from "../services/staffSessionService.js";
 
 export default async function ownerRoutes(app, deps) {
-  const { prisma, buildQrTargetUrl, STAFF_ACCESS_MODULES, STAFF_ALLOWED_ROLES, normalizeAccess, normalizeDbPermissions, serializeAccess, realtime } = deps;
+  const { prisma, buildQrTargetUrl, FRONTEND_URL, STAFF_ACCESS_MODULES, STAFF_ALLOWED_ROLES, normalizeAccess, normalizeDbPermissions, serializeAccess, realtime } = deps;
   const uploadController = buildUploadController();
+  const STAFF_LOGIN_LINK_EXPIRES_IN = process.env.STAFF_LOGIN_LINK_EXPIRES_IN || "30d";
   const LEGACY_ORDER_NO_PATTERN = /^ORD-\d{12,}$/i;
   const toDisplayOrderNo = (order, restaurant) => {
     const existing = String(order?.orderNo || "").trim();
@@ -27,20 +33,42 @@ export default async function ownerRoutes(app, deps) {
     });
   };
   const normalizeDesignation = (value) => String(value || "").trim().slice(0, 60);
+  const normalizeBillPaymentMode = (value) => {
+    const mode = String(value || "").trim().toUpperCase();
+    if (mode === "CASH" || mode === "UPI" || mode === "CARD" || mode === "ONLINE") return mode;
+    return "CASH";
+  };
   const isDesignationArgError = (err) =>
     /Unknown argument [`'"]?designation[`'"]?/i.test(String(err?.message || ""));
+  const resolveStaffRole = (role, designation) => {
+    const normalizedRole = String(role || "STAFF").toUpperCase();
+    if (normalizedRole === "SUPER_ADMIN") return "SUPER_ADMIN";
+    if (normalizedRole && normalizedRole !== "STAFF") return normalizedRole;
+    return inferRoleFromDesignation(designation) || normalizedRole || "STAFF";
+  };
+  const buildStaffLoginLink = (user) =>
+    buildStaffMagicLinkUrl({
+      frontendUrl: FRONTEND_URL,
+      token: buildStaffMagicLinkToken({
+        app,
+        user,
+        expiresIn: STAFF_LOGIN_LINK_EXPIRES_IN,
+      }),
+      });
   const buildStaffUserResponse = (user, access) => ({
     id: user.id,
     name: user.name,
     email: user.email,
     phone: user.phone || "",
-    role: user.role,
+    role: resolveStaffRole(user.role, user.designation),
     designation: user.designation || "",
     isActive: user.isActive,
     restaurantId: user.restaurantId,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
-    access,
+    access:
+      access ?? normalizeDbPermissions(user?.staffAccess?.permissions, resolveStaffRole(user.role, user.designation)),
+    loginLink: buildStaffLoginLink(user),
   });
 
   app.post("/owner/:restaurantId/uploads/presign", uploadController.presign);
@@ -206,13 +234,22 @@ export default async function ownerRoutes(app, deps) {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const status = String(req.query?.status || "").trim().toUpperCase();
+      const source = String(req.query?.source || "").trim().toUpperCase();
       const q = String(req.query?.q || "").trim().toLowerCase();
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
+
+      const sourceFilter =
+        source === "ONLINE"
+          ? { in: ["ONLINE", "PICKUP", "DELIVERY"] }
+          : source
+            ? { equals: source }
+            : undefined;
 
       const orders = await prisma.order.findMany({
         where: {
           restaurantId,
           ...(status ? { status } : {}),
+          ...(sourceFilter ? { orderSource: sourceFilter } : {}),
         },
         include: {
           items: true,
@@ -333,6 +370,11 @@ export default async function ownerRoutes(app, deps) {
     try {
       const restaurantId = Number(req.params.restaurantId);
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
+      const restaurant = await prisma.restaurant.findUnique({
+        where: { id: restaurantId },
+        select: { id: true, slug: true },
+      });
+      if (!restaurant) return reply.code(404).send({ message: "Restaurant not found" });
       const activeStatuses = ["PLACED", "ACCEPTED", "PREPARING", "READY"];
       const [tables, activeOrders, latestTableOrders] = await Promise.all([
         prisma.diningTable.findMany({
@@ -356,6 +398,7 @@ export default async function ownerRoutes(app, deps) {
               select: {
                 id: true,
                 itemName: true,
+                preparedByName: true,
                 qty: true,
                 price: true,
                 total: true,
@@ -393,15 +436,16 @@ export default async function ownerRoutes(app, deps) {
           status: order.status,
           createdAt: order.createdAt,
           total: Number(order.total || 0),
-          items: Array.isArray(order.items)
-            ? order.items.map((item) => ({
-                id: item.id,
-                itemName: item.itemName,
-                qty: Number(item.qty || 0),
-                price: Number(item.price || 0),
-                total: Number(item.total || 0),
-              }))
-            : [],
+            items: Array.isArray(order.items)
+              ? order.items.map((item) => ({
+                  id: item.id,
+                  itemName: item.itemName,
+                  preparedByName: item.preparedByName || null,
+                  qty: Number(item.qty || 0),
+                  price: Number(item.price || 0),
+                  total: Number(item.total || 0),
+                }))
+              : [],
         });
         return acc;
       }, {});
@@ -415,6 +459,7 @@ export default async function ownerRoutes(app, deps) {
 
       return tables.map((table) => ({
         ...table,
+        qrCodeUrl: buildQrTargetUrl(restaurant.slug, table.tableNo),
         ...(function buildTableState() {
           const tableKey = String(table.tableNo || "").trim().toLowerCase();
           const tableActiveOrders = activeOrdersByTable[tableKey] || [];
@@ -768,6 +813,7 @@ export default async function ownerRoutes(app, deps) {
           email: order.email,
           tableNo: order.tableNo,
           notes: order.notes,
+          deliveryAddress: order.deliveryAddress,
           orderSource: order.orderSource,
           subtotal: Number(order.subtotal || 0),
           discountAmount: discount,
@@ -928,12 +974,7 @@ export default async function ownerRoutes(app, deps) {
       });
 
       const mapped = users
-        .map((user) =>
-          buildStaffUserResponse(
-            user,
-            normalizeDbPermissions(user.staffAccess?.permissions, user.role)
-          )
-        )
+        .map((user) => buildStaffUserResponse(user))
         .filter((user) => {
           if (!q) return true;
           return (
@@ -978,7 +1019,8 @@ export default async function ownerRoutes(app, deps) {
       const normalizedEmail = String(email).trim().toLowerCase();
       const normalizedPhone = String(phone).trim();
       const normalizedDesignation = normalizeDesignation(designation);
-      const normalizedAccess = normalizeAccess(access, normalizedRole);
+      const effectiveRole = resolveStaffRole(normalizedRole, normalizedDesignation);
+      const normalizedAccess = normalizeAccess(access, effectiveRole);
 
       const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { id: true } });
       if (!restaurant) return reply.code(404).send({ message: "Restaurant not found" });
@@ -992,7 +1034,7 @@ export default async function ownerRoutes(app, deps) {
         email: normalizedEmail,
         phone: normalizedPhone,
         password: hashedPassword,
-        role: normalizedRole,
+        role: effectiveRole,
         isActive: Boolean(isActive),
         restaurantId,
       };
@@ -1015,8 +1057,8 @@ export default async function ownerRoutes(app, deps) {
 
       await prisma.staffAccess.upsert({
         where: { userId: user.id },
-        create: { restaurantId, userId: user.id, permissions: serializeAccess(normalizedAccess, normalizedRole) },
-        update: { restaurantId, permissions: serializeAccess(normalizedAccess, normalizedRole) },
+        create: { restaurantId, userId: user.id, permissions: serializeAccess(normalizedAccess, effectiveRole) },
+        update: { restaurantId, permissions: serializeAccess(normalizedAccess, effectiveRole) },
       });
 
       return {
@@ -1059,7 +1101,8 @@ export default async function ownerRoutes(app, deps) {
         if (emailExists) return reply.code(400).send({ message: "Email already exists" });
       }
 
-      const nextRole = role ? String(role).toUpperCase() : staff.role;
+      const nextDesignation = designation === undefined ? staff.designation : normalizeDesignation(designation) || null;
+      const nextRole = resolveStaffRole(role ? String(role).toUpperCase() : staff.role, nextDesignation);
       const data = {
         name: name ?? staff.name,
         email: email ? String(email).trim().toLowerCase() : staff.email,
@@ -1068,7 +1111,7 @@ export default async function ownerRoutes(app, deps) {
         isActive: isActive === undefined ? staff.isActive : Boolean(isActive),
       };
       if (designation !== undefined) {
-        data.designation = normalizeDesignation(designation) || null;
+        data.designation = nextDesignation;
       }
       if (password) data.password = bcrypt.hashSync(String(password), 10);
 
@@ -1095,10 +1138,7 @@ export default async function ownerRoutes(app, deps) {
 
       return {
         message: "Staff user updated",
-        user: buildStaffUserResponse(
-          updated,
-          normalizeDbPermissions(updated.staffAccess?.permissions, updated.role)
-        ),
+        user: buildStaffUserResponse(updated),
       };
     } catch (err) {
       console.log(err);
@@ -1129,10 +1169,7 @@ export default async function ownerRoutes(app, deps) {
 
       return {
         message: `Staff user ${isActive ? "enabled" : "disabled"}`,
-        user: buildStaffUserResponse(
-          updated,
-          normalizeDbPermissions(updated.staffAccess?.permissions, updated.role)
-        ),
+        user: buildStaffUserResponse(updated),
       };
     } catch (err) {
       console.log(err);
@@ -1291,6 +1328,101 @@ export default async function ownerRoutes(app, deps) {
       if (code === "restaurant_access_denied") return reply.code(403).send({ message: "Forbidden" });
       if (code === "order_cancelled") return reply.code(409).send({ message: "Order already cancelled" });
       return reply.code(500).send({ message: "Failed to update order status" });
+    }
+  });
+
+  app.post("/owner/:restaurantId/tables/:tableNo/settle-bill", async (req, reply) => {
+    try {
+      const actor =
+        req.staffActor ||
+        ({
+          userId: Number(req.user?.id || 0) || null,
+          role: String(req.user?.role || "").toUpperCase(),
+          restaurantId: Number(req.user?.restaurantId || 0) || null,
+          branchId: Number(req.user?.branchId || 0) || null,
+        });
+
+      const restaurantId = Number(req.params.restaurantId);
+      const tableNo = String(req.params.tableNo || "").trim();
+      if (!restaurantId || !tableNo) return reply.code(400).send({ message: "Invalid id values" });
+      if (!actor?.role) return reply.code(401).send({ message: "Authentication required" });
+      if (actor?.restaurantId && actor.restaurantId !== restaurantId && actor.role !== "SUPER_ADMIN") {
+        return reply.code(403).send({ message: "Forbidden" });
+      }
+
+      const paymentMode = normalizeBillPaymentMode(req.body?.paymentMode || req.body?.paymentMethod || req.body?.method);
+      const changedByName = req.body?.changedByName ? String(req.body.changedByName).trim() : null;
+      const activeStatuses = ["PLACED", "ACCEPTED", "PREPARING", "READY"];
+
+      const activeOrders = await prisma.order.findMany({
+        where: {
+          restaurantId,
+          tableNo,
+          status: { in: activeStatuses },
+        },
+        select: {
+          id: true,
+          restaurantId: true,
+          branchId: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "asc" },
+      });
+
+      if (!activeOrders.length) {
+        return reply.send({
+          message: `Table ${tableNo} already has no active bill`,
+          orders: [],
+          cleared: false,
+        });
+      }
+
+      const updatedOrders = await prisma.$transaction(async (tx) => {
+        const results = [];
+
+        for (const order of activeOrders) {
+          const updatedOrder = await tx.order.update({
+            where: { id: order.id },
+            data: {
+              paymentStatus: "SUCCESS",
+              paymentMode,
+              status: "DELIVERED",
+              statusEvents: {
+                create: {
+                  status: "DELIVERED",
+                  source: "STAFF",
+                  changedByUserId: actor?.userId || null,
+                  changedByName,
+                  notes: `Bill settled via ${paymentMode}`,
+                },
+              },
+            },
+            include: {
+              items: true,
+              customer: true,
+              statusEvents: { orderBy: { createdAt: "asc" } },
+            },
+          });
+
+          results.push(updatedOrder);
+        }
+
+        return results;
+      });
+
+      updatedOrders.forEach((order) => {
+        realtime?.emitOrderUpdated?.(order);
+      });
+
+      return {
+        message: `Table ${tableNo} bill settled`,
+        orders: updatedOrders,
+        cleared: true,
+        paymentMode,
+      };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to settle table bill" });
     }
   });
 }

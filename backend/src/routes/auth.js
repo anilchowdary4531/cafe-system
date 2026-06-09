@@ -7,5 +7,5 @@ export default async function authRoutes(app, deps) {
 
   app.post("/auth/send-otp", controller.sendOtp);
   app.post("/auth/verify-otp", controller.verifyOtp);
+  app.post("/auth/staff-link/consume", controller.consumeStaffLink);
 }
-
