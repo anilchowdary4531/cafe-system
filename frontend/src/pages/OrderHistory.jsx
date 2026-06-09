@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Activity, IndianRupee, ReceiptText, RefreshCcw } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
@@ -7,6 +7,7 @@ import useCachedGet from "../hooks/useCachedGet";
 import { useCart } from "../context/CartContext";
 import { showToast } from "../utils/toast";
 import BrandLogo from "../components/BrandLogo";
+import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 import {
     Area,
     AreaChart,
@@ -47,7 +48,22 @@ const formatDayLabel = (dayKey) => {
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
 
-export function reorderOrderToCart({ restaurantSlug, order, addToCart, setRestaurantContext, navigate }) {
+const getOrderFlowLabel = (order) => {
+    const source = String(order?.orderSource || "").trim().toUpperCase();
+    const tableNo = String(order?.tableNo || "").trim();
+    const fulfillment = String(order?.fulfillment || "").trim().toUpperCase();
+
+    if (fulfillment === "PICKUP") return "Pickup";
+    if (fulfillment === "DELIVERY") return "Delivery";
+    if (fulfillment === "DINEIN") return tableNo ? `Table ${tableNo}` : "Dine In";
+    if (tableNo) return `Table ${tableNo}`;
+    if (source === "ONLINE") return order?.deliveryAddress ? "Delivery" : "Pickup";
+    if (["DELIVERY", "HOME_DELIVERY", "DOOR_DELIVERY"].includes(source)) return "Delivery";
+    if (["POS", "PICKUP", "TAKEAWAY", "TAKE_AWAY", "COUNTER"].includes(source)) return "Pickup";
+    return "Takeaway";
+};
+
+export function reorderOrderToCart({ restaurantSlug, order, addToCart, setRestaurantContext, navigate, tableNo = "" }) {
     const slug = String(restaurantSlug || "").trim();
     if (!slug) return 0;
 
@@ -70,17 +86,20 @@ export function reorderOrderToCart({ restaurantSlug, order, addToCart, setRestau
     });
 
     setRestaurantContext({ slug });
-    navigate(`/r/${slug}`);
+    navigate(buildRestaurantMenuPath(slug, tableNo));
     return addedCount;
 }
 
 export default function OrderHistory({ embedded = false } = {}) {
     const location = useLocation();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { customer, customerToken } = useAuth();
     const { restaurantContext, setRestaurantContext } = useRestaurantContext();
     const { addToCart } = useCart();
     const highlightOrderIdFromState = location?.state?.highlightOrderId || null;
+    const isCustomerScope = searchParams.get("scope") === "customer";
+    const buildProfilePath = (path) => (isCustomerScope ? `${path}?scope=customer` : path);
 
     const phone = String(customer?.phone || "").trim();
     const enabled = Boolean(phone || customerToken);
@@ -286,12 +305,17 @@ export default function OrderHistory({ embedded = false } = {}) {
     };
 
     const handleReorder = (restaurantSlug, order) => {
+        const currentTableNo =
+            String(restaurantContext?.slug || "") === String(restaurantSlug || "")
+                ? String(restaurantContext?.tableNo || "").trim()
+                : "";
         const addedCount = reorderOrderToCart({
             restaurantSlug,
             order,
             addToCart,
             setRestaurantContext,
             navigate,
+            tableNo: currentTableNo,
         });
         if (addedCount > 0) {
             showToast({
@@ -331,7 +355,7 @@ export default function OrderHistory({ embedded = false } = {}) {
                             {!embedded && (
                                 <>
                                     <Link
-                                        to="/profile"
+                                        to={buildProfilePath("/profile/overview")}
                                         className="theme-soft-button inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold"
                                     >
                                         Back to Profile
@@ -588,13 +612,14 @@ export default function OrderHistory({ embedded = false } = {}) {
                         )}
 
                         {filteredVisibleGroups.map((group) => (
-                            <RestaurantOrders
-                                key={String(group?.restaurant?.slug || "unknown")}
-                                group={group}
-                                highlightOrderId={highlightOrderIdFromState || customer?.latestOrderId || null}
-                                onReorder={handleReorder}
-                                embedded={embedded}
-                            />
+                        <RestaurantOrders
+                            key={String(group?.restaurant?.slug || "unknown")}
+                            group={group}
+                            highlightOrderId={highlightOrderIdFromState || customer?.latestOrderId || null}
+                            onReorder={handleReorder}
+                            embedded={embedded}
+                            profilePath={buildProfilePath}
+                        />
                         ))}
                     </div>
                 )}
@@ -615,7 +640,7 @@ function HistoryStat({ icon, label, value }) {
     );
 }
 
-function RestaurantOrders({ group, highlightOrderId, onReorder, embedded = false }) {
+function RestaurantOrders({ group, highlightOrderId, onReorder, embedded = false, profilePath }) {
     const restaurant = group?.restaurant || null;
     const orders = Array.isArray(group?.orders) ? group.orders : [];
     const visibleSpend = useMemo(() => orders.reduce((sum, o) => sum + Number(o?.total || 0), 0), [orders]);
@@ -648,7 +673,13 @@ function RestaurantOrders({ group, highlightOrderId, onReorder, embedded = false
                 </div>
 
                 {restaurant?.slug && (
-                    <Link to={`/r/${restaurant.slug}`} className={embedded ? "theme-button inline-flex justify-center rounded-xl px-3 py-2 text-xs font-semibold" : "theme-button inline-flex justify-center rounded-2xl px-5 py-3 text-sm font-semibold"}>
+                    <Link
+                        to={buildRestaurantMenuPath(
+                            restaurant.slug,
+                            String(restaurantContext?.slug || "") === String(restaurant.slug || "") ? restaurantContext?.tableNo || "" : ""
+                        )}
+                        className={embedded ? "theme-button inline-flex justify-center rounded-xl px-3 py-2 text-xs font-semibold" : "theme-button inline-flex justify-center rounded-2xl px-5 py-3 text-sm font-semibold"}
+                    >
                         Continue Ordering
                     </Link>
                 )}
@@ -667,6 +698,7 @@ function RestaurantOrders({ group, highlightOrderId, onReorder, embedded = false
                             highlight={highlightOrderId === order.id}
                             onReorder={onReorder}
                             embedded={embedded}
+                            profilePath={profilePath}
                         />
                     ))}
                 </div>
@@ -675,10 +707,10 @@ function RestaurantOrders({ group, highlightOrderId, onReorder, embedded = false
     );
 }
 
-function OrderCard({ order, restaurantName, restaurantSlug, onReorder, highlight = false, embedded = false }) {
+function OrderCard({ order, restaurantName, restaurantSlug, onReorder, profilePath, highlight = false, embedded = false }) {
     const createdAt = useMemo(() => new Date(order?.createdAt), [order?.createdAt]);
     const status = String(order?.status || "PLACED").toUpperCase();
-    const tableNoRaw = String(order?.tableNo || "").trim();
+    const flowLabel = getOrderFlowLabel(order);
 
     const highlightStyle = !embedded && highlight ? { boxShadow: "0 0 0 2px var(--app-primary)" } : undefined;
 
@@ -693,14 +725,14 @@ function OrderCard({ order, restaurantName, restaurantSlug, onReorder, highlight
                     </p>
                     <div className={embedded ? "mt-2 flex flex-wrap gap-1.5 text-[11px]" : "mt-3 flex flex-wrap gap-2 text-xs"}>
                         <span className={embedded ? "theme-pill rounded-full px-2 py-1" : "theme-pill rounded-full px-3 py-1"}>Status: {formatStatus(status)}</span>
-                        <span className={embedded ? "theme-pill rounded-full px-2 py-1" : "theme-pill rounded-full px-3 py-1"}>Table: {tableNoRaw ? tableNoRaw : "Takeaway"}</span>
+                        <span className={embedded ? "theme-pill rounded-full px-2 py-1" : "theme-pill rounded-full px-3 py-1"}>Type: {flowLabel}</span>
                         <span className={embedded ? "theme-pill rounded-full px-2 py-1" : "theme-pill rounded-full px-3 py-1"}>Total: {formatMoney(order?.total)}</span>
                     </div>
                 </div>
 
                 <div className={embedded ? "flex gap-2 md:w-[220px]" : "flex flex-col gap-3 md:w-[280px]"}>
                     <Link
-                        to={`/profile/orders/${encodeURIComponent(String(order?.id || ""))}`}
+                        to={profilePath ? profilePath(`/profile/orders/${encodeURIComponent(String(order?.id || ""))}`) : `/profile/orders/${encodeURIComponent(String(order?.id || ""))}`}
                         state={{ order, restaurant: { name: restaurantName, slug: restaurantSlug } }}
                         className={embedded
                             ? "theme-soft-button inline-flex items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold"

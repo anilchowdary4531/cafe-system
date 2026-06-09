@@ -1,10 +1,11 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 // ============================
 // PUBLIC PAGES
 // ============================
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import Landing from "./pages/Landing";
 
 import Cart from "./pages/Cart";
 import Login from "./pages/Login";
@@ -40,16 +41,24 @@ import OwnerFinance from "./pages/admin/OwnerFinance";
 import OwnerStaff from "./pages/admin/OwnerStaff";
 import OwnerSettings from "./pages/admin/OwnerSettings";
 import OwnerNotifications from "./pages/admin/OwnerNotifications";
+import RestaurantPublicMenu from "./pages/restaurant/RestaurantPublicMenu";
 import RestaurantMenu from "./pages/restaurant/RestaurantMenu";
 import SuperAdminDashboard from "./pages/super-admin/SuperAdminDashboard";
+import SuperAdminCreateRestaurant from "./pages/super-admin/SuperAdminCreateRestaurant";
+import SuperAdminUsers from "./pages/super-admin/SuperAdminUsers";
+import SuperAdminSettings from "./pages/super-admin/SuperAdminSettings";
 import NewOrder from "./pages/admin/NewOrder.jsx";
 import PaymentSuccess from "./pages/admin/PaymentSuccess.jsx";
 import Kitchen from "./pages/Kitchen.jsx";
-import Waiter from "./pages/Waiter.jsx";
+import KitchenChefDetail from "./pages/KitchenChefDetail.jsx";
+import StaffProfile from "./pages/StaffProfile.jsx";
+import Server from "./pages/Server.jsx";
 
 import OwnerLayout from "./layouts/OwnerLayout.jsx";
 
 export default function App() {
+    const location = useLocation();
+
     return (
         <AuthProvider>
             <StaffSocketProvider>
@@ -60,10 +69,7 @@ export default function App() {
                     {/* PUBLIC CUSTOMER ROUTES */}
                     {/* ================================= */}
 
-                    <Route
-                        path="/"
-                        element={<Navigate to="/r/cafeking" replace />}
-                    />
+                    <Route path="/" element={<Landing />} />
 
                     <Route
                         path="/cart"
@@ -86,7 +92,7 @@ export default function App() {
                         }
                     />
 
-                    <Route path="/profile" element={<Navigate to="/profile/overview" replace />} />
+                    <Route path="/profile" element={<Navigate to={`/profile/overview${location.search || ""}`} replace />} />
                     <Route
                         path="/profile/overview"
                         element={
@@ -106,8 +112,18 @@ export default function App() {
                                 <Footer />
                             </>
                         }
+                        />
+                    <Route path="/profile/orders" element={<Navigate to={`/profile/order-history${location.search || ""}`} replace />} />
+                    <Route
+                        path="/profile/addresses"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="addresses" />
+                                <Footer />
+                            </>
+                        }
                     />
-                    <Route path="/profile/orders" element={<Navigate to="/profile/order-history" replace />} />
                     <Route
                         path="/profile/orders/:id"
                         element={
@@ -203,12 +219,45 @@ export default function App() {
                             </ProtectedRoute>
                         }
                     />
+                    <Route
+                        path="/kitchen/chef/:chefId"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"]}>
+                                <KitchenChefDetail />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/staff/profile/:staffId"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF", "WAITER", "CASHIER", "STAFF"]}>
+                                <StaffProfile />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/kitchen/assigned-items"
+                        element={<Navigate to="/kitchen" replace />}
+                    />
+                    <Route
+                        path="/kitchen/assignment-history"
+                        element={<Navigate to="/kitchen" replace />}
+                    />
 
                     <Route
                         path="/waiter"
                         element={
                             <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CASHIER"]}>
-                                <Waiter />
+                                <Server />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    <Route
+                        path="/server"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CASHIER"]}>
+                                <Server />
                             </ProtectedRoute>
                         }
                     />
@@ -217,7 +266,10 @@ export default function App() {
                     {/* RESTAURANT CUSTOMER MENU */}
                     {/* ================================= */}
 
-                    <Route path="/r/:slug" element={<RestaurantMenu />} />
+                    <Route path="/r/:slug" element={<Landing />} />
+                    <Route path="/r/:slug/menu" element={<RestaurantPublicMenu key={`${location.pathname}${location.search}`} />} />
+                    <Route path="/m/:slug/:table?" element={<RestaurantMenu key={`${location.pathname}${location.search}`} />} />
+                    <Route path="/debug/menu/:slug/:table?" element={<RestaurantMenu key={`${location.pathname}${location.search}`} />} />
 
                     {/* ================================= */}
                     {/* SUPER ADMIN PANEL */}
@@ -231,6 +283,30 @@ export default function App() {
                             </ProtectedRoute>
                         }
                     />
+                    <Route
+                        path="/super-admin/create-restaurant"
+                        element={
+                            <ProtectedRoute role="SUPER_ADMIN">
+                                <SuperAdminCreateRestaurant />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/super-admin/users"
+                        element={
+                            <ProtectedRoute role="SUPER_ADMIN">
+                                <SuperAdminUsers />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/super-admin/settings"
+                        element={
+                            <ProtectedRoute role="SUPER_ADMIN">
+                                <SuperAdminSettings />
+                            </ProtectedRoute>
+                        }
+                    />
 
                     {/* ================================= */}
                     {/* OWNER PANEL */}
@@ -239,13 +315,14 @@ export default function App() {
                     <Route
                         path="/owner"
                         element={
-                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STAFF"]}>
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF", "CASHIER"]}>
                                 <OwnerLayout />
                             </ProtectedRoute>
                         }
                     >
                         <Route index element={<OwnerDashboard />} />
                         <Route path="orders" element={<OwnerOrders />} />
+                        <Route path="online-orders" element={<OwnerOrders sourceFilter="ONLINE" />} />
                         <Route path="menu" element={<MenuStudio />} />
                         <Route path="tables" element={<OwnerTables />} />
                         <Route path="kitchen" element={<OwnerKitchenLive />} />

@@ -86,7 +86,7 @@ export default function RestaurantSelector({ variant = "default" }) {
         // We intentionally drop any existing `?table=` query because it is tied to the previous restaurant.
         const path = String(location.pathname || "");
         if (path === "/" || path.startsWith("/r/")) {
-            navigate(`/r/${next.slug}`);
+            navigate(`/r/${next.slug}/menu`);
         }
     };
 

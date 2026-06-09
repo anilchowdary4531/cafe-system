@@ -4,6 +4,7 @@ import { Heart, Trash2 } from "lucide-react";
 import { getCustomerFavorites, setCustomerFavorites } from "../../../utils/customerFavorites";
 import { resolveImageUrl } from "../../../utils/resolveImageUrl";
 import { showToast } from "../../../utils/toast";
+import { buildRestaurantMenuPath } from "../../../utils/restaurantMenuNavigation";
 
 const formatMoney = (value) => `Rs ${Math.round(Number(value || 0))}`;
 
@@ -61,7 +62,7 @@ export default function FavoritesSection() {
                                     <p className="theme-muted mt-0.5 text-xs">{group.items.length} item{group.items.length === 1 ? "" : "s"}</p>
                                 </div>
                                 <Link
-                                    to={`/r/${group.slug}`}
+                                    to={buildRestaurantMenuPath(group.slug)}
                                     className="theme-button inline-flex items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold"
                                 >
                                     Open Menu

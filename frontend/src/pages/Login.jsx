@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, Phone, UserCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useRestaurantContext } from "../context/RestaurantContext";
-import ThemeSelector from "../components/ThemeSelector";
 import { api } from "../utils/apiClient";
 import BrandLogo from "../components/BrandLogo";
+import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
+import { resolveEffectiveStaffRole } from "../utils/staffRole";
 
 export default function Login() {
-    const { login, loginCustomer } = useAuth();
+    const { login, loginSession, loginCustomer } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -21,7 +22,11 @@ export default function Login() {
 
     const [mode, setMode] = useState(initialMode);
 
-    const [email, setEmail] = useState(""); // staff email
+    const [email, setEmail] = useState(() => {
+        const mode = String(searchParams.get("mode") || "").trim().toLowerCase();
+        const prefilledEmail = String(searchParams.get("email") || "").trim();
+        return mode === "staff" ? prefilledEmail : "";
+    }); // staff email
     const [password, setPassword] = useState(""); // staff password
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false); // staff loading
@@ -36,14 +41,56 @@ export default function Login() {
     const [customerDevOtp, setCustomerDevOtp] = useState("");
     const [customerLoading, setCustomerLoading] = useState(false);
     const [customerError, setCustomerError] = useState("");
+    const autoLoginTokenRef = useRef("");
+    const staffLink = String(searchParams.get("staffLink") || "").trim();
 
     const customerMenuPath = useMemo(() => {
         const slug = String(restaurantContext?.slug || "").trim();
-        return slug ? `/r/${encodeURIComponent(slug)}` : "/";
-    }, [restaurantContext?.slug]);
+        return buildRestaurantMenuPath(slug, restaurantContext?.tableNo);
+    }, [restaurantContext?.slug, restaurantContext?.tableNo]);
 
-    const getRedirectPath = (role) => {
-        const normalizedRole = String(role || "").toUpperCase();
+    const handleSuccessfulStaffLogin = (data, { session = false } = {}) => {
+        if (session) {
+            loginSession(data);
+        } else {
+            login(data);
+        }
+
+        setRestaurantContext({
+            id: data?.user?.restaurant?.id || data?.user?.restaurantId || null,
+            name: data?.user?.restaurant?.name || null,
+            slug: data?.user?.restaurant?.slug || null,
+        });
+
+        const from = location.state?.from;
+        const fromPathname = String(from?.pathname || "");
+        const fromPath = fromPathname ? `${fromPathname}${from.search || ""}${from.hash || ""}` : "";
+        const effectiveRole = resolveEffectiveStaffRole(data?.user?.role, data?.user?.designation);
+        const isSeniorChef = /SENIOR/i.test(String(data?.user?.designation || ""));
+        const shouldIgnoreFromPath =
+            (effectiveRole === "WAITER" &&
+                fromPathname &&
+                (fromPathname === "/owner" ||
+                    fromPathname.startsWith("/owner/") ||
+                    fromPathname === "/admin" ||
+                    fromPathname.startsWith("/admin/") ||
+                    fromPathname.startsWith("/super-admin"))) ||
+            (effectiveRole === "CHEF" &&
+                fromPathname &&
+                (fromPathname === "/owner/kitchen" ||
+                    fromPathname === "/kitchen" ||
+                    fromPathname.startsWith("/kitchen/")) &&
+                !isSeniorChef);
+        const redirectTarget =
+            fromPath && fromPathname !== "/login" && !shouldIgnoreFromPath
+                ? fromPath
+                : getRedirectPath(effectiveRole, data?.user?.designation, data?.user?.id);
+        navigate(redirectTarget, { replace: true });
+    };
+
+    const getRedirectPath = (role, designation, userId) => {
+        const normalizedRole = resolveEffectiveStaffRole(role, designation);
+        const isSeniorChef = /SENIOR/i.test(String(designation || ""));
 
         if (normalizedRole === "SUPER_ADMIN") {
             return "/super-admin";
@@ -55,9 +102,14 @@ export default function Login() {
             return "/owner";
         }
         if (normalizedRole === "CHEF") {
-            return "/owner/kitchen";
+            if (isSeniorChef) return "/kitchen";
+            const chefId = String(userId || "").trim();
+            return chefId ? `/kitchen/chef/${chefId}` : "/kitchen";
         }
-        if (normalizedRole === "WAITER" || normalizedRole === "CASHIER") {
+        if (normalizedRole === "WAITER") {
+            return "/server";
+        }
+        if (normalizedRole === "CASHIER") {
             return "/owner/orders";
         }
         if (normalizedRole === "MANAGER") {
@@ -79,6 +131,44 @@ export default function Login() {
         setCustomerDevOtp("");
         setCustomerError("");
     }, [mode]);
+
+    useEffect(() => {
+        if (mode !== "staff") return;
+        if (!staffLink) return;
+        if (autoLoginTokenRef.current === staffLink) return;
+        autoLoginTokenRef.current = staffLink;
+
+        let cancelled = false;
+
+        const consumeStaffLink = async () => {
+            try {
+                setLoading(true);
+                setError("");
+
+                const res = await api.post("/auth/staff-link/consume", { token: staffLink });
+                if (cancelled) return;
+                handleSuccessfulStaffLogin(res.data, { session: true });
+            } catch (err) {
+                if (cancelled) return;
+                setError(
+                    err.response?.data?.message ||
+                    (err.message === "Network Error"
+                        ? "Backend is unreachable. Check your API URL configuration (VITE_API_URL)."
+                        : err.message || "Failed to open staff login link")
+                );
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        consumeStaffLink();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [mode, staffLink]);
 
     const setModeAndUrl = (nextMode) => {
         const value = nextMode === "staff" ? "staff" : "customer";
@@ -102,18 +192,7 @@ export default function Login() {
                 password,
             });
 
-            login(res.data);
-
-            setRestaurantContext({
-                id: res.data?.user?.restaurant?.id || res.data?.user?.restaurantId || null,
-                name: res.data?.user?.restaurant?.name || null,
-                slug: res.data?.user?.restaurant?.slug || null,
-            });
-
-            const from = location.state?.from;
-            const fromPath = from?.pathname ? `${from.pathname}${from.search || ""}${from.hash || ""}` : "";
-            const redirectTarget = fromPath && fromPath !== "/login" ? fromPath : getRedirectPath(res.data?.user?.role);
-            navigate(redirectTarget, { replace: true });
+            handleSuccessfulStaffLogin(res.data);
         } catch (err) {
             setError(
                 err.response?.data?.message ||
@@ -231,10 +310,6 @@ export default function Login() {
             <div className="flex items-center justify-center px-6 py-10">
 
                 <div className="theme-panel w-full max-w-md rounded-3xl p-8 backdrop-blur-2xl">
-                    <div className="mb-6 flex justify-end">
-                        <ThemeSelector variant="compact" />
-                    </div>
-
                     <div className="mb-6 grid grid-cols-2 gap-2">
                         <button
                             type="button"

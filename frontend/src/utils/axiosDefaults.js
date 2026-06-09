@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearStaffSession, getActiveStaffSession } from "./staffSessionStorage";
 
 const pathFromUrl = (url) => {
     const raw = String(url || "");
@@ -12,7 +13,8 @@ const pathFromUrl = (url) => {
 
 axios.interceptors.request.use((config) => {
     const path = pathFromUrl(config?.url);
-    const staffToken = localStorage.getItem("token");
+    const activeStaffSession = getActiveStaffSession();
+    const staffToken = activeStaffSession?.token || null;
     const customerToken = localStorage.getItem("customerToken");
 
     config.headers = config.headers || {};
@@ -34,13 +36,13 @@ axios.interceptors.response.use(
         const status = error?.response?.status;
         if (status === 401) {
             const path = pathFromUrl(error?.config?.url);
+            const activeStaffSession = getActiveStaffSession();
             try {
                 if (path.startsWith("/customer")) {
                     localStorage.removeItem("customerToken");
                     localStorage.removeItem("customer");
                 } else {
-                    localStorage.removeItem("token");
-                    localStorage.removeItem("user");
+                    clearStaffSession(activeStaffSession?.scope || "local");
                 }
             } catch {
                 // ignore
@@ -58,4 +60,3 @@ axios.interceptors.response.use(
         return Promise.reject(error);
     }
 );
-

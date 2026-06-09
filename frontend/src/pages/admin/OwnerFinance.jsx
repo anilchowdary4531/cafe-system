@@ -12,7 +12,6 @@ import {
     LoaderCircle,
     ReceiptText,
     RefreshCcw,
-    Trash2,
     Wallet,
     X,
 } from "lucide-react";
@@ -65,12 +64,6 @@ const formatCount = (value) =>
 
 const formatPercent = (value) => `${toNumber(value).toFixed(1)}%`;
 
-const formatShortDate = (value) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "-";
-    return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
-};
-
 const formatGeneratedAt = (value) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "just now";
@@ -114,12 +107,6 @@ const resolvePaymentBucket = (paymentMode, paymentStatus) => {
     }
 
     return "Digital";
-};
-
-const signalClass = (type) => {
-    if (type === "WARNING") return "border-amber-300 bg-amber-500/10 text-amber-700";
-    if (type === "GOOD") return "border-emerald-300 bg-emerald-500/10 text-emerald-700";
-    return "border-sky-300 bg-sky-500/10 text-sky-700";
 };
 
 const statusBadgeClass = (status) => {
@@ -219,14 +206,6 @@ export default function OwnerFinance() {
     const [data, setData] = useState(null);
     const [error, setError] = useState("");
     const [search, setSearch] = useState("");
-    const [expenseForm, setExpenseForm] = useState({
-        title: "",
-        category: "General",
-        amount: "",
-        notes: "",
-        spentAt: "",
-    });
-    const [savingExpense, setSavingExpense] = useState(false);
     const [upiIdInput, setUpiIdInput] = useState("");
     const [savingUpi, setSavingUpi] = useState(false);
     const [upiNotice, setUpiNotice] = useState("");
@@ -284,51 +263,6 @@ export default function OwnerFinance() {
         return () => window.removeEventListener("keydown", handleEscape);
     }, [selectedInvoice]);
 
-    const addExpense = async (e) => {
-        e.preventDefault();
-        if (!expenseForm.title || !expenseForm.amount) {
-            setError("Expense title and amount are required.");
-            return;
-        }
-
-        try {
-            setSavingExpense(true);
-            setError("");
-
-            await axios.post(`${API}/owner/${restaurantId}/finance/expenses`, {
-                title: expenseForm.title,
-                category: expenseForm.category,
-                amount: Number(expenseForm.amount),
-                notes: expenseForm.notes,
-                spentAt: expenseForm.spentAt || undefined,
-            });
-
-            setExpenseForm({
-                title: "",
-                category: "General",
-                amount: "",
-                notes: "",
-                spentAt: "",
-            });
-            await loadFinance({ silent: true });
-        } catch (err) {
-            console.log(err);
-            setError(err?.response?.data?.message || "Failed to add expense.");
-        } finally {
-            setSavingExpense(false);
-        }
-    };
-
-    const deleteExpense = async (expenseId) => {
-        try {
-            await axios.delete(`${API}/owner/${restaurantId}/finance/expenses/${expenseId}`);
-            await loadFinance({ silent: true });
-        } catch (err) {
-            console.log(err);
-            setError(err?.response?.data?.message || "Failed to delete expense.");
-        }
-    };
-
     const saveUpiId = async () => {
         const normalizedUpiId = String(upiIdInput || "").trim().toLowerCase();
         if (normalizedUpiId && !/^[a-z0-9._-]{2,}@[a-z0-9._-]{2,}$/i.test(normalizedUpiId)) {
@@ -354,7 +288,6 @@ export default function OwnerFinance() {
     };
 
     const invoices = Array.isArray(data?.invoices) ? data.invoices : [];
-    const expenses = Array.isArray(data?.expenses) ? data.expenses : [];
     const summary = data?.summary || {};
 
     const filteredInvoices = useMemo(() => {
@@ -771,105 +704,6 @@ export default function OwnerFinance() {
                 </article>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-2">
-                <article className="theme-card rounded-2xl p-5">
-                    <h4 className="mb-3 text-xl font-semibold">Expense Tracker</h4>
-
-                    <form onSubmit={addExpense} className="grid gap-2 md:grid-cols-2">
-                        <input
-                            placeholder="Expense title"
-                            value={expenseForm.title}
-                            onChange={(e) => setExpenseForm((prev) => ({ ...prev, title: e.target.value }))}
-                            className="theme-input rounded-lg px-3 py-2"
-                        />
-                        <input
-                            placeholder="Category"
-                            value={expenseForm.category}
-                            onChange={(e) => setExpenseForm((prev) => ({ ...prev, category: e.target.value }))}
-                            className="theme-input rounded-lg px-3 py-2"
-                        />
-                        <input
-                            placeholder="Amount"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={expenseForm.amount}
-                            onChange={(e) => setExpenseForm((prev) => ({ ...prev, amount: e.target.value }))}
-                            className="theme-input rounded-lg px-3 py-2"
-                        />
-                        <input
-                            type="date"
-                            value={expenseForm.spentAt}
-                            onChange={(e) => setExpenseForm((prev) => ({ ...prev, spentAt: e.target.value }))}
-                            className="theme-input rounded-lg px-3 py-2"
-                        />
-                        <input
-                            placeholder="Notes"
-                            value={expenseForm.notes}
-                            onChange={(e) => setExpenseForm((prev) => ({ ...prev, notes: e.target.value }))}
-                            className="theme-input rounded-lg px-3 py-2 md:col-span-2"
-                        />
-                        <button
-                            type="submit"
-                            disabled={savingExpense}
-                            className="theme-button rounded-lg px-4 py-2 text-sm font-semibold md:col-span-2 disabled:opacity-70"
-                        >
-                            {savingExpense ? "Saving..." : "Add Expense"}
-                        </button>
-                    </form>
-
-                    <div className="mt-4 space-y-2">
-                        {expenses.map((expense) => (
-                            <div
-                                key={expense.id}
-                                className="theme-card flex items-center justify-between rounded-lg border px-3 py-2"
-                            >
-                                <div>
-                                    <p className="text-sm font-medium">{expense.title}</p>
-                                    <p className="theme-muted text-xs">
-                                        {expense.category} - {formatShortDate(expense.spentAt || expense.createdAt)}
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <p className="text-sm font-semibold text-red-700">{formatMoney(expense.amount)}</p>
-                                    <button
-                                        type="button"
-                                        onClick={() => deleteExpense(expense.id)}
-                                        className="theme-muted hover:text-red-700"
-                                        title="Delete expense"
-                                    >
-                                        <Trash2 size={14} />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-
-                        {expenses.length === 0 && (
-                            <div className="theme-muted rounded-lg border border-dashed border-current/30 p-3 text-sm">
-                                No expenses added in this range.
-                            </div>
-                        )}
-                    </div>
-                </article>
-
-                <article className="theme-card rounded-2xl p-5">
-                    <h4 className="mb-3 text-xl font-semibold">AI Finance Signals</h4>
-                    <div className="space-y-3">
-                        {(data?.aiSignals || []).map((signal) => (
-                            <div key={signal.title} className={`rounded-xl border p-3 ${signalClass(signal.type)}`}>
-                                <p className="text-sm font-semibold">{signal.title}</p>
-                                <p className="mt-1 text-xs opacity-90">{signal.message}</p>
-                            </div>
-                        ))}
-                        {(data?.aiSignals || []).length === 0 && (
-                            <div className="theme-muted rounded-lg border border-dashed border-current/30 p-3 text-sm">
-                                No AI signals for selected range.
-                            </div>
-                        )}
-                    </div>
-                </article>
-            </div>
-
             <article className="theme-card rounded-2xl p-5">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <h4 className="text-xl font-semibold">Invoice Ledger</h4>
@@ -986,6 +820,7 @@ export default function OwnerFinance() {
                             <ReceiptMeta label="Phone" value={selectedInvoice.phone || "-"} />
                             <ReceiptMeta label="Table" value={selectedInvoice.tableNo || "-"} />
                             <ReceiptMeta label="Order Source" value={selectedInvoice.orderSource || "-"} />
+                            <ReceiptMeta label="Delivery Address" value={selectedInvoice.deliveryAddress || "-"} />
                             <ReceiptMeta label="Payment Mode" value={selectedInvoice.paymentMode || "UNKNOWN"} />
                             <ReceiptMeta label="Payment Status" value={selectedInvoice.paymentStatus || "PENDING"} />
                         </div>
@@ -1130,7 +965,7 @@ function ReceiptMeta({ label, value }) {
     return (
         <div className="rounded-lg border px-3 py-2">
             <p className="theme-muted text-xs uppercase tracking-[0.08em]">{label}</p>
-            <p className="mt-1 text-sm font-semibold">{value}</p>
+            <p className="mt-1 whitespace-pre-line text-sm font-semibold">{value}</p>
         </div>
     );
 }

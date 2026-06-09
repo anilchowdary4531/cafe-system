@@ -1,11 +1,12 @@
 import { memo, useMemo } from "react";
-import { Link, NavLink } from "react-router-dom";
-import { ArrowLeft, Gift, Heart, IndianRupee, Settings, Sparkles, Star, UserCircle2 } from "lucide-react";
+import { Link, NavLink, useSearchParams } from "react-router-dom";
+import { ArrowLeft, Gift, Heart, IndianRupee, MapPin, Settings, Sparkles, Star, UserCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import useCustomerProfile from "../hooks/useCustomerProfile";
 import useCachedGet from "../hooks/useCachedGet";
 import { getCustomerProfileExtras } from "../utils/customerProfileExtras";
 import OrdersSection from "./customer/profile/OrdersSection";
+import AddressesSection from "./customer/profile/AddressesSection";
 import OrderDetailsPage from "./customer/profile/OrderDetailsPage";
 import WalletSection from "./customer/profile/WalletSection";
 import FavoritesSection from "./customer/profile/FavoritesSection";
@@ -19,9 +20,13 @@ const formatStatus = (status) => {
 };
 
 export default function Profile({ section = "overview" }) {
-    const { user, customer } = useAuth();
+    const { user, customer, staffToken } = useAuth();
+    const [searchParams] = useSearchParams();
+    const forceCustomerMode = searchParams.get("scope") === "customer";
+    const buildProfilePath = (path) => (forceCustomerMode ? `${path}?scope=customer` : path);
+    const hasStaffSession = Boolean(user && staffToken);
 
-    if (user) {
+    if (hasStaffSession && !forceCustomerMode) {
         return <StaffProfile user={user} />;
     }
 
@@ -42,10 +47,10 @@ export default function Profile({ section = "overview" }) {
         );
     }
 
-    return <CustomerProfileLayout section={section} />;
+    return <CustomerProfileLayout section={section} buildProfilePath={buildProfilePath} />;
 }
 
-function CustomerProfileLayout({ section }) {
+function CustomerProfileLayout({ section, buildProfilePath }) {
     const profileState = useCustomerProfile();
     const { profile, customerToken, loading, saving, error, updateProfile, setError } = profileState;
 
@@ -65,6 +70,8 @@ function CustomerProfileLayout({ section }) {
             ? "Order details"
             : activeSection === "orders"
             ? "Orders"
+            : activeSection === "addresses"
+            ? "Address"
             : activeSection === "wallet"
             ? "Wallet"
             : activeSection === "edit"
@@ -78,6 +85,9 @@ function CustomerProfileLayout({ section }) {
     const sectionNode = (() => {
         if (activeSection === "ordersdetail") return <OrderDetailsPage />;
         if (activeSection === "orders") return <OrdersSection />;
+        if (activeSection === "addresses") {
+            return <AddressesSection profile={profile} customerToken={customerToken} />;
+        }
         if (activeSection === "wallet") return <WalletSection profile={profile} customerToken={customerToken} />;
         if (activeSection === "edit") {
             return (
@@ -112,7 +122,7 @@ function CustomerProfileLayout({ section }) {
 
     if (isOverviewPage) {
         return (
-            <div className="theme-page min-h-screen px-4 py-10 md:px-8">
+            <div className="theme-page profile-overview-flat min-h-screen px-4 py-10 md:px-8">
                 <div className="mx-auto w-full max-w-6xl space-y-6">
                     <header className="theme-panel rounded-[32px] p-6">
                         <div className="flex items-start gap-4">
@@ -131,26 +141,32 @@ function CustomerProfileLayout({ section }) {
 
                         <nav className="mt-4 flex flex-wrap items-center gap-2.5">
                             <OverviewActionCard
-                                to="/profile/edit"
+                                to={buildProfilePath("/profile/edit")}
                                 icon={<UserCircle2 size={19} />}
                                 label="Edit profile"
                                 caption="Photo, name, number"
                             />
                             <OverviewActionCard
-                                to="/profile/favorites"
+                                to={buildProfilePath("/profile/addresses")}
+                                icon={<MapPin size={19} />}
+                                label="Address"
+                                caption="Saved delivery locations"
+                            />
+                            <OverviewActionCard
+                                to={buildProfilePath("/profile/favorites")}
                                 icon={<Heart size={19} />}
                                 label="Favorites"
                                 caption="Your liked dishes"
                             />
                             <OverviewActionCard
-                                to="/profile/settings"
+                                to={buildProfilePath("/profile/settings")}
                                 icon={<Settings size={19} />}
                                 label="Settings"
                                 caption="Profile preferences"
                             />
                         </nav>
 
-                        <RecentOrdersSection profile={profile} customerToken={customerToken} />
+                        <RecentOrdersSection profile={profile} customerToken={customerToken} buildProfilePath={buildProfilePath} />
 
                         <section className="mt-4 rounded-3xl p-1">
                             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -207,7 +223,7 @@ function CustomerProfileLayout({ section }) {
             <div className="mx-auto w-full max-w-6xl space-y-6">
                 <header className="flex items-center gap-3 px-1">
                     <NavLink
-                        to="/profile/overview"
+                        to={buildProfilePath("/profile/overview")}
                         reloadDocument
                         aria-label="Back to overview"
                         title="Back to overview"
@@ -231,7 +247,7 @@ const OverviewActionCard = memo(function OverviewActionCard({ to, icon, label, c
             reloadDocument
             end={Boolean(end)}
             className={({ isActive }) =>
-                `theme-soft-button inline-flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left shadow-[0_8px_18px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 hover:shadow-[0_10px_22px_rgba(0,0,0,0.22)] ${
+                `theme-soft-button profile-no-shadow-card inline-flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition hover:-translate-y-0.5 ${
                     isActive ? "ring-1 ring-[var(--app-border-strong)]" : "opacity-95 hover:opacity-100"
                 }`
             }
@@ -247,9 +263,7 @@ const OverviewActionCard = memo(function OverviewActionCard({ to, icon, label, c
 
 function ProfileValueCard({ icon, label, hint, value, toneClass }) {
     return (
-        <article
-            className={`rounded-2xl bg-gradient-to-br ${toneClass} px-3 py-3 shadow-[0_8px_20px_rgba(0,0,0,0.18)] backdrop-blur-sm`}
-        >
+        <article className={`profile-no-shadow-card rounded-2xl bg-gradient-to-br ${toneClass} px-3 py-3 backdrop-blur-sm`}>
             <div className="theme-soft-button inline-flex h-7 w-7 items-center justify-center rounded-lg">{icon}</div>
             <p className="theme-muted mt-2 text-[10px] font-semibold uppercase tracking-[0.2em]">{label}</p>
             <p className="theme-muted mt-1 text-[11px]">{hint}</p>
@@ -258,7 +272,7 @@ function ProfileValueCard({ icon, label, hint, value, toneClass }) {
     );
 }
 
-function RecentOrdersSection({ profile, customerToken }) {
+function RecentOrdersSection({ profile, customerToken, buildProfilePath }) {
     const phone = String(profile?.phone || "").trim();
     const enabled = Boolean(phone || customerToken);
     const params = useMemo(() => (phone ? { phone } : undefined), [phone]);
@@ -291,7 +305,7 @@ function RecentOrdersSection({ profile, customerToken }) {
                     <h2 className="mt-1 text-lg font-semibold">Latest activity</h2>
                 </div>
                 <NavLink
-                    to="/profile/order-history"
+                    to={buildProfilePath("/profile/order-history")}
                     reloadDocument
                     className="theme-soft-button inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold"
                 >
@@ -335,7 +349,7 @@ function RecentOrdersSection({ profile, customerToken }) {
                                     orderId ? (
                                         <Link
                                             key={String(order?.id)}
-                                            to={`/profile/orders/${encodeURIComponent(orderId)}`}
+                                            to={buildProfilePath(`/profile/orders/${encodeURIComponent(orderId)}`)}
                                             state={{
                                                 order,
                                                 restaurant: {

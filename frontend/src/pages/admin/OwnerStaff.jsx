@@ -13,6 +13,7 @@ import {
     UserRoundX,
 } from "lucide-react";
 import { API } from "../../config";
+import { showToast } from "../../utils/toast";
 
 const DESIGNATION_OPTIONS = [
     "Chef",
@@ -125,6 +126,28 @@ const resolveDesignation = (staffUser) => {
     return getRoleDesignationFallback(staffUser?.role);
 };
 
+const buildFallbackStaffLoginLink = (staffUser) => {
+    const email = String(staffUser?.email || "").trim().toLowerCase();
+    const params = new URLSearchParams({ mode: "staff" });
+    if (email) params.set("email", email);
+
+    const base = typeof window !== "undefined" ? window.location.origin : "";
+    const path = `/login?${params.toString()}`;
+    return base ? `${base}${path}` : path;
+};
+
+const getStaffLoginLink = (staffUser) => {
+    const link = String(staffUser?.loginLink || "").trim();
+    if (link) return link;
+    return buildFallbackStaffLoginLink(staffUser);
+};
+
+const buildStaffLoginShareText = (staffUser, restaurantName, loginLink) => {
+    const name = String(staffUser?.name || "there").trim() || "there";
+    const restaurant = String(restaurantName || "your restaurant").trim() || "your restaurant";
+    return `Hi ${name}, use this one-click staff login link for ${restaurant}: ${loginLink}`;
+};
+
 export default function OwnerStaff() {
     const [users, setUsers] = useState([]);
     const [modules, setModules] = useState(Object.keys(ACCESS_LABELS));
@@ -169,6 +192,7 @@ export default function OwnerStaff() {
     }, []);
 
     const restaurantId = Number(user?.restaurantId);
+    const restaurantName = String(user?.restaurant?.name || user?.restaurantName || "your restaurant").trim() || "your restaurant";
 
     const loadStaff = async ({ silent = false } = {}) => {
         if (!restaurantId) {
@@ -364,6 +388,46 @@ export default function OwnerStaff() {
         }
     };
 
+    const copyStaffLoginLink = async (staffUser) => {
+        const loginLink = getStaffLoginLink(staffUser);
+        try {
+            await navigator.clipboard.writeText(loginLink);
+            showToast({
+                title: "Login link copied",
+                message: `${staffUser?.name || "Staff"} can be shared on WhatsApp now.`,
+                variant: "success",
+            });
+        } catch {
+            showToast({
+                title: "Copy failed",
+                message: "Your browser blocked clipboard access.",
+                variant: "error",
+            });
+        }
+    };
+
+    const shareStaffLoginOnWhatsApp = (staffUser) => {
+        const loginLink = getStaffLoginLink(staffUser);
+        const message = buildStaffLoginShareText(staffUser, restaurantName, loginLink);
+        const shareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+        const popup = window.open(shareUrl, "_blank", "noopener,noreferrer");
+
+        if (!popup) {
+            showToast({
+                title: "WhatsApp blocked",
+                message: "Allow pop-ups to open WhatsApp sharing.",
+                variant: "error",
+            });
+            return;
+        }
+
+        showToast({
+            title: "WhatsApp ready",
+            message: `Prepared a share message for ${staffUser?.name || "staff"}.`,
+            variant: "success",
+        });
+    };
+
     return (
         <section className="space-y-5">
             {error && (
@@ -512,6 +576,7 @@ export default function OwnerStaff() {
                         {users.map((staffUser) => {
                             const open = selectedAccessUserId === staffUser.id;
                             const isEditing = editingStaffId === staffUser.id;
+                            const staffLoginLink = getStaffLoginLink(staffUser);
                             return (
                                 <div key={staffUser.id} className="relative p-4 pr-14">
                                     <div className="flex flex-col gap-3">
@@ -587,14 +652,14 @@ export default function OwnerStaff() {
                                                 <>
                                                     <div className="flex items-center gap-2">
                                                         <p className="text-base font-semibold">{staffUser.name}</p>
-                                                        <span className="rounded bg-cyan-500/20 px-2 py-0.5 text-xs text-cyan-100">
+                                                        <span className="theme-staff-role-pill rounded-full px-2 py-0.5 text-xs font-semibold">
                                                             {resolveDesignation(staffUser)}
                                                         </span>
                                                         <span
-                                                            className={`rounded px-2 py-0.5 text-xs ${
+                                                            className={`theme-staff-status-pill rounded-full px-2 py-0.5 text-xs font-semibold ${
                                                                 staffUser.isActive
-                                                                    ? "bg-emerald-500/20 text-emerald-200"
-                                                                    : "bg-gray-500/20 text-gray-300"
+                                                                    ? "is-active"
+                                                                    : "is-disabled"
                                                             }`}
                                                         >
                                                             {staffUser.isActive ? "ACTIVE" : "DISABLED"}
@@ -605,6 +670,31 @@ export default function OwnerStaff() {
                                                     <p className="text-xs text-gray-500">
                                                         Created {new Date(staffUser.createdAt).toLocaleString()}
                                                     </p>
+                                                    <div className="mt-3 text-sm leading-7">
+                                                        <a
+                                                            href={staffLoginLink}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="break-all font-medium text-[color:var(--app-text)] underline decoration-dotted decoration-[color:var(--app-primary)] underline-offset-4 transition hover:text-[color:var(--app-primary)]"
+                                                            title="Open one-click staff login"
+                                                        >
+                                                            {staffLoginLink}
+                                                        </a>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => copyStaffLoginLink(staffUser)}
+                                                            className="ml-3 inline text-[color:var(--app-primary)] underline decoration-dotted underline-offset-4 transition hover:opacity-80"
+                                                        >
+                                                            Copy
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => shareStaffLoginOnWhatsApp(staffUser)}
+                                                            className="ml-3 inline text-[color:var(--app-muted-strong)] underline decoration-dotted underline-offset-4 transition hover:text-[color:var(--app-text)]"
+                                                        >
+                                                            WhatsApp
+                                                        </button>
+                                                    </div>
                                                 </>
                                             )}
                                         </div>
