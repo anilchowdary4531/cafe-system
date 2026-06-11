@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import {
     Coffee,
-    Flame,
-    Heart,
     IceCream,
-    Leaf,
-    LogIn,
     Pizza,
-    Plus,
     Search,
     ShoppingBag,
     Sparkles,
-    Star,
     Tags,
-    UserCircle2,
     Sandwich,
     UtensilsCrossed,
 } from "lucide-react";
@@ -22,167 +15,31 @@ import { useCart } from "../../context/CartContext";
 import { useRestaurantContext } from "../../context/RestaurantContext";
 import CartDrawer from "../../components/CartDrawer";
 import BrandLogo from "../../components/BrandLogo";
-import VegModeToggle from "../../components/VegModeToggle";
 import useCachedGet from "../../hooks/useCachedGet";
-import { useAuth } from "../../context/AuthContext";
 import { getCustomerFavorites, toggleFavoriteMenuItem } from "../../utils/customerFavorites";
 import { showToast } from "../../utils/toast";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
+import {
+    EMPTY_MENU,
+    FALLBACK_IMAGE,
+    compareMenuItems,
+    getSectionMeta,
+    normalizeText,
+    isVegModeItem,
+    MenuSection,
+} from "./RestaurantMenu";
+import VegModeToggle from "../../components/VegModeToggle";
 
-const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
-const EMPTY_MENU = [];
-
-const NON_VEG_KEYWORDS = ["chicken", "mutton", "fish", "prawn", "egg", "meat", "beef", "pork", "seafood", "kebab"];
-const COFFEE_KEYWORDS = ["coffee", "cappuccino", "espresso", "latte", "mocha", "americano", "macchiato"];
-const SNACK_KEYWORDS = ["snack", "fries", "burger", "sandwich", "wrap", "pizza", "roll", "momo", "nugget", "samosa", "cutlet", "chips", "starter"];
-const VEG_KEYWORDS = ["veg", "vegetarian", "paneer", "aloo", "dal", "mushroom", "tofu", "salad"];
-const DESSERT_KEYWORDS = ["dessert", "cake", "brownie", "ice cream", "icecream", "sweet", "shake", "milkshake"];
-const GENERIC_CATEGORY_RE = /^(food|general|menu|items?|item|specials?|special|misc|miscellaneous|other|others?)$/i;
 const FEATURED_MENU_THRESHOLD = 10;
 
-const SECTION_RULES = [
-    { key: "coffee-drinks", label: "Coffee & Drinks", keywords: COFFEE_KEYWORDS, Icon: Coffee, rank: 10 },
-    { key: "biryani", label: "Biryani", keywords: ["biryani"], Icon: UtensilsCrossed, rank: 20 },
-    { key: "pizza", label: "Pizza", keywords: ["pizza"], Icon: Pizza, rank: 30 },
-    { key: "burgers", label: "Burgers", keywords: ["burger"], Icon: Sandwich, rank: 40 },
-    { key: "snacks-starters", label: "Snacks & Starters", keywords: SNACK_KEYWORDS, Icon: Tags, rank: 50 },
-    { key: "desserts", label: "Desserts", keywords: DESSERT_KEYWORDS, Icon: IceCream, rank: 60 },
-];
-
-const normalizeText = (value) => String(value || "").trim().toLowerCase();
-
-const toTitleCase = (value) =>
-    String(value || "")
-        .trim()
-        .replace(/\s+/g, " ")
-        .replace(/\b\w/g, (char) => char.toUpperCase());
-
-const toSectionKey = (value) =>
-    normalizeText(value)
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "") || "specials";
-
-const combinedText = (item) => {
-    const name = normalizeText(item?.name);
-    const description = normalizeText(item?.description);
-    const category = normalizeText(item?.category);
-    return `${name} ${description} ${category}`.trim();
-};
-
-const hasKeyword = (text, keywords) => keywords.some((keyword) => text.includes(keyword));
-
-const isNonVegItem = (item) => hasKeyword(combinedText(item), NON_VEG_KEYWORDS);
-const isCoffeeItem = (item) => hasKeyword(combinedText(item), COFFEE_KEYWORDS);
-const isSnackItem = (item) => hasKeyword(combinedText(item), SNACK_KEYWORDS);
-const isVegItem = (item) => {
-    const text = combinedText(item);
-    if (!text) return false;
-    if (isNonVegItem(item)) return false;
-    return hasKeyword(text, VEG_KEYWORDS);
-};
-
-const isVegModeItem = (item) => {
-    const text = combinedText(item);
-    if (!text) return false;
-    return !isNonVegItem(item);
-};
-
-const getDietBadge = (item) => {
-    const text = combinedText(item);
-    if (!text) return null;
-    if (hasKeyword(text, NON_VEG_KEYWORDS)) {
-        return {
-            label: "Non-Veg",
-            className: "border-red-500/30 bg-red-500/10 text-red-200",
-            Icon: Flame,
-        };
-    }
-    if (hasKeyword(text, VEG_KEYWORDS)) {
-        return {
-            label: "Veg",
-            className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-            Icon: Leaf,
-        };
-    }
-    return null;
-};
-
-const getSectionMeta = (item, index) => {
-    const text = combinedText(item);
-    const rawCategory = String(item?.category || "").trim();
-    const matchedRule = SECTION_RULES.find((rule) => hasKeyword(text, rule.keywords));
-
-    if (matchedRule) {
-        return matchedRule;
-    }
-
-    if (rawCategory && !GENERIC_CATEGORY_RE.test(rawCategory)) {
-        return {
-            key: toSectionKey(rawCategory),
-            label: toTitleCase(rawCategory),
-            Icon: Tags,
-            rank: 120 + index,
-        };
-    }
-
-    if (isCoffeeItem(item)) {
-        return { key: "coffee-drinks", label: "Coffee & Drinks", Icon: Coffee, rank: 10 };
-    }
-
-    if (isSnackItem(item)) {
-        return { key: "snacks-starters", label: "Snacks & Starters", Icon: Tags, rank: 50 };
-    }
-
-    if (isVegItem(item)) {
-        return { key: "veg-specials", label: "Veg Specials", Icon: Leaf, rank: 70 };
-    }
-
-    if (isNonVegItem(item)) {
-        return { key: "non-veg-specials", label: "Non-Veg Specials", Icon: Flame, rank: 80 };
-    }
-
-    return {
-        key: "chef-specials",
-        label: "Chef Specials",
-        Icon: UtensilsCrossed,
-        rank: 140 + index,
-    };
-};
-
-const popularityScore = (item) => {
-    const featuredBoost = item?.isFeatured ? 1_000_000 : 0;
-    const orderBoost = Number(item?.orderCount || 0) * 12;
-    const ratingBoost = Number(item?.rating || 0) * 100;
-    const reviewsBoost = Number(item?.reviewCount || 0);
-    return featuredBoost + orderBoost + ratingBoost + reviewsBoost;
-};
-
-const compareMenuItems = (a, b) => {
-    const scoreDiff = popularityScore(b) - popularityScore(a);
-    if (scoreDiff !== 0) return scoreDiff;
-    return normalizeText(a?.name).localeCompare(normalizeText(b?.name));
-};
-
-export default function RestaurantMenu() {
-    const { slug, table: tableFromPathParam } = useParams();
-    const navigate = useNavigate();
-    const [searchParams, setSearchParams] = useSearchParams();
+export default function RestaurantPublicMenu() {
+    const { slug } = useParams();
+    const [searchParams] = useSearchParams();
     const { restaurantContext, setRestaurantContext } = useRestaurantContext();
-    const { customer, customerToken } = useAuth();
-
-    const tableFromPath = String(tableFromPathParam || "").trim();
-    const tableFromUrl = String(searchParams.get("table") || tableFromPath || "").trim();
-    const searchFromUrl = String(searchParams.get("search") || "").trim();
-    const tableFromContext = useMemo(() => {
-        // Only trust stored tableNo when it's for the same restaurant slug.
-        if (String(restaurantContext?.slug || "") !== String(slug || "")) return "";
-        return String(restaurantContext?.tableNo || "").trim();
-    }, [restaurantContext?.slug, restaurantContext?.tableNo, slug]);
-
-    // URL is source-of-truth when present. Otherwise keep the last selected table from local storage.
-    const tableNo = tableFromUrl || tableFromContext || "";
-    const vegModeEnabled = Boolean(restaurantContext?.vegOnly);
     const { addToCart, cart, total } = useCart();
+
+    const tableFromUrl = String(searchParams.get("table") || "").trim();
+    const searchFromUrl = String(searchParams.get("search") || "").trim();
 
     const { data, loading } = useCachedGet(`/r/${slug}/menu`, {
         ttlMs: 2 * 60_000,
@@ -191,7 +48,8 @@ export default function RestaurantMenu() {
     });
     const restaurant = data?.restaurant || null;
     const menu = Array.isArray(data?.menu) ? data.menu : EMPTY_MENU;
-    const restaurantName = String(restaurant?.name || restaurantContext?.name || slug || "Restaurant").trim();
+    const restaurantName = String(restaurant?.name || slug || "Restaurant").trim();
+    const vegModeEnabled = Boolean(restaurantContext?.vegOnly);
 
     const [search, setSearch] = useState(() => searchFromUrl);
     const [activeSection, setActiveSection] = useState("all");
@@ -202,24 +60,20 @@ export default function RestaurantMenu() {
     const menuStartRef = useRef(null);
 
     useEffect(() => {
-        // Keep global restaurant context in sync with the URL immediately,
-        // so dropdowns show the right selection even before API response returns.
-        setRestaurantContext({ slug: slug || null, tableNo: tableNo || null });
-    }, [setRestaurantContext, slug, tableNo]);
+        setRestaurantContext({ slug: slug || null, tableNo: null });
+    }, [setRestaurantContext, slug]);
 
     useEffect(() => {
-        // If a table is stored but missing from the URL, make the menu link shareable and stable.
-        if (!slug) return;
-        if (!tableNo) return;
-        if (tableFromUrl) return;
-        setSearchParams(
-            (prev) => {
-                prev.set("table", tableNo);
-                return prev;
-            },
-            { replace: true }
-        );
-    }, [setSearchParams, slug, tableFromUrl, tableNo]);
+        if (!data?.restaurant) return;
+        setRestaurantContext({
+            id: data.restaurant.id || null,
+            name: data.restaurant.name || null,
+            slug: data.restaurant.slug || slug || null,
+            logo: data.restaurant.logo || data.restaurant.logoUrl || null,
+            upiId: data.restaurant.upiId || null,
+            tableNo: null,
+        });
+    }, [data?.restaurant, setRestaurantContext, slug]);
 
     const handleVegModeToggle = useCallback(
         (enabled) => {
@@ -228,25 +82,13 @@ export default function RestaurantMenu() {
         [setRestaurantContext]
     );
 
-    useEffect(() => {
-        if (!data?.restaurant) return;
-        setRestaurantContext({
-            id: data.restaurant.id || null,
-            name: data.restaurant.name || null,
-            slug: data.restaurant.slug || slug || null,
-            logo: data.restaurant.logo || data.restaurant.logoUrl || restaurantContext?.logo || null,
-            upiId: data.restaurant.upiId || null,
-            tableNo: tableNo || null,
-        });
-    }, [data?.restaurant, restaurantContext?.logo, setRestaurantContext, slug, tableNo]);
-
     const menuWithMeta = useMemo(() => {
         return menu.map((item, index) => {
             const section = getSectionMeta(item, index);
             return {
                 ...item,
                 _index: index,
-                _score: popularityScore(item),
+                _score: Number(item?.isFeatured ? 1_000_000 : 0) + Number(item?.orderCount || 0) * 12 + Number(item?.rating || 0) * 100 + Number(item?.reviewCount || 0),
                 _section: section,
             };
         });
@@ -371,9 +213,7 @@ export default function RestaurantMenu() {
                 if (!visible) return;
 
                 const sectionKey = visible.target.getAttribute("data-section-key");
-                if (sectionKey) {
-                    setActiveSection(sectionKey);
-                }
+                if (sectionKey) setActiveSection(sectionKey);
             },
             {
                 rootMargin: "-15% 0px -68% 0px",
@@ -382,9 +222,8 @@ export default function RestaurantMenu() {
         );
 
         observedNodes.forEach((node) => observer.observe(node));
-
         return () => observer.disconnect();
-    }, [menuSections, filtered.length]);
+    }, [filtered.length, menuSections]);
 
     const registerSectionRef = useCallback((key) => {
         return (node) => {
@@ -432,7 +271,10 @@ export default function RestaurantMenu() {
     };
 
     const cartCount = cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-    const isCustomerLoggedIn = Boolean(customerToken || customer);
+
+    if (slug && tableFromUrl) {
+        return <Navigate to={`/m/${encodeURIComponent(slug)}/${encodeURIComponent(tableFromUrl)}`} replace />;
+    }
 
     if (loading) {
         return (
@@ -448,7 +290,7 @@ export default function RestaurantMenu() {
         <div className="theme-page min-h-screen">
             <div className="theme-nav sticky top-0 z-30 border-b px-2 py-2 sm:px-4 md:px-6">
                 <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
-                    <div className="flex min-w-0 items-center gap-3 justify-self-start">
+                    <Link to="/" className="flex min-w-0 items-center gap-3 justify-self-start">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1.5 shadow-[0_4px_14px_rgba(104,70,37,0.12)]">
                             <BrandLogo className="h-full w-full" title="Tiffzy logo" />
                         </div>
@@ -457,9 +299,9 @@ export default function RestaurantMenu() {
                             <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]">
                                 Tiffzy
                             </p>
-                            <p className="truncate text-sm font-bold leading-tight sm:text-base">Menu Board</p>
+                            <p className="truncate text-sm font-bold leading-tight sm:text-base">Restaurant Menu</p>
                         </div>
-                    </div>
+                    </Link>
 
                     <div className="min-w-0 justify-self-center text-center">
                         <p className="truncate text-sm font-extrabold tracking-wide text-[color:var(--app-accent)] sm:text-base md:text-lg">
@@ -474,23 +316,12 @@ export default function RestaurantMenu() {
                             className="w-full sm:w-auto"
                         />
 
-                        {isCustomerLoggedIn ? (
-                            <button
-                                onClick={() => navigate("/profile/overview?scope=customer")}
-                                className="theme-soft-button inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm"
-                            >
-                                <UserCircle2 size={16} />
-                                <span className="hidden sm:inline">Profile</span>
-                            </button>
-                        ) : (
-                            <button
-                                onClick={() => navigate("/login?mode=customer")}
-                                className="theme-soft-button inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition sm:px-4 sm:text-sm"
-                            >
-                                <LogIn size={16} />
-                                <span className="hidden sm:inline">Login</span>
-                            </button>
-                        )}
+                        <Link
+                            to="/"
+                            className="theme-soft-button inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition sm:px-4 sm:text-sm"
+                        >
+                            <span className="hidden sm:inline">Home</span>
+                        </Link>
                     </div>
                 </div>
             </div>
@@ -575,7 +406,6 @@ export default function RestaurantMenu() {
                                         onClick={() => handleVegModeToggle(false)}
                                         className="theme-soft-button inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
                                     >
-                                        <Leaf size={16} />
                                         Show all items
                                     </button>
                                 ) : null}
@@ -602,145 +432,3 @@ export default function RestaurantMenu() {
         </div>
     );
 }
-
-function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, onAdd, sectionRef }) {
-    if (!Array.isArray(items) || !items.length) return null;
-
-    const Icon = section?.Icon || Tags;
-
-    return (
-        <section
-            ref={sectionRef}
-            data-section-key={section.key}
-            className="scroll-mt-32"
-        >
-            <div className="mb-3 flex items-center justify-between gap-3 px-0.5">
-                <div className="flex items-center gap-2">
-                    <span className="theme-pill inline-flex h-8 w-8 items-center justify-center rounded-2xl">
-                        <Icon size={16} className="theme-accent-text" />
-                    </span>
-                    <div>
-                        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] sm:text-base">{section.title}</h2>
-                        {section.key === "recommended" ? (
-                            <p className="theme-muted mt-0.5 text-xs">Popular picks surfaced first</p>
-                        ) : null}
-                    </div>
-                </div>
-                <span className="theme-muted text-xs tabular-nums">{items.length} items</span>
-            </div>
-
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(185px,220px))] justify-start gap-3 sm:gap-4">
-                {items.map((item) => (
-                    <MenuItemCard
-                        key={String(item?.id || `${section.key}-${item?.name || "item"}`)}
-                        item={item}
-                        slug={slug}
-                        isFavorite={favoriteKeySet.has(`${String(slug || "").trim()}:${Number(item?.id || 0)}`)}
-                        onToggleFavorite={onToggleFavorite}
-                        onAdd={onAdd}
-                    />
-                ))}
-            </div>
-        </section>
-    );
-}
-
-function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
-    const imageSrc = resolveImageUrl(item?.image) || FALLBACK_IMAGE;
-    const dietBadge = getDietBadge(item);
-
-    return (
-        <article className="theme-card group w-full max-w-[220px] overflow-hidden rounded-[20px] transition hover:-translate-y-0.5 hover:shadow-2xl">
-            <div className="relative">
-                <img
-                    src={imageSrc}
-                    className="h-24 w-full object-cover sm:h-28"
-                    alt={String(item?.name || "Menu item")}
-                    loading="lazy"
-                />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/55 to-transparent" />
-
-                <div className="absolute bottom-2 right-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#fff8e6] drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
-                        <Star size={11} className="text-[#ffd24d]" />
-                        {Number(item?.rating || 4.5).toFixed(1)}
-                    </span>
-                </div>
-
-                <button
-                    type="button"
-                    onClick={() => onToggleFavorite && onToggleFavorite(item)}
-                    className={`absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-xl border transition ${
-                        isFavorite
-                            ? "border-red-500/40 bg-red-500/10 text-red-300"
-                            : "border-white/10 bg-black/10 text-white/90"
-                    }`}
-                    aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                >
-                    <Heart size={12} fill={isFavorite ? "currentColor" : "none"} />
-                </button>
-            </div>
-
-            <div className="flex min-w-0 flex-col gap-2 p-2 sm:p-2.5">
-                <div className="flex flex-wrap items-center gap-1">
-                    {dietBadge ? (
-                        <span
-                            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[9px] font-semibold ${dietBadge.className}`}
-                        >
-                            <dietBadge.Icon size={10} />
-                            {dietBadge.label}
-                        </span>
-                    ) : null}
-                </div>
-
-                <div className="min-w-0 space-y-0.5">
-                    <h3 className="truncate text-[13px] font-bold leading-tight sm:text-sm">{item?.name}</h3>
-                    <p
-                        className="theme-muted text-[10px] leading-snug"
-                        style={{
-                            display: "-webkit-box",
-                            WebkitBoxOrient: "vertical",
-                            WebkitLineClamp: 2,
-                            overflow: "hidden",
-                        }}
-                    >
-                        {item?.description || "Freshly prepared, premium quality ingredients."}
-                    </p>
-                </div>
-
-                <div className="flex items-end justify-between gap-2">
-                    <div className="space-y-0.5">
-                        {Number(item?.orderCount || 0) > 0 ? (
-                            <p className="theme-muted text-[10px]">{Number(item?.orderCount || 0).toLocaleString("en-IN")} orders</p>
-                        ) : null}
-
-                        {Number(item?.reviewCount || 0) > 0 ? (
-                            <p className="theme-muted text-[9px] font-semibold uppercase tracking-[0.14em]">
-                                {Number(item?.reviewCount || 0)} ratings
-                            </p>
-                        ) : null}
-                    </div>
-
-                    <button
-                        onClick={() => onAdd && onAdd(item)}
-                        className="theme-button inline-flex items-center justify-center gap-1 rounded-lg px-2.5 py-[5px] text-[11px] font-semibold sm:px-3 sm:py-1.5 sm:text-xs"
-                    >
-                        <Plus size={12} />
-                        Add
-                    </button>
-                </div>
-            </div>
-        </article>
-    );
-}
-
-export {
-    FALLBACK_IMAGE,
-    EMPTY_MENU,
-    normalizeText,
-    compareMenuItems,
-    getSectionMeta,
-    MenuSection,
-    MenuItemCard,
-    isVegModeItem,
-};

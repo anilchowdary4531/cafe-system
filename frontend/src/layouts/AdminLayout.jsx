@@ -107,6 +107,7 @@ export default function AdminLayout() {
                 {/* LOGOUT */}
                 <div className="absolute bottom-0 w-full p-4">
                     <button
+                        type="button"
                         onClick={handleLogout}
                         className="w-full bg-red-500 hover:bg-red-600 py-3 rounded-2xl font-semibold"
                     >

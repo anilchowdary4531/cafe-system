@@ -183,6 +183,7 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
           create: normalizedItems.map((item) => ({
             menuItemId: item.menuItemId,
             itemName: item.itemName,
+            preparedByName: item.preparedByName || null,
             qty: item.qty,
             price: item.priceSubunit / 100,
             total: (item.priceSubunit * item.qty) / 100,

@@ -197,7 +197,7 @@ export default function OwnerAnalytics() {
     }
 
     return (
-        <section className="space-y-4" style={{ color: "var(--app-text)" }}>
+        <section className="space-y-4 text-[15px]" style={{ color: "var(--app-text)" }}>
             <article className="theme-hero-band relative overflow-hidden rounded-[28px] px-5 py-6 sm:px-7">
                 <div className="pointer-events-none absolute -right-20 -top-20 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
                 <div className="pointer-events-none absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-black/15 blur-3xl" />
@@ -207,7 +207,7 @@ export default function OwnerAnalytics() {
                         <p className="theme-price text-[11px] uppercase tracking-[0.26em]">
                             Neural Analytics Grid
                         </p>
-                        <h3 className="mt-1.5 text-3xl font-extrabold sm:text-4xl">
+                        <h3 className="mt-1.5 text-2xl font-extrabold sm:text-3xl">
                             {data?.restaurant?.name || "Restaurant"} Intelligence
                         </h3>
                         <p className="theme-muted-strong mt-2 text-sm sm:text-base">
@@ -225,7 +225,7 @@ export default function OwnerAnalytics() {
                                     key={option}
                                     type="button"
                                     onClick={() => setRange(option)}
-                                    className="min-w-[52px] whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-semibold transition-all duration-200"
+                                    className="min-w-[52px] whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-200"
                                     style={getRangeButtonStyle(range === option)}
                                 >
                                     {option}
@@ -236,7 +236,7 @@ export default function OwnerAnalytics() {
                         <button
                             type="button"
                             onClick={() => setAutoRefresh((prev) => !prev)}
-                            className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-sm font-semibold transition-all duration-200"
+                            className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all duration-200"
                             style={getLiveButtonStyle(autoRefresh)}
                         >
                             <span
@@ -249,7 +249,7 @@ export default function OwnerAnalytics() {
                             type="button"
                             onClick={() => fetchAnalytics({ silent: true })}
                             disabled={refreshing}
-                            className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-sm font-semibold transition-all duration-200 disabled:opacity-60"
+                            className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all duration-200 disabled:opacity-60"
                             style={refreshButtonStyle}
                         >
                             {refreshing ? (
@@ -271,8 +271,8 @@ export default function OwnerAnalytics() {
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <article className={panelClass}>
-                    <p className="theme-muted-strong text-xl sm:text-2xl">Total Revenue</p>
-                    <p className="mt-2 text-[34px] font-black leading-none sm:text-[40px]">
+                    <p className="theme-muted-strong text-lg sm:text-xl">Total Revenue</p>
+                    <p className="mt-2 text-[30px] font-black leading-none sm:text-[34px]">
                         {formatMoney(data?.overview?.totalRevenue)}
                     </p>
                     <p className="theme-price mt-3 text-sm">
@@ -282,8 +282,8 @@ export default function OwnerAnalytics() {
                 </article>
 
                 <article className={panelClass}>
-                    <p className="theme-muted-strong text-xl sm:text-2xl">Kitchen Queue</p>
-                    <p className="mt-2 text-[34px] font-black leading-none sm:text-[40px]">
+                    <p className="theme-muted-strong text-lg sm:text-xl">Kitchen Queue</p>
+                    <p className="mt-2 text-[30px] font-black leading-none sm:text-[34px]">
                         {data?.realtime?.activeQueue || 0}
                     </p>
                     <p className="theme-price mt-3 text-sm">
@@ -293,8 +293,8 @@ export default function OwnerAnalytics() {
                 </article>
 
                 <article className={panelClass}>
-                    <p className="theme-muted-strong text-xl sm:text-2xl">Completion Rate</p>
-                    <p className="mt-2 text-[34px] font-black leading-none sm:text-[40px]">
+                    <p className="theme-muted-strong text-lg sm:text-xl">Completion Rate</p>
+                    <p className="mt-2 text-[30px] font-black leading-none sm:text-[34px]">
                         {formatPct(data?.overview?.completionRate)}
                     </p>
                     <p className="mt-3 text-sm text-rose-300">
@@ -303,8 +303,8 @@ export default function OwnerAnalytics() {
                 </article>
 
                 <article className={panelClass}>
-                    <p className="theme-muted-strong text-xl sm:text-2xl">Forecast EOD</p>
-                    <p className="mt-2 text-[34px] font-black leading-none sm:text-[40px]">
+                    <p className="theme-muted-strong text-lg sm:text-xl">Forecast EOD</p>
+                    <p className="mt-2 text-[30px] font-black leading-none sm:text-[34px]">
                         {formatMoney(data?.forecast?.projectedEodRevenue)}
                     </p>
                     <p className="mt-3 text-sm text-violet-300">
@@ -316,8 +316,8 @@ export default function OwnerAnalytics() {
             <div className="grid gap-4 xl:grid-cols-3">
                 <article className={`${panelClass} xl:col-span-2`}>
                     <div className="flex items-center justify-between">
-                        <h4 className="text-3xl font-extrabold sm:text-[34px]">Demand Waveform</h4>
-                        <span className="theme-muted-strong text-base">{range} window</span>
+                        <h4 className="text-2xl font-extrabold sm:text-[28px]">Demand Waveform</h4>
+                        <span className="theme-muted-strong text-sm">{range} window</span>
                     </div>
                     <div className="mt-5 flex flex-wrap gap-x-3 gap-y-4">
                         {series.map((point) => {
@@ -349,14 +349,14 @@ export default function OwnerAnalytics() {
                 </article>
 
                 <article className={panelClass}>
-                    <h4 className="flex items-center gap-2 text-3xl font-extrabold sm:text-[34px]">
+                    <h4 className="flex items-center gap-2 text-2xl font-extrabold sm:text-[28px]">
                         <BrainCircuit size={18} className="theme-price" />
                         AI Radar
                     </h4>
                     <div className="mt-5 space-y-3">
                         <div className={subPanelClass} style={subPanelStyle}>
-                            <p className="theme-muted-strong text-xl">Today Revenue</p>
-                            <p className="mt-1.5 text-[32px] font-black leading-none sm:text-[36px]">
+                            <p className="theme-muted-strong text-lg">Today Revenue</p>
+                            <p className="mt-1.5 text-[28px] font-black leading-none sm:text-[32px]">
                                 {formatMoney(data?.forecast?.todayRevenue)}
                             </p>
                             <p className="theme-muted mt-2 text-sm">
@@ -365,8 +365,8 @@ export default function OwnerAnalytics() {
                         </div>
 
                         <div className={subPanelClass} style={subPanelStyle}>
-                            <p className="theme-muted-strong text-xl">Peak Demand Window</p>
-                            <p className="theme-price mt-1.5 text-2xl font-bold sm:text-[28px]">
+                            <p className="theme-muted-strong text-lg">Peak Demand Window</p>
+                            <p className="theme-price mt-1.5 text-xl font-bold sm:text-2xl">
                                 {peakSlot ? peakSlot.label : "No peak yet"}
                             </p>
                             <p className="theme-muted mt-2 text-sm">
@@ -379,7 +379,7 @@ export default function OwnerAnalytics() {
 
             <div className="grid gap-4 xl:grid-cols-3">
                 <article className={panelClass}>
-                    <h4 className="flex items-center gap-2 text-3xl font-extrabold sm:text-[34px]">
+                    <h4 className="flex items-center gap-2 text-2xl font-extrabold sm:text-[28px]">
                         <Activity size={18} className="theme-price" />
                         Kitchen Flow
                     </h4>
@@ -390,7 +390,7 @@ export default function OwnerAnalytics() {
 
                             return (
                                 <div key={row.status}>
-                                    <div className="mb-1.5 flex items-center justify-between text-base sm:text-lg">
+                                    <div className="mb-1.5 flex items-center justify-between text-sm sm:text-base">
                                         <span>{row.status}</span>
                                         <span>{row.count}</span>
                                     </div>
@@ -410,7 +410,7 @@ export default function OwnerAnalytics() {
                 </article>
 
                 <article className={`${panelClass} xl:col-span-2`}>
-                    <h4 className="flex items-center gap-2 text-3xl font-extrabold sm:text-[34px]">
+                    <h4 className="flex items-center gap-2 text-2xl font-extrabold sm:text-[28px]">
                         <ChartColumnIncreasing size={18} className="theme-price" />
                         Top Movers
                     </h4>
@@ -420,7 +420,7 @@ export default function OwnerAnalytics() {
                             return (
                                 <div key={item.name} className={subPanelClass} style={subPanelStyle}>
                                     <div className="flex items-center justify-between gap-2">
-                                        <p className="text-base font-semibold sm:text-lg">
+                                        <p className="text-sm font-semibold sm:text-base">
                                             {index + 1}. {item.name}
                                         </p>
                                         <p className="theme-price text-sm">{formatMoney(item.revenue)}</p>
@@ -436,7 +436,7 @@ export default function OwnerAnalytics() {
                             );
                         })}
                         {topItems.length === 0 && (
-                            <p className="theme-muted text-base">No item movement data yet.</p>
+                        <p className="theme-muted text-sm">No item movement data yet.</p>
                         )}
                     </div>
                 </article>
@@ -444,7 +444,7 @@ export default function OwnerAnalytics() {
 
             <div className="grid gap-4 xl:grid-cols-2">
                 <article className={panelClass}>
-                    <h4 className="flex items-center gap-2 text-2xl font-extrabold sm:text-3xl">
+                    <h4 className="flex items-center gap-2 text-xl font-extrabold sm:text-2xl">
                         <Bot size={17} className="theme-price" />
                         Smart Alerts
                     </h4>
@@ -467,7 +467,7 @@ export default function OwnerAnalytics() {
                 </article>
 
                 <article className={panelClass}>
-                    <h4 className="flex items-center gap-2 text-2xl font-extrabold sm:text-3xl">
+                    <h4 className="flex items-center gap-2 text-xl font-extrabold sm:text-2xl">
                         <Sparkles size={17} className="theme-price" />
                         Category Intelligence
                     </h4>
@@ -513,7 +513,7 @@ export default function OwnerAnalytics() {
                                     <p className="theme-muted text-[11px] uppercase tracking-[0.12em]">
                                         {hasCategoryPieData ? "Revenue Mix" : "Awaiting Data"}
                                     </p>
-                                    <p className="mt-1 text-base font-semibold">
+                                    <p className="mt-1 text-sm font-semibold">
                                         {hasCategoryPieData ? formatMoney(totalCategoryRevenue) : "--"}
                                     </p>
                                 </div>
@@ -546,7 +546,7 @@ export default function OwnerAnalytics() {
             </div>
 
             <article className={panelClass}>
-                <h4 className="text-2xl font-extrabold sm:text-3xl">Table Heatmap</h4>
+                <h4 className="text-xl font-extrabold sm:text-2xl">Table Heatmap</h4>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {tableHeatmap.map((table) => {
                         const glow = (Number(table.orders || 0) / maxTableOrders) * 100;
@@ -559,7 +559,7 @@ export default function OwnerAnalytics() {
                                     boxShadow: `inset 0 0 ${Math.max(8, glow / 3)}px color-mix(in srgb, var(--app-primary) 24%, transparent)`,
                                 }}
                             >
-                                <p className="text-base font-semibold sm:text-lg">{table.tableNo}</p>
+                                <p className="text-sm font-semibold sm:text-base">{table.tableNo}</p>
                                 <p className="theme-muted mt-1 text-sm">{table.orders} orders</p>
                                 <p className="theme-price text-sm">{formatMoney(table.revenue)} revenue</p>
                             </div>

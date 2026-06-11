@@ -2,18 +2,19 @@
 import {
     LayoutDashboard,
     ShoppingBag,
+    ClipboardPlus,
     UtensilsCrossed,
     TableProperties,
     ChefHat,
     BarChart3,
-    IndianRupee,
+    Globe2,
     Users,
-    Settings,
+    User,
     LogOut,
     Bell,
+    Wallet,
     Menu,
     X,
-    ClipboardPlus,
     MoreHorizontal,
     Printer,
 } from "lucide-react";
@@ -22,6 +23,8 @@ import axios from "axios";
 import { resolveRestaurantName } from "../utils/restaurantContext";
 import BrandLogo from "../components/BrandLogo";
 import { useAuth } from "../context/AuthContext";
+import { resolveEffectiveStaffRole } from "../utils/staffRole";
+import { showToast } from "../utils/toast";
 import tiffzyLogo from "../assets/tiffzy-logo.png";
 import {
     getOwnerUnreadCount,
@@ -162,6 +165,24 @@ const getReceiptOrderTotal = (order) => {
     );
 };
 
+const normalizeOrderStatus = (value) => String(value || "PLACED").toUpperCase();
+
+const formatOrderStatusLabel = (value) => normalizeOrderStatus(value).replace(/_/g, " ");
+
+const getOrderStatusTone = (value) => {
+    const status = normalizeOrderStatus(value);
+    if (status === "READY" || status === "DELIVERED") {
+        return "border-emerald-200/70 bg-emerald-100/60 text-emerald-900";
+    }
+    if (status === "PREPARING" || status === "ACCEPTED") {
+        return "border-amber-200/70 bg-amber-100/60 text-amber-900";
+    }
+    if (status === "CANCELLED") {
+        return "border-rose-200/70 bg-rose-100/60 text-rose-900";
+    }
+    return "border-sky-200/70 bg-sky-100/60 text-sky-900";
+};
+
 const escapeReceiptText = (value) =>
     String(value ?? "")
         .replaceAll("&", "&amp;")
@@ -289,6 +310,7 @@ const normalizeTableRows = (rows) =>
                                 qty: Number(item?.qty || 0),
                                 price: Number(item?.price || 0),
                                 total: Number(item?.total || 0),
+                                status: String(item?.status || order?.status || "").toUpperCase(),
                             }))
                           : [],
                   }))
@@ -356,6 +378,18 @@ const resolveTableState = (table) => {
     return TABLE_STATE_KEYS.BLANK;
 };
 
+const resolveOrderSortTime = (order) => {
+    const rawTimestamp =
+        order?.updatedAt ||
+        order?.createdAt ||
+        order?.placedAt ||
+        order?.created_on ||
+        null;
+    if (!rawTimestamp) return 0;
+    const parsed = new Date(rawTimestamp).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+};
+
 export default function OwnerLayout() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -381,15 +415,22 @@ export default function OwnerLayout() {
     const [openMoreTableKey, setOpenMoreTableKey] = useState("");
     const [completingTableKey, setCompletingTableKey] = useState("");
     const [receiptActionError, setReceiptActionError] = useState("");
+    const [tablePopoverPlacement, setTablePopoverPlacement] = useState({});
+    const [selectedLiveOrder, setSelectedLiveOrder] = useState(null);
 
     const { user, logout } = useAuth();
     const restaurantId = Number(user?.restaurantId || 0);
 
     const restaurantName = resolveRestaurantName(user, "Restaurant");
 
+    const effectiveRole = useMemo(
+        () => resolveEffectiveStaffRole(user?.role, user?.designation),
+        [user?.designation, user?.role]
+    );
+
     const access = useMemo(
-        () => normalizeAccess(user?.access, user?.role),
-        [user]
+        () => normalizeAccess(user?.access, effectiveRole),
+        [effectiveRole, user?.access]
     );
 
     // logout is provided by AuthContext (clears cache + navigates with replace).
@@ -402,7 +443,7 @@ export default function OwnerLayout() {
             accessKey: "dashboard",
         },
         {
-            label: "New Order (POS)",
+            label: "Billing Desk",
             path: "/admin/new-order",
             icon: <ClipboardPlus size={18} />,
             accessKey: "orders",
@@ -411,6 +452,12 @@ export default function OwnerLayout() {
             label: "Live Orders",
             path: "/owner/orders",
             icon: <ShoppingBag size={18} />,
+            accessKey: "orders",
+        },
+        {
+            label: "Online Orders",
+            path: "/owner/online-orders",
+            icon: <Globe2 size={18} />,
             accessKey: "orders",
         },
         {
@@ -438,28 +485,16 @@ export default function OwnerLayout() {
             accessKey: "analytics",
         },
         {
-            label: "Finance",
-            path: "/owner/finance",
-            icon: <IndianRupee size={18} />,
-            accessKey: "finance",
-        },
-        {
             label: "Staff",
             path: "/owner/staff",
             icon: <Users size={18} />,
             accessKey: "staff",
         },
         {
-            label: "Settings",
+            label: "Profile",
             path: "/owner/settings",
-            icon: <Settings size={18} />,
+            icon: <User size={18} />,
             accessKey: "settings",
-        },
-        {
-            label: "Notifications",
-            path: "/owner/notifications",
-            icon: <Bell size={18} />,
-            accessKey: "notifications",
         },
     ];
 
@@ -480,9 +515,16 @@ export default function OwnerLayout() {
         return access[match.accessKey];
     })();
     const hideTableAssignmentStripOn = [
+        "/owner/menu",
+        "/owner/notifications",
+        "/owner/orders",
+        "/owner/online-orders",
+        "/owner/staff",
+        "/owner/tables",
         "/owner/kitchen",
         "/owner/finance",
         "/owner/analytics",
+        "/owner/settings",
     ];
     const showTableAssignmentStrip = !hideTableAssignmentStripOn.some((path) =>
         location.pathname.startsWith(path)
@@ -824,10 +866,17 @@ export default function OwnerLayout() {
         }, 250);
     };
 
-    const handleDoneTableReceipt = async (table, assignmentKey) => {
+    const handleFreeTable = async (table, assignmentKey) => {
         const activeOrders = Array.isArray(table?.activeOrders) ? table.activeOrders : [];
-        if (!activeOrders.length || !restaurantId) {
+        const hasAssignment = Boolean(tableAssignments[assignmentKey]);
+        if ((!activeOrders.length && !hasAssignment) || !restaurantId) {
             setOpenOrdersTableKey("");
+            setOpenMoreTableKey("");
+            showToast({
+                title: "Table already free",
+                message: `Table ${table?.tableNo || "--"} is already free.`,
+                variant: "info",
+            });
             return;
         }
 
@@ -845,13 +894,22 @@ export default function OwnerLayout() {
                     )
                 )
             );
+            if (hasAssignment) {
+                clearTableAssignment(assignmentKey);
+            }
             await refreshTableOverview();
-            clearTableAssignment(assignmentKey);
             setOpenOrdersTableKey("");
+            setOpenStaffTableKey("");
+            setOpenMoreTableKey("");
+            showToast({
+                title: "Table freed",
+                message: `Table ${table?.tableNo || "--"} is now free.`,
+                variant: "success",
+            });
         } catch (err) {
             console.log(err);
             setReceiptActionError(
-                err?.response?.data?.message || "Failed to complete table orders."
+                err?.response?.data?.message || "Failed to free the table."
             );
         } finally {
             setCompletingTableKey("");
@@ -882,6 +940,82 @@ export default function OwnerLayout() {
     }, [openOrdersTableKey]);
 
     const freeTables = Math.max(0, tableOverview.total - tableOverview.occupied);
+    const isDashboardRoute = location.pathname === "/owner";
+    const stripOnlineOrders = useMemo(() => {
+        const rows = tableOverview.tables.flatMap((table) => {
+            const activeOrders = Array.isArray(table?.activeOrders) ? table.activeOrders : [];
+            return activeOrders.map((order) => ({
+                ...order,
+                tableKey: table?.key || table?.assignmentKey || "table",
+                tableNo: table?.tableNo || "--",
+                sortTime: resolveOrderSortTime(order),
+            }));
+        });
+
+        return rows
+            .sort((a, b) => b.sortTime - a.sortTime || Number(b.id || 0) - Number(a.id || 0))
+            .slice(0, 8);
+    }, [tableOverview.tables]);
+    const selectedLiveOrderItems = Array.isArray(selectedLiveOrder?.items)
+        ? selectedLiveOrder.items
+        : [];
+    const selectedLiveOrderItemCount = selectedLiveOrderItems.reduce(
+        (sum, item) => sum + Math.max(0, Number(item?.qty || 0)),
+        0
+    );
+
+    useEffect(() => {
+        if (!selectedLiveOrder) return undefined;
+        const handleKeyDown = (event) => {
+            if (event.key === "Escape") setSelectedLiveOrder(null);
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [selectedLiveOrder]);
+
+    useEffect(() => {
+        if (!isDashboardRoute && selectedLiveOrder) {
+            setSelectedLiveOrder(null);
+        }
+    }, [isDashboardRoute, selectedLiveOrder]);
+
+    const resolvePopoverPlacement = (event, kind) => {
+        if (!isDashboardRoute) return "bottom";
+        const trigger = event?.currentTarget;
+        if (!trigger || typeof trigger.closest !== "function") return "bottom";
+        const tableCard = trigger.closest("[data-table-card='true']");
+        if (!tableCard || typeof tableCard.getBoundingClientRect !== "function") {
+            return "bottom";
+        }
+
+        const rect = tableCard.getBoundingClientRect();
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        const edgePadding = 16;
+        const spaceBelow = viewportHeight - rect.bottom - edgePadding;
+        const spaceAbove = rect.top - edgePadding;
+
+        const expectedHeightByKind = {
+            orders: 288,
+            staff: 220,
+            more: 124,
+        };
+        const requiredHeight = expectedHeightByKind[kind] || 180;
+
+        if (spaceBelow >= requiredHeight) return "bottom";
+        if (spaceAbove >= requiredHeight) return "top";
+        return spaceBelow >= spaceAbove ? "bottom" : "top";
+    };
+
+    const setPopoverPlacementFor = (kind, assignmentKey, event) => {
+        const placement = resolvePopoverPlacement(event, kind);
+        setTablePopoverPlacement((prev) => ({
+            ...prev,
+            [`${kind}:${assignmentKey}`]: placement,
+        }));
+    };
+
+    const toPopoverYClass = (placement) =>
+        placement === "top" ? "bottom-full mb-2" : "top-full mt-2";
 
     return (
         <div className="theme-page flex min-h-screen overflow-x-hidden">
@@ -947,19 +1081,20 @@ export default function OwnerLayout() {
                         ))}
                     </div>
 
-                    {/* Logout */}
-                    <button
-                        onClick={logout}
-                        className="mt-auto flex items-center gap-3 px-4 py-3 rounded-2xl bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                    >
-                        <LogOut size={18} />
-                        Logout
+                {/* Logout */}
+                <button
+                    type="button"
+                    onClick={logout}
+                    className="mt-auto flex items-center gap-3 px-4 py-3 rounded-2xl bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                >
+                    <LogOut size={18} />
+                    Logout
                     </button>
                 </div>
             </aside>
 
             {/* Main */}
-            <div className="flex-1 min-w-0">
+            <div className="flex min-h-screen min-w-0 flex-1 flex-col">
                 {/* Header */}
                 <header className="theme-nav border-b px-3 py-3 sm:px-4 md:px-6">
                     <div className="flex items-center justify-between gap-3">
@@ -990,6 +1125,28 @@ export default function OwnerLayout() {
                             <p className="theme-muted max-w-[160px] truncate text-sm font-medium sm:max-w-[220px]">
                                 {restaurantName}
                             </p>
+                            {access.orders && (
+                                <button
+                                    type="button"
+                                    onClick={() => navigate("/admin/new-order")}
+                                    className="theme-icon-button rounded-2xl p-2.5 sm:p-3"
+                                    title="Open billing desk"
+                                    aria-label="Open billing desk"
+                                >
+                                    <ClipboardPlus size={18} />
+                                </button>
+                            )}
+                            {access.finance && (
+                                <button
+                                    type="button"
+                                    onClick={() => navigate("/owner/finance")}
+                                    className="theme-icon-button rounded-2xl p-2.5 sm:p-3"
+                                    title="Open finance"
+                                    aria-label="Open finance page"
+                                >
+                                    <Wallet size={18} />
+                                </button>
+                            )}
                             {access.notifications && (
                                 <button
                                     onClick={() => navigate("/owner/notifications")}
@@ -1008,184 +1165,283 @@ export default function OwnerLayout() {
                 </header>
 
                 {showTableAssignmentStrip && (
-                    <div className="theme-nav border-b px-3 py-2 sm:px-4 md:px-6">
-                        <div className="flex flex-col gap-2.5">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                                <span className="theme-pill rounded-full px-3 py-1 font-semibold">
-                                    Tables: {tableOverview.total}
-                                </span>
-                                <span className="theme-chip-active rounded-full px-3 py-1 font-semibold">
-                                    Occupied: {tableOverview.occupied}
-                                </span>
-                                <span className="theme-pill rounded-full px-3 py-1 font-semibold">
-                                    Free: {freeTables}
-                                </span>
-                            </div>
-                            <div className="flex flex-wrap items-center justify-end gap-2 text-[10px]">
-                                {TABLE_STATE_LEGEND.map((stateKey) => {
-                                    const stateClass = toTableStateClassToken(stateKey);
-                                    return (
-                                        <span
-                                            key={stateKey}
-                                            className={`theme-table-legend-item state-${stateClass}`}
-                                        >
-                                            <span className="theme-table-legend-dot" />
-                                            {TABLE_STATE_LABELS[stateKey]}
+                    <div
+                        className={`theme-nav border-b px-3 py-2 sm:px-4 md:px-6 ${
+                            isDashboardRoute ? "flex-1" : ""
+                        }`}
+                    >
+                        <div
+                            className={
+                                isDashboardRoute ? "grid h-full gap-3 xl:grid-cols-4" : "flex flex-col gap-2.5"
+                            }
+                        >
+                            <div
+                                className={
+                                    isDashboardRoute
+                                        ? "flex min-h-0 flex-col gap-2.5 xl:col-span-3"
+                                        : ""
+                                }
+                            >
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                                        <span className="theme-pill rounded-full px-3 py-1 font-semibold">
+                                            Tables: {tableOverview.total}
                                         </span>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="theme-muted mr-1 text-[10px] font-semibold uppercase tracking-[0.2em]">
-                                Staff
-                            </span>
-                            {staffOverview.loading ? (
-                                <span className="theme-muted text-xs">Loading staff...</span>
-                            ) : staffOverview.users.length === 0 ? (
-                                <span className="theme-muted text-xs">No active staff found.</span>
-                            ) : (
-                                staffOverview.users.map((staffUser) => {
-                                    const staffId = String(staffUser.id || "");
-                                    const assignedCount = assignedTableCountByStaff[staffId] || 0;
-                                    const staffName = getStaffName(staffUser);
-                                    const designation = getStaffDesignation(staffUser);
-
-                                    return (
-                                        <button
-                                            key={staffUser.key}
-                                            type="button"
-                                            draggable
-                                            onDragStart={(event) =>
-                                                handleStaffDragStart(event, staffId)
-                                            }
-                                            onDragEnd={() => {
-                                                setDraggedStaffId("");
-                                                setDragOverTableKey("");
-                                            }}
-                                            title={`${staffName} - ${designation}${
-                                                assignedCount
-                                                    ? ` - managing ${assignedCount} table${assignedCount > 1 ? "s" : ""}`
-                                                    : ""
-                                            }`}
-                                            className={`theme-staff-chip inline-flex cursor-grab items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold transition ${
-                                                draggedStaffId === staffId ? "is-dragging" : ""
-                                            }`}
-                                        >
-                                            <span className="max-w-[96px] truncate">
-                                                {staffName}
-                                            </span>
-                                            <span className="theme-staff-chip-role rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.08em]">
-                                                {designation}
-                                            </span>
-                                        </button>
-                                    );
-                                })
-                            )}
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                            <span className="theme-muted mr-1 text-[10px] font-semibold uppercase tracking-[0.2em]">
-                                Tables
-                            </span>
-                            {tableOverview.loading ? (
-                                <span className="theme-muted text-xs">Loading tables...</span>
-                            ) : tableOverview.tables.length === 0 ? (
-                                <span className="theme-muted text-xs">No tables found.</span>
-                            ) : (
-                                <div className="flex flex-wrap gap-2 pb-3">
-                                    {tableOverview.tables.map((table) => {
-                                        const assignmentKey = String(
-                                            table.assignmentKey || table.key
-                                        );
-                                        const assignedStaffId = String(
-                                            tableAssignments[assignmentKey] || ""
-                                        );
-                                        const assignedStaff = assignedStaffId
-                                            ? staffById.get(assignedStaffId)
-                                            : null;
-                                        const assignedStaffLabel = assignedStaff
-                                            ? getStaffDisplayLabel(assignedStaff)
-                                            : "";
-                                        const isDropTarget =
-                                            Boolean(draggedStaffId) &&
-                                            dragOverTableKey === assignmentKey;
-                                        const tableLabel = table.tableNo || "--";
-                                        const occupiedFor = formatOccupiedDuration(
-                                            table.occupiedSince
-                                        );
-                                        const isOrdersOpen =
-                                            openOrdersTableKey === assignmentKey;
-                                        const isStaffOpen =
-                                            openStaffTableKey === assignmentKey;
-                                        const isMoreOpen = openMoreTableKey === assignmentKey;
-                                        const activeOrders = Array.isArray(table.activeOrders)
-                                            ? table.activeOrders
-                                            : [];
-                                        const tableReceiptTotal = activeOrders.reduce(
-                                            (sum, order) => sum + getReceiptOrderTotal(order),
-                                            0
-                                        );
-                                        const isCompletingThisTable =
-                                            completingTableKey === assignmentKey;
-                                        const tableStateKey = resolveTableState(table);
-                                        const tableStateClassToken =
-                                            toTableStateClassToken(tableStateKey);
-                                        const openStaffSelector = () => {
-                                            setOpenStaffTableKey((prev) =>
-                                                prev === assignmentKey ? "" : assignmentKey
+                                        <span className="theme-chip-active rounded-full px-3 py-1 font-semibold">
+                                            Occupied: {tableOverview.occupied}
+                                        </span>
+                                        <span className="theme-pill rounded-full px-3 py-1 font-semibold">
+                                            Free: {freeTables}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center justify-end gap-2 text-[10px]">
+                                        {TABLE_STATE_LEGEND.map((stateKey) => {
+                                            const stateClass = toTableStateClassToken(stateKey);
+                                            return (
+                                                <span
+                                                    key={stateKey}
+                                                    className={`theme-table-legend-item state-${stateClass}`}
+                                                >
+                                                    <span className="theme-table-legend-dot" />
+                                                    {TABLE_STATE_LABELS[stateKey]}
+                                                </span>
                                             );
-                                            setOpenOrdersTableKey("");
-                                            setOpenMoreTableKey("");
-                                            setReceiptActionError("");
-                                        };
+                                        })}
+                                    </div>
+                                </div>
 
-                                        return (
-                                            <div
-                                                key={table.key}
-                                                onDragOver={(event) =>
-                                                    handleTableDragOver(event, assignmentKey)
-                                                }
-                                                onDragEnter={(event) =>
-                                                    handleTableDragOver(event, assignmentKey)
-                                                }
-                                                onDragLeave={() =>
-                                                    setDragOverTableKey((prev) =>
-                                                        prev === assignmentKey ? "" : prev
-                                                    )
-                                                }
-                                                onDrop={(event) =>
-                                                    handleTableDrop(event, assignmentKey)
-                                                }
-                                                title={`Table ${tableLabel} - ${
-                                                    table.isOccupied ? "Occupied" : "Free"
-                                                }${
-                                                    assignedStaff
-                                                        ? ` - Managed by ${assignedStaffLabel}`
-                                                        : ""
-                                                }`}
-                                                className={`theme-table-box relative w-[152px] aspect-square rounded-xl p-2 pb-8 text-xs state-${tableStateClassToken} ${
-                                                    table.isOccupied ? "is-occupied" : ""
-                                                } ${isDropTarget ? "is-drop-target" : ""}`}
-                                            >
-                                                <div className="flex h-full flex-col">
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <div className="min-w-0">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <p className="truncate text-lg font-semibold leading-none">
-                                                                    {tableLabel}
-                                                                </p>
+                                <div
+                                    className={
+                                        isDashboardRoute
+                                            ? "flex min-h-0 flex-1 flex-col gap-1.5"
+                                            : "flex flex-col gap-1.5"
+                                    }
+                                >
+                                    <span className="theme-muted mr-1 text-[10px] font-semibold uppercase tracking-[0.2em]">
+                                        Tables
+                                    </span>
+                                    {tableOverview.loading ? (
+                                        <span className="theme-muted text-xs">Loading tables...</span>
+                                    ) : tableOverview.tables.length === 0 ? (
+                                        <span className="theme-muted text-xs">No tables found.</span>
+                                    ) : (
+                                        <div
+                                            className={
+                                                isDashboardRoute
+                                                    ? "flex min-h-0 flex-wrap content-start gap-2 overflow-visible pb-3 pr-1"
+                                                    : "flex flex-wrap gap-2 pb-3"
+                                            }
+                                        >
+                                            {tableOverview.tables.map((table) => {
+                                                const assignmentKey = String(
+                                                    table.assignmentKey || table.key
+                                                );
+                                                const assignedStaffId = String(
+                                                    tableAssignments[assignmentKey] || ""
+                                                );
+                                                const assignedStaff = assignedStaffId
+                                                    ? staffById.get(assignedStaffId)
+                                                    : null;
+                                                const assignedStaffLabel = assignedStaff
+                                                    ? getStaffDisplayLabel(assignedStaff)
+                                                    : "";
+                                                const isDropTarget =
+                                                    Boolean(draggedStaffId) &&
+                                                    dragOverTableKey === assignmentKey;
+                                                const tableLabel = table.tableNo || "--";
+                                                const occupiedFor = formatOccupiedDuration(
+                                                    table.occupiedSince
+                                                );
+                                                const isOrdersOpen =
+                                                    openOrdersTableKey === assignmentKey;
+                                                const isStaffOpen =
+                                                    openStaffTableKey === assignmentKey;
+                                                const isMoreOpen = openMoreTableKey === assignmentKey;
+                                                const activeOrders = Array.isArray(table.activeOrders)
+                                                    ? table.activeOrders
+                                                    : [];
+                                                const tableReceiptTotal = activeOrders.reduce(
+                                                    (sum, order) => sum + getReceiptOrderTotal(order),
+                                                    0
+                                                );
+                                                const isCompletingThisTable =
+                                                    completingTableKey === assignmentKey;
+                                                const tableStateKey = resolveTableState(table);
+                                                const tableStateClassToken =
+                                                    toTableStateClassToken(tableStateKey);
+                                                const ordersPopoverYClass = toPopoverYClass(
+                                                    tablePopoverPlacement[`orders:${assignmentKey}`] ||
+                                                        "bottom"
+                                                );
+                                                const staffPopoverYClass = toPopoverYClass(
+                                                    tablePopoverPlacement[`staff:${assignmentKey}`] ||
+                                                        "bottom"
+                                                );
+                                                const morePopoverYClass = toPopoverYClass(
+                                                    tablePopoverPlacement[`more:${assignmentKey}`] ||
+                                                        "bottom"
+                                                );
+                                                const openStaffSelector = (event) => {
+                                                    event.stopPropagation();
+                                                    setPopoverPlacementFor("staff", assignmentKey, event);
+                                                    setOpenStaffTableKey((prev) =>
+                                                        prev === assignmentKey ? "" : assignmentKey
+                                                    );
+                                                    setOpenOrdersTableKey("");
+                                                    setOpenMoreTableKey("");
+                                                    setReceiptActionError("");
+                                                };
+
+                                                return (
+                                                    <div
+                                                        key={table.key}
+                                                        data-table-card="true"
+                                                        onDragOver={(event) =>
+                                                            handleTableDragOver(event, assignmentKey)
+                                                        }
+                                                        onDragEnter={(event) =>
+                                                            handleTableDragOver(event, assignmentKey)
+                                                        }
+                                                        onDragLeave={() =>
+                                                            setDragOverTableKey((prev) =>
+                                                                prev === assignmentKey ? "" : prev
+                                                            )
+                                                        }
+                                                        onDrop={(event) =>
+                                                            handleTableDrop(event, assignmentKey)
+                                                        }
+                                                        title={`Table ${tableLabel} - ${
+                                                            table.isOccupied ? "Occupied" : "Free"
+                                                        }${
+                                                            assignedStaff
+                                                                ? ` - Managed by ${assignedStaffLabel}`
+                                                                : ""
+                                                        }`}
+                                                        className={`theme-table-box relative w-[152px] aspect-square rounded-xl p-2 pb-8 text-xs state-${tableStateClassToken} ${
+                                                            table.isOccupied ? "is-occupied" : ""
+                                                        } ${isDropTarget ? "is-drop-target" : ""}`}
+                                                    >
+                                                        <div className="flex h-full flex-col">
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <div className="min-w-0">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <p className="truncate text-lg font-semibold leading-none">
+                                                                            {tableLabel}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="flex items-center gap-1">
+                                                                    {table.isOccupied && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(event) => {
+                                                                                event.stopPropagation();
+                                                                                setPopoverPlacementFor(
+                                                                                    "orders",
+                                                                                    assignmentKey,
+                                                                                    event
+                                                                                );
+                                                                                setOpenOrdersTableKey((prev) =>
+                                                                                    prev === assignmentKey
+                                                                                        ? ""
+                                                                                        : assignmentKey
+                                                                                );
+                                                                                setOpenStaffTableKey("");
+                                                                                setOpenMoreTableKey("");
+                                                                                setReceiptActionError("");
+                                                                            }}
+                                                                            className="theme-table-meta-pill rounded-full px-2 py-0.5 text-[10px] leading-none transition hover:opacity-90"
+                                                                            title={`Show orders for table ${tableLabel}`}
+                                                                        >
+                                                                            {table.activeOrderCount || 0} order
+                                                                            {Number(table.activeOrderCount || 0) ===
+                                                                            1
+                                                                                ? ""
+                                                                                : "s"}
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(event) => {
+                                                                            event.stopPropagation();
+                                                                            setPopoverPlacementFor(
+                                                                                "more",
+                                                                                assignmentKey,
+                                                                                event
+                                                                            );
+                                                                            setOpenMoreTableKey((prev) =>
+                                                                                prev === assignmentKey
+                                                                                    ? ""
+                                                                                    : assignmentKey
+                                                                            );
+                                                                            setOpenOrdersTableKey("");
+                                                                            setOpenStaffTableKey("");
+                                                                        }}
+                                                                        className="theme-table-icon-btn rounded-md p-1.5 transition"
+                                                                        title={`More options for table ${tableLabel}`}
+                                                                    >
+                                                                        <MoreHorizontal size={14} />
+                                                                    </button>
+                                                                </div>
                                                             </div>
+
+                                                            {table.isOccupied && (
+                                                                <div className="mt-auto flex items-end justify-start gap-1 pr-16 text-[10px]">
+                                                                    {assignedStaff ? (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(event) =>
+                                                                                openStaffSelector(event)
+                                                                            }
+                                                                            className="theme-table-staff-pill inline-flex items-center gap-1 rounded-full px-2 py-0.5 transition hover:opacity-90"
+                                                                            title={`Change server for table ${tableLabel}`}
+                                                                        >
+                                                                            <span className="theme-table-staff-symbol inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold leading-none">
+                                                                                {getStaffSymbol(
+                                                                                    assignedStaff,
+                                                                                    assignedStaffLabel
+                                                                                )}
+                                                                            </span>
+                                                                            <span className="max-w-[120px] truncate">
+                                                                                {getStaffName(assignedStaff)}
+                                                                            </span>
+                                                                        </button>
+                                                                    ) : (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(event) =>
+                                                                                openStaffSelector(event)
+                                                                            }
+                                                                            className="theme-table-meta-pill rounded-full px-2 py-0.5 transition hover:opacity-90"
+                                                                            title={`Assign server for table ${tableLabel}`}
+                                                                        >
+                                                                            No server
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </div>
 
-                                                        <div className="flex items-center gap-1">
-                                                            {table.isOccupied && (
+                                                        {table.isOccupied && (
+                                                            <div className="pointer-events-none absolute bottom-2 right-2 z-10">
+                                                                <span className="theme-table-time-pill inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold">
+                                                                    {occupiedFor || "just now"}
+                                                                </span>
+                                                            </div>
+                                                        )}
+
+                                                        {table.isOccupied && (
+                                                            <div className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2">
                                                                 <button
                                                                     type="button"
                                                                     onClick={(event) => {
                                                                         event.stopPropagation();
+                                                                        setPopoverPlacementFor(
+                                                                            "orders",
+                                                                            assignmentKey,
+                                                                            event
+                                                                        );
                                                                         setOpenOrdersTableKey((prev) =>
                                                                             prev === assignmentKey
                                                                                 ? ""
@@ -1195,332 +1451,316 @@ export default function OwnerLayout() {
                                                                         setOpenMoreTableKey("");
                                                                         setReceiptActionError("");
                                                                     }}
-                                                                    className="theme-table-meta-pill rounded-full px-2 py-0.5 text-[10px] leading-none transition hover:opacity-90"
-                                                                    title={`Show orders for table ${tableLabel}`}
+                                                                    className="theme-table-icon-btn rounded-md p-1.5 transition"
+                                                                    title={`Show receipt for table ${tableLabel}`}
                                                                 >
-                                                                    {table.activeOrderCount || 0} order
-                                                                    {Number(table.activeOrderCount || 0) ===
-                                                                    1
-                                                                        ? ""
-                                                                        : "s"}
+                                                                    <Printer size={14} />
                                                                 </button>
-                                                            )}
-                                                            <button
-                                                                type="button"
-                                                                onClick={(event) => {
-                                                                    event.stopPropagation();
-                                                                    setOpenMoreTableKey((prev) =>
-                                                                        prev === assignmentKey
-                                                                            ? ""
-                                                                            : assignmentKey
-                                                                    );
-                                                                    setOpenOrdersTableKey("");
-                                                                    setOpenStaffTableKey("");
-                                                                }}
-                                                                className="theme-table-icon-btn rounded-md p-1.5 transition"
-                                                                title={`More options for table ${tableLabel}`}
-                                                            >
-                                                                <MoreHorizontal size={14} />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-
-                                                    {table.isOccupied && (
-                                                        <div className="mt-auto flex items-end justify-start gap-1 pr-16 text-[10px]">
-                                                            {assignedStaff ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={openStaffSelector}
-                                                                    className="theme-table-staff-pill inline-flex items-center gap-1 rounded-full px-2 py-0.5 transition hover:opacity-90"
-                                                                    title={`Change server for table ${tableLabel}`}
-                                                                >
-                                                                    <span className="theme-table-staff-symbol inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold leading-none">
-                                                                        {getStaffSymbol(
-                                                                            assignedStaff,
-                                                                            assignedStaffLabel
-                                                                        )}
-                                                                    </span>
-                                                                    <span className="max-w-[120px] truncate">
-                                                                        {getStaffName(assignedStaff)}
-                                                                    </span>
-                                                                </button>
-                                                            ) : (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={openStaffSelector}
-                                                                    className="theme-table-meta-pill rounded-full px-2 py-0.5 transition hover:opacity-90"
-                                                                    title={`Assign server for table ${tableLabel}`}
-                                                                >
-                                                                    No server
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {table.isOccupied && (
-                                                    <div className="pointer-events-none absolute bottom-2 right-2 z-10">
-                                                        <span className="theme-table-time-pill inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold">
-                                                            {occupiedFor || "just now"}
-                                                        </span>
-                                                    </div>
-                                                )}
-
-                                                {table.isOccupied && (
-                                                    <div className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={(event) => {
-                                                                event.stopPropagation();
-                                                                setOpenOrdersTableKey((prev) =>
-                                                                    prev === assignmentKey
-                                                                        ? ""
-                                                                        : assignmentKey
-                                                                );
-                                                                setOpenStaffTableKey("");
-                                                                setOpenMoreTableKey("");
-                                                                setReceiptActionError("");
-                                                            }}
-                                                            className="theme-table-icon-btn rounded-md p-1.5 transition"
-                                                            title={`Show receipt for table ${tableLabel}`}
-                                                        >
-                                                            <Printer size={14} />
-                                                        </button>
-                                                    </div>
-                                                )}
-
-                                                {table.isOccupied && isOrdersOpen && (
-                                                    <div className="theme-table-popover absolute left-0 top-full z-20 mt-1 w-72 rounded-lg p-2 text-[11px]">
-                                                        <div className="mb-1 flex items-center justify-between gap-2">
-                                                            <p className="font-semibold">
-                                                                Table {tableLabel} receipt
-                                                            </p>
-                                                            <button
-                                                                type="button"
-                                                                onClick={(event) => {
-                                                                    event.stopPropagation();
-                                                                    setOpenOrdersTableKey("");
-                                                                    setReceiptActionError("");
-                                                                }}
-                                                                className="theme-table-icon-btn rounded-md p-1 transition"
-                                                                title="Close receipt"
-                                                                aria-label={`Close receipt for table ${tableLabel}`}
-                                                            >
-                                                                <X size={12} />
-                                                            </button>
-                                                        </div>
-                                                        {activeOrders.length === 0 ? (
-                                                            <p className="theme-muted mt-1">
-                                                                No active orders for this table.
-                                                            </p>
-                                                        ) : (
-                                                            <div className="mt-1.5 space-y-1.5">
-                                                                {activeOrders.map((order) => {
-                                                                    const orderTotal =
-                                                                        getReceiptOrderTotal(order);
-                                                                    return (
-                                                                        <div
-                                                                            key={`${table.key}-${order.id}`}
-                                                                            className="theme-table-order-row rounded-md px-2 py-1.5"
-                                                                        >
-                                                                            <div className="flex items-start justify-between gap-2">
-                                                                                <p className="font-medium">
-                                                                                    {order.orderNo
-                                                                                        ? order.orderNo
-                                                                                        : `#${order.id}`}
-                                                                                    <span className="theme-muted ml-1 text-[10px] uppercase">
-                                                                                        {order.status}
-                                                                                    </span>
-                                                                                </p>
-                                                                                <p className="font-semibold">
-                                                                                    {formatReceiptAmount(orderTotal)}
-                                                                                </p>
-                                                                            </div>
-                                                                            {Array.isArray(order.items) &&
-                                                                            order.items.length > 0 ? (
-                                                                                <div className="mt-1 space-y-0.5">
-                                                                                    {order.items.map((item) => {
-                                                                                        const lineTotal =
-                                                                                            getReceiptItemLineTotal(
-                                                                                                item
-                                                                                            );
-                                                                                        return (
-                                                                                            <div
-                                                                                                key={`${order.id}-${item.id}`}
-                                                                                                className="theme-muted flex items-center justify-between gap-2 text-[10px]"
-                                                                                            >
-                                                                                                <span className="truncate">
-                                                                                                    {Number(
-                                                                                                        item.qty || 0
-                                                                                                    )}{" "}
-                                                                                                    x{" "}
-                                                                                                    {item.itemName ||
-                                                                                                        "Item"}
-                                                                                                </span>
-                                                                                                <span>
-                                                                                                    {formatReceiptAmount(
-                                                                                                        lineTotal
-                                                                                                    )}
-                                                                                                </span>
-                                                                                            </div>
-                                                                                        );
-                                                                                    })}
-                                                                                </div>
-                                                                            ) : (
-                                                                                <p className="theme-muted mt-1 text-[10px]">
-                                                                                    No items found.
-                                                                                </p>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                                <div className="theme-table-order-row rounded-md px-2 py-1.5">
-                                                                    <div className="flex items-center justify-between gap-2 text-[12px]">
-                                                                        <span className="font-semibold">
-                                                                            Total Amount
-                                                                        </span>
-                                                                        <span className="font-semibold">
-                                                                            {formatReceiptAmount(
-                                                                                tableReceiptTotal
-                                                                            )}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
                                                             </div>
                                                         )}
-                                                        {receiptActionError ? (
-                                                            <p className="mt-2 rounded-md border border-red-300/40 bg-red-500/10 px-2 py-1 text-[10px] text-red-200">
-                                                                {receiptActionError}
-                                                            </p>
-                                                        ) : null}
-                                                        {activeOrders.length > 0 ? (
-                                                            <div className="mt-2 flex items-center justify-end gap-1.5">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        handleReceiptPrint({
-                                                                            tableLabel,
-                                                                            activeOrders,
-                                                                            tableReceiptTotal,
-                                                                        })
-                                                                    }
-                                                                    className="theme-soft-button rounded-md px-2 py-1 text-[10px] font-semibold"
-                                                                >
-                                                                    Print
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        handleDoneTableReceipt(
-                                                                            table,
-                                                                            assignmentKey
-                                                                        )
-                                                                    }
-                                                                    disabled={isCompletingThisTable}
-                                                                    className="theme-button rounded-md px-2 py-1 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-                                                                >
-                                                                    {isCompletingThisTable
-                                                                        ? "Completing..."
-                                                                        : "Done"}
-                                                                </button>
-                                                            </div>
-                                                        ) : null}
-                                                    </div>
-                                                )}
 
-                                                {table.isOccupied && isStaffOpen && (
-                                                    <div className="theme-table-popover absolute left-0 top-full z-20 mt-1 w-64 rounded-lg p-2 text-[11px]">
-                                                        <p className="font-semibold">
-                                                            Assign server for table {tableLabel}
-                                                        </p>
-                                                        {staffOverview.loading ? (
-                                                            <p className="theme-muted mt-1">
-                                                                Loading staff...
-                                                            </p>
-                                                        ) : staffOverview.users.length === 0 ? (
-                                                            <p className="theme-muted mt-1">
-                                                                No active staff found.
-                                                            </p>
-                                                        ) : (
-                                                            <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                                                {staffOverview.users.map(
-                                                                    (staffUser) => {
-                                                                        const staffId = String(
-                                                                            staffUser.id || ""
-                                                                        );
-                                                                        const isSelected =
-                                                                            assignedStaffId === staffId;
-                                                                        return (
+                                                        {table.isOccupied && isOrdersOpen && (
+                                                            <div
+                                                                className={`theme-table-popover absolute left-0 z-20 w-72 rounded-xl p-2 text-[11px] transition-all duration-150 ${ordersPopoverYClass}`}
+                                                            >
+                                                                <div className="mb-1 flex items-center justify-between gap-2">
+                                                                    <p className="font-semibold">
+                                                                        Table {tableLabel} receipt
+                                                                    </p>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(event) => {
+                                                                            event.stopPropagation();
+                                                                            setOpenOrdersTableKey("");
+                                                                            setReceiptActionError("");
+                                                                        }}
+                                                                        className="theme-table-icon-btn rounded-md p-1 transition"
+                                                                        title="Close receipt"
+                                                                        aria-label={`Close receipt for table ${tableLabel}`}
+                                                                    >
+                                                                        <X size={12} />
+                                                                    </button>
+                                                                </div>
+                                                                {activeOrders.length === 0 ? (
+                                                                    <p className="theme-muted mt-1">
+                                                                        No active orders for this table.
+                                                                    </p>
+                                                                ) : (
+                                                                    <div className="mt-1.5 space-y-1.5">
+                                                                        {activeOrders.map((order) => {
+                                                                            const orderTotal =
+                                                                                getReceiptOrderTotal(order);
+                                                                            return (
+                                                                                <div
+                                                                                    key={`${table.key}-${order.id}`}
+                                                                                    className="theme-table-order-row rounded-md px-2 py-1.5"
+                                                                                >
+                                                                                    <div className="flex items-start justify-between gap-2">
+                                                                                        <p className="font-medium">
+                                                                                            {order.orderNo
+                                                                                                ? order.orderNo
+                                                                                                : `#${order.id}`}
+                                                                                            <span className="theme-muted ml-1 text-[10px] uppercase">
+                                                                                                {order.status}
+                                                                                            </span>
+                                                                                        </p>
+                                                                                        <p className="font-semibold">
+                                                                                            {formatReceiptAmount(orderTotal)}
+                                                                                        </p>
+                                                                                    </div>
+                                                                                    {Array.isArray(order.items) &&
+                                                                                    order.items.length > 0 ? (
+                                                                                        <div className="mt-1 space-y-0.5">
+                                                                                            {order.items.map((item) => {
+                                                                                                const lineTotal =
+                                                                                                    getReceiptItemLineTotal(
+                                                                                                        item
+                                                                                                    );
+                                                                                                return (
+                                                                                                    <div
+                                                                                                        key={`${order.id}-${item.id}`}
+                                                                                                        className="theme-muted flex items-center justify-between gap-2 text-[10px]"
+                                                                                                    >
+                                                                                                        <span className="truncate">
+                                                                                                            {Number(
+                                                                                                                item.qty || 0
+                                                                                                            )}{" "}
+                                                                                                            x{" "}
+                                                                                                            {item.itemName ||
+                                                                                                                "Item"}
+                                                                                                        </span>
+                                                                                                        <span>
+                                                                                                            {formatReceiptAmount(
+                                                                                                                lineTotal
+                                                                                                            )}
+                                                                                                        </span>
+                                                                                                    </div>
+                                                                                                );
+                                                                                            })}
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <p className="theme-muted mt-1 text-[10px]">
+                                                                                            No items found.
+                                                                                        </p>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                        <div className="theme-table-order-row rounded-md px-2 py-1.5">
+                                                                            <div className="flex items-center justify-between gap-2 text-[12px]">
+                                                                                <span className="font-semibold">
+                                                                                    Total Amount
+                                                                                </span>
+                                                                                <span className="font-semibold">
+                                                                                    {formatReceiptAmount(
+                                                                                        tableReceiptTotal
+                                                                                    )}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {receiptActionError ? (
+                                                                    <p className="mt-2 rounded-md border border-red-300/40 bg-red-500/10 px-2 py-1 text-[10px] text-red-200">
+                                                                        {receiptActionError}
+                                                                    </p>
+                                                                ) : null}
+                                                                {activeOrders.length > 0 ? (
+                                                                    <div className="mt-2 flex items-center justify-end gap-1.5">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                handleReceiptPrint({
+                                                                                    tableLabel,
+                                                                                    activeOrders,
+                                                                                    tableReceiptTotal,
+                                                                                })
+                                                                            }
+                                                                            className="theme-soft-button rounded-md px-2 py-1 text-[10px] font-semibold"
+                                                                        >
+                                                                            Print
+                                                                        </button>
                                                                             <button
-                                                                                key={`${assignmentKey}-${staffId}`}
                                                                                 type="button"
                                                                                 onClick={() =>
-                                                                                    assignStaffToTable(
-                                                                                        assignmentKey,
-                                                                                        staffId
-                                                                                    )
-                                                                                }
-                                                                                className={`theme-table-staff-option rounded-lg px-2 py-1 text-[10px] font-semibold transition ${
-                                                                                    isSelected
-                                                                                        ? "is-selected"
-                                                                                        : ""
-                                                                                }`}
-                                                                            >
-                                                                                {getStaffName(
-                                                                                    staffUser
-                                                                                )}
-                                                                            </button>
-                                                                        );
-                                                                    }
+                                                                                handleFreeTable(
+                                                                                    table,
+                                                                                    assignmentKey
+                                                                                )
+                                                                            }
+                                                                            disabled={isCompletingThisTable}
+                                                                            className="theme-button rounded-md px-2 py-1 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                                                                        >
+                                                                            {isCompletingThisTable
+                                                                                ? "Completing..."
+                                                                                : "Done"}
+                                                                        </button>
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+                                                        )}
+
+                                                        {table.isOccupied && isStaffOpen && (
+                                                            <div
+                                                                className={`theme-table-popover absolute left-0 z-20 w-64 rounded-xl p-2 text-[11px] transition-all duration-150 ${staffPopoverYClass}`}
+                                                            >
+                                                                <p className="font-semibold">
+                                                                    Assign server for table {tableLabel}
+                                                                </p>
+                                                                {staffOverview.loading ? (
+                                                                    <p className="theme-muted mt-1">
+                                                                        Loading staff...
+                                                                    </p>
+                                                                ) : staffOverview.users.length === 0 ? (
+                                                                    <p className="theme-muted mt-1">
+                                                                        No active staff found.
+                                                                    </p>
+                                                                ) : (
+                                                                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                                        {staffOverview.users.map(
+                                                                            (staffUser) => {
+                                                                                const staffId = String(
+                                                                                    staffUser.id || ""
+                                                                                );
+                                                                                const isSelected =
+                                                                                    assignedStaffId === staffId;
+                                                                                return (
+                                                                                    <button
+                                                                                        key={`${assignmentKey}-${staffId}`}
+                                                                                        type="button"
+                                                                                        onClick={() =>
+                                                                                            assignStaffToTable(
+                                                                                                assignmentKey,
+                                                                                                staffId
+                                                                                            )
+                                                                                        }
+                                                                                        className={`theme-table-staff-option rounded-lg px-2 py-1 text-[10px] font-semibold transition ${
+                                                                                            isSelected
+                                                                                                ? "is-selected"
+                                                                                                : ""
+                                                                                        }`}
+                                                                                    >
+                                                                                        {getStaffName(
+                                                                                            staffUser
+                                                                                        )}
+                                                                                    </button>
+                                                                                );
+                                                                            }
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                {assignedStaff && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            clearTableAssignment(
+                                                                                assignmentKey
+                                                                            )
+                                                                        }
+                                                                        className="theme-table-remove-btn mt-2 rounded-md px-2 py-1 text-[10px] font-semibold transition"
+                                                                    >
+                                                                        Remove assigned server
+                                                                    </button>
                                                                 )}
                                                             </div>
                                                         )}
-                                                        {assignedStaff && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    clearTableAssignment(
-                                                                        assignmentKey
-                                                                    )
-                                                                }
-                                                                className="theme-table-remove-btn mt-2 rounded-md px-2 py-1 text-[10px] font-semibold transition"
+
+                                                        {isMoreOpen && (
+                                                            <div
+                                                                className={`theme-table-popover absolute right-0 z-20 w-44 rounded-xl p-2 text-[11px] transition-all duration-150 ${morePopoverYClass}`}
                                                             >
-                                                                Remove assigned server
-                                                            </button>
+                                                                <div className="theme-table-order-row rounded-md px-2 py-1.5">
+                                                                    <p className="theme-muted text-[10px] uppercase tracking-[0.08em]">
+                                                                        Seats
+                                                                    </p>
+                                                                    <p className="font-semibold">
+                                                                        {table.seats} seat
+                                                                        {Number(table.seats || 0) === 1
+                                                                            ? ""
+                                                                            : "s"}
+                                                                    </p>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        handleFreeTable(table, assignmentKey);
+                                                                    }}
+                                                                    disabled={isCompletingThisTable}
+                                                                    className="theme-table-remove-btn mt-2 w-full rounded-md px-2 py-1 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                                                                >
+                                                                    {isCompletingThisTable
+                                                                        ? "Freeing..."
+                                                                        : "Free table"}
+                                                                </button>
+                                                            </div>
                                                         )}
                                                     </div>
-                                                )}
-
-                                                {isMoreOpen && (
-                                                    <div className="theme-table-popover absolute right-0 top-full z-20 mt-1 w-44 rounded-lg p-2 text-[11px]">
-                                                        <div className="theme-table-order-row rounded-md px-2 py-1.5">
-                                                            <p className="theme-muted text-[10px] uppercase tracking-[0.08em]">
-                                                                Seats
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            {isDashboardRoute && (
+                                <aside className="theme-panel rounded-2xl p-3 sm:p-4 xl:col-span-1 xl:flex xl:h-full xl:flex-col">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="text-sm font-semibold uppercase tracking-[0.14em]">
+                                            Online Orders
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate("/owner/online-orders")}
+                                            className="theme-soft-button rounded-md px-2 py-1 text-[10px] font-semibold"
+                                        >
+                                            View all
+                                        </button>
+                                    </div>
+                                    <p className="theme-muted mt-1 text-[11px]">
+                                        {stripOnlineOrders.length} active online order
+                                        {stripOnlineOrders.length === 1 ? "" : "s"}
+                                    </p>
+                                    <div className="mt-2 space-y-1.5 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1">
+                                        {stripOnlineOrders.length === 0 ? (
+                                            <div className="theme-table-order-row rounded-lg px-2 py-2 text-[11px]">
+                                                No online orders.
+                                            </div>
+                                        ) : (
+                                            stripOnlineOrders.map((order) => (
+                                                <button
+                                                    key={`${order.tableKey}-${order.id}`}
+                                                    type="button"
+                                                    onClick={() => setSelectedLiveOrder(order)}
+                                                    className="theme-table-order-row block w-full rounded-lg px-2 py-2 text-left transition hover:opacity-90"
+                                                >
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="min-w-0">
+                                                            <p className="truncate text-xs font-semibold">
+                                                                {order.orderNo ? order.orderNo : `#${order.id}`}
                                                             </p>
-                                                            <p className="font-semibold">
-                                                                {table.seats} seat
-                                                                {Number(table.seats || 0) === 1
-                                                                    ? ""
-                                                                    : "s"}
+                                                            <p className="theme-muted text-[10px]">
+                                                                Table {order.tableNo || "--"}
                                                             </p>
                                                         </div>
+                                                        <p className="text-[10px] font-semibold uppercase">
+                                                            {order.status || "PLACED"}
+                                                        </p>
                                                     </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                                    <p className="mt-1 text-xs font-semibold">
+                                                        {formatReceiptAmount(getReceiptOrderTotal(order))}
+                                                    </p>
+                                                </button>
+                                            ))
+                                        )}
+                                    </div>
+                                </aside>
                             )}
-                        </div>
-                        <p className="theme-muted text-[11px]">
-                            Drag and drop a staff chip to a table, or use the server icon to assign directly.
-                        </p>
                         </div>
                     </div>
                 )}
 
                 {/* Page */}
-                <main className="p-3 sm:p-4 md:p-6">
+                <main className={`p-3 sm:p-4 md:p-6 ${isDashboardRoute ? "hidden" : ""}`}>
                     {visibleNavItems.length === 0 ? (
                         <div className="theme-panel rounded-2xl p-6 text-sm">
                             No modules are enabled for this account.
@@ -1530,6 +1770,109 @@ export default function OwnerLayout() {
                     ) : null}
                 </main>
             </div>
+            {selectedLiveOrder && (
+                <div
+                    className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-3 sm:p-5"
+                    onClick={() => setSelectedLiveOrder(null)}
+                >
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Live order details"
+                        className="theme-panel w-full max-w-2xl rounded-2xl p-4 shadow-[0_24px_70px_rgba(0,0,0,0.45)] sm:p-5"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <p className="theme-muted text-xs uppercase tracking-[0.2em]">
+                                    Order Details
+                                </p>
+                                <h3 className="mt-1 text-lg font-semibold">
+                                    {selectedLiveOrder.orderNo
+                                        ? selectedLiveOrder.orderNo
+                                        : `#${selectedLiveOrder.id}`}
+                                </h3>
+                                <p className="theme-muted mt-1 text-sm">
+                                    Table {selectedLiveOrder.tableNo || "--"}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span
+                                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase ${getOrderStatusTone(
+                                        selectedLiveOrder.status
+                                    )}`}
+                                >
+                                    {formatOrderStatusLabel(selectedLiveOrder.status)}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedLiveOrder(null)}
+                                    className="theme-soft-button inline-flex h-8 w-8 items-center justify-center rounded-full"
+                                    aria-label="Close order details"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 max-h-[56vh] space-y-2 overflow-y-auto pr-1">
+                            {selectedLiveOrderItems.length === 0 ? (
+                                <div className="theme-table-order-row rounded-lg px-3 py-3 text-sm">
+                                    No items found for this order.
+                                </div>
+                            ) : (
+                                selectedLiveOrderItems.map((item, index) => {
+                                    const qty = Math.max(1, Number(item?.qty || 1));
+                                    const itemLabel = String(
+                                        item?.itemName || `Item ${index + 1}`
+                                    ).trim();
+                                    const lineTotal = getReceiptItemLineTotal(item);
+                                    const itemStatus = item?.status || selectedLiveOrder.status;
+                                    return (
+                                        <div
+                                            key={item?.id || `${itemLabel}-${index}`}
+                                            className="theme-table-order-row rounded-lg px-3 py-2.5"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="text-sm font-semibold">
+                                                        {qty} x {itemLabel || "Item"}
+                                                    </p>
+                                                    <p className="theme-muted mt-0.5 text-xs">
+                                                        {formatReceiptAmount(Number(item?.price || 0))} each
+                                                    </p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span
+                                                        className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${getOrderStatusTone(
+                                                            itemStatus
+                                                        )}`}
+                                                    >
+                                                        {formatOrderStatusLabel(itemStatus)}
+                                                    </span>
+                                                    <p className="mt-1 text-sm font-semibold">
+                                                        {formatReceiptAmount(lineTotal)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        <div className="mt-4 flex items-center justify-between border-t border-black/10 pt-3">
+                            <p className="theme-muted text-sm">
+                                {selectedLiveOrderItemCount} item
+                                {selectedLiveOrderItemCount === 1 ? "" : "s"}
+                            </p>
+                            <p className="text-sm font-semibold">
+                                Total {formatReceiptAmount(getReceiptOrderTotal(selectedLiveOrder))}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

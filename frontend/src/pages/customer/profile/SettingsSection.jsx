@@ -15,11 +15,19 @@ const emptyAddress = (profile) => ({
     line1: "",
     line2: "",
     city: "",
-    state: "",
+    mandal: "",
     postalCode: "",
+    latitude: null,
+    longitude: null,
     notes: "",
     isDefault: false,
 });
+
+const normalizeCoordinate = (value) => {
+    if (value === "" || value === null || value === undefined) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+};
 
 export default function SettingsSection({ profile, customerToken, loading, saving, error, updateProfile, setError }) {
     const { logoutCustomer } = useAuth();
@@ -70,6 +78,14 @@ export default function SettingsSection({ profile, customerToken, loading, savin
         if (!canUseProfileApi) return;
         if (!String(addressDraft.line1 || "").trim()) {
             showToast({ title: "Address required", message: "Please enter address line 1.", variant: "error" });
+            return;
+        }
+        if (!String(addressDraft.city || "").trim()) {
+            showToast({ title: "City required", message: "Please enter the city.", variant: "error" });
+            return;
+        }
+        if (!String(addressDraft.mandal || "").trim()) {
+            showToast({ title: "Mandal required", message: "Please enter the mandal or area.", variant: "error" });
             return;
         }
         setAddressSaving(true);
@@ -226,10 +242,10 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                 </div>
             </section>
 
-            <section className="space-y-2 px-1 py-2">
-                <p className="theme-muted text-[11px] font-semibold uppercase tracking-[0.16em]">Addresses</p>
-                <h2 className="text-lg font-semibold">Saved addresses</h2>
-                <p className="theme-muted text-xs">Stored in your account (requires OTP session token).</p>
+            <section id="addresses" className="scroll-mt-24 space-y-2 px-1 py-2">
+                <p className="theme-muted text-[11px] font-semibold uppercase tracking-[0.16em]">Address</p>
+                <h2 className="text-lg font-semibold">Saved address</h2>
+                <p className="theme-muted text-xs">Stored in your account (requires OTP session token). Add the exact house / flat and landmark details for delivery.</p>
 
                 {!canUseProfileApi ? (
                     <div className="mt-3 rounded-xl border border-white/10 bg-black/10 px-3 py-2 text-xs">
@@ -240,21 +256,31 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                     <>
                         <div className="mt-3 grid gap-3 md:grid-cols-2">
                             <div className="md:col-span-2">
-                                <label className="theme-muted mb-1 block text-xs">Address line 1</label>
+                                <label className="theme-muted mb-1 block text-xs">House / Flat / Building</label>
                                 <input
                                     value={addressDraft.line1}
                                     onChange={(e) => setAddressDraft((d) => ({ ...d, line1: e.target.value }))}
                                     className="theme-input w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                                    placeholder="Flat / Street / Building"
+                                    placeholder="House no / Flat no / Building name"
                                 />
                             </div>
                             <div className="md:col-span-2">
-                                <label className="theme-muted mb-1 block text-xs">Address line 2 (optional)</label>
+                                <label className="theme-muted mb-1 block text-xs">Street / Area (optional)</label>
                                 <input
                                     value={addressDraft.line2}
                                     onChange={(e) => setAddressDraft((d) => ({ ...d, line2: e.target.value }))}
                                     className="theme-input w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                                    placeholder="Landmark / Area"
+                                    placeholder="Street, society, locality"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="theme-muted mb-1 block text-xs">Landmark / delivery instructions (optional)</label>
+                                <textarea
+                                    value={addressDraft.notes}
+                                    onChange={(e) => setAddressDraft((d) => ({ ...d, notes: e.target.value }))}
+                                    className="theme-input w-full rounded-2xl px-3 py-2.5 text-sm outline-none"
+                                    rows={3}
+                                    placeholder="Gate code, nearby shop, floor number, delivery directions..."
                                 />
                             </div>
                             <div>
@@ -266,11 +292,33 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                                 />
                             </div>
                             <div>
-                                <label className="theme-muted mb-1 block text-xs">State</label>
+                                <label className="theme-muted mb-1 block text-xs">Mandal / Area</label>
                                 <input
-                                    value={addressDraft.state}
-                                    onChange={(e) => setAddressDraft((d) => ({ ...d, state: e.target.value }))}
+                                    value={addressDraft.mandal}
+                                    onChange={(e) => setAddressDraft((d) => ({ ...d, mandal: e.target.value }))}
                                     className="theme-input w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="theme-muted mb-1 block text-xs">Latitude</label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    value={addressDraft.latitude ?? ""}
+                                    onChange={(e) => setAddressDraft((d) => ({ ...d, latitude: e.target.value }))}
+                                    className="theme-input w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                                    placeholder="GPS latitude"
+                                />
+                            </div>
+                            <div>
+                                <label className="theme-muted mb-1 block text-xs">Longitude</label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    value={addressDraft.longitude ?? ""}
+                                    onChange={(e) => setAddressDraft((d) => ({ ...d, longitude: e.target.value }))}
+                                    className="theme-input w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                                    placeholder="GPS longitude"
                                 />
                             </div>
                             <div>
@@ -311,14 +359,26 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                                 addresses.map((addr) => (
                                     <div key={addr.id} className="flex items-start justify-between gap-3 border-b border-[var(--app-border)] py-3 last:border-b-0">
                                         <div className="min-w-0">
-                                            <p className="text-sm font-semibold">
-                                                {addr.label}
-                                                {addr.isDefault ? " (Default)" : ""}
-                                            </p>
-                                            <p className="theme-muted mt-0.5 text-xs">{addr.line1}</p>
-                                            {(addr.city || addr.state || addr.postalCode) && (
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="text-sm font-semibold">
+                                                    {addr.label}
+                                                    {addr.isDefault ? " (Default)" : ""}
+                                                </p>
+                                            </div>
+                                            <p className="theme-muted mt-0.5 whitespace-pre-line text-xs">{[addr.line1, addr.line2].filter(Boolean).join("\n")}</p>
+                                            {addr.notes && <p className="theme-muted mt-0.5 text-[11px]">{addr.notes}</p>}
+                                            {(addr.city || addr.mandal || addr.state || addr.postalCode) && (
                                                 <p className="theme-muted mt-0.5 text-[11px]">
-                                                    {[addr.city, addr.state, addr.postalCode].filter(Boolean).join(", ")}
+                                                    {[addr.city, addr.mandal || addr.state, addr.postalCode].filter(Boolean).join(", ")}
+                                                </p>
+                                            )}
+                                            {(normalizeCoordinate(addr.latitude) != null || normalizeCoordinate(addr.longitude) != null) && (
+                                                <p className="theme-muted mt-0.5 text-[11px]">
+                                                    Lat, Lng:{" "}
+                                                    {[normalizeCoordinate(addr.latitude), normalizeCoordinate(addr.longitude)]
+                                                        .map((value) => (value == null ? "" : value.toFixed(5)))
+                                                        .filter(Boolean)
+                                                        .join(", ")}
                                                 </p>
                                             )}
                                         </div>

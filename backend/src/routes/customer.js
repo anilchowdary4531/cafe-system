@@ -5,6 +5,54 @@ import { buildCustomerOtpController } from "../controllers/customerOtpController
 import { buildCustomerProfileController } from "../controllers/customerProfileController.js";
 import { buildCustomerAddressController } from "../controllers/customerAddressController.js";
 
+const normalizeDeliveryAddress = (value) => {
+  if (!value) return "";
+
+  if (typeof value === "string") {
+    return value.trim().replace(/\n{3,}/g, "\n\n");
+  }
+
+  if (typeof value === "object") {
+    const label = String(value.label || "").trim();
+    const line1 = String(value.line1 || value.addressLine1 || value.address || "").trim();
+    const line2 = String(value.line2 || value.addressLine2 || "").trim();
+    const locality = [value.city, value.mandal || value.state, value.postalCode || value.pincode]
+      .map((part) => String(part || "").trim())
+      .filter(Boolean)
+      .join(", ");
+    const notes = String(value.notes || value.instructions || "").trim();
+
+    return [label, line1, line2, locality, notes]
+      .map((part) => String(part || "").trim())
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  return String(value).trim();
+};
+
+const normalizeDeliveryCoordinate = (value) => {
+  if (value === "" || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const normalizeFulfillment = (value) => {
+  const fulfillment = String(value || "").trim().toLowerCase();
+  if (["pickup", "takeaway", "take_away", "counter"].includes(fulfillment)) return "pickup";
+  if (["delivery", "online", "home_delivery", "door_delivery"].includes(fulfillment)) return "delivery";
+  return "";
+};
+
+const normalizeDeliveryLocation = (body) => {
+  const source = body && typeof body === "object" ? body : {};
+  const addressSource = source.deliveryAddress && typeof source.deliveryAddress === "object" ? source.deliveryAddress : {};
+  return {
+    latitude: normalizeDeliveryCoordinate(source.deliveryLatitude ?? source.latitude ?? addressSource.latitude ?? addressSource.lat),
+    longitude: normalizeDeliveryCoordinate(source.deliveryLongitude ?? source.longitude ?? addressSource.longitude ?? addressSource.lng),
+  };
+};
+
 export default async function customerRoutes(app, deps) {
   const { prisma, realtime } = deps;
   const otpController = buildCustomerOtpController({ prisma, app });
@@ -131,6 +179,11 @@ export default async function customerRoutes(app, deps) {
       let normalizedEmail = String(body.email || "").trim().toLowerCase();
       let normalizedCustomerName = String(body.customerName || "").trim();
       const normalizedTableNo = String(body.tableNumber || "").trim() || null;
+      const requestedFulfillment = normalizeFulfillment(body.fulfillment || body.orderSource);
+      const isPickupOrder = !normalizedTableNo && requestedFulfillment === "pickup";
+      const normalizedOrderSource = normalizedTableNo ? "QR" : isPickupOrder ? "PICKUP" : "DELIVERY";
+      const normalizedDeliveryAddress = normalizeDeliveryAddress(body.deliveryAddress || body.address || body.shippingAddress || "");
+      const normalizedDeliveryLocation = normalizeDeliveryLocation(body);
 
       const items = body.items;
       const notes = body.notes;
@@ -152,6 +205,12 @@ export default async function customerRoutes(app, deps) {
       if (!items || items.length === 0) {
         return reply.code(400).send({
           message: "No items selected",
+        });
+      }
+
+      if (normalizedOrderSource === "DELIVERY" && !normalizedDeliveryAddress) {
+        return reply.code(400).send({
+          message: "Delivery address is required for online orders",
         });
       }
 
@@ -280,11 +339,15 @@ export default async function customerRoutes(app, deps) {
           restaurantId: restaurant.id,
           orderNo,
           invoiceNo,
+          orderSource: normalizedOrderSource,
           customerName: normalizedCustomerName || null,
           phone: normalizedPhone || null,
           email: normalizedEmail || null,
           tableNo: normalizedTableNo,
           notes,
+          deliveryAddress: isPickupOrder ? null : normalizedDeliveryAddress || null,
+          deliveryLatitude: isPickupOrder ? null : normalizedDeliveryLocation.latitude,
+          deliveryLongitude: isPickupOrder ? null : normalizedDeliveryLocation.longitude,
           subtotal,
           taxAmount,
           serviceChargeAmount,

@@ -85,7 +85,7 @@ const normalizeDbPermissions = (permissions, role) => {
 const serializeAccess = (access, role) => JSON.stringify(normalizeAccess(access, role));
 
 const buildQrTargetUrl = (slug, tableNo) => {
-  const pathPart = `/r/${slug}?table=${encodeURIComponent(tableNo)}`;
+  const pathPart = `/m/${encodeURIComponent(slug)}/${encodeURIComponent(tableNo)}`;
   return `${FRONTEND_URL}${pathPart}`;
 };
 
@@ -133,7 +133,11 @@ await app.register(fastifyStatic, {
 });
 
 const requireOwnerRouteAuth = async (req, reply) => {
-  const actor = await requireStaffJwt(req, reply, { allowedRoles: STAFF_ALLOWED_ROLES, matchRestaurantParam: "restaurantId" });
+  const actor = await requireStaffJwt(req, reply, {
+    prisma,
+    allowedRoles: STAFF_ALLOWED_ROLES,
+    matchRestaurantParam: "restaurantId",
+  });
   if (!actor) return reply;
   req.staffActor = actor;
   return null;
@@ -155,6 +159,7 @@ const realtime = initRealtime({
 const routeDeps = {
   prisma,
   buildQrTargetUrl,
+  FRONTEND_URL,
   STAFF_ACCESS_MODULES,
   STAFF_ALLOWED_ROLES,
   normalizeAccess,

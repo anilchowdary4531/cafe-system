@@ -5,15 +5,21 @@ import ThemeSelector from "./ThemeSelector";
 import RestaurantSelector from "./RestaurantSelector";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import BrandLogo from "./BrandLogo";
+import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
+import { resolveEffectiveStaffRole } from "../utils/staffRole";
 
 export default function Navbar() {
     const location = useLocation();
-    const { user, customer, logout } = useAuth();
+    const { user, customer, staffToken, logout } = useAuth();
     const { restaurantContext } = useRestaurantContext();
-    const activeProfile = user || customer;
-    const isStaff = Boolean(user);
-    const normalizedRole = String(user?.role || "").toUpperCase();
-    const isProfilePage = String(location.pathname || "").startsWith("/profile");
+    const isCustomerProfileScope = new URLSearchParams(location.search).get("scope") === "customer";
+    const hasStaffSession = Boolean(user && staffToken);
+    const isStaff = hasStaffSession && !isCustomerProfileScope;
+    const activeProfile = isStaff ? user : customer;
+    const normalizedRole = resolveEffectiveStaffRole(isStaff ? user?.role : "", isStaff ? user?.designation : "");
+    const isProfilePage =
+        String(location.pathname || "").startsWith("/profile") ||
+        String(location.pathname || "").startsWith("/staff/profile");
 
     const loginPath = (() => {
         const path = String(location.pathname || "");
@@ -24,7 +30,7 @@ export default function Navbar() {
     })();
 
     const restaurantName = (() => {
-        const fromUserRestaurant = user?.restaurant?.name || user?.restaurantName || null;
+        const fromUserRestaurant = isStaff ? user?.restaurant?.name || user?.restaurantName || null : null;
         if (fromUserRestaurant) return fromUserRestaurant;
 
         if (normalizedRole === "SUPER_ADMIN" || normalizedRole === "ADMIN") {
@@ -36,7 +42,12 @@ export default function Navbar() {
 
     const customerMenuPath = (() => {
         const slug = String(restaurantContext?.slug || "").trim();
-        return slug ? `/r/${encodeURIComponent(slug)}` : "/";
+        return buildRestaurantMenuPath(slug, restaurantContext?.tableNo);
+    })();
+
+    const staffProfilePath = (() => {
+        const staffId = String(user?.id || "").trim();
+        return staffId ? `/staff/profile/${encodeURIComponent(staffId)}` : "/kitchen";
     })();
 
     const staffLinks = (() => {
@@ -46,7 +57,7 @@ export default function Navbar() {
             {
                 key: "pos",
                 to: "/admin/new-order",
-                label: "New Order",
+                label: "Billing Desk",
                 icon: <UtensilsCrossed size={16} />,
                 allow: true,
             },
@@ -58,9 +69,9 @@ export default function Navbar() {
                 allow: role === "SUPER_ADMIN" || role === "OWNER" || role === "MANAGER" || role === "CHEF",
             },
             {
-                key: "waiter",
-                to: "/waiter",
-                label: "Waiter",
+                key: "server",
+                to: "/server",
+                label: "Server",
                 icon: <LayoutGrid size={16} />,
                 allow: role === "SUPER_ADMIN" || role === "OWNER" || role === "MANAGER" || role === "WAITER" || role === "CASHIER",
             },
@@ -123,7 +134,7 @@ export default function Navbar() {
                     </Link>
                 )}
 
-                {user && normalizedRole !== "ADMIN" && normalizedRole !== "SUPER_ADMIN" && (
+                {isStaff && ["OWNER", "MANAGER", "CHEF", "CASHIER"].includes(normalizedRole) && (
                     <Link
                         to="/owner"
                         className="theme-button-secondary rounded-lg px-4 py-2 text-sm"
@@ -138,15 +149,15 @@ export default function Navbar() {
                             <Link
                                 to="/"
                                 className="inline-flex h-12 w-12 items-center justify-center"
-                                aria-label="Home"
+                                aria-label="Tiffzy Home"
                                 title="Home"
                             >
-                                <BrandLogo className="theme-brand-logo h-10 w-10" title="Home" />
+                                <BrandLogo className="theme-brand-logo h-10 w-10" title="Tiffzy Home" />
                             </Link>
                         )}
 
                         <Link
-                            to={isStaff ? "/profile" : customerMenuPath}
+                            to={isStaff ? staffProfilePath : customerMenuPath}
                             className="theme-soft-button inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm"
                         >
                             <UserCircle2 size={18} />
@@ -155,6 +166,7 @@ export default function Navbar() {
 
                         {isStaff && (
                             <button
+                                type="button"
                                 onClick={logout}
                                 className="rounded-lg bg-red-500 px-4 py-2 text-sm"
                             >

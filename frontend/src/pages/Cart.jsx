@@ -5,6 +5,7 @@ import { useCart } from "../context/CartContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import useCachedGet from "../hooks/useCachedGet";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
+import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
 
@@ -54,7 +55,7 @@ export default function Cart() {
                                 <h2 className="mb-4 text-2xl">Cart is empty</h2>
 
                                 <Link
-                                    to="/"
+                                    to={buildRestaurantMenuPath(slug, restaurantContext?.tableNo)}
                                     className="theme-button inline-block rounded-xl px-6 py-3"
                                 >
                                     Browse Menu
@@ -142,7 +143,7 @@ export default function Cart() {
                                 </button>
 
                                 <Link
-                                    to="/"
+                                    to={buildRestaurantMenuPath(slug, restaurantContext?.tableNo)}
                                     className="theme-muted mt-4 block text-center hover:opacity-80"
                                 >
                                     Continue Shopping

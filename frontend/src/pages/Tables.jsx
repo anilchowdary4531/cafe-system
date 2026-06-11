@@ -20,7 +20,15 @@ export default function Tables() {
     const buildMenuUrl = (slug, tableNo) => {
         const safeSlug = String(slug || "").trim() || "restaurant";
         const safeTable = String(tableNo || "").trim();
-        const path = `/r/${safeSlug}?table=${encodeURIComponent(safeTable)}`;
+        const path = `/m/${encodeURIComponent(safeSlug)}/${encodeURIComponent(safeTable)}`;
+        const base = typeof window !== "undefined" ? window.location.origin : "";
+        return base ? `${base}${path}` : path;
+    };
+
+    const buildDebugMenuUrl = (slug, tableNo) => {
+        const safeSlug = String(slug || "").trim() || "restaurant";
+        const safeTable = String(tableNo || "").trim();
+        const path = `/debug/menu/${encodeURIComponent(safeSlug)}/${encodeURIComponent(safeTable)}`;
         const base = typeof window !== "undefined" ? window.location.origin : "";
         return base ? `${base}${path}` : path;
     };
@@ -32,6 +40,7 @@ export default function Tables() {
             <div className="grid grid-cols-4 gap-4">
                 {tables.map((table) => {
                     const target = table.qrCodeUrl || buildMenuUrl(table.restaurant?.slug, table.tableNo);
+                    const debugTarget = buildDebugMenuUrl(table.restaurant?.slug, table.tableNo);
                     return (
                         <div key={table.id} className="bg-[#1a2333] p-4 rounded text-center">
                             <p>Table {table.tableNo}</p>
@@ -42,6 +51,15 @@ export default function Tables() {
                                 className="mt-2"
                                 alt={`${table.tableNo} QR`}
                             />
+
+                            <a
+                                href={debugTarget}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-sky-400/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200 transition hover:bg-sky-500/20"
+                            >
+                                Open debug link
+                            </a>
                         </div>
                     );
                 })}

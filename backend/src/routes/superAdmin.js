@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { requireStaffJwt } from "../services/staffAuthService.js";
 
 const slugify = (value) =>
   String(value || "")
@@ -15,15 +16,10 @@ export default async function superAdminRoutes(app, deps) {
   const { prisma, STAFF_ACCESS_MODULES } = deps;
 
   const requireSuperAdmin = async (req, reply) => {
-    try {
-      await req.jwtVerify();
-      const role = String(req.user?.role || "").toUpperCase();
-      if (role !== "SUPER_ADMIN") {
-        return reply.code(403).send({ message: "Super admin access required" });
-      }
-    } catch {
-      return reply.code(401).send({ message: "Authentication required" });
-    }
+    const actor = await requireStaffJwt(req, reply, { prisma, allowedRoles: ["SUPER_ADMIN"] });
+    if (!actor) return reply;
+    req.staffActor = actor;
+    return null;
   };
 
   const serializeRestaurant = (restaurant) => {
@@ -36,6 +32,7 @@ export default async function superAdminRoutes(app, deps) {
       legalName: restaurant.legalName,
       slug: restaurant.slug,
       ownerName: restaurant.ownerName,
+      logoUrl: restaurant.logoUrl,
       email: restaurant.email,
       phone: restaurant.phone,
       city: restaurant.city,
@@ -114,6 +111,84 @@ export default async function superAdminRoutes(app, deps) {
     } catch (err) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to fetch restaurants" });
+    }
+  });
+
+  app.get("/super-admin/users", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const q = String(req.query?.q || "").trim();
+
+      const restaurants = await prisma.restaurant.findMany({
+        where: q
+          ? {
+              OR: [
+                { name: { contains: q, mode: "insensitive" } },
+                { slug: { contains: q, mode: "insensitive" } },
+                { city: { contains: q, mode: "insensitive" } },
+                {
+                  users: {
+                    some: {
+                      OR: [
+                        { name: { contains: q, mode: "insensitive" } },
+                        { email: { contains: q, mode: "insensitive" } },
+                        { phone: { contains: q, mode: "insensitive" } },
+                      ],
+                    },
+                  },
+                },
+              ],
+            }
+          : {},
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          city: true,
+          logoUrl: true,
+          isActive: true,
+          users: {
+            where: { role: { not: "SUPER_ADMIN" } },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              role: true,
+              isActive: true,
+            },
+            orderBy: { id: "asc" },
+          },
+        },
+        orderBy: { name: "asc" },
+      });
+
+      const items = restaurants.map((restaurant) => ({
+        id: restaurant.id,
+        name: restaurant.name,
+        slug: restaurant.slug,
+        city: restaurant.city,
+        logoUrl: restaurant.logoUrl,
+        isActive: restaurant.isActive,
+        users: (restaurant.users || []).map((user) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          isActive: user.isActive,
+        })),
+      }));
+
+      return {
+        restaurants: items,
+        summary: {
+          restaurants: items.length,
+          users: items.reduce((sum, item) => sum + (item.users?.length || 0), 0),
+        },
+      };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to fetch users" });
     }
   });
 

@@ -1,6 +1,7 @@
 import axios from "axios";
 import { API } from "../config";
 import { deleteCacheEntry, getCacheEntry, isFresh, isStaleAllowed, makeCacheEntry, pruneCache, setCacheEntry } from "./localCache";
+import { clearStaffSession, getActiveStaffSession } from "./staffSessionStorage";
 
 const stableStringify = (value) => {
     if (value === null || value === undefined) return "";
@@ -20,7 +21,8 @@ const inFlight = new Map();
 
 api.interceptors.request.use((config) => {
     const url = String(config?.url || "");
-    const staffToken = localStorage.getItem("token");
+    const activeStaffSession = getActiveStaffSession();
+    const staffToken = activeStaffSession?.token || null;
     const customerToken = localStorage.getItem("customerToken");
 
     config.headers = config.headers || {};
@@ -42,13 +44,13 @@ api.interceptors.response.use(
         const status = error?.response?.status;
         if (status === 401) {
             const url = String(error?.config?.url || "");
+            const activeStaffSession = getActiveStaffSession();
             try {
                 if (url.startsWith("/customer")) {
                     localStorage.removeItem("customerToken");
                     localStorage.removeItem("customer");
                 } else {
-                    localStorage.removeItem("token");
-                    localStorage.removeItem("user");
+                    clearStaffSession(activeStaffSession?.scope || "local");
                 }
             } catch {
                 // ignore

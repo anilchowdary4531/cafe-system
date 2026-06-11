@@ -10,7 +10,15 @@ import {
 const formatTime = (value) => {
     const dt = new Date(value);
     if (Number.isNaN(dt.getTime())) return "Just now";
-    return dt.toLocaleString();
+    return dt.toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+    });
 };
 
 export default function OwnerNotifications() {
@@ -40,36 +48,23 @@ export default function OwnerNotifications() {
 
     return (
         <section className="space-y-5">
-            <article className="theme-hero-band rounded-3xl p-6">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <p className="text-xs uppercase tracking-[0.24em] theme-muted-strong">
-                            Activity Center
-                        </p>
-                        <h3 className="mt-1 text-3xl font-bold">Notifications</h3>
-                        <p className="mt-1 text-sm theme-muted">
-                            View all updates and keep track of unread messages.
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <span className="theme-chip rounded-full px-3 py-1 text-sm">
-                            {unreadCount} unread
-                        </span>
-                        <button
-                            type="button"
-                            onClick={onMarkAllRead}
-                            disabled={unreadCount === 0}
-                            className="theme-button rounded-xl px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            Mark all as read
-                        </button>
-                    </div>
+            <article className="px-1 py-1">
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <h3 className="text-3xl font-bold">Notifications</h3>
+                    <p className="theme-muted text-sm">{unreadCount} unread</p>
+                    <button
+                        type="button"
+                        onClick={onMarkAllRead}
+                        disabled={unreadCount === 0}
+                        className="theme-soft-button rounded-full px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        Mark all as read
+                    </button>
                 </div>
             </article>
 
             {notifications.length === 0 ? (
-                <article className="theme-panel rounded-2xl p-6">
+                <div className="px-2 py-3">
                     <div className="flex items-center gap-2">
                         <Bell size={18} />
                         <p className="font-semibold">No notifications yet</p>
@@ -77,49 +72,47 @@ export default function OwnerNotifications() {
                     <p className="theme-muted mt-2 text-sm">
                         New alerts will appear here automatically.
                     </p>
-                </article>
+                </div>
             ) : (
-                <div className="space-y-3">
+                <div className="divide-y divide-[color:var(--app-border)]">
                     {notifications.map((item) => (
-                        <article
-                            key={item.id}
-                            className={`theme-panel rounded-2xl p-4 ${item.read ? "" : "border-[color:var(--app-primary)]"}`}
-                        >
-                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                                <div>
-                                    <div className="flex items-center gap-2">
+                        <article key={item.id} className="py-4 first:pt-1">
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
                                         <h4 className="font-semibold">{item.title}</h4>
                                         <span className="theme-chip rounded-full px-2 py-0.5 text-[11px] uppercase">
                                             {item.type}
                                         </span>
                                         {!item.read && (
-                                            <span className="theme-count-badge rounded-full px-2 py-0.5 text-[11px] font-semibold">
+                                            <span className="theme-price text-[11px] font-semibold uppercase tracking-[0.12em]">
                                                 New
                                             </span>
                                         )}
                                     </div>
-                                    <p className="theme-muted mt-1 text-sm">{item.message}</p>
-                                    <p className="theme-muted mt-2 flex items-center gap-1 text-xs">
-                                        <Clock3 size={12} />
-                                        {formatTime(item.createdAt)}
-                                    </p>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <p className="theme-muted flex items-center gap-1 text-xs whitespace-nowrap">
+                                            <Clock3 size={12} />
+                                            {formatTime(item.createdAt)}
+                                        </p>
+                                        {item.read ? (
+                                            <span className="theme-muted inline-flex items-center gap-1 text-xs font-semibold">
+                                                <CheckCheck size={13} />
+                                                Read
+                                            </span>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => onMarkOneRead(item.id)}
+                                                className="theme-soft-button inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs"
+                                            >
+                                                <Check size={13} />
+                                                Mark read
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-
-                                {item.read ? (
-                                    <span className="theme-chip inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs">
-                                        <CheckCheck size={13} />
-                                        Read
-                                    </span>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => onMarkOneRead(item.id)}
-                                        className="theme-soft-button inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs"
-                                    >
-                                        <Check size={13} />
-                                        Mark read
-                                    </button>
-                                )}
+                                <p className="theme-muted mt-1 text-sm">{item.message}</p>
                             </div>
                         </article>
                     ))}
@@ -128,4 +121,3 @@ export default function OwnerNotifications() {
         </section>
     );
 }
-

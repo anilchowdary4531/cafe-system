@@ -78,6 +78,7 @@ export const toPriceSubunitItems = ({ menuItems = [], items = [] } = {}) => {
     normalized.push({
       menuItemId,
       itemName: String(dbItem.name || "").trim(),
+      preparedByName: String(raw?.preparedByName || raw?.chefName || raw?.preparedBy || "").trim() || null,
       qty,
       priceSubunit: toSubunit(dbItem.price),
     });
@@ -85,4 +86,3 @@ export const toPriceSubunitItems = ({ menuItems = [], items = [] } = {}) => {
 
   return normalized;
 };
-

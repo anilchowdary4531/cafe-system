@@ -1,7 +1,13 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { clearAllCache } from "../utils/localCache";
 import { getCustomerSettings } from "../utils/customerSettings";
+import {
+    clearStaffSession,
+    getActiveStaffSession,
+    getActiveStaffScope,
+    writeStaffSession,
+} from "../utils/staffSessionStorage";
 
 const AuthContext = createContext();
 
@@ -47,7 +53,10 @@ export function useAuth() {
 
 export default function AuthProvider({ children }) {
     const navigate = useNavigate();
-    const [user, setUser] = useState(readStored("user"));
+    const initialStaffSession = getActiveStaffSession();
+    const [staffToken, setStaffToken] = useState(() => initialStaffSession?.token || null);
+    const [user, setUser] = useState(() => initialStaffSession?.user || null);
+    const [staffSessionScope, setStaffSessionScope] = useState(() => initialStaffSession?.scope || null);
     const [customerToken, setCustomerToken] = useState(() => {
         const token = localStorage.getItem("customerToken") || null;
         const settings = getCustomerSettings();
@@ -68,12 +77,24 @@ export default function AuthProvider({ children }) {
         return token ? customerFromToken(token) : null;
     });
 
+    const syncStaffSessionFromStorage = useCallback(() => {
+        const session = getActiveStaffSession();
+
+        setStaffToken(session?.token || null);
+        setUser(session?.user || null);
+        setStaffSessionScope(session?.scope || null);
+    }, []);
+
     useEffect(() => {
         const handleStorage = (event) => {
             if (!event?.key) return;
-            if (event.key === "user") setUser(readStored("user"));
+            if (event.key === "user" || event.key === "token") {
+                if (typeof window !== "undefined" && window.sessionStorage.getItem("token")) {
+                    return;
+                }
+                syncStaffSessionFromStorage();
+            }
             if (event.key === "customer") setCustomer(readStored("customer"));
-            if (event.key === "token" && !event.newValue) setUser(null);
             if (event.key === "customerToken") setCustomerToken(event.newValue || null);
         };
 
@@ -84,6 +105,8 @@ export default function AuthProvider({ children }) {
 
             if (!scope || scope === "staff") {
                 setUser(null);
+                setStaffToken(null);
+                setStaffSessionScope(null);
             }
 
             if (!scope || scope === "customer") {
@@ -94,18 +117,55 @@ export default function AuthProvider({ children }) {
             clearAllCache();
         };
 
+        const handlePageShow = () => {
+            syncStaffSessionFromStorage();
+        };
+
+        const handleFocus = () => {
+            syncStaffSessionFromStorage();
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") {
+                syncStaffSessionFromStorage();
+            }
+        };
+
         window.addEventListener("storage", handleStorage);
         window.addEventListener("auth:logout", handleForcedLogout);
+        window.addEventListener("pageshow", handlePageShow);
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
         return () => {
             window.removeEventListener("storage", handleStorage);
             window.removeEventListener("auth:logout", handleForcedLogout);
+            window.removeEventListener("pageshow", handlePageShow);
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
         };
     }, []);
 
     const login = (data) => {
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
+        clearStaffSession("session");
+        writeStaffSession({
+            token: data.token,
+            user: data.user,
+            scope: "local",
+        });
+        setStaffToken(String(data.token || ""));
         setUser(data.user);
+        setStaffSessionScope("local");
+    };
+
+    const loginSession = (data) => {
+        writeStaffSession({
+            token: data.token,
+            user: data.user,
+            scope: "session",
+        });
+        setStaffToken(String(data.token || ""));
+        setUser(data.user);
+        setStaffSessionScope("session");
     };
 
     const loginCustomer = (profile) => {
@@ -143,11 +203,12 @@ export default function AuthProvider({ children }) {
     };
 
     const logout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        clearStaffSession(staffSessionScope || getActiveStaffScope() || "local");
         setUser(null);
+        setStaffToken(null);
+        setStaffSessionScope(null);
         clearAllCache();
-        navigate("/login", { replace: true });
+        navigate("/login?mode=staff", { replace: true });
     };
 
     const logoutCustomer = () => {
@@ -163,9 +224,11 @@ export default function AuthProvider({ children }) {
         <AuthContext.Provider
             value={{
                 user,
+                staffToken,
                 customer,
                 customerToken,
                 login,
+                loginSession,
                 loginCustomer,
                 updateCustomer,
                 logout,

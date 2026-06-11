@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { CheckCircle2, Clock3, LoaderCircle, RefreshCw, Search } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/apiClient";
 import { useStaffSocket } from "../../context/StaffSocketContext";
 import { showToast } from "../../utils/toast";
+import { resolveEffectiveStaffRole } from "../../utils/staffRole";
 
 const STATUS_COLUMNS = ["PLACED", "PREPARING", "READY", "DELIVERED"];
 
@@ -28,13 +31,13 @@ const normalizeStatus = (status) => {
 const statusPillClass = (status) => {
     switch (status) {
         case "READY":
-            return "bg-emerald-500/20 text-emerald-300";
+            return "bg-emerald-500/20 text-[color:var(--app-text)]";
         case "PREPARING":
-            return "bg-amber-500/20 text-amber-300";
+            return "bg-amber-500/20 text-[color:var(--app-text)]";
         case "DELIVERED":
-            return "bg-slate-500/30 text-slate-300";
+            return "bg-slate-500/30 text-[color:var(--app-text)]";
         default:
-            return "bg-blue-500/20 text-blue-300";
+            return "bg-blue-500/20 text-[color:var(--app-text)]";
     }
 };
 
@@ -46,6 +49,7 @@ const nextActionByStatus = (status) => {
 };
 
 export default function OwnerKitchenLive() {
+    const { user: authUser } = useAuth();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -55,14 +59,7 @@ export default function OwnerKitchenLive() {
     const [updatingOrderId, setUpdatingOrderId] = useState(null);
 
     const { socket, connected } = useStaffSocket();
-
-    const user = useMemo(() => {
-        try {
-            return JSON.parse(localStorage.getItem("user")) || {};
-        } catch {
-            return {};
-        }
-    }, []);
+    const effectiveRole = resolveEffectiveStaffRole(authUser?.role, authUser?.designation);
 
     const loadOrders = async ({ silent = false } = {}) => {
         try {
@@ -203,13 +200,17 @@ export default function OwnerKitchenLive() {
         });
     };
 
+    if (effectiveRole === "CHEF") {
+        return <Navigate to="/kitchen" replace />;
+    }
+
     return (
         <section>
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <p className="text-sm text-gray-400">Kitchen Control</p>
+                    <p className="theme-muted text-sm">Kitchen Control</p>
                     <h3 className="text-3xl font-bold">Kitchen Live</h3>
-                    <p className="mt-1 text-sm text-gray-400">
+                    <p className="theme-muted mt-1 text-sm">
                         Real-time updates via WebSockets.
                     </p>
                 </div>
@@ -235,14 +236,14 @@ export default function OwnerKitchenLive() {
                         key={status}
                         className="min-w-[150px] flex-1 rounded-2xl border border-white/10 bg-[#111827] p-4"
                     >
-                        <p className="text-xs text-gray-400">{status}</p>
+                        <p className="theme-muted text-xs">{status}</p>
                         <p className="mt-1 text-3xl font-bold">{counts[status] || 0}</p>
                     </article>
                 ))}
             </div>
 
             <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/10 bg-[#111827] px-3 py-2">
-                <Search size={16} className="text-gray-400" />
+                <Search size={16} className="theme-muted" />
                 <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
@@ -264,8 +265,8 @@ export default function OwnerKitchenLive() {
                         className="rounded-2xl border border-white/10 bg-[#111827] p-4"
                     >
                         <div className="mb-3 flex items-center justify-between">
-                            <h4 className="text-sm font-semibold text-gray-200">{status}</h4>
-                            <span className="text-xs text-gray-400">{counts[status] || 0}</span>
+                            <h4 className="text-sm font-semibold theme-muted-strong">{status}</h4>
+                            <span className="text-xs theme-muted">{counts[status] || 0}</span>
                         </div>
 
                         <div className="space-y-3">
@@ -283,7 +284,7 @@ export default function OwnerKitchenLive() {
                                                 <p className="text-sm font-semibold">
                                                     {order.orderNo || `Order #${order.id}`}
                                                 </p>
-                                                <p className="text-xs text-gray-400">
+                                                <p className="theme-muted text-xs">
                                                     Table {order.tableNo || "-"}
                                                     {order.customerName ? ` • ${order.customerName}` : ""}
                                                 </p>
@@ -303,19 +304,19 @@ export default function OwnerKitchenLive() {
                                                     key={`${order.id}-${item.id || item.itemName}`}
                                                     className="flex items-center justify-between text-xs"
                                                 >
-                                                    <span className="text-gray-200">
+                                                    <span className="theme-muted-strong">
                                                         {item.qty}x {item.itemName}
                                                     </span>
-                                                    <span className="text-gray-400">
+                                                    <span className="theme-muted">
                                                         {formatCurrency(item.total)}
                                                     </span>
                                                 </div>
                                             ))}
                                         </div>
 
-                                        <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-xs text-gray-300">
+                                        <div className="theme-muted-strong mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-xs">
                                             <span>Total: {formatCurrency(order.total)}</span>
-                                            <span className="inline-flex items-center gap-1 text-gray-400">
+                                            <span className="theme-muted inline-flex items-center gap-1">
                                                 <Clock3 size={13} />
                                                 {prepMins === null ? "--" : `${prepMins} min`}
                                             </span>
@@ -342,7 +343,7 @@ export default function OwnerKitchenLive() {
                         </div>
 
                         {!loading && groupedOrders[status].length === 0 && (
-                            <div className="rounded-xl border border-dashed border-white/10 bg-[#0f172a] p-3 text-xs text-gray-400">
+                            <div className="theme-muted rounded-xl border border-dashed border-white/10 bg-[#0f172a] p-3 text-xs">
                                 No orders in {status.toLowerCase()} queue.
                             </div>
                         )}
@@ -351,13 +352,13 @@ export default function OwnerKitchenLive() {
             </div>
 
             {loading && (
-                <div className="mt-6 rounded-2xl border border-white/10 bg-[#111827] p-5 text-gray-300">
+                <div className="theme-muted mt-6 rounded-2xl border border-white/10 bg-[#111827] p-5">
                     Loading kitchen queue...
                 </div>
             )}
 
             {lastSyncAt && (
-                <p className="mt-4 text-xs text-gray-500">
+                <p className="theme-muted mt-4 text-xs">
                     Last synced at {lastSyncAt.toLocaleTimeString()}.
                 </p>
             )}

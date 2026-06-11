@@ -26,6 +26,7 @@ export default function MenuStudio() {
     const [error, setError] = useState("");
     const [openActionMenuId, setOpenActionMenuId] = useState(null);
     const [openActionMenuPlacement, setOpenActionMenuPlacement] = useState("down");
+    const [openActionMenuMeta, setOpenActionMenuMeta] = useState(null);
 
     const user = useMemo(() => {
         try {
@@ -89,14 +90,19 @@ export default function MenuStudio() {
     useEffect(() => {
         if (!openActionMenuId) return undefined;
 
+        const closeActionMenu = () => {
+            setOpenActionMenuId(null);
+            setOpenActionMenuMeta(null);
+        };
+
         const onPointerDown = (event) => {
             if (!event.target.closest("[data-item-action-menu='true']")) {
-                setOpenActionMenuId(null);
+                closeActionMenu();
             }
         };
 
         const onKeyDown = (event) => {
-            if (event.key === "Escape") setOpenActionMenuId(null);
+            if (event.key === "Escape") closeActionMenu();
         };
 
         window.addEventListener("mousedown", onPointerDown);
@@ -116,20 +122,40 @@ export default function MenuStudio() {
     const toggleActionMenu = (itemId, event) => {
         if (openActionMenuId === itemId) {
             setOpenActionMenuId(null);
+            setOpenActionMenuMeta(null);
             return;
         }
 
         const triggerRect = event?.currentTarget?.getBoundingClientRect?.();
         if (triggerRect) {
             const viewportPadding = 12;
+            const menuWidth = 160;
             const estimatedMenuHeight = 176;
             const gap = 8;
             const spaceBelow = window.innerHeight - triggerRect.bottom - viewportPadding - gap;
             const spaceAbove = triggerRect.top - viewportPadding - gap;
             const shouldOpenUpward = spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow;
+            const availableSpace = Math.max(0, shouldOpenUpward ? spaceAbove : spaceBelow);
+            const maxHeight = Math.min(estimatedMenuHeight, availableSpace || estimatedMenuHeight);
+            const left = Math.min(
+                window.innerWidth - viewportPadding - menuWidth,
+                Math.max(viewportPadding, triggerRect.right - menuWidth)
+            );
             setOpenActionMenuPlacement(shouldOpenUpward ? "up" : "down");
+            setOpenActionMenuMeta({
+                bottom: shouldOpenUpward ? window.innerHeight - triggerRect.top + gap : null,
+                left,
+                maxHeight,
+                top: shouldOpenUpward ? null : triggerRect.bottom + gap,
+            });
         } else {
             setOpenActionMenuPlacement("down");
+            setOpenActionMenuMeta({
+                bottom: null,
+                left: 0,
+                maxHeight: 176,
+                top: 0,
+            });
         }
 
         setOpenActionMenuId(itemId);
@@ -352,7 +378,7 @@ export default function MenuStudio() {
                     {groupedItems.map(([category, categoryItems]) => (
                         <span
                             key={category}
-                            className="rounded-full border border-cyan-400/45 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-100"
+                            className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,var(--app-primary)_20%,transparent)] px-3 py-1 text-xs font-semibold text-[color:var(--app-text)]"
                         >
                             {category} ({categoryItems.length})
                         </span>
@@ -385,7 +411,7 @@ export default function MenuStudio() {
                                                 <button
                                                     type="button"
                                                     onClick={(event) => toggleActionMenu(item.id, event)}
-                                                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-transparent text-white/95 transition hover:text-white"
+                                                    className="theme-table-icon-btn inline-flex h-10 w-10 items-center justify-center rounded-xl shadow-lg backdrop-blur-sm transition"
                                                     aria-label="Open item actions"
                                                 >
                                                     <MoreVertical size={20} strokeWidth={2.4} />
@@ -393,19 +419,24 @@ export default function MenuStudio() {
 
                                                 {openActionMenuId === item.id && (
                                                     <div
-                                                        className={`absolute right-0 z-30 w-40 overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#0b1222] p-1 shadow-[0_16px_40px_rgba(0,0,0,0.55)] touch-pan-y ${
-                                                            openActionMenuPlacement === "up"
-                                                                ? "bottom-full mb-2 max-h-[min(14rem,calc(100vh-2rem))]"
-                                                                : "mt-2 max-h-[min(14rem,calc(100vh-2rem))]"
+                                                        className={`theme-table-popover fixed z-50 w-40 overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl p-1 touch-pan-y ${
+                                                            openActionMenuPlacement === "up" ? "origin-bottom-right" : "origin-top-right"
                                                         }`}
+                                                        style={{
+                                                            bottom: openActionMenuMeta?.bottom != null ? `${openActionMenuMeta.bottom}px` : "auto",
+                                                            left: openActionMenuMeta?.left != null ? `${openActionMenuMeta.left}px` : "auto",
+                                                            maxHeight: openActionMenuMeta?.maxHeight != null ? `${openActionMenuMeta.maxHeight}px` : "176px",
+                                                            top: openActionMenuMeta?.top != null ? `${openActionMenuMeta.top}px` : "auto",
+                                                        }}
                                                     >
                                                         <button
                                                             type="button"
                                                             onClick={() => {
                                                                 startEdit(item);
                                                                 setOpenActionMenuId(null);
+                                                                setOpenActionMenuMeta(null);
                                                             }}
-                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-yellow-300 transition hover:bg-yellow-500/15"
+                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-amber-700 transition hover:bg-amber-500/10"
                                                         >
                                                             Edit
                                                         </button>
@@ -414,9 +445,10 @@ export default function MenuStudio() {
                                                             onClick={() => {
                                                                 setAvailability(item, true);
                                                                 setOpenActionMenuId(null);
+                                                                setOpenActionMenuMeta(null);
                                                             }}
                                                             disabled={item.isAvailable}
-                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-green-300 transition hover:bg-green-500/15 disabled:cursor-not-allowed disabled:opacity-45"
+                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-700 transition hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-45"
                                                         >
                                                             Enable
                                                         </button>
@@ -425,9 +457,10 @@ export default function MenuStudio() {
                                                             onClick={() => {
                                                                 setAvailability(item, false);
                                                                 setOpenActionMenuId(null);
+                                                                setOpenActionMenuMeta(null);
                                                             }}
                                                             disabled={!item.isAvailable}
-                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-gray-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-500/10 disabled:cursor-not-allowed disabled:opacity-45"
                                                         >
                                                             Disable
                                                         </button>
@@ -436,8 +469,9 @@ export default function MenuStudio() {
                                                             onClick={() => {
                                                                 handleDelete(item.id);
                                                                 setOpenActionMenuId(null);
+                                                                setOpenActionMenuMeta(null);
                                                             }}
-                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-red-300 transition hover:bg-red-500/15"
+                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-rose-700 transition hover:bg-rose-500/10"
                                                         >
                                                             Delete
                                                         </button>
@@ -455,10 +489,10 @@ export default function MenuStudio() {
                                                 <div className="shrink-0 text-right">
                                                     <p className="text-lg font-semibold text-orange-300">₹{item.price}</p>
                                                     <span
-                                                        className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                                                        className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${
                                                             item.isAvailable
-                                                                ? "bg-emerald-500/20 text-emerald-200"
-                                                                : "bg-slate-500/30 text-slate-200"
+                                                                ? "border-emerald-500/65 bg-emerald-500/30 text-emerald-900"
+                                                                : "border-slate-500/60 bg-slate-500/25 text-slate-700"
                                                         }`}
                                                     >
                                                         {item.isAvailable ? "Available" : "Disabled"}

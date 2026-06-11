@@ -15,7 +15,7 @@ const buildSocket = (token) => {
 };
 
 export function StaffSocketProvider({ children }) {
-    const { user } = useAuth();
+    const { user, staffToken } = useAuth();
     const socketRef = useRef(null);
     const tokenRef = useRef("");
 
@@ -24,7 +24,7 @@ export function StaffSocketProvider({ children }) {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        const token = localStorage.getItem("token") || "";
+        const token = String(staffToken || "").trim();
 
         if (!user || !token) {
             if (socketRef.current) {
@@ -81,7 +81,7 @@ export function StaffSocketProvider({ children }) {
                 setSocketInstance(null);
             }
         };
-    }, [user?.id]);
+    }, [staffToken, user?.id]);
 
     const value = useMemo(
         () => ({

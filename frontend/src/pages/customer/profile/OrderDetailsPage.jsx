@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ClipboardList } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import { useRestaurantContext } from "../../../context/RestaurantContext";
@@ -23,14 +23,31 @@ const safeDateTime = (value) => {
     return d.toLocaleString();
 };
 
+const DELIVERY_TRACKING_STEPS = [
+    { key: "PLACED", label: "Placed", hint: "Order received" },
+    { key: "PREPARING", label: "Preparing", hint: "Kitchen is working on it" },
+    { key: "READY", label: "Ready", hint: "Out for delivery" },
+    { key: "DELIVERED", label: "Delivered", hint: "Order delivered" },
+];
+
+const PICKUP_TRACKING_STEPS = [
+    { key: "PLACED", label: "Placed", hint: "Order received" },
+    { key: "PREPARING", label: "Preparing", hint: "Kitchen is working on it" },
+    { key: "READY", label: "Ready", hint: "Ready for pickup" },
+    { key: "PICKED_UP", label: "Picked Up", hint: "Collected by customer" },
+];
+
 export default function OrderDetailsPage() {
     const { id } = useParams();
     const orderId = Number(id || 0);
     const location = useLocation();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { customer, customerToken } = useAuth();
-    const { setRestaurantContext } = useRestaurantContext();
+    const { restaurantContext, setRestaurantContext } = useRestaurantContext();
     const { addToCart } = useCart();
+    const isCustomerScope = searchParams.get("scope") === "customer";
+    const buildProfilePath = (path) => (isCustomerScope ? `${path}?scope=customer` : path);
 
     const stateOrder = location?.state?.order || null;
     const stateRestaurant = location?.state?.restaurant || null;
@@ -40,7 +57,7 @@ export default function OrderDetailsPage() {
     const enabled = Boolean((phone || customerToken) && orderId && !stateOrderMatches);
     const params = useMemo(() => (phone ? { phone } : undefined), [phone]);
 
-    const { data, loading, error } = useCachedGet("/customer/orders", {
+    const { data, loading, error, refresh } = useCachedGet("/customer/orders", {
         enabled,
         params,
         ttlMs: 10_000,
@@ -48,13 +65,12 @@ export default function OrderDetailsPage() {
         scope: phone ? `customer:${phone}` : "customer:session",
     });
 
-    const resolved = useMemo(() => {
-        if (stateOrderMatches) {
-            const slug = String(stateRestaurant?.slug || stateOrder?.restaurant?.slug || "").trim();
-            const name = String(stateRestaurant?.name || stateOrder?.restaurant?.name || "").trim();
-            return { order: stateOrder, restaurant: { slug, name } };
-        }
+    useEffect(() => {
+        if (!enabled) return;
+        refresh({ force: true });
+    }, [enabled, refresh]);
 
+    const resolved = useMemo(() => {
         const groups = Array.isArray(data?.groups) ? data.groups : [];
         for (const g of groups) {
             const restaurant = g?.restaurant || null;
@@ -70,6 +86,13 @@ export default function OrderDetailsPage() {
                 };
             }
         }
+
+        if (stateOrderMatches) {
+            const slug = String(stateRestaurant?.slug || stateOrder?.restaurant?.slug || "").trim();
+            const name = String(stateRestaurant?.name || stateOrder?.restaurant?.name || "").trim();
+            return { order: stateOrder, restaurant: { slug, name } };
+        }
+
         return { order: null, restaurant: { slug: "", name: "" } };
     }, [data?.groups, orderId, stateOrder, stateOrderMatches, stateRestaurant?.name, stateRestaurant?.slug]);
 
@@ -79,6 +102,28 @@ export default function OrderDetailsPage() {
 
     const items = useMemo(() => (Array.isArray(order?.items) ? order.items : []), [order?.items]);
     const status = String(order?.status || "PLACED").toUpperCase();
+    const fulfillmentHint = String(location?.state?.fulfillment || searchParams.get("fulfillment") || "").trim().toLowerCase();
+    const orderSource = String(order?.orderSource || stateOrder?.orderSource || "").trim().toUpperCase();
+    const orderFulfillment = String(order?.fulfillment || stateOrder?.fulfillment || "").trim().toUpperCase();
+    const isPickupOrder =
+        fulfillmentHint === "pickup" ||
+        orderFulfillment === "PICKUP" ||
+        ["PICKUP", "POS", "COUNTER", "TAKEAWAY", "TAKE_AWAY"].includes(orderSource) ||
+        (orderSource === "ONLINE" && !order?.deliveryAddress);
+    const isDeliveryOrder =
+        fulfillmentHint === "delivery" ||
+        orderFulfillment === "DELIVERY" ||
+        Boolean(order?.deliveryAddress) ||
+        ["DELIVERY", "HOME_DELIVERY", "DOOR_DELIVERY"].includes(orderSource) ||
+        orderSource === "ONLINE";
+    const orderFlowLabel = isPickupOrder
+        ? "Pickup order"
+        : isDeliveryOrder
+            ? "Delivery order"
+            : order?.tableNo
+                ? `Table ${order.tableNo}`
+                : "Dine-in order";
+    const trackingSteps = isPickupOrder ? PICKUP_TRACKING_STEPS : isDeliveryOrder ? DELIVERY_TRACKING_STEPS : undefined;
 
     const handleReorder = () => {
         if (!order || !restaurantSlug) return;
@@ -88,6 +133,7 @@ export default function OrderDetailsPage() {
             addToCart,
             setRestaurantContext,
             navigate,
+            tableNo: restaurantContext?.tableNo || "",
         });
         if (addedCount > 0) {
             showToast({
@@ -115,13 +161,15 @@ export default function OrderDetailsPage() {
                             <span className="mx-2 opacity-50">•</span>
                             <span className="font-semibold">{formatStatus(status)}</span>
                             <span className="mx-2 opacity-50">•</span>
+                            <span className="font-semibold">{orderFlowLabel}</span>
+                            <span className="mx-2 opacity-50">•</span>
                             <span className="tabular-nums">{safeDateTime(order?.createdAt)}</span>
                         </p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
                         <Link
-                            to="/profile/orders"
+                            to={buildProfilePath("/profile/order-history")}
                             className="theme-soft-button inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold"
                         >
                             <ArrowLeft size={16} />
@@ -142,7 +190,11 @@ export default function OrderDetailsPage() {
                 </div>
 
                 <div className="mt-6 rounded-3xl border border-white/10 bg-black/10 p-6">
-                    <OrderTrackingTimeline status={status} compact />
+                    <OrderTrackingTimeline
+                        status={status}
+                        steps={trackingSteps}
+                        compact
+                    />
                 </div>
 
                 {loading && <p className="theme-muted mt-6 text-sm">Loading order…</p>}
@@ -201,6 +253,20 @@ export default function OrderDetailsPage() {
                             <div className="my-2 h-px bg-white/10" />
                             <Row label="Total" value={formatMoney(order?.total)} strong />
                         </div>
+
+                        {isDeliveryOrder && order?.deliveryAddress ? (
+                            <div className="mt-6 rounded-3xl border border-white/10 bg-black/10 p-5">
+                                <p className="theme-muted text-xs font-semibold uppercase tracking-[0.24em]">Delivery Address</p>
+                                <p className="mt-3 whitespace-pre-line text-sm leading-relaxed">{order.deliveryAddress}</p>
+                            </div>
+                        ) : isPickupOrder ? (
+                            <div className="mt-6 rounded-3xl border border-white/10 bg-black/10 p-5">
+                                <p className="theme-muted text-xs font-semibold uppercase tracking-[0.24em]">Pickup Order</p>
+                                <p className="mt-3 text-sm leading-relaxed">
+                                    Collect this order from the counter when the status reaches Ready.
+                                </p>
+                            </div>
+                        ) : null}
                     </aside>
                 </div>
             )}

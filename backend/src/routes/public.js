@@ -1,7 +1,49 @@
 import bcrypt from "bcryptjs";
+import {
+  buildStaffLoginPayload,
+  issueStaffSession,
+} from "../services/staffSessionService.js";
 
 export default async function publicRoutes(app, deps) {
   const { prisma, normalizeDbPermissions, buildQrTargetUrl } = deps;
+
+  const parsePositiveInt = (value, fallback, max = null) => {
+    const parsed = Number.parseInt(String(value ?? "").trim(), 10);
+    if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+    if (max !== null) return Math.min(parsed, max);
+    return parsed;
+  };
+
+  const normalizeQuery = (value) => String(value || "").trim();
+
+  const restaurantSearchOr = (query) => [
+    { name: { contains: query, mode: "insensitive" } },
+    { legalName: { contains: query, mode: "insensitive" } },
+    { slug: { contains: query, mode: "insensitive" } },
+    { city: { contains: query, mode: "insensitive" } },
+    { state: { contains: query, mode: "insensitive" } },
+    { country: { contains: query, mode: "insensitive" } },
+    { pincode: { contains: query, mode: "insensitive" } },
+    { addressLine1: { contains: query, mode: "insensitive" } },
+    {
+      menuItems: {
+        some: {
+          isAvailable: true,
+          OR: [
+            { name: { contains: query, mode: "insensitive" } },
+            { description: { contains: query, mode: "insensitive" } },
+            { category: { contains: query, mode: "insensitive" } },
+          ],
+        },
+      },
+    },
+  ];
+
+  const itemSearchOr = (query) => [
+    { name: { contains: query, mode: "insensitive" } },
+    { description: { contains: query, mode: "insensitive" } },
+    { category: { contains: query, mode: "insensitive" } },
+  ];
 
   app.get("/", async () => {
     return {
@@ -17,25 +59,66 @@ export default async function publicRoutes(app, deps) {
   // Public restaurant list for customer-side auto selection (geo or manual).
   app.get("/restaurants", async (req, reply) => {
     try {
+      const query = normalizeQuery(req.query?.q || req.query?.query);
+      const hasQuery = query.length >= 2;
+      const limit = parsePositiveInt(req.query?.limit, null, 100);
+      const offset = parsePositiveInt(req.query?.offset, 0, 10_000);
+      const coordsOnly = String(req.query?.coordsOnly || "").trim().toLowerCase();
+      const isCoordsOnly = coordsOnly === "1" || coordsOnly === "true";
+
+      const where = {
+        isActive: true,
+        ...(hasQuery
+          ? {
+              OR: restaurantSearchOr(query),
+            }
+          : {}),
+      };
+
       const rows = await prisma.restaurant.findMany({
-        where: { isActive: true },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          city: true,
-          state: true,
-          country: true,
-          pincode: true,
-          logoUrl: true,
-          latitude: true,
-          longitude: true,
-        },
-        orderBy: { id: "asc" },
+        where,
+        select: isCoordsOnly
+          ? {
+              id: true,
+              name: true,
+              slug: true,
+              city: true,
+              state: true,
+              logoUrl: true,
+              latitude: true,
+              longitude: true,
+            }
+          : {
+              id: true,
+              name: true,
+              slug: true,
+              city: true,
+              state: true,
+              country: true,
+              pincode: true,
+              logoUrl: true,
+              latitude: true,
+              longitude: true,
+            },
+        orderBy: { name: "asc" },
+        ...(limit !== null ? { take: limit, skip: offset } : {}),
       });
 
       // Keep response shape stable (`logo` key) even though DB field is `logoUrl`.
-      return rows.map((r) => ({ ...r, logo: r.logoUrl || "", logoUrl: undefined }));
+      const restaurantRows = rows.map((r) => ({ ...r, logo: r.logoUrl || "", logoUrl: undefined }));
+
+      if (limit === null && !hasQuery) {
+        return restaurantRows;
+      }
+
+      const total = await prisma.restaurant.count({ where });
+      return {
+        restaurants: restaurantRows,
+        total,
+        hasMore: offset + restaurantRows.length < total,
+        nextOffset: offset + restaurantRows.length,
+        query: query || "",
+      };
     } catch (err) {
       req.log.error({ err: err?.message || err }, "restaurants_fetch_failed");
       return reply.code(500).send({
@@ -43,6 +126,118 @@ export default async function publicRoutes(app, deps) {
           process.env.NODE_ENV === "development"
             ? `Failed to load restaurants: ${err?.message || "Unknown error"}`
             : "Failed to load restaurants",
+      });
+    }
+  });
+
+  app.get("/catalog/search", async (req, reply) => {
+    try {
+      const query = normalizeQuery(req.query?.q || req.query?.query);
+      if (query.length < 2) {
+        return {
+          query,
+          restaurants: [],
+          items: [],
+          totalRestaurants: 0,
+          totalItems: 0,
+          hasMoreRestaurants: false,
+        };
+      }
+
+      const restaurantLimit = parsePositiveInt(req.query?.restaurantLimit, 24, 60);
+      const itemLimit = parsePositiveInt(req.query?.itemLimit, 12, 50);
+
+      const restaurantWhere = {
+        isActive: true,
+        OR: restaurantSearchOr(query),
+      };
+
+      const itemWhere = {
+        isAvailable: true,
+        OR: itemSearchOr(query),
+      };
+
+      const [restaurantRows, restaurantTotal, rawItems, itemTotal] = await Promise.all([
+        prisma.restaurant.findMany({
+          where: restaurantWhere,
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            city: true,
+            state: true,
+            country: true,
+            pincode: true,
+            logoUrl: true,
+            latitude: true,
+            longitude: true,
+          },
+          orderBy: { name: "asc" },
+          take: restaurantLimit,
+        }),
+        prisma.restaurant.count({ where: restaurantWhere }),
+        prisma.menuItem.findMany({
+          where: itemWhere,
+          include: {
+            restaurant: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                city: true,
+                state: true,
+                logoUrl: true,
+                isActive: true,
+              },
+            },
+          },
+          orderBy: [{ orderCount: "desc" }, { rating: "desc" }, { name: "asc" }],
+          take: itemLimit * 4,
+        }),
+        prisma.menuItem.count({ where: itemWhere }),
+      ]);
+
+      const restaurants = restaurantRows.map((r) => ({ ...r, logo: r.logoUrl || "", logoUrl: undefined }));
+
+      const items = rawItems
+        .filter((item) => item?.restaurant?.isActive !== false)
+        .slice(0, itemLimit)
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          category: item.category,
+          image: item.image,
+          price: item.price,
+          rating: item.rating,
+          reviewCount: item.reviewCount,
+          orderCount: item.orderCount,
+          isFeatured: item.isFeatured,
+          restaurant: {
+            id: item.restaurant?.id || null,
+            name: item.restaurant?.name || "",
+            slug: item.restaurant?.slug || "",
+            city: item.restaurant?.city || "",
+            state: item.restaurant?.state || "",
+            logo: item.restaurant?.logoUrl || "",
+          },
+        }));
+
+      return {
+        query,
+        restaurants,
+        items,
+        totalRestaurants: restaurantTotal,
+        totalItems: itemTotal,
+        hasMoreRestaurants: restaurantTotal > restaurants.length,
+      };
+    } catch (err) {
+      req.log.error({ err: err?.message || err }, "catalog_search_failed");
+      return reply.code(500).send({
+        message:
+          process.env.NODE_ENV === "development"
+            ? `Search failed: ${err?.message || "Unknown error"}`
+            : "Search failed",
       });
     }
   });
@@ -87,31 +282,9 @@ export default async function publicRoutes(app, deps) {
         });
       }
 
-      const baseRole = String(user.role || "STAFF").toUpperCase();
-      const accessRole = String(user.staffAccess?.role || "").toUpperCase();
-      const effectiveRole = baseRole === "SUPER_ADMIN" ? "SUPER_ADMIN" : baseRole || accessRole || "STAFF";
-
-      const token = app.jwt.sign({
-        id: user.id,
-        role: effectiveRole,
-        restaurantId: user.restaurantId || null,
-        branchId: user.branchId || null,
-      });
-
-      let access = null;
-      if (effectiveRole !== "SUPER_ADMIN") {
-        access = normalizeDbPermissions(user.staffAccess?.permissions, effectiveRole);
-      }
-
-      const userPayload = {
-        ...user,
-        role: effectiveRole,
-        access,
-      };
-      delete userPayload.password;
-      if (userPayload.staffAccess !== undefined) {
-        delete userPayload.staffAccess;
-      }
+      const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
+      const { token, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
+      userPayload.sessionVersion = sessionVersion;
 
       return {
         message: "Login success",
@@ -238,11 +411,17 @@ export default async function publicRoutes(app, deps) {
   app.get("/tables", async (req, reply) => {
     try {
       const restaurantId = Number(req.query?.restaurantId || 0);
-      return await prisma.diningTable.findMany({
+      const tables = await prisma.diningTable.findMany({
         where: restaurantId ? { restaurantId } : {},
         include: { restaurant: { select: { id: true, name: true, slug: true } } },
         orderBy: { id: "desc" },
       });
+      return tables.map((table) => ({
+        ...table,
+        qrCodeUrl: table.restaurant?.slug
+          ? buildQrTargetUrl(table.restaurant.slug, table.tableNo)
+          : table.qrCodeUrl || "",
+      }));
     } catch (err) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to fetch tables" });
@@ -313,7 +492,7 @@ export default async function publicRoutes(app, deps) {
 
       return tables.map((table) => ({
         ...table,
-        qrCodeUrl: table.qrCodeUrl || buildQrTargetUrl(restaurant.slug, table.tableNo),
+        qrCodeUrl: buildQrTargetUrl(restaurant.slug, table.tableNo),
       }));
     } catch (err) {
       console.log(err);
