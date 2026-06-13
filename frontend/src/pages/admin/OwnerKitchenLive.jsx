@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { CheckCircle2, Clock3, LoaderCircle, RefreshCw, Search } from "lucide-react";
+import { Link } from "react-router-dom";
+import { CheckCircle2, ChefHat, Clock3, LoaderCircle, RefreshCw, Search } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/apiClient";
 import { useStaffSocket } from "../../context/StaffSocketContext";
@@ -200,10 +200,6 @@ export default function OwnerKitchenLive() {
         });
     };
 
-    if (effectiveRole === "CHEF") {
-        return <Navigate to="/kitchen" replace />;
-    }
-
     return (
         <section>
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -215,19 +211,29 @@ export default function OwnerKitchenLive() {
                     </p>
                 </div>
 
-                <button
-                    type="button"
-                    onClick={() => loadOrders({ silent: true })}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2 font-semibold text-black disabled:opacity-70"
-                    disabled={refreshing}
-                >
-                    {refreshing ? (
-                        <LoaderCircle size={16} className="animate-spin" />
-                    ) : (
-                        <RefreshCw size={16} />
-                    )}
-                    Refresh now
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                    <Link
+                        to="/kitchen"
+                        className="theme-soft-button inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 font-semibold"
+                    >
+                        <ChefHat size={16} />
+                        Kitchen Pass
+                    </Link>
+
+                    <button
+                        type="button"
+                        onClick={() => loadOrders({ silent: true })}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2 font-semibold text-black disabled:opacity-70"
+                        disabled={refreshing}
+                    >
+                        {refreshing ? (
+                            <LoaderCircle size={16} className="animate-spin" />
+                        ) : (
+                            <RefreshCw size={16} />
+                        )}
+                        Refresh now
+                    </button>
+                </div>
             </div>
 
             <div className="mt-4 flex gap-3 overflow-x-auto pb-1">

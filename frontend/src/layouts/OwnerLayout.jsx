@@ -432,6 +432,11 @@ export default function OwnerLayout() {
         () => normalizeAccess(user?.access, effectiveRole),
         [effectiveRole, user?.access]
     );
+    const canUseKitchenWorkspace =
+        Boolean(access.kitchen) || ["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"].includes(effectiveRole);
+
+    const hasNavAccess = (item) =>
+        item.accessKey === "kitchen" ? canUseKitchenWorkspace : Boolean(access[item.accessKey]);
 
     // logout is provided by AuthContext (clears cache + navigates with replace).
 
@@ -474,7 +479,13 @@ export default function OwnerLayout() {
         },
         {
             label: "Kitchen Live",
-            path: "/owner/kitchen",
+            path: "/kitchen-live",
+            icon: <ChefHat size={18} />,
+            accessKey: "kitchen",
+        },
+        {
+            label: "Kitchen Pass",
+            path: "/kitchen",
             icon: <ChefHat size={18} />,
             accessKey: "kitchen",
         },
@@ -498,7 +509,7 @@ export default function OwnerLayout() {
         },
     ];
 
-    const visibleNavItems = navItems.filter((item) => access[item.accessKey]);
+    const visibleNavItems = navItems.filter((item) => hasNavAccess(item));
 
     const firstAllowedPath = visibleNavItems[0]?.path || "/owner";
 
@@ -512,7 +523,7 @@ export default function OwnerLayout() {
     const canAccessCurrentRoute = (() => {
         const match = findRouteAccess(location.pathname);
         if (!match) return true;
-        return access[match.accessKey];
+        return hasNavAccess(match);
     })();
     const hideTableAssignmentStripOn = [
         "/owner/menu",

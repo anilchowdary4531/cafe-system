@@ -58,7 +58,8 @@ Required:
 ## Deploy Notes
 
 Vercel (Frontend):
-- Set `VITE_API_URL` in Vercel project environment variables for Production/Preview.
+- Set `VITE_API_URL=/api` in Vercel project environment variables for Production/Preview, and keep the `/api` rewrite in `frontend/vercel.json`.
+- If you host the frontend somewhere else, set `VITE_API_URL` to the backend origin instead.
 
 AWS EC2 (Backend):
 - Set `NODE_ENV=production`

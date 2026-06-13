@@ -894,6 +894,13 @@ export default function Kitchen() {
                                 Clear Assignments
                             </button>
 
+                            <Link to="/kitchen-live" className="kitchen-paper-action">
+                                <span className="inline-flex items-center gap-2">
+                                    <ChefHat size={14} />
+                                    Kitchen Live
+                                </span>
+                            </Link>
+
                             <Link to="/owner" className="kitchen-paper-action">
                                 Back Office
                             </Link>

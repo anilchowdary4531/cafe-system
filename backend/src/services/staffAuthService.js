@@ -1,4 +1,5 @@
 import { inferRoleFromDesignation } from "./staffSessionService.js";
+import { isSchemaMissingDbError } from "./dbError.js";
 
 export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestaurantParam, prisma } = {}) => {
   try {
@@ -20,16 +21,33 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
   const userId = Number(req.user?.id || 0) || null;
 
   if (prisma && userId) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        isActive: true,
-        role: true,
-        restaurantId: true,
-        branchId: true,
-        sessionVersion: true,
-      },
-    });
+    let user = null;
+    let sessionVersionSupported = true;
+
+    try {
+      user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          isActive: true,
+          role: true,
+          restaurantId: true,
+          branchId: true,
+          sessionVersion: true,
+        },
+      });
+    } catch (err) {
+      if (!isSchemaMissingDbError(err)) throw err;
+      sessionVersionSupported = false;
+      user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          isActive: true,
+          role: true,
+          restaurantId: true,
+          branchId: true,
+        },
+      });
+    }
 
     if (!user || user.isActive === false) {
       reply.code(401).send({ message: "Session expired. Please log in again." });
@@ -45,11 +63,13 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
           : inferRoleFromDesignation(user?.designation) || role || dbRole || "STAFF";
     const currentRestaurantId = Number(user.restaurantId || 0) || null;
     const currentBranchId = Number(user.branchId || 0) || null;
-    const currentSessionVersion = Number(user.sessionVersion || 0) || 0;
+    if (sessionVersionSupported) {
+      const currentSessionVersion = Number(user.sessionVersion || 0) || 0;
 
-    if (currentSessionVersion !== tokenSessionVersion) {
-      reply.code(401).send({ message: "Session expired. Please log in again." });
-      return null;
+      if (currentSessionVersion !== tokenSessionVersion) {
+        reply.code(401).send({ message: "Session expired. Please log in again." });
+        return null;
+      }
     }
 
     if (allowedRoles?.length && currentRole && !allowedRoles.includes(currentRole)) {

@@ -1,3 +1,5 @@
+import { isSchemaMissingDbError } from "./dbError.js";
+
 const DEFAULT_STAFF_LINK_EXPIRES_IN = process.env.STAFF_LOGIN_LINK_EXPIRES_IN || "30d";
 const STAFF_MAGIC_LINK_PURPOSE = "STAFF_MAGIC_LINK";
 
@@ -48,13 +50,21 @@ export const buildStaffLoginPayload = ({ user, normalizeDbPermissions }) => {
 };
 
 export const issueStaffSession = async ({ prisma, app, user, effectiveRole }) => {
-  const updated = await prisma.user.update({
-    where: { id: user.id },
-    data: { sessionVersion: { increment: 1 } },
-    select: { sessionVersion: true },
-  });
+  let sessionVersion = Number(user?.sessionVersion || 0) || 0;
 
-  const sessionVersion = Number(updated.sessionVersion || 0);
+  try {
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: { sessionVersion: { increment: 1 } },
+      select: { sessionVersion: true },
+    });
+
+    sessionVersion = Number(updated.sessionVersion || sessionVersion) || sessionVersion;
+  } catch (err) {
+    if (!isSchemaMissingDbError(err)) throw err;
+    // Fall back to the current version when the deployed schema has not added session_version yet.
+  }
+
   const token = app.jwt.sign({
     id: user.id,
     role: effectiveRole,

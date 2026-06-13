@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Eye, EyeOff, Phone, UserCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CircleAlert, Eye, EyeOff, KeyRound, Loader2, Mail, Phone, UserCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useRestaurantContext } from "../context/RestaurantContext";
@@ -41,8 +41,22 @@ export default function Login() {
     const [customerDevOtp, setCustomerDevOtp] = useState("");
     const [customerLoading, setCustomerLoading] = useState(false);
     const [customerError, setCustomerError] = useState("");
+    const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+    const [forgotPasswordEmail, setForgotPasswordEmail] = useState(() => String(searchParams.get("email") || "").trim());
+    const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+    const [forgotPasswordError, setForgotPasswordError] = useState("");
+    const [forgotPasswordMessage, setForgotPasswordMessage] = useState("");
+    const [forgotPasswordLink, setForgotPasswordLink] = useState("");
+    const [resetPassword, setResetPassword] = useState("");
+    const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
+    const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+    const [resetPasswordError, setResetPasswordError] = useState("");
+    const [resetPasswordMessage, setResetPasswordMessage] = useState("");
     const autoLoginTokenRef = useRef("");
     const staffLink = String(searchParams.get("staffLink") || "").trim();
+    const resetToken = String(searchParams.get("resetToken") || "").trim();
+    const isPasswordResetMode = Boolean(resetToken);
+    const activeMode = isPasswordResetMode ? "staff" : mode;
 
     const customerMenuPath = useMemo(() => {
         const slug = String(restaurantContext?.slug || "").trim();
@@ -133,6 +147,28 @@ export default function Login() {
     }, [mode]);
 
     useEffect(() => {
+        if (mode === "staff") return;
+        setForgotPasswordOpen(false);
+        setForgotPasswordError("");
+        setForgotPasswordMessage("");
+        setForgotPasswordLink("");
+    }, [mode]);
+
+    useEffect(() => {
+        if (!resetToken || mode === "staff") return;
+        setMode("staff");
+    }, [mode, resetToken]);
+
+    useEffect(() => {
+        if (!resetToken) {
+            setResetPassword("");
+            setResetPasswordConfirm("");
+            setResetPasswordError("");
+            setResetPasswordMessage("");
+        }
+    }, [resetToken]);
+
+    useEffect(() => {
         if (mode !== "staff") return;
         if (!staffLink) return;
         if (autoLoginTokenRef.current === staffLink) return;
@@ -180,6 +216,118 @@ export default function Login() {
             },
             { replace: true }
         );
+    };
+
+    const clearResetToken = () => {
+        setPassword("");
+        setShowPassword(false);
+        setResetPassword("");
+        setResetPasswordConfirm("");
+        setResetPasswordError("");
+        setResetPasswordMessage("");
+        setForgotPasswordOpen(false);
+        setForgotPasswordError("");
+        setForgotPasswordMessage("");
+        setForgotPasswordLink("");
+        setSearchParams(
+            (prev) => {
+                prev.delete("resetToken");
+                prev.set("mode", "staff");
+                return prev;
+            },
+            { replace: true }
+        );
+        setMode("staff");
+    };
+
+    const openForgotPasswordPanel = () => {
+        setForgotPasswordOpen(true);
+        setForgotPasswordError("");
+        setForgotPasswordMessage("");
+        setForgotPasswordLink("");
+        setForgotPasswordEmail(String(email || "").trim());
+    };
+
+    const closeForgotPasswordPanel = () => {
+        setForgotPasswordOpen(false);
+        setForgotPasswordError("");
+        setForgotPasswordMessage("");
+        setForgotPasswordLink("");
+        setForgotPasswordLoading(false);
+    };
+
+    const handleRequestPasswordReset = async () => {
+        const requestEmail = String(forgotPasswordEmail || email || "").trim().toLowerCase();
+        if (!requestEmail) {
+            setForgotPasswordError("Email address is required.");
+            return;
+        }
+
+        try {
+            setForgotPasswordLoading(true);
+            setForgotPasswordError("");
+            setForgotPasswordMessage("");
+            setForgotPasswordLink("");
+
+            const res = await api.post("/auth/staff/password/forgot", { email: requestEmail });
+            setForgotPasswordMessage(res.data?.message || "Password reset email sent.");
+            if (res.data?.devResetLink) {
+                setForgotPasswordLink(String(res.data.devResetLink));
+            }
+        } catch (err) {
+            setForgotPasswordError(
+                err.response?.data?.message ||
+                (err.message === "Network Error"
+                    ? "Backend is unreachable. Check your API URL configuration (VITE_API_URL)."
+                    : err.message || "Failed to send reset link")
+            );
+        } finally {
+            setForgotPasswordLoading(false);
+        }
+    };
+
+    const handleResetPassword = async () => {
+        const newPassword = String(resetPassword || "").trim();
+        const confirmPassword = String(resetPasswordConfirm || "").trim();
+
+        if (!newPassword) {
+            setResetPasswordError("New password is required.");
+            return;
+        }
+        if (newPassword.length < 6) {
+            setResetPasswordError("Password must be at least 6 characters.");
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setResetPasswordError("Passwords do not match.");
+            return;
+        }
+
+        try {
+            setResetPasswordLoading(true);
+            setResetPasswordError("");
+            setResetPasswordMessage("");
+
+            const res = await api.post("/auth/staff/password/reset", {
+                token: resetToken,
+                password: newPassword,
+            });
+
+            setResetPasswordMessage(res.data?.message || "Password updated successfully.");
+            setPassword("");
+            setShowPassword(false);
+            setResetPassword("");
+            setResetPasswordConfirm("");
+        } catch (err) {
+            setResetPasswordError(
+                err.response?.data?.message ||
+                (err.message === "Network Error"
+                    ? "Backend is unreachable. Check your API URL configuration (VITE_API_URL)."
+                    : err.message || "Failed to reset password")
+            );
+        } finally {
+            setResetPasswordLoading(false);
+        }
     };
 
     const handleLogin = async () => {
@@ -310,21 +458,29 @@ export default function Login() {
             <div className="flex items-center justify-center px-6 py-10">
 
                 <div className="theme-panel w-full max-w-md rounded-3xl p-8 backdrop-blur-2xl">
-                    <div className="mb-6 grid grid-cols-2 gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setModeAndUrl("customer")}
-                            className={`rounded-2xl px-4 py-2 text-sm font-semibold ${mode === "customer" ? "theme-button" : "theme-soft-button"}`}
-                        >
-                            Customer
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setModeAndUrl("staff")}
-                            className={`rounded-2xl px-4 py-2 text-sm font-semibold ${mode === "staff" ? "theme-button" : "theme-soft-button"}`}
-                        >
-                            Staff
-                        </button>
+                    <div className="mb-6">
+                        {isPasswordResetMode ? (
+                            <div className="theme-soft-button rounded-2xl px-4 py-2 text-center text-sm font-semibold">
+                                Staff password reset
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setModeAndUrl("customer")}
+                                    className={`rounded-2xl px-4 py-2 text-sm font-semibold ${activeMode === "customer" ? "theme-button" : "theme-soft-button"}`}
+                                >
+                                    Customer
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setModeAndUrl("staff")}
+                                    className={`rounded-2xl px-4 py-2 text-sm font-semibold ${activeMode === "staff" ? "theme-button" : "theme-soft-button"}`}
+                                >
+                                    Staff
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* MOBILE LOGO */}
@@ -333,58 +489,241 @@ export default function Login() {
                         <h1 className="text-3xl font-bold">Tiffzy</h1>
                     </div>
 
-                    {mode === "staff" ? (
+                    {activeMode === "staff" ? (
                         <>
-                            <h2 className="text-3xl font-bold mb-2">Welcome Back</h2>
-                            <p className="theme-muted mb-8">Login to manage your restaurant</p>
+                            {isPasswordResetMode ? (
+                                <>
+                                    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-orange-200/70 bg-orange-50/80 px-3 py-1 text-xs font-semibold text-orange-700">
+                                        <KeyRound size={14} />
+                                        Staff password reset
+                                    </div>
+                                    <h2 className="text-3xl font-bold mb-2">Set a new password</h2>
+                                    <p className="theme-muted mb-8">Choose a new password for {email || "your staff account"}.</p>
 
-                            {error && (
-                                <div className="mb-5 bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl text-sm">
-                                    {error}
-                                </div>
-                            )}
+                                    {resetPasswordMessage && (
+                                        <div className="mb-5 flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-800">
+                                            <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+                                            <span>{resetPasswordMessage}</span>
+                                        </div>
+                                    )}
 
-                            <div className="space-y-5">
-                                <div>
-                                    <label className="theme-muted mb-2 block text-sm">Email Address</label>
-                                    <input
-                                        type="email"
-                                        placeholder="admin@cafe.com"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
-                                    />
-                                </div>
+                                    {resetPasswordError && (
+                                        <div className="mb-5 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-sm text-red-300">
+                                            <CircleAlert size={18} className="mt-0.5 shrink-0" />
+                                            <span>{resetPasswordError}</span>
+                                        </div>
+                                    )}
 
-                                <div>
-                                    <label className="theme-muted mb-2 block text-sm">Password</label>
-                                    <div className="relative">
-                                        <input
-                                            type={showPassword ? "text" : "password"}
-                                            placeholder="Enter password"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            className="theme-input w-full rounded-xl px-4 py-3 pr-12 outline-none transition"
-                                        />
+                                    <div className="space-y-5">
+                                        <div>
+                                            <label className="theme-muted mb-2 block text-sm">Email Address</label>
+                                            <div className="relative">
+                                                <Mail size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                <input
+                                                    type="email"
+                                                    value={email}
+                                                    readOnly
+                                                    className="theme-input w-full cursor-not-allowed rounded-xl px-11 py-3 outline-none transition opacity-90"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="theme-muted mb-2 block text-sm">New Password</label>
+                                            <div className="relative">
+                                                <input
+                                                    type={showPassword ? "text" : "password"}
+                                                    placeholder="Enter new password"
+                                                    value={resetPassword}
+                                                    onChange={(e) => setResetPassword(e.target.value)}
+                                                    className="theme-input w-full rounded-xl px-4 py-3 pr-12 outline-none transition"
+                                                />
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowPassword(!showPassword)}
+                                                    className="theme-muted absolute right-4 top-3.5 hover:opacity-80"
+                                                >
+                                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="theme-muted mb-2 block text-sm">Confirm Password</label>
+                                            <input
+                                                type={showPassword ? "text" : "password"}
+                                                placeholder="Re-enter new password"
+                                                value={resetPasswordConfirm}
+                                                onChange={(e) => setResetPasswordConfirm(e.target.value)}
+                                                className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
+                                            />
+                                        </div>
+
+                                        <div className="flex flex-col gap-3 sm:flex-row">
+                                            <button
+                                                onClick={handleResetPassword}
+                                                disabled={resetPasswordLoading}
+                                                className="theme-button flex-1 rounded-xl py-3 font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70"
+                                            >
+                                                {resetPasswordLoading ? (
+                                                    <span className="inline-flex items-center justify-center gap-2">
+                                                        <Loader2 size={18} className="animate-spin" />
+                                                        Updating...
+                                                    </span>
+                                                ) : (
+                                                    "Update Password"
+                                                )}
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={clearResetToken}
+                                                className="theme-soft-button inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-semibold"
+                                            >
+                                                <ArrowLeft size={16} />
+                                                Back to Login
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <h2 className="text-3xl font-bold mb-2">Welcome Back</h2>
+                                    <p className="theme-muted mb-8">Login to manage your restaurant</p>
+
+                                    {error && (
+                                        <div className="mb-5 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-sm text-red-300">
+                                            <CircleAlert size={18} className="mt-0.5 shrink-0" />
+                                            <span>{error}</span>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-5">
+                                        <div>
+                                            <label className="theme-muted mb-2 block text-sm">Email Address</label>
+                                            <input
+                                                type="email"
+                                                placeholder="admin@cafe.com"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <div className="mb-2 flex items-center justify-between gap-3">
+                                                <label className="theme-muted block text-sm">Password</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={openForgotPasswordPanel}
+                                                    className="theme-muted text-xs font-semibold underline decoration-dotted underline-offset-4 hover:opacity-80"
+                                                >
+                                                    Forgot password?
+                                                </button>
+                                            </div>
+                                            <div className="relative">
+                                                <input
+                                                    type={showPassword ? "text" : "password"}
+                                                    placeholder="Enter password"
+                                                    value={password}
+                                                    onChange={(e) => setPassword(e.target.value)}
+                                                    className="theme-input w-full rounded-xl px-4 py-3 pr-12 outline-none transition"
+                                                />
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowPassword(!showPassword)}
+                                                    className="theme-muted absolute right-4 top-3.5 hover:opacity-80"
+                                                >
+                                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {forgotPasswordOpen && (
+                                            <div className="rounded-2xl border border-orange-200/80 bg-orange-50/70 p-4">
+                                                <div className="flex items-start gap-2 text-sm text-orange-950">
+                                                    <Mail size={16} className="mt-0.5 shrink-0 text-orange-500" />
+                                                    <div>
+                                                        <p className="font-semibold">Reset your staff password</p>
+                                                        <p className="mt-1 text-sm text-orange-950/75">
+                                                            We will email a reset link to the address on file.
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {forgotPasswordError && (
+                                                    <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-sm text-red-700">
+                                                        <CircleAlert size={18} className="mt-0.5 shrink-0" />
+                                                        <span>{forgotPasswordError}</span>
+                                                    </div>
+                                                )}
+
+                                                {forgotPasswordMessage && (
+                                                    <div className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-800">
+                                                        <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+                                                        <span>{forgotPasswordMessage}</span>
+                                                    </div>
+                                                )}
+
+                                                {forgotPasswordLink && import.meta.env.DEV && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => window.location.assign(forgotPasswordLink)}
+                                                        className="mt-4 theme-soft-button inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold"
+                                                    >
+                                                        Open reset link
+                                                    </button>
+                                                )}
+
+                                                <div className="mt-4">
+                                                    <label className="theme-muted mb-2 block text-sm">Email Address</label>
+                                                    <input
+                                                        type="email"
+                                                        placeholder="admin@cafe.com"
+                                                        value={forgotPasswordEmail}
+                                                        onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                                                        className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
+                                                    />
+                                                </div>
+
+                                                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                                                    <button
+                                                        onClick={handleRequestPasswordReset}
+                                                        disabled={forgotPasswordLoading}
+                                                        className="theme-button flex-1 rounded-xl py-3 font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70"
+                                                    >
+                                                        {forgotPasswordLoading ? (
+                                                            <span className="inline-flex items-center justify-center gap-2">
+                                                                <Loader2 size={18} className="animate-spin" />
+                                                                Sending link...
+                                                            </span>
+                                                        ) : (
+                                                            "Send reset link"
+                                                        )}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={closeForgotPasswordPanel}
+                                                        className="theme-soft-button rounded-xl px-4 py-3 font-semibold"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         <button
-                                            type="button"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            className="theme-muted absolute right-4 top-3.5 hover:opacity-80"
+                                            onClick={handleLogin}
+                                            disabled={loading}
+                                            className="theme-button w-full rounded-xl py-3 font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70"
                                         >
-                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                            {loading ? "Logging in..." : "Login"}
                                         </button>
                                     </div>
-                                </div>
-
-                                <button
-                                    onClick={handleLogin}
-                                    disabled={loading}
-                                    className="theme-button w-full rounded-xl py-3 font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70"
-                                >
-                                    {loading ? "Logging in..." : "Login"}
-                                </button>
-                            </div>
+                                </>
+                            )}
                         </>
                     ) : (
                         <>

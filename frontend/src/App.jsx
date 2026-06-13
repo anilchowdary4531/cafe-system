@@ -220,6 +220,14 @@ export default function App() {
                         }
                     />
                     <Route
+                        path="/kitchen-live"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF", "CASHIER"]}>
+                                <OwnerKitchenLive />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/kitchen/chef/:chefId"
                         element={
                             <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"]}>
@@ -325,7 +333,7 @@ export default function App() {
                         <Route path="online-orders" element={<OwnerOrders sourceFilter="ONLINE" />} />
                         <Route path="menu" element={<MenuStudio />} />
                         <Route path="tables" element={<OwnerTables />} />
-                        <Route path="kitchen" element={<OwnerKitchenLive />} />
+                        <Route path="kitchen" element={<Navigate to="/kitchen-live" replace />} />
                         <Route path="analytics" element={<OwnerAnalytics />} />
                         <Route path="finance" element={<OwnerFinance />} />
                         <Route path="staff" element={<OwnerStaff />} />
