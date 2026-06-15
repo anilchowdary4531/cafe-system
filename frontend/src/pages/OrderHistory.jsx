@@ -9,15 +9,19 @@ import { showToast } from "../utils/toast";
 import BrandLogo from "../components/BrandLogo";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 import {
+    Cell,
     Area,
     AreaChart,
     Bar,
     BarChart,
     CartesianGrid,
+    Line,
+    LabelList,
     ResponsiveContainer,
     Tooltip,
     XAxis,
     YAxis,
+    ReferenceLine,
 } from "recharts";
 
 const ACTIVE_STATUSES = new Set(["PLACED", "ACCEPTED", "PREPARING", "READY"]);
@@ -115,7 +119,7 @@ export default function OrderHistory({ embedded = false } = {}) {
 
     const groups = useMemo(() => (Array.isArray(data?.groups) ? data.groups : []), [data?.groups]);
     const [selectedSlug, setSelectedSlug] = useState(() => String(restaurantContext?.slug || ""));
-    const [dateFilter, setDateFilter] = useState(() => getTodayKey());
+    const [dateFilter, setDateFilter] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [tableFilter, setTableFilter] = useState("");
 
@@ -204,8 +208,12 @@ export default function OrderHistory({ embedded = false } = {}) {
 
     const spendTrendData = useMemo(() => {
         const days = 14;
-        const today = new Date();
-        const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (days - 1));
+        const datedOrders = filteredOrders
+            .map((order) => new Date(order?.createdAt))
+            .filter((date) => !Number.isNaN(date.getTime()))
+            .sort((a, b) => a.getTime() - b.getTime());
+        const anchorDate = datedOrders.length ? datedOrders[datedOrders.length - 1] : new Date();
+        const start = new Date(anchorDate.getFullYear(), anchorDate.getMonth(), anchorDate.getDate() - (days - 1));
         const buckets = new Map();
 
         for (let i = 0; i < days; i += 1) {
@@ -239,6 +247,13 @@ export default function OrderHistory({ embedded = false } = {}) {
             .sort((a, b) => b.spend - a.spend)
             .slice(0, 6);
     }, [filteredVisibleGroups]);
+
+    const restaurantBreakdownAverage = useMemo(() => {
+        if (!restaurantBreakdown.length) return 0;
+        return restaurantBreakdown.reduce((sum, row) => sum + Number(row?.spend || 0), 0) / restaurantBreakdown.length;
+    }, [restaurantBreakdown]);
+
+    const topRestaurantBreakdown = restaurantBreakdown[0] || null;
 
     const selectedGroup = useMemo(() => {
         if (!selectedSlug) return null;
@@ -500,33 +515,54 @@ export default function OrderHistory({ embedded = false } = {}) {
                                 </div>
                             )}
 
-                            {!embedded && <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                                <div className="theme-card rounded-2xl p-5">
+                            <div className={embedded ? "mt-5" : "mt-6 grid gap-4 lg:grid-cols-2"}>
+                                    <div className="theme-card rounded-2xl p-5">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
-                                            <p className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">Orders Over Time</p>
-                                            <p className="mt-2 text-lg font-semibold">Last 14 days</p>
+                                            <p className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">Order insights</p>
+                                            <p className="mt-2 text-lg font-semibold">Orders vs spend</p>
                                         </div>
-                                        <div className="theme-muted text-sm">
-                                            Total: <span className="font-semibold">{String(derivedStats.totalOrders)}</span>
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <span className="theme-soft-button rounded-xl px-3 py-1.5 font-semibold">{derivedStats.totalOrders} orders</span>
+                                            <span className="theme-soft-button rounded-xl px-3 py-1.5 font-semibold">{formatMoney(derivedStats.totalSpend)}</span>
                                         </div>
                                     </div>
 
                                     {spendTrendData.length === 0 ? (
                                         <div className="theme-empty mt-4 rounded-2xl p-6">No data yet.</div>
                                     ) : (
-                                        <div className="mt-4 h-56">
+                                        <div className="mt-4 overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,rgba(255,250,238,0.06),rgba(255,248,232,0.035)),repeating-linear-gradient(0deg,rgba(255,255,255,0.03)_0px,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_44px),repeating-linear-gradient(90deg,rgba(255,255,255,0.02)_0px,rgba(255,255,255,0.02)_1px,transparent_1px,transparent_64px)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                                            <div className="mb-4 flex flex-wrap items-center gap-2">
+                                                <span className="rounded-full border border-[#dfc07b]/30 bg-[#dfc07b]/10 px-3 py-1 text-[11px] font-semibold text-[#f3d78d]">
+                                                    Avg {formatMoney(derivedStats.averageOrderValue)}
+                                                </span>
+                                                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/80">
+                                                    Peak {formatMoney(Math.max(...spendTrendData.map((item) => Number(item.spend || 0)), 0))}
+                                                </span>
+                                            </div>
+                                        <div className="h-56">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <AreaChart data={spendTrendData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
                                                     <defs>
-                                                        <linearGradient id="ordersGradient" x1="0" y1="0" x2="0" y2="1">
-                                                            <stop offset="5%" stopColor="var(--app-primary)" stopOpacity={0.45} />
-                                                            <stop offset="95%" stopColor="var(--app-primary)" stopOpacity={0.05} />
+                                                        <linearGradient id="historySpendGradient" x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="0%" stopColor="#dfc07b" stopOpacity={0.42} />
+                                                            <stop offset="50%" stopColor="#dfc07b" stopOpacity={0.16} />
+                                                            <stop offset="100%" stopColor="#dfc07b" stopOpacity={0.02} />
                                                         </linearGradient>
                                                     </defs>
-                                                    <CartesianGrid stroke="var(--app-border)" opacity={0.35} vertical={false} />
+                                                    <CartesianGrid stroke="rgba(255,248,232,0.08)" vertical={false} strokeDasharray="2 8" />
                                                     <XAxis dataKey="day" tick={{ fill: "var(--app-muted)", fontSize: 12 }} axisLine={false} tickLine={false} />
                                                     <YAxis
+                                                        yAxisId="left"
+                                                        tick={{ fill: "var(--app-muted)", fontSize: 12 }}
+                                                        axisLine={false}
+                                                        tickLine={false}
+                                                        width={40}
+                                                        tickFormatter={(v) => String(Math.round(Number(v || 0)))}
+                                                    />
+                                                    <YAxis
+                                                        yAxisId="right"
+                                                        orientation="right"
                                                         tick={{ fill: "var(--app-muted)", fontSize: 12 }}
                                                         axisLine={false}
                                                         tickLine={false}
@@ -541,63 +577,180 @@ export default function OrderHistory({ embedded = false } = {}) {
                                                             boxShadow: "var(--app-shadow)",
                                                         }}
                                                         labelStyle={{ color: "var(--app-text)", fontWeight: 700 }}
-                                                        formatter={(value, name, props) => {
-                                                            if (name === "orders") return [String(value), "Orders"];
-                                                            return [String(value), String(name)];
+                                                        formatter={(value, name) => {
+                                                            if (name === "Orders") return [String(value), "Orders"];
+                                                            return [formatMoney(value), "Spend"];
                                                         }}
                                                     />
                                                     <Area
+                                                        yAxisId="right"
+                                                        type="monotone"
+                                                        dataKey="spend"
+                                                        stroke="#dfc07b"
+                                                        strokeWidth={3}
+                                                        fill="url(#historySpendGradient)"
+                                                        fillOpacity={1}
+                                                        name="Spend"
+                                                        activeDot={{ r: 6, fill: "#dfc07b", stroke: "#1b1b20", strokeWidth: 2 }}
+                                                    />
+                                                    <Line
+                                                        yAxisId="left"
                                                         type="monotone"
                                                         dataKey="orders"
-                                                        stroke="var(--app-primary)"
+                                                        name="Orders"
+                                                        stroke="rgba(255,255,255,0.88)"
                                                         strokeWidth={2}
-                                                        fill="url(#ordersGradient)"
-                                                        fillOpacity={1}
-                                                        name="orders"
+                                                        dot={{ r: 3, fill: "#ffffff", stroke: "#1b1b20", strokeWidth: 1.5 }}
+                                                        activeDot={{ r: 5, fill: "#ffffff", stroke: "#1b1b20", strokeWidth: 2 }}
                                                     />
                                                 </AreaChart>
                                             </ResponsiveContainer>
                                         </div>
+                                        </div>
                                     )}
                                 </div>
-                            </div>}
+                            </div>
 
                             {!embedded && restaurantBreakdown.length > 0 && (
-                                <div className="mt-4 theme-card rounded-2xl p-5">
-                                    <p className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">Restaurant-wise Spend</p>
-                                    <p className="mt-2 text-lg font-semibold">Spend by restaurant</p>
-                                    <div className="mt-4 h-44">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={restaurantBreakdown} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                                                <CartesianGrid stroke="var(--app-border)" opacity={0.25} vertical={false} />
-                                                <XAxis
-                                                    dataKey="name"
-                                                    tick={{ fill: "var(--app-muted)", fontSize: 11 }}
-                                                    axisLine={false}
-                                                    tickLine={false}
-                                                    interval={0}
-                                                    height={56}
-                                                />
-                                                <YAxis
-                                                    tick={{ fill: "var(--app-muted)", fontSize: 12 }}
-                                                    axisLine={false}
-                                                    tickLine={false}
-                                                    width={40}
-                                                    tickFormatter={(v) => Math.round(Number(v || 0))}
-                                                />
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        background: "var(--app-surface)",
-                                                        border: "1px solid var(--app-border)",
-                                                        borderRadius: 16,
-                                                        boxShadow: "var(--app-shadow)",
-                                                    }}
-                                                    labelStyle={{ color: "var(--app-text)", fontWeight: 700 }}
-                                                    formatter={(value) => [formatMoney(value), "Spend"]}
-                                                />
-                                                <Bar dataKey="spend" fill="var(--app-primary)" radius={[14, 14, 6, 6]} />
-                                            </BarChart>
-                                        </ResponsiveContainer>
+                                <div className="mt-4 overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(245,185,78,0.16),transparent_34%),linear-gradient(180deg,rgba(255,248,232,0.05),rgba(255,248,232,0.02))] p-5 shadow-[0_16px_50px_rgba(0,0,0,0.18)]">
+                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                        <div>
+                                            <p className="theme-muted text-xs font-semibold uppercase tracking-[0.28em]">Restaurant-wise Spend</p>
+                                            <p className="mt-2 text-lg font-semibold sm:text-xl">Spend by restaurant</p>
+                                            <p className="theme-muted mt-1 max-w-2xl text-sm">
+                                                A ranked view of where your spend is concentrated across restaurants.
+                                            </p>
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2">
+                                            <span className="rounded-full border border-[#dfc07b]/25 bg-[#dfc07b]/10 px-3 py-1.5 text-[11px] font-semibold text-[#f7df9d]">
+                                                {restaurantBreakdown.length} restaurants
+                                            </span>
+                                            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-white/80">
+                                                Avg {formatMoney(restaurantBreakdownAverage)}
+                                            </span>
+                                            {topRestaurantBreakdown ? (
+                                                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-white/80">
+                                                    Top {topRestaurantBreakdown.name}: {formatMoney(topRestaurantBreakdown.spend)}
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(260px,0.8fr)]">
+                                        <div className="overflow-hidden rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,248,232,0.03)),repeating-linear-gradient(0deg,rgba(255,255,255,0.035)_0px,rgba(255,255,255,0.035)_1px,transparent_1px,transparent_42px),repeating-linear-gradient(90deg,rgba(255,255,255,0.02)_0px,rgba(255,255,255,0.02)_1px,transparent_1px,transparent_56px)] p-3 sm:p-4">
+                                            <div className="h-64">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart
+                                                        data={restaurantBreakdown}
+                                                        layout="vertical"
+                                                        margin={{ top: 8, right: 32, left: 8, bottom: 0 }}
+                                                        barCategoryGap={18}
+                                                    >
+                                                        <defs>
+                                                            <linearGradient id="restaurantSpendGradient" x1="0" y1="0" x2="1" y2="0">
+                                                                <stop offset="0%" stopColor="#f8d98a" stopOpacity={1} />
+                                                                <stop offset="55%" stopColor="#f5b94e" stopOpacity={1} />
+                                                                <stop offset="100%" stopColor="#ef9f2e" stopOpacity={1} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid stroke="rgba(255,248,232,0.08)" vertical={false} strokeDasharray="2 8" />
+                                                        <XAxis
+                                                            type="number"
+                                                            tick={{ fill: "var(--app-muted)", fontSize: 12 }}
+                                                            axisLine={false}
+                                                            tickLine={false}
+                                                            tickFormatter={(v) => formatMoney(v)}
+                                                            tickMargin={10}
+                                                        />
+                                                        <YAxis
+                                                            type="category"
+                                                            dataKey="name"
+                                                            tick={{ fill: "var(--app-muted-strong)", fontSize: 12, fontWeight: 600 }}
+                                                            axisLine={false}
+                                                            tickLine={false}
+                                                            width={128}
+                                                            tickMargin={10}
+                                                        />
+                                                        <ReferenceLine
+                                                            x={restaurantBreakdownAverage}
+                                                            stroke="rgba(245,185,78,0.35)"
+                                                            strokeDasharray="6 6"
+                                                            ifOverflow="extendDomain"
+                                                        />
+                                                        <Tooltip
+                                                            cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                                                            contentStyle={{
+                                                                background: "rgba(13, 14, 20, 0.96)",
+                                                                border: "1px solid rgba(255,255,255,0.12)",
+                                                                borderRadius: 18,
+                                                                boxShadow: "0 22px 50px rgba(0,0,0,0.35)",
+                                                                color: "var(--app-text)",
+                                                            }}
+                                                            labelStyle={{ color: "var(--app-text)", fontWeight: 700 }}
+                                                            formatter={(value, name, props) => {
+                                                                if (name === "spend") {
+                                                                    return [formatMoney(value), "Spend"];
+                                                                }
+                                                                return [String(props?.payload?.orders || 0), "Orders"];
+                                                            }}
+                                                        />
+                                                    <Bar dataKey="spend" radius={[0, 7, 7, 0]} maxBarSize={14}>
+                                                            {restaurantBreakdown.map((entry, index) => (
+                                                                <Cell
+                                                                    key={entry.slug}
+                                                                    fill={index === 0 ? "url(#restaurantSpendGradient)" : "rgba(245, 185, 78, 0.82)"}
+                                                                />
+                                                            ))}
+                                                            <LabelList
+                                                                dataKey="spend"
+                                                                position="right"
+                                                                offset={10}
+                                                                formatter={(value) => formatMoney(value)}
+                                                                fill="var(--app-muted-strong)"
+                                                                style={{ fontSize: 12, fontWeight: 700 }}
+                                                            />
+                                                        </Bar>
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col gap-3">
+                                            {restaurantBreakdown.map((row, index) => {
+                                                const topShare = restaurantBreakdownAverage ? Math.min(100, Math.round((Number(row.spend || 0) / restaurantBreakdownAverage) * 50)) : 0;
+                                                return (
+                                                    <div
+                                                        key={row.slug}
+                                                        className="rounded-[22px] border border-white/10 bg-black/10 p-4"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[11px] font-bold text-white/85">
+                                                                        {index + 1}
+                                                                    </span>
+                                                                    <p className="truncate text-sm font-semibold">{row.name}</p>
+                                                                </div>
+                                                                <p className="theme-muted mt-1 text-xs">
+                                                                    {row.orders} order{row.orders === 1 ? "" : "s"}
+                                                                </p>
+                                                            </div>
+                                                            <p className="shrink-0 text-sm font-semibold tabular-nums text-[#f7df9d]">
+                                                                {formatMoney(row.spend)}
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/8">
+                                                            <div
+                                                                className="h-full rounded-full bg-[linear-gradient(90deg,#f8d98a,#f5b94e,#ef9f2e)]"
+                                                                style={{ width: `${Math.max(12, topShare)}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -641,6 +794,7 @@ function HistoryStat({ icon, label, value }) {
 }
 
 function RestaurantOrders({ group, highlightOrderId, onReorder, embedded = false, profilePath }) {
+    const { restaurantContext } = useRestaurantContext();
     const restaurant = group?.restaurant || null;
     const orders = Array.isArray(group?.orders) ? group.orders : [];
     const visibleSpend = useMemo(() => orders.reduce((sum, o) => sum + Number(o?.total || 0), 0), [orders]);

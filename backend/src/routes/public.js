@@ -452,15 +452,15 @@ export default async function publicRoutes(app, deps) {
         });
       }
 
-        return {
-          restaurant: {
-            id: restaurant.id,
-            name: restaurant.name,
-            slug: restaurant.slug,
-            upiId: restaurant.upiId || null,
-            taxEnabled: restaurant.taxEnabled,
-            taxType: restaurant.taxType,
-            defaultTaxPercent: restaurant.defaultTaxPercent,
+      return {
+        restaurant: {
+          id: restaurant.id,
+          name: restaurant.name,
+          slug: restaurant.slug,
+          upiId: restaurant.upiId || null,
+          taxEnabled: restaurant.taxEnabled,
+          taxType: restaurant.taxType,
+          defaultTaxPercent: restaurant.defaultTaxPercent,
           serviceChargeEnabled: restaurant.serviceChargeEnabled,
           serviceChargePercent: restaurant.serviceChargePercent,
           gstEnabled: restaurant.taxEnabled,

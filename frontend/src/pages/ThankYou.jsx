@@ -61,7 +61,7 @@ export default function ThankYou() {
         if (!slug || !isPaymentSuccess) return;
         const id = window.setTimeout(() => {
             navigate(buildRestaurantMenuPath(slug, restaurantContext?.tableNo), { replace: true });
-        }, 5000);
+        }, 60_000);
         return () => window.clearTimeout(id);
     }, [isPaymentSuccess, navigate, restaurantContext?.tableNo, slug]);
 
@@ -84,9 +84,9 @@ export default function ThankYou() {
                     </div>
 
                     <h1 className="mt-6 text-4xl font-bold">{headline}</h1>
-                    <p className="theme-muted mt-3 text-base">
+                        <p className="theme-muted mt-3 text-base">
                         {isPaymentSuccess
-                            ? `Thanks for ordering. ${slug ? "Returning to the menu in 5s." : "You can continue ordering anytime."}`
+                            ? `Thanks for ordering. ${slug ? "Returning to the menu in 60s." : "You can continue ordering anytime."}`
                             : "Payment was not completed. You can retry from the restaurant page."}
                     </p>
 

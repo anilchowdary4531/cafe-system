@@ -30,7 +30,7 @@ export default function PaymentSuccess() {
             total={data.amount}
             orderStatus={data.orderStatus}
             redirectTo="/admin/new-order"
-            redirectAfterMs={5000}
+            redirectAfterMs={60_000}
             showTracking
         />
     );

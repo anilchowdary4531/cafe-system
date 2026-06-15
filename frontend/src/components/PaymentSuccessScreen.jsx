@@ -14,7 +14,7 @@ export default function PaymentSuccessScreen({
     total = 0,
     orderStatus = "PLACED",
     redirectTo = "/",
-    redirectAfterMs = 5000,
+    redirectAfterMs = 60_000,
     showTracking = true,
 }) {
     const navigate = useNavigate();
@@ -51,7 +51,7 @@ export default function PaymentSuccessScreen({
                     </div>
 
                     <h1 className="mt-6 text-4xl font-bold">Payment Successful</h1>
-                    <p className="theme-muted mt-3 text-base">Thanks for ordering. Redirecting in 5s.</p>
+                    <p className="theme-muted mt-3 text-base">Thanks for ordering. Redirecting in 60s.</p>
 
                     <div className="mt-8 grid gap-3 text-left sm:grid-cols-3">
                         <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
@@ -78,7 +78,7 @@ export default function PaymentSuccessScreen({
                                 <div className="theme-panel inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/10 px-3 py-2 text-sm font-semibold">
                                     <Clock3 size={16} className="theme-muted" />
                                     <span className="theme-muted">Auto redirect</span>
-                                    <span className="tabular-nums">5s</span>
+                                    <span className="tabular-nums">60s</span>
                                 </div>
                             </div>
 
@@ -92,4 +92,3 @@ export default function PaymentSuccessScreen({
         </div>
     );
 }
-
