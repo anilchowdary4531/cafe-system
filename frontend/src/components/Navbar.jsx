@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { ChefHat, ShoppingCart, UserCircle2, UtensilsCrossed, LayoutGrid } from "lucide-react";
+import { ChevronLeft, ChefHat, ShoppingCart, UserCircle2, UtensilsCrossed, LayoutGrid } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import ThemeSelector from "./ThemeSelector";
 import RestaurantSelector from "./RestaurantSelector";
@@ -157,11 +157,12 @@ export default function Navbar() {
                         )}
 
                         <Link
-                            to={isStaff ? staffProfilePath : customerMenuPath}
-                            className="theme-soft-button inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm"
+                            to={isStaff ? staffProfilePath : customerMenuPath || "/"}
+                            className="theme-soft-button inline-flex h-10 w-10 items-center justify-center rounded-lg text-sm"
+                            aria-label={isProfilePage && !isStaff ? "Return" : "Profile"}
+                            title={isProfilePage && !isStaff ? "Return" : "Profile"}
                         >
-                            <UserCircle2 size={18} />
-                            Profile
+                            {isProfilePage && !isStaff ? <ChevronLeft size={18} /> : <UserCircle2 size={18} />}
                         </Link>
 
                         {isStaff && (
