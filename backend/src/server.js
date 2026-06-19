@@ -89,15 +89,160 @@ const buildQrTargetUrl = (slug, tableNo) => {
   return `${FRONTEND_URL}${pathPart}`;
 };
 
-const allowedCorsOrigins = new Set(CORS_ORIGINS);
+const setStaffAccess = (restaurantId, staffId, access) => {
+  staffAccessStore[restaurantId] = staffAccessStore[restaurantId] || {};
+  staffAccessStore[restaurantId][staffId] = access;
+};
+
+const getStaffPhone = (restaurantId, staffId, fallback = "") => {
+  const byRestaurant = staffPhoneStore[restaurantId] || {};
+  return byRestaurant[staffId] || fallback || "";
+};
+
+const setStaffPhone = (restaurantId, staffId, phone) => {
+  staffPhoneStore[restaurantId] = staffPhoneStore[restaurantId] || {};
+  staffPhoneStore[restaurantId][staffId] = phone || "";
+};
+
+const deleteStaffAccess = (restaurantId, staffId) => {
+  if (!staffAccessStore[restaurantId]) return;
+  delete staffAccessStore[restaurantId][staffId];
+};
+
+const deleteStaffPhone = (restaurantId, staffId) => {
+  if (!staffPhoneStore[restaurantId]) return;
+  delete staffPhoneStore[restaurantId][staffId];
+};
+
+const isDbUnavailable = (err) => {
+  const msg = String(err?.message || "");
+  return (
+    err?.name === "PrismaClientInitializationError" ||
+    msg.includes("Can't reach database server") ||
+    msg.includes("ECONNREFUSED") ||
+    msg.includes("P1001") ||
+    msg.includes("P2021") ||
+    msg.includes("P2022")
+  );
+};
+
+const isOrderArchitectureUnavailable = (err) => {
+  const msg = String(err?.message || "");
+  return (
+    msg.includes("Cannot read properties of undefined") ||
+    msg.includes("Unknown argument `customerId`") ||
+    msg.includes("Unknown argument `statusEvents`") ||
+    msg.includes("Unknown field `customer`") ||
+    msg.includes("Unknown field `statusEvents`") ||
+    msg.includes("Unknown field `customerId`") ||
+    msg.includes("Unknown field `restaurantId_phone`") ||
+    msg.includes("Could not find mapping for model Customer") ||
+    msg.includes("Could not find mapping for model OrderStatusEvent") ||
+    msg.includes("Customer") && msg.includes("does not exist") ||
+    msg.includes("OrderStatusEvent") && msg.includes("does not exist") ||
+    msg.includes("column") && msg.includes("customerId") ||
+    msg.includes("P2021") ||
+    msg.includes("P2022")
+  );
+};
+
+const getFrontendBaseUrl = () =>
+  process.env.FRONTEND_URL || "http://localhost:5173";
+
+const buildQrTargetUrl = (slug, tableNo) =>
+  `${getFrontendBaseUrl()}/r/${slug}?table=${encodeURIComponent(tableNo)}`;
+
+const ensureDefaultUsersInDatabase = async () => {
+  try {
+    const restaurants = await prisma.restaurant.findMany({
+      select: { id: true, slug: true },
+    });
+    const restaurantIdBySlug = new Map(restaurants.map((restaurant) => [restaurant.slug, restaurant.id]));
+
+    for (const fallbackUser of fallbackUsers) {
+      const normalizedEmail = String(fallbackUser.email || "").trim().toLowerCase();
+      const restaurantSlug = fallbackUser.restaurant?.slug || null;
+      const restaurantId = restaurantSlug ? restaurantIdBySlug.get(restaurantSlug) || null : null;
+
+      if (fallbackUser.role !== "SUPER_ADMIN" && restaurantSlug && !restaurantId) {
+        continue;
+      }
+
+      const user = await prisma.user.upsert({
+        where: { email: normalizedEmail },
+        update: {
+          name: fallbackUser.name,
+          phone: fallbackUser.phone || null,
+          role: fallbackUser.role,
+          isActive: fallbackUser.isActive !== false,
+          restaurantId,
+        },
+        create: {
+          name: fallbackUser.name,
+          email: normalizedEmail,
+          phone: fallbackUser.phone || null,
+          password: bcrypt.hashSync(String(fallbackUser.password), 10),
+          role: fallbackUser.role,
+          isActive: fallbackUser.isActive !== false,
+          restaurantId,
+        },
+      });
+
+      if (fallbackUser.role !== "SUPER_ADMIN" && restaurantId) {
+        await prisma.staffAccess.upsert({
+          where: { userId: user.id },
+          update: {
+            restaurantId,
+            permissions: defaultAccessByRole(fallbackUser.role),
+          },
+          create: {
+            restaurantId,
+            userId: user.id,
+            permissions: defaultAccessByRole(fallbackUser.role),
+          },
+        });
+      }
+    }
+  } catch (err) {
+    if (isDbUnavailable(err)) {
+      app.log.warn("Skipping default user sync because the database is unavailable");
+      return;
+    }
+    throw err;
+  }
+};
+
+// ======================
+// CORS
+// ======================
+const allowedCorsOrigins = new Set(
+  [
+    ...CORS_ORIGINS,
+    "http://localhost:5175",
+    "http://localhost:5174",
+    "http://localhost:5173",
+    "https://suretra.com",
+    "https://www.suretra.com",
+    "https://cafe-system-nu.vercel.app",
+  ]
+    .filter(Boolean)
+    .map((origin) => String(origin).trim().replace(/\/+$/, ""))
+);
+
+const isAllowedDevOrigin = (origin) => {
+  if (process.env.NODE_ENV === "production") return false;
+  try {
+    const url = new URL(origin);
+    return ["http:", "https:"].includes(url.protocol) && ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  } catch {
+    return false;
+  }
+};
 
 await app.register(cors, {
   origin: (origin, cb) => {
-    if (!origin) {
-      cb(null, true);
-      return;
-    }
-    if (allowedCorsOrigins.has(String(origin).trim().replace(/\/+$/, ""))) {
+    const normalizedOrigin = origin ? String(origin).trim().replace(/\/+$/, "") : "";
+    if (!normalizedOrigin || allowedCorsOrigins.has(normalizedOrigin) || isAllowedDevOrigin(normalizedOrigin)) {
       cb(null, true);
       return;
     }
