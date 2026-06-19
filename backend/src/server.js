@@ -84,11 +84,6 @@ const normalizeDbPermissions = (permissions, role) => {
 
 const serializeAccess = (access, role) => JSON.stringify(normalizeAccess(access, role));
 
-const buildQrTargetUrl = (slug, tableNo) => {
-  const pathPart = `/m/${encodeURIComponent(slug)}/${encodeURIComponent(tableNo)}`;
-  return `${FRONTEND_URL}${pathPart}`;
-};
-
 const setStaffAccess = (restaurantId, staffId, access) => {
   staffAccessStore[restaurantId] = staffAccessStore[restaurantId] || {};
   staffAccessStore[restaurantId][staffId] = access;
@@ -221,6 +216,9 @@ const allowedCorsOrigins = new Set(
     "http://localhost:5175",
     "http://localhost:5174",
     "http://localhost:5173",
+    "https://tiffzy.com",
+    "https://www.tiffzy.com",
+    "https://api.tiffzy.com",
     "https://suretra.com",
     "https://www.suretra.com",
     "https://cafe-system-nu.vercel.app",
