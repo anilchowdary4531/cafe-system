@@ -18,7 +18,7 @@ const safeKey = (key) => {
 const localUploadOrigin = () => {
   const configured = String(process.env.LOCAL_UPLOAD_BASE_URL || process.env.BACKEND_PUBLIC_URL || "").trim().replace(/\/+$/, "");
   if (configured) return configured;
-  return `http://localhost:${process.env.PORT || 4000}`;
+  return `http://localhost:${process.env.PORT || 3000}`;
 };
 
 const publicUrlForLocalKey = (key) => `${localUploadOrigin()}/uploads/${String(key || "").replace(/^\/+/, "")}`;

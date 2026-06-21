@@ -163,6 +163,12 @@ const compareMenuItems = (a, b) => {
     return normalizeText(a?.name).localeCompare(normalizeText(b?.name));
 };
 
+const formatPrice = (value) => {
+    const amount = Number(value || 0);
+    if (!Number.isFinite(amount)) return "₹0";
+    return `₹${amount.toLocaleString("en-IN")}`;
+};
+
 export default function RestaurantMenu() {
     const { slug, table: tableFromPathParam } = useParams();
     const navigate = useNavigate();
@@ -192,6 +198,7 @@ export default function RestaurantMenu() {
     const restaurant = data?.restaurant || null;
     const menu = Array.isArray(data?.menu) ? data.menu : EMPTY_MENU;
     const restaurantName = String(restaurant?.name || restaurantContext?.name || slug || "Restaurant").trim();
+    const restaurantLocation = [restaurant?.city, restaurant?.state].filter(Boolean).join(", ");
 
     const [search, setSearch] = useState(() => searchFromUrl);
     const [activeSection, setActiveSection] = useState("all");
@@ -447,25 +454,30 @@ export default function RestaurantMenu() {
     return (
         <div className="theme-page min-h-screen">
             <div className="theme-nav sticky top-0 z-30 border-b px-2 py-2 sm:px-4 md:px-6">
-                <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
-                    <div className="flex min-w-0 items-center gap-3 justify-self-start">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1.5 shadow-[0_4px_14px_rgba(104,70,37,0.12)]">
-                            <BrandLogo className="h-full w-full" title="Tiffzy logo" />
-                        </div>
+                    <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+                        <div className="flex min-w-0 items-center gap-3 justify-self-start">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1.5 shadow-[0_4px_14px_rgba(104,70,37,0.12)]">
+                                <BrandLogo className="h-full w-full" title="Tiffzy logo" />
+                            </div>
 
-                        <div className="min-w-0">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]">
-                                Tiffzy
+	                        <div className="min-w-0">
+	                            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]">
+	                                Tiffzy
+	                            </p>
+	                        </div>
+	                    </div>
+
+                        <div className="min-w-0 justify-self-center text-center">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]/80">
+                                Restaurant
                             </p>
-                            <p className="truncate text-sm font-bold leading-tight sm:text-base">Menu Board</p>
+                            <p className="truncate text-base font-black tracking-tight text-[color:var(--app-accent)] sm:text-lg md:text-xl">
+                                {restaurantName}
+                            </p>
+                            {restaurantLocation ? (
+                                <p className="truncate text-xs text-[color:var(--app-muted)] sm:text-sm">{restaurantLocation}</p>
+                            ) : null}
                         </div>
-                    </div>
-
-                    <div className="min-w-0 justify-self-center text-center">
-                        <p className="truncate text-sm font-extrabold tracking-wide text-[color:var(--app-accent)] sm:text-base md:text-lg">
-                            {restaurantName}
-                        </p>
-                    </div>
 
                     <div className="flex shrink-0 flex-wrap items-center gap-2 justify-self-end">
                         <VegModeToggle
@@ -548,7 +560,7 @@ export default function RestaurantMenu() {
                     ))}
 
                     {!hasResults && (
-                        <div className="theme-card rounded-3xl p-6 text-center">
+                        <div className="py-12 text-center">
                             <h3 className="text-lg font-bold">
                                 {vegModeEnabled ? "No veg items found" : "No items found"}
                             </h3>
@@ -609,12 +621,8 @@ function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, o
     const Icon = section?.Icon || Tags;
 
     return (
-        <section
-            ref={sectionRef}
-            data-section-key={section.key}
-            className="scroll-mt-32"
-        >
-            <div className="mb-3 flex items-center justify-between gap-3 px-0.5">
+        <section ref={sectionRef} data-section-key={section.key} className="scroll-mt-32">
+            <div className="mb-2 flex items-end justify-between gap-3 px-0.5">
                 <div className="flex items-center gap-2">
                     <span className="theme-pill inline-flex h-8 w-8 items-center justify-center rounded-2xl">
                         <Icon size={16} className="theme-accent-text" />
@@ -629,7 +637,7 @@ function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, o
                 <span className="theme-muted text-xs tabular-nums">{items.length} items</span>
             </div>
 
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(185px,220px))] justify-start gap-3 sm:gap-4">
+            <div className="divide-y divide-white/6">
                 {items.map((item) => (
                     <MenuItemCard
                         key={String(item?.id || `${section.key}-${item?.name || "item"}`)}
@@ -648,13 +656,14 @@ function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, o
 function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
     const imageSrc = resolveImageUrl(item?.image) || FALLBACK_IMAGE;
     const dietBadge = getDietBadge(item);
+    const itemPrice = Number(item?.price || 0);
 
     return (
-        <article className="theme-card group w-full max-w-[220px] overflow-hidden rounded-[20px] transition hover:-translate-y-0.5 hover:shadow-2xl">
-            <div className="relative">
+        <article className="group flex gap-3 py-4 sm:gap-4">
+            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-white/8 bg-black/10 sm:h-28 sm:w-28">
                 <img
                     src={imageSrc}
-                    className="h-24 w-full object-cover sm:h-28"
+                    className="h-full w-full object-cover"
                     alt={String(item?.name || "Menu item")}
                     loading="lazy"
                 />
@@ -670,7 +679,7 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
                 <button
                     type="button"
                     onClick={() => onToggleFavorite && onToggleFavorite(item)}
-                    className={`absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-xl border transition ${
+                    className={`absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full border transition ${
                         isFavorite
                             ? "border-red-500/40 bg-red-500/10 text-red-300"
                             : "border-white/10 bg-black/10 text-white/90"
@@ -681,53 +690,53 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
                 </button>
             </div>
 
-            <div className="flex min-w-0 flex-col gap-2 p-2 sm:p-2.5">
-                <div className="flex flex-wrap items-center gap-1">
-                    {dietBadge ? (
-                        <span
-                            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[9px] font-semibold ${dietBadge.className}`}
-                        >
-                            <dietBadge.Icon size={10} />
-                            {dietBadge.label}
-                        </span>
-                    ) : null}
-                </div>
+            <div className="min-w-0 flex-1 pb-4">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-[15px] font-bold leading-tight sm:text-base">{item?.name}</h3>
+                            {dietBadge ? (
+                                <span
+                                    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[9px] font-semibold ${dietBadge.className}`}
+                                >
+                                    <dietBadge.Icon size={10} />
+                                    {dietBadge.label}
+                                </span>
+                            ) : null}
+                        </div>
 
-                <div className="min-w-0 space-y-0.5">
-                    <h3 className="truncate text-[13px] font-bold leading-tight sm:text-sm">{item?.name}</h3>
-                    <p
-                        className="theme-muted text-[10px] leading-snug"
-                        style={{
-                            display: "-webkit-box",
-                            WebkitBoxOrient: "vertical",
-                            WebkitLineClamp: 2,
-                            overflow: "hidden",
-                        }}
-                    >
-                        {item?.description || "Freshly prepared, premium quality ingredients."}
-                    </p>
-                </div>
-
-                <div className="flex items-end justify-between gap-2">
-                    <div className="space-y-0.5">
-                        {Number(item?.orderCount || 0) > 0 ? (
-                            <p className="theme-muted text-[10px]">{Number(item?.orderCount || 0).toLocaleString("en-IN")} orders</p>
-                        ) : null}
-
-                        {Number(item?.reviewCount || 0) > 0 ? (
-                            <p className="theme-muted text-[9px] font-semibold uppercase tracking-[0.14em]">
-                                {Number(item?.reviewCount || 0)} ratings
-                            </p>
-                        ) : null}
+                        <p className="mt-1 text-sm font-semibold text-[color:var(--app-accent)]">{formatPrice(itemPrice)}</p>
                     </div>
 
                     <button
                         onClick={() => onAdd && onAdd(item)}
-                        className="theme-button inline-flex items-center justify-center gap-1 rounded-lg px-2.5 py-[5px] text-[11px] font-semibold sm:px-3 sm:py-1.5 sm:text-xs"
+                        className="theme-button inline-flex shrink-0 items-center justify-center gap-1 rounded-full px-3 py-2 text-xs font-semibold sm:px-4"
                     >
                         <Plus size={12} />
                         Add
                     </button>
+                </div>
+
+                <p
+                    className="theme-muted mt-2 text-sm leading-6"
+                    style={{
+                        display: "-webkit-box",
+                        WebkitBoxOrient: "vertical",
+                        WebkitLineClamp: 2,
+                        overflow: "hidden",
+                    }}
+                >
+                    {item?.description || "Freshly prepared, premium quality ingredients."}
+                </p>
+
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-[color:var(--app-muted)]">
+                    {Number(item?.orderCount || 0) > 0 ? (
+                        <span>{Number(item?.orderCount || 0).toLocaleString("en-IN")} orders</span>
+                    ) : null}
+
+                    {Number(item?.reviewCount || 0) > 0 ? (
+                        <span className="uppercase tracking-[0.14em]">{Number(item?.reviewCount || 0)} ratings</span>
+                    ) : null}
                 </div>
             </div>
         </article>

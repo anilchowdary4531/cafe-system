@@ -59,7 +59,7 @@ export const getRuntimeConfig = () => {
 
   const portRaw = String(process.env.PORT || "").trim();
 
-  const port = portRaw ? Number(portRaw) : 4000;
+  const port = portRaw ? Number(portRaw) : 3000;
 
   if (!Number.isFinite(port) || port <= 0) {
     throw new Error("[env] Invalid PORT. Provide a valid port number.");

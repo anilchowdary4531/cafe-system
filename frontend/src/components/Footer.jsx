@@ -1,4 +1,5 @@
-﻿import BrandLogo from "./BrandLogo";
+﻿import { Link } from "react-router-dom";
+import BrandLogo from "./BrandLogo";
 
 export default function Footer() {
     return (
@@ -49,7 +50,11 @@ export default function Footer() {
 
                         <ul className="theme-muted space-y-3">
                             <li className="cursor-pointer hover:opacity-80">Help Center</li>
-                            <li className="cursor-pointer hover:opacity-80">Terms</li>
+                            <li>
+                                <Link to="/terms" className="hover:opacity-80">
+                                    Terms
+                                </Link>
+                            </li>
                             <li className="cursor-pointer hover:opacity-80">Privacy</li>
                             <li className="cursor-pointer hover:opacity-80">Contact Us</li>
                         </ul>
