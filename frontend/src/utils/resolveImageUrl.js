@@ -38,7 +38,7 @@ export function resolveImageUrl(raw) {
     if (isAbsoluteHttpUrl(value)) {
         try {
             const parsed = new URL(value);
-            // Heal stale local URLs (e.g. http://localhost:4000/uploads/...) using current API base.
+            // Heal stale local URLs (e.g. http://localhost:3000/uploads/...) using current API base.
             if (isLocalHostname(parsed.hostname) && parsed.pathname.startsWith("/uploads/")) {
                 return joinUrl(uploadBase || API, `${parsed.pathname}${parsed.search || ""}${parsed.hash || ""}`);
             }

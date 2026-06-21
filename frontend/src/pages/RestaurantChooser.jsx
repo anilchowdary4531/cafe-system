@@ -1,9 +1,9 @@
-import { useDeferredValue, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Navigation, Search, UserCircle2 } from "lucide-react";
+import { ChevronRight, Navigation, Search, UserCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
-import { cachedGet } from "../utils/apiClient";
+import { api, cachedGet } from "../utils/apiClient";
 import useCachedGet from "../hooks/useCachedGet";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
 import BrandLogo from "../components/BrandLogo";
@@ -51,12 +51,11 @@ const normalizeRestaurantList = (data) => {
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
 const INITIAL_RESTAURANT_LIMIT = 24;
 const SEARCH_RESTAURANT_LIMIT = 24;
+const FEED_ITEM_LIMIT = 24;
 const SEARCH_ITEM_LIMIT = 12;
 const MIN_SEARCH_LENGTH = 2;
 
 const normalizeSearch = (value) => String(value || "").trim();
-
-const formatLocation = (restaurant) => [restaurant?.city, restaurant?.state].filter(Boolean).join(", ");
 
 const getCurrentPosition = () =>
     new Promise((resolve, reject) => {
@@ -77,16 +76,14 @@ export default function RestaurantChooser() {
     const { restaurantContext, setRestaurantContext } = useRestaurantContext();
     const [search, setSearch] = useState("");
     const deferredSearch = useDeferredValue(normalizeSearch(search));
-    const [selectedSlugState, setSelectedSlugState] = useState(String(restaurantContext?.slug || ""));
     const [locationHint, setLocationHint] = useState("");
     const [detecting, setDetecting] = useState(false);
+    const [backendState, setBackendState] = useState("checking");
     const vegModeEnabled = Boolean(restaurantContext?.vegOnly);
     const profilePath = customer ? "/profile/overview?scope=customer" : "/login?mode=customer";
     const profileLabel = customer ? "Profile" : "Login";
 
-    const selectedSlug = String(restaurantContext?.slug || selectedSlugState || "");
-
-    const { data: browseData, loading: browseLoading, error: browseError } = useCachedGet("/restaurants", {
+    const { data: restaurantData, loading: restaurantLoading, error: restaurantError, refresh: refreshRestaurants } = useCachedGet("/restaurants", {
         params: {
             limit: INITIAL_RESTAURANT_LIMIT,
             offset: 0,
@@ -95,43 +92,61 @@ export default function RestaurantChooser() {
         staleMs: 30 * 60_000,
     });
 
-    const browseRestaurants = normalizeRestaurantList(browseData) || [];
-    const browseTotal = Number(browseData?.total || browseRestaurants.length);
+    const browseRestaurants = normalizeRestaurantList(restaurantData) || [];
+
+    const probeBackend = useCallback(async () => {
+        setBackendState("checking");
+        try {
+            await api.get("/healthz", { timeout: 2500 });
+            setBackendState("up");
+            return true;
+        } catch {
+            setBackendState("down");
+            return false;
+        }
+    }, []);
+
+    useEffect(() => {
+        probeBackend();
+    }, [probeBackend]);
 
     const searchEnabled = deferredSearch.length >= MIN_SEARCH_LENGTH;
-    const { data: searchData, loading: searchLoading, error: searchError } = useCachedGet("/catalog/search", {
+    const { data: catalogData, loading: catalogLoading, error: catalogError, refresh: refreshCatalog } = useCachedGet("/catalog/search", {
         params: {
-            q: deferredSearch,
+            q: searchEnabled ? deferredSearch : "",
             restaurantLimit: SEARCH_RESTAURANT_LIMIT,
-            itemLimit: SEARCH_ITEM_LIMIT,
+            itemLimit: searchEnabled ? SEARCH_ITEM_LIMIT : FEED_ITEM_LIMIT,
         },
         ttlMs: 2 * 60_000,
         staleMs: 10 * 60_000,
-        enabled: searchEnabled,
     });
 
-    const visibleRestaurants = searchEnabled ? normalizeRestaurantList(searchData) || [] : browseRestaurants;
-    const visibleItems = searchEnabled
-        ? (Array.isArray(searchData?.items) ? searchData.items.filter((item) => !vegModeEnabled || isVegModeItem(item)) : [])
+    const visibleItems = Array.isArray(catalogData?.items)
+        ? catalogData.items.filter((item) => !vegModeEnabled || isVegModeItem(item))
         : [];
-    const restaurantTotal = searchEnabled ? Number(searchData?.totalRestaurants || 0) : browseTotal;
-    const itemTotal = searchEnabled ? visibleItems.length : 0;
-    const activeSearchError = searchEnabled ? searchError : "";
+    const itemTotal = Number(catalogData?.totalItems || visibleItems.length);
+    const itemSections = useMemo(() => {
+        const groups = new Map();
 
-    const openRestaurant = (restaurant) => {
-        if (!restaurant?.slug) return;
+        for (const item of visibleItems) {
+            const rawCategory = String(item?.category || "").trim();
+            const label = rawCategory || "Other";
+            const key = label.toLowerCase();
 
-        setRestaurantContext({
-            id: restaurant.id || null,
-            name: restaurant.name || null,
-            slug: restaurant.slug || null,
-            logo: restaurant.logo || restaurant.logoUrl || null,
-            tableNo: null,
-        });
-        setSelectedSlugState(String(restaurant.slug || ""));
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    key,
+                    label,
+                    items: [],
+                });
+            }
 
-        navigate(`/r/${restaurant.slug}/menu`, { replace: true });
-    };
+            groups.get(key).items.push(item);
+        }
+
+        return [...groups.values()];
+    }, [visibleItems]);
+    const activeSearchError = catalogError || "";
 
     const openItemRestaurant = (item) => {
         const slug = String(item?.restaurant?.slug || "").trim();
@@ -144,7 +159,6 @@ export default function RestaurantChooser() {
             logo: item?.restaurant?.logo || null,
             tableNo: null,
         });
-        setSelectedSlugState(slug);
 
         const itemName = String(item?.name || "").trim();
         const path = itemName ? `/r/${slug}/menu?search=${encodeURIComponent(itemName)}` : `/r/${slug}/menu`;
@@ -180,7 +194,6 @@ export default function RestaurantChooser() {
                 return;
             }
 
-            setSelectedSlugState(nearest.restaurant.slug);
             const roundedKm = Math.max(0, Math.round(nearest.distanceKm * 10) / 10);
             setLocationHint(`Selected ${nearest.restaurant.name} (${roundedKm} km away) based on your current location.`);
         } catch {
@@ -191,9 +204,15 @@ export default function RestaurantChooser() {
         }
     };
 
-    const isSearching = searchEnabled;
     const handleVegModeToggle = (enabled) => {
         setRestaurantContext({ vegOnly: Boolean(enabled) });
+    };
+
+    const handleRetryConnection = async () => {
+        const ok = await probeBackend();
+        if (ok) {
+            await Promise.all([refreshCatalog({ force: true }), refreshRestaurants({ force: true })]);
+        }
     };
 
     return (
@@ -208,11 +227,10 @@ export default function RestaurantChooser() {
                             <div className="theme-card flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:h-14 sm:w-14">
                                 <BrandLogo className="h-8 w-8 sm:h-9 sm:w-9" title="Brand logo" />
                             </div>
-                            <div className="min-w-0 space-y-2">
+                            <div className="min-w-0">
                                 <span className="inline-flex bg-gradient-to-r from-[#ff8a1f] via-[#d97706] to-[#8a4b11] bg-clip-text text-[12px] font-black uppercase tracking-[0.5em] text-transparent drop-shadow-[0_1px_0_rgba(255,255,255,0.45)] sm:text-[13px]">
                                     Tiffzy
                                 </span>
-                                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">Choose your restaurant</h1>
                             </div>
                         </div>
 
@@ -236,7 +254,7 @@ export default function RestaurantChooser() {
 
                                 <button
                                     onClick={() => detectNearest({ userTriggered: true })}
-                                    disabled={detecting || browseLoading || browseRestaurants.length === 0}
+                                    disabled={detecting || restaurantLoading || browseRestaurants.length === 0}
                                     style={{ border: "none", boxShadow: "none" }}
                                     className="theme-soft-button inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-3 py-2 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-70 sm:px-4 sm:py-3 sm:text-sm"
                                 >
@@ -250,7 +268,7 @@ export default function RestaurantChooser() {
                                 <input
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Search restaurants or dishes..."
+                                    placeholder="Search dishes..."
                                     className="theme-input w-full rounded-full border border-[var(--app-border)] bg-white/70 py-2.5 pl-11 pr-4 text-sm shadow-[0_10px_24px_rgba(104,70,37,0.08)] outline-none placeholder:text-[color:var(--app-muted)] sm:py-3"
                                 />
                             </div>
@@ -258,176 +276,78 @@ export default function RestaurantChooser() {
                     </header>
 
                     <div className="mt-5 space-y-4 sm:mt-6 sm:space-y-5">
-                        {browseError ? (
-                            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                                {browseError}
-                            </div>
-                        ) : null}
-
                         {locationHint ? (
                             <div className="rounded-2xl border border-[var(--app-border)] bg-black/5 px-4 py-3 text-sm">
                                 {locationHint}
                             </div>
                         ) : null}
 
-                        {isSearching && searchLoading ? (
-                            <p className="theme-muted text-sm">Searching restaurants and dishes...</p>
-                        ) : null}
-
-                        {activeSearchError ? (
-                            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                                {activeSearchError}
-                            </div>
-                        ) : null}
-
-                        {isSearching && visibleRestaurants.length === 0 && visibleItems.length === 0 && !searchLoading ? (
-                            <div className="rounded-[28px] border border-[var(--app-border)] bg-white/55 p-6 text-center">
-                                <h2 className="text-lg font-bold">No matches found</h2>
-                                <p className="theme-muted mt-2 text-sm">
-                                    Try a different restaurant name, dish name, or category.
-                                </p>
-                            </div>
-                        ) : null}
-
-                        {!isSearching ? (
-                            <div className="space-y-4">
-                                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
-                                    <div>
-                                        <p className="theme-muted text-xs font-semibold uppercase tracking-[0.28em]">
-                                            Restaurants
-                                        </p>
-                                        <h2 className="mt-1 text-lg font-bold sm:text-xl">Tap a restaurant to open its menu</h2>
-                                    </div>
-                                    <p className="theme-muted text-sm sm:text-right">
-                                        {browseTotal ? `${browseTotal.toLocaleString("en-IN")} total` : ""}
-                                    </p>
-                                </div>
-
-                                {browseLoading ? <p className="theme-muted text-sm">Loading restaurants...</p> : null}
-
-                                <div className="grid justify-start gap-4 sm:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(240px,280px))]">
-                                    {browseRestaurants.map((restaurant) => {
-                                        const isSelected = String(restaurant.slug) === String(selectedSlug);
-                                        return (
-                                            <RestaurantCard
-                                                key={restaurant.id}
-                                                restaurant={restaurant}
-                                                isSelected={isSelected}
-                                                onClick={() => openRestaurant(restaurant)}
-                                            />
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                        {backendState === "checking" ? (
+                            <InitialBrowseLoadingCard />
+                        ) : backendState === "down" ? (
+                            <BackendOfflineCard
+                                message={restaurantError || catalogError || "Network Error"}
+                                onRetry={handleRetryConnection}
+                            />
                         ) : (
-                            <div className="space-y-6">
-                                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
-                                    <div>
-                                        <p className="theme-muted text-xs font-semibold uppercase tracking-[0.28em]">
-                                            Restaurants
+                            <>
+                                {catalogLoading ? (
+                                    <p className="theme-muted text-sm">
+                                        {searchEnabled ? "Searching dishes..." : "Loading popular dishes..."}
+                                    </p>
+                                ) : null}
+
+                                {activeSearchError ? (
+                                    <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                                        {activeSearchError}
+                                    </div>
+                                ) : null}
+
+                                {visibleItems.length === 0 && !catalogLoading ? (
+                                    <div className="py-8 text-center">
+                                        <h2 className="text-lg font-bold">No matches found</h2>
+                                        <p className="theme-muted mt-2 text-sm">
+                                            Try a different dish name or clear the search to browse popular items.
                                         </p>
-                                        <h2 className="mt-1 text-lg font-bold sm:text-xl">
-                                            {restaurantTotal.toLocaleString("en-IN")} restaurants found
-                                        </h2>
                                     </div>
-                                </div>
+                                ) : null}
 
-                                <div className="grid justify-start gap-4 sm:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(240px,280px))]">
-                                    {visibleRestaurants.map((restaurant) => {
-                                        const isSelected = String(restaurant.slug) === String(selectedSlug);
-                                        return (
-                                            <RestaurantCard
-                                                key={restaurant.id}
-                                                restaurant={restaurant}
-                                                isSelected={isSelected}
-                                                onClick={() => openRestaurant(restaurant)}
-                                            />
-                                        );
-                                    })}
-                                </div>
+                                <div className="space-y-4">
+                                    <div className="space-y-5">
+                                        {itemSections.map((section) => (
+                                            <div key={section.key} className="space-y-2">
+                                                <div className="flex items-end justify-between gap-3">
+                                                    <div>
+                                                        <p className="theme-muted text-xs font-semibold uppercase tracking-[0.28em]">
+                                                            {section.label}
+                                                        </p>
+                                                        <h3 className="mt-1 text-sm font-bold sm:text-base">
+                                                            {section.items.length} {section.items.length === 1 ? "item" : "items"}
+                                                        </h3>
+                                                    </div>
+                                                </div>
 
-                                <div className="space-y-3">
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
-                                        <div>
-                                            <p className="theme-muted text-xs font-semibold uppercase tracking-[0.28em]">
-                                                Dishes
-                                            </p>
-                                            <h2 className="mt-1 text-lg font-bold sm:text-xl">
-                                                {itemTotal.toLocaleString("en-IN")} dish matches
-                                            </h2>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        {visibleItems.map((item) => (
-                                            <SearchItemCard
-                                                key={item.id}
-                                                item={item}
-                                                onClick={() => openItemRestaurant(item)}
-                                            />
+                                                <div className="snap-x snap-mandatory overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                                    <div className="flex w-max gap-3 pr-2 sm:gap-4">
+                                                        {section.items.map((item) => (
+                                                            <SearchItemCard
+                                                                key={item.id}
+                                                                item={item}
+                                                                onClick={() => openItemRestaurant(item)}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
-                            </div>
+                            </>
                         )}
                     </div>
                 </section>
             </div>
         </div>
-    );
-}
-
-function RestaurantCard({ restaurant, isSelected, onClick }) {
-    const placeText = formatLocation(restaurant);
-    const logoSrc = resolveImageUrl(restaurant?.logo || restaurant?.logoUrl);
-
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={[
-                "theme-card group w-full max-w-[280px] overflow-hidden rounded-[24px] text-left transition hover:-translate-y-1 hover:shadow-2xl",
-                isSelected ? "ring-2 ring-[color:var(--app-accent)]" : "",
-            ]
-                .filter(Boolean)
-                .join(" ")}
-        >
-            <div className="relative aspect-[16/9] overflow-hidden bg-[linear-gradient(135deg,rgba(255,133,27,0.18)_0%,rgba(255,255,255,0.45)_100%)]">
-                {logoSrc ? (
-                    <img
-                        src={logoSrc}
-                        alt={restaurant?.name || "Restaurant logo"}
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                    />
-                ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                        <BrandLogo className="h-16 w-16" title={restaurant?.name || "Restaurant logo"} />
-                    </div>
-                )}
-
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-
-                <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-                    {isSelected ? <span className="theme-pill rounded-full px-2.5 py-0.5 text-[10px] font-semibold">Selected</span> : null}
-                    {placeText ? <span className="theme-pill rounded-full px-2.5 py-0.5 text-[10px] font-semibold">{placeText}</span> : null}
-                </div>
-
-            </div>
-
-            <div className="flex min-h-[100px] flex-col gap-2 p-3">
-                <div className="min-w-0">
-                    <h3 className="truncate text-base font-bold">{restaurant?.name}</h3>
-                    <p className="theme-muted mt-1 text-xs sm:text-sm">{placeText || "Tap to open this restaurant menu"}</p>
-                </div>
-
-                <div className="mt-auto flex items-center justify-between gap-3">
-                    <p className="theme-muted text-[10px] uppercase tracking-[0.2em]">{restaurant?.slug}</p>
-                    <span className="theme-button inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold">
-                        View items
-                    </span>
-                </div>
-            </div>
-        </button>
     );
 }
 
@@ -439,41 +359,141 @@ function SearchItemCard({ item, onClick }) {
         <button
             type="button"
             onClick={onClick}
-            className="theme-card group flex w-full flex-col gap-3 rounded-[24px] p-3 text-left transition hover:-translate-y-0.5 hover:shadow-2xl sm:flex-row sm:items-center"
+            className="group flex w-[170px] shrink-0 snap-start flex-col overflow-hidden rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.02)_100%)] text-left shadow-[0_14px_34px_rgba(0,0,0,0.12)] transition hover:-translate-y-1 hover:border-white/15 hover:bg-white/6 sm:w-[182px] md:w-[194px]"
         >
-            <div className="h-32 w-full shrink-0 overflow-hidden rounded-2xl sm:h-16 sm:w-16">
-                <img src={imageSrc} alt={item?.name || "Menu item"} className="h-full w-full object-cover" loading="lazy" />
-            </div>
-
-            <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
+            <div className="relative aspect-[4/3] overflow-hidden bg-white/5">
+                <img
+                    src={imageSrc}
+                    alt={item?.name || "Menu item"}
+                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                    loading="lazy"
+                />
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0)_35%,rgba(0,0,0,0.35)_100%)]" />
+                <div className="absolute left-3 top-3 flex flex-wrap gap-2">
                     {item?.category ? (
-                        <span className="theme-pill rounded-full px-2.5 py-1 text-[11px] font-semibold">{item.category}</span>
+                        <span className="theme-pill rounded-full px-2 py-0.5 text-[10px] font-semibold">{item.category}</span>
                     ) : null}
                     {item?.isFeatured ? (
-                        <span className="theme-pill rounded-full px-2.5 py-1 text-[11px] font-semibold">Featured</span>
-                    ) : null}
-                </div>
-
-                <h3 className="mt-1 truncate text-base font-bold">{item?.name}</h3>
-                <p className="theme-muted mt-1 truncate text-sm">
-                    {item?.restaurant?.name}
-                    {placeText ? ` - ${placeText}` : ""}
-                </p>
-
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="theme-badge inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold">
-                        Rs {Math.round(Number(item?.price || 0))}
-                    </span>
-                    {Number(item?.orderCount || 0) > 0 ? (
-                        <span className="theme-muted text-xs">{Number(item?.orderCount || 0).toLocaleString("en-IN")} orders</span>
+                        <span className="theme-pill rounded-full px-2 py-0.5 text-[10px] font-semibold">Featured</span>
                     ) : null}
                 </div>
             </div>
 
-            <span className="theme-button inline-flex items-center rounded-full px-3 py-2 text-xs font-semibold sm:shrink-0">
-                Open
-            </span>
+            <div className="flex min-h-[110px] min-w-0 flex-1 flex-col p-3">
+                <h3 className="truncate text-sm font-bold sm:text-[15px]">{item?.name}</h3>
+                <p className="theme-muted mt-1 truncate text-xs">{item?.restaurant?.name || "Restaurant"}</p>
+                {placeText ? <p className="theme-muted mt-0.5 truncate text-[11px]">{placeText}</p> : null}
+
+                <div className="mt-auto flex items-end justify-between gap-2 pt-3">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className="text-xs font-semibold text-[color:var(--app-accent)]">Rs {Math.round(Number(item?.price || 0))}</span>
+                        {Number(item?.orderCount || 0) > 0 ? (
+                            <span className="theme-muted truncate text-[11px]">{Number(item?.orderCount || 0).toLocaleString("en-IN")} orders</span>
+                        ) : null}
+                    </div>
+
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-accent)]">
+                        <ChevronRight size={14} />
+                    </span>
+                </div>
+            </div>
         </button>
+    );
+}
+function BackendOfflineCard({ message, onRetry }) {
+    return (
+        <div className="overflow-hidden rounded-[28px] border border-red-500/20 bg-[linear-gradient(180deg,rgba(49,18,18,0.92)_0%,rgba(24,18,26,0.96)_100%)] p-5 text-left shadow-[0_24px_80px_rgba(0,0,0,0.28)] sm:p-6">
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,220px)_1fr] lg:items-center">
+                <div className="relative mx-auto flex h-44 w-full max-w-[220px] items-center justify-center rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,214,132,0.2),rgba(255,255,255,0.03)_42%,rgba(255,255,255,0)_70%)]">
+                    <svg viewBox="0 0 220 180" className="h-full w-full" role="img" aria-label="Cute character eating noodles">
+                        <defs>
+                            <linearGradient id="bowlGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#ffcc7a" />
+                                <stop offset="100%" stopColor="#ff8a1f" />
+                            </linearGradient>
+                            <linearGradient id="noodleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#fff4c8" />
+                                <stop offset="100%" stopColor="#f8c55d" />
+                            </linearGradient>
+                        </defs>
+
+                        <ellipse cx="110" cy="154" rx="66" ry="10" fill="rgba(0,0,0,0.28)" />
+                        <circle cx="110" cy="72" r="32" fill="#ffd9c6" />
+                        <circle cx="98" cy="68" r="4" fill="#3d2b24" />
+                        <circle cx="122" cy="68" r="4" fill="#3d2b24" />
+                        <path d="M102 83c6 6 10 6 18 0" fill="none" stroke="#8a4d35" strokeWidth="4" strokeLinecap="round" />
+                        <path d="M92 88c10 8 26 8 36 0" fill="none" stroke="#ff9f8d" strokeWidth="3" strokeLinecap="round" opacity="0.9" />
+                        <path d="M80 60c6-12 20-20 30-20 10 0 22 6 28 16" fill="none" stroke="#ffb36b" strokeWidth="8" strokeLinecap="round" />
+                        <path d="M128 44c10 4 18 12 22 22" fill="none" stroke="#ffb36b" strokeWidth="8" strokeLinecap="round" />
+
+                        <path d="M88 97c-16 7-28 23-31 40h110c-3-17-15-33-31-40" fill="url(#bowlGradient)" />
+                        <path d="M70 101h80c-2 18-16 32-40 32s-38-14-40-32Z" fill="#fff8ef" opacity="0.95" />
+                        <path d="M73 103c10 6 18 8 27 8s17-2 27-8c7 6 15 8 23 8" fill="none" stroke="url(#noodleGradient)" strokeWidth="5" strokeLinecap="round" />
+                        <path d="M77 114c9 4 16 5 23 5s14-1 22-5" fill="none" stroke="url(#noodleGradient)" strokeWidth="4" strokeLinecap="round" />
+                        <path d="M115 96c-4-15 1-22 12-28" fill="none" stroke="#ffd88b" strokeWidth="4" strokeLinecap="round" />
+                        <path d="M136 88c3 8 3 16 0 24" fill="none" stroke="#ffd88b" strokeWidth="4" strokeLinecap="round" />
+
+                        <path d="M145 56l24 10" stroke="#ffe6ab" strokeWidth="4" strokeLinecap="round" />
+                        <path d="M144 64l26 6" stroke="#ffe6ab" strokeWidth="4" strokeLinecap="round" />
+                        <path d="M142 72l24 0" stroke="#ffe6ab" strokeWidth="4" strokeLinecap="round" />
+
+                        <circle cx="50" cy="40" r="5" fill="#ffd9c6" opacity="0.7" />
+                        <circle cx="172" cy="34" r="5" fill="#ffd9c6" opacity="0.7" />
+                        <circle cx="182" cy="60" r="3" fill="#ffd9c6" opacity="0.55" />
+                        <circle cx="42" cy="62" r="3" fill="#ffd9c6" opacity="0.55" />
+                    </svg>
+                </div>
+
+                <div className="space-y-3">
+                    <span className="inline-flex w-fit items-center rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-red-200">
+                        Connection lost
+                    </span>
+                    <h2 className="text-2xl font-bold text-white sm:text-3xl">We lost the dish feed</h2>
+                    <p className="max-w-2xl text-sm leading-6 text-white/75 sm:text-base">
+                        The backend is not responding right now, so the dish feed cannot load. Please check the server and
+                        try again in a moment.
+                    </p>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white/65 sm:text-sm">
+                        {message}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onRetry}
+                        className="theme-button inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold"
+                    >
+                        Try again
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function InitialBrowseLoadingCard() {
+    return (
+        <div className="overflow-hidden rounded-[28px] border border-[var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.06)_0%,rgba(255,255,255,0.02)_100%)] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.18)] sm:p-8">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
+                <div className="relative mx-auto flex h-40 w-full max-w-[220px] items-center justify-center rounded-[28px] border border-white/10 bg-white/5">
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="h-12 w-12 animate-pulse rounded-full border-4 border-[color:var(--app-accent)] border-t-transparent" />
+                        <div className="text-center">
+                            <p className="text-sm font-semibold text-white/85">Checking connection</p>
+                            <p className="mt-1 text-xs text-white/55">Please wait while we load dishes.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <span className="inline-flex w-fit items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
+                        Loading
+                    </span>
+                    <h2 className="text-2xl font-bold text-white sm:text-3xl">Warming up the feed</h2>
+                    <p className="max-w-2xl text-sm leading-6 text-white/65 sm:text-base">
+                        We are reaching out to the backend and preparing the mixed dish feed. If the server takes a moment,
+                        this screen stays calm instead of flashing the layout.
+                    </p>
+                </div>
+            </div>
+        </div>
     );
 }

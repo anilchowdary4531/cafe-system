@@ -133,19 +133,73 @@ export default async function publicRoutes(app, deps) {
   app.get("/catalog/search", async (req, reply) => {
     try {
       const query = normalizeQuery(req.query?.q || req.query?.query);
+      const restaurantLimit = parsePositiveInt(req.query?.restaurantLimit, 24, 60);
+      const itemLimit = parsePositiveInt(req.query?.itemLimit, 12, 50);
+
+      const mapItem = (item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        category: item.category,
+        image: item.image,
+        price: item.price,
+        rating: item.rating,
+        reviewCount: item.reviewCount,
+        orderCount: item.orderCount,
+        isFeatured: item.isFeatured,
+        restaurant: {
+          id: item.restaurant?.id || null,
+          name: item.restaurant?.name || "",
+          slug: item.restaurant?.slug || "",
+          city: item.restaurant?.city || "",
+          state: item.restaurant?.state || "",
+          logo: item.restaurant?.logoUrl || "",
+        },
+      });
+
       if (query.length < 2) {
+        const [rawItems, itemTotal] = await Promise.all([
+          prisma.menuItem.findMany({
+            where: {
+              isAvailable: true,
+            },
+            include: {
+              restaurant: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  city: true,
+                  state: true,
+                  logoUrl: true,
+                  isActive: true,
+                },
+              },
+            },
+            orderBy: [{ isFeatured: "desc" }, { orderCount: "desc" }, { rating: "desc" }, { name: "asc" }],
+            take: itemLimit * 4,
+          }),
+          prisma.menuItem.count({
+            where: {
+              isAvailable: true,
+            },
+          }),
+        ]);
+
+        const items = rawItems
+          .filter((item) => item?.restaurant?.isActive !== false)
+          .slice(0, itemLimit)
+          .map(mapItem);
+
         return {
-          query,
+          query: "",
           restaurants: [],
-          items: [],
+          items,
           totalRestaurants: 0,
-          totalItems: 0,
+          totalItems: itemTotal,
           hasMoreRestaurants: false,
         };
       }
-
-      const restaurantLimit = parsePositiveInt(req.query?.restaurantLimit, 24, 60);
-      const itemLimit = parsePositiveInt(req.query?.itemLimit, 12, 50);
 
       const restaurantWhere = {
         isActive: true,
@@ -202,26 +256,7 @@ export default async function publicRoutes(app, deps) {
       const items = rawItems
         .filter((item) => item?.restaurant?.isActive !== false)
         .slice(0, itemLimit)
-        .map((item) => ({
-          id: item.id,
-          name: item.name,
-          description: item.description,
-          category: item.category,
-          image: item.image,
-          price: item.price,
-          rating: item.rating,
-          reviewCount: item.reviewCount,
-          orderCount: item.orderCount,
-          isFeatured: item.isFeatured,
-          restaurant: {
-            id: item.restaurant?.id || null,
-            name: item.restaurant?.name || "",
-            slug: item.restaurant?.slug || "",
-            city: item.restaurant?.city || "",
-            state: item.restaurant?.state || "",
-            logo: item.restaurant?.logoUrl || "",
-          },
-        }));
+        .map(mapItem);
 
       return {
         query,

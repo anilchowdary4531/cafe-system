@@ -6,6 +6,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Landing from "./pages/Landing";
+import Terms from "./pages/Terms";
 
 import Cart from "./pages/Cart";
 import Login from "./pages/Login";
@@ -70,6 +71,7 @@ export default function App() {
                     {/* ================================= */}
 
                     <Route path="/" element={<Landing />} />
+                    <Route path="/terms" element={<Terms />} />
 
                     <Route
                         path="/cart"

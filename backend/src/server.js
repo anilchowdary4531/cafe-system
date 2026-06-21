@@ -141,12 +141,6 @@ const isOrderArchitectureUnavailable = (err) => {
   );
 };
 
-const getFrontendBaseUrl = () =>
-  process.env.FRONTEND_URL || "http://localhost:5173";
-
-const buildQrTargetUrl = (slug, tableNo) =>
-  `${getFrontendBaseUrl()}/r/${slug}?table=${encodeURIComponent(tableNo)}`;
-
 const ensureDefaultUsersInDatabase = async () => {
   try {
     const restaurants = await prisma.restaurant.findMany({

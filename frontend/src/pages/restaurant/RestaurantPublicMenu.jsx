@@ -49,6 +49,7 @@ export default function RestaurantPublicMenu() {
     const restaurant = data?.restaurant || null;
     const menu = Array.isArray(data?.menu) ? data.menu : EMPTY_MENU;
     const restaurantName = String(restaurant?.name || slug || "Restaurant").trim();
+    const restaurantLocation = [restaurant?.city, restaurant?.state].filter(Boolean).join(", ");
     const vegModeEnabled = Boolean(restaurantContext?.vegOnly);
 
     const [search, setSearch] = useState(() => searchFromUrl);
@@ -295,18 +296,23 @@ export default function RestaurantPublicMenu() {
                             <BrandLogo className="h-full w-full" title="Tiffzy logo" />
                         </div>
 
-                        <div className="min-w-0">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]">
-                                Tiffzy
-                            </p>
-                            <p className="truncate text-sm font-bold leading-tight sm:text-base">Restaurant Menu</p>
-                        </div>
-                    </Link>
+	                        <div className="min-w-0">
+	                            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]">
+	                                Tiffzy
+	                            </p>
+	                        </div>
+	                    </Link>
 
                     <div className="min-w-0 justify-self-center text-center">
-                        <p className="truncate text-sm font-extrabold tracking-wide text-[color:var(--app-accent)] sm:text-base md:text-lg">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]/80">
+                            Restaurant
+                        </p>
+                        <p className="truncate text-base font-black tracking-tight text-[color:var(--app-accent)] sm:text-lg md:text-xl">
                             {restaurantName}
                         </p>
+                        {restaurantLocation ? (
+                            <p className="truncate text-xs text-[color:var(--app-muted)] sm:text-sm">{restaurantLocation}</p>
+                        ) : null}
                     </div>
 
                     <div className="flex shrink-0 flex-wrap items-center gap-2 justify-self-end">
@@ -379,7 +385,7 @@ export default function RestaurantPublicMenu() {
                     ))}
 
                     {!hasResults && (
-                        <div className="theme-card rounded-3xl p-6 text-center">
+                        <div className="py-12 text-center">
                             <h3 className="text-lg font-bold">
                                 {vegModeEnabled ? "No veg items found" : "No items found"}
                             </h3>

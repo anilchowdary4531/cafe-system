@@ -147,6 +147,16 @@ const formatOccupiedDuration = (occupiedSince) => {
     return remHours ? `${days}d ${remHours}h` : `${days}d`;
 };
 
+const formatOrderTime = (value) => {
+    if (!value) return "";
+    const time = new Date(value).getTime();
+    if (Number.isNaN(time)) return "";
+    return new Date(time).toLocaleTimeString("en-IN", {
+        hour: "numeric",
+        minute: "2-digit",
+    });
+};
+
 const formatReceiptAmount = (value) => `\u20B9${Number(value || 0).toFixed(2)}`;
 
 const getReceiptItemLineTotal = (item) => {
@@ -1726,31 +1736,39 @@ export default function OwnerLayout() {
                                                 No online orders.
                                             </div>
                                         ) : (
-                                            stripOnlineOrders.map((order) => (
-                                                <button
-                                                    key={`${order.tableKey}-${order.id}`}
-                                                    type="button"
-                                                    onClick={() => setSelectedLiveOrder(order)}
-                                                    className="theme-table-order-row block w-full rounded-lg px-2 py-2 text-left transition hover:opacity-90"
-                                                >
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <div className="min-w-0">
-                                                            <p className="truncate text-xs font-semibold">
-                                                                {order.orderNo ? order.orderNo : `#${order.id}`}
-                                                            </p>
-                                                            <p className="theme-muted text-[10px]">
-                                                                Table {order.tableNo || "--"}
+                                            stripOnlineOrders.map((order) => {
+                                                const orderTimeLabel = formatOrderTime(order.createdAt);
+                                                return (
+                                                    <button
+                                                        key={`${order.tableKey}-${order.id}`}
+                                                        type="button"
+                                                        onClick={() => setSelectedLiveOrder(order)}
+                                                        className="theme-table-order-row block w-full rounded-lg px-2 py-2 text-left transition hover:opacity-90"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="min-w-0">
+                                                                <p className="truncate text-xs font-semibold">
+                                                                    {order.orderNo ? order.orderNo : `#${order.id}`}
+                                                                </p>
+                                                                <p className="theme-muted text-[10px]">
+                                                                    Table {order.tableNo || "--"}
+                                                                </p>
+                                                                {orderTimeLabel ? (
+                                                                    <p className="theme-muted text-[10px]">
+                                                                        Time {orderTimeLabel}
+                                                                    </p>
+                                                                ) : null}
+                                                            </div>
+                                                            <p className="text-[10px] font-semibold uppercase">
+                                                                {order.status || "PLACED"}
                                                             </p>
                                                         </div>
-                                                        <p className="text-[10px] font-semibold uppercase">
-                                                            {order.status || "PLACED"}
+                                                        <p className="mt-1 text-xs font-semibold">
+                                                            {formatReceiptAmount(getReceiptOrderTotal(order))}
                                                         </p>
-                                                    </div>
-                                                    <p className="mt-1 text-xs font-semibold">
-                                                        {formatReceiptAmount(getReceiptOrderTotal(order))}
-                                                    </p>
-                                                </button>
-                                            ))
+                                                    </button>
+                                                );
+                                            })
                                         )}
                                     </div>
                                 </aside>
@@ -1795,6 +1813,11 @@ export default function OwnerLayout() {
                                 <p className="theme-muted mt-1 text-sm">
                                     Table {selectedLiveOrder.tableNo || "--"}
                                 </p>
+                                {formatOrderTime(selectedLiveOrder.createdAt) ? (
+                                    <p className="theme-muted mt-0.5 text-sm">
+                                        Time {formatOrderTime(selectedLiveOrder.createdAt)}
+                                    </p>
+                                ) : null}
                             </div>
                             <div className="flex items-center gap-2">
                                 <span
@@ -1876,5 +1899,3 @@ export default function OwnerLayout() {
         </div>
     );
 }
-
-
