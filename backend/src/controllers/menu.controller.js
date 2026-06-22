@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma.js';
+import { resolveMenuPricing } from '../services/menuPricingService.js';
 
 export async function getMenu(req, reply) {
     const restaurantId = Number(req.params.restaurantId);
@@ -11,11 +12,13 @@ export async function getMenu(req, reply) {
 
 export async function createMenuItem(req, reply) {
     const restaurantId = Number(req.params.restaurantId);
-    const { name, description, category, image, price, isAvailable } = req.body || {};
+    const { name, description, category, image, price, originalPrice, discountPercent, isAvailable } = req.body || {};
 
-    if (!name || !category || price === undefined) {
+    if (!name || !category || (price === undefined && originalPrice === undefined)) {
         return reply.code(400).send({ message: 'Missing required fields' });
     }
+
+    const pricing = resolveMenuPricing({ price, originalPrice, discountPercent });
 
     const item = await prisma.menuItem.create({
         data: {
@@ -24,7 +27,9 @@ export async function createMenuItem(req, reply) {
             description: description || '',
             category,
             image: image || '',
-            price: Number(price),
+            price: pricing.price,
+            originalPrice: pricing.originalPrice,
+            discountPercent: pricing.discountPercent,
             isAvailable: isAvailable ?? true,
         },
     });
@@ -35,12 +40,20 @@ export async function createMenuItem(req, reply) {
 export async function updateMenuItem(req, reply) {
     const menuId = Number(req.params.menuId);
     const data = req.body || {};
+    const existing = await prisma.menuItem.findUnique({ where: { id: menuId } });
+    if (!existing) {
+        return reply.code(404).send({ message: 'Menu item not found' });
+    }
+
+    const pricing = resolveMenuPricing(data, existing);
 
     const updated = await prisma.menuItem.update({
         where: { id: menuId },
         data: {
             ...data,
-            price: data.price !== undefined ? Number(data.price) : undefined,
+            price: pricing.price,
+            originalPrice: pricing.originalPrice,
+            discountPercent: pricing.discountPercent,
         },
     });
 

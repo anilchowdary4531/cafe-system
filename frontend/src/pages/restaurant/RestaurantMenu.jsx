@@ -621,8 +621,8 @@ function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, o
     const Icon = section?.Icon || Tags;
 
     return (
-        <section ref={sectionRef} data-section-key={section.key} className="scroll-mt-32">
-            <div className="mb-2 flex items-end justify-between gap-3 px-0.5">
+        <section ref={sectionRef} data-section-key={section.key} className="scroll-mt-28">
+            <div className="mb-1.5 flex items-end justify-between gap-3 px-0.5">
                 <div className="flex items-center gap-2">
                     <span className="theme-pill inline-flex h-8 w-8 items-center justify-center rounded-2xl">
                         <Icon size={16} className="theme-accent-text" />
@@ -657,21 +657,24 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
     const imageSrc = resolveImageUrl(item?.image) || FALLBACK_IMAGE;
     const dietBadge = getDietBadge(item);
     const itemPrice = Number(item?.price || 0);
+    const originalPrice = Number(item?.originalPrice || 0);
+    const discountPercent = Number(item?.discountPercent || 0);
+    const hasDiscount = discountPercent > 0 && originalPrice > itemPrice;
 
     return (
-        <article className="group flex gap-3 py-4 sm:gap-4">
-            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-white/8 bg-black/10 sm:h-28 sm:w-28">
+        <article className="group flex gap-3 py-3 sm:gap-3.5 sm:py-3.5">
+            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-white/8 bg-black/10 sm:h-24 sm:w-24">
                 <img
                     src={imageSrc}
                     className="h-full w-full object-cover"
                     alt={String(item?.name || "Menu item")}
                     loading="lazy"
                 />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/55 to-transparent" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/55 to-transparent" />
 
-                <div className="absolute bottom-2 right-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#fff8e6] drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
-                        <Star size={11} className="text-[#ffd24d]" />
+                <div className="absolute bottom-1.5 right-1.5">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#fff8e6] drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
+                        <Star size={10} className="text-[#ffd24d]" />
                         {Number(item?.rating || 4.5).toFixed(1)}
                     </span>
                 </div>
@@ -679,7 +682,7 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
                 <button
                     type="button"
                     onClick={() => onToggleFavorite && onToggleFavorite(item)}
-                    className={`absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full border transition ${
+                    className={`absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border transition ${
                         isFavorite
                             ? "border-red-500/40 bg-red-500/10 text-red-300"
                             : "border-white/10 bg-black/10 text-white/90"
@@ -694,42 +697,56 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-[15px] font-bold leading-tight sm:text-base">{item?.name}</h3>
+                            <h3 className="text-[14px] font-bold leading-tight sm:text-[15px]">{item?.name}</h3>
                             {dietBadge ? (
                                 <span
-                                    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[9px] font-semibold ${dietBadge.className}`}
+                                    className={`inline-flex items-center gap-1.5 rounded-full border px-1.5 py-0.5 text-[8px] font-semibold ${dietBadge.className}`}
                                 >
-                                    <dietBadge.Icon size={10} />
+                                    <dietBadge.Icon size={9} />
                                     {dietBadge.label}
                                 </span>
                             ) : null}
                         </div>
 
-                        <p className="mt-1 text-sm font-semibold text-[color:var(--app-accent)]">{formatPrice(itemPrice)}</p>
+                        {hasDiscount ? (
+                            <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                                <p className="text-[11px] text-[color:var(--app-muted)] line-through">
+                                    {formatPrice(originalPrice)}
+                                </p>
+                                <p className="text-[13px] font-semibold text-[color:var(--app-accent)]">
+                                    {formatPrice(itemPrice)}
+                                </p>
+                                <span className="inline-flex items-center rounded-full border border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,var(--app-primary)_16%,transparent)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[color:var(--app-primary)]">
+                                    {Math.round(discountPercent)}% off
+                                </span>
+                            </div>
+                        ) : (
+                            <p className="mt-0.5 text-[13px] font-semibold text-[color:var(--app-accent)]">{formatPrice(itemPrice)}</p>
+                        )}
                     </div>
 
                     <button
                         onClick={() => onAdd && onAdd(item)}
-                        className="theme-button inline-flex shrink-0 items-center justify-center gap-1 rounded-full px-3 py-2 text-xs font-semibold sm:px-4"
+                        className="theme-button inline-flex shrink-0 items-center justify-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-semibold sm:px-3"
                     >
-                        <Plus size={12} />
+                        <Plus size={11} />
                         Add
                     </button>
                 </div>
 
                 <p
-                    className="theme-muted mt-2 text-sm leading-6"
+                    className="theme-muted mt-1.5 text-[13px] leading-5"
                     style={{
                         display: "-webkit-box",
                         WebkitBoxOrient: "vertical",
-                        WebkitLineClamp: 2,
+                        WebkitLineClamp: 1,
                         overflow: "hidden",
                     }}
                 >
                     {item?.description || "Freshly prepared, premium quality ingredients."}
                 </p>
 
-                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-[color:var(--app-muted)]">
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[color:var(--app-muted)]">
                     {Number(item?.orderCount || 0) > 0 ? (
                         <span>{Number(item?.orderCount || 0).toLocaleString("en-IN")} orders</span>
                     ) : null}

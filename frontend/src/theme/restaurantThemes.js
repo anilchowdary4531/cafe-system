@@ -93,7 +93,7 @@ export const restaurantThemes = [
     },
 ];
 
-export const DEFAULT_RESTAURANT_THEME_ID = restaurantThemes[0].id;
+export const DEFAULT_RESTAURANT_THEME_ID = "warm-indian-premium";
 
 export function getRestaurantTheme(themeId) {
     return restaurantThemes.find((theme) => theme.id === themeId) || restaurantThemes[0];

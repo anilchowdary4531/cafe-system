@@ -135,27 +135,27 @@ function MenuCard({ item, qty, disabled, onAdd }) {
             type="button"
             disabled={disabled}
             onClick={() => onAdd(item)}
-            className="group relative w-full max-w-[220px] overflow-hidden rounded-2xl border-0 bg-transparent p-0 text-left transition hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:w-[200px] sm:max-w-[200px] sm:flex-none"
+            className="group relative w-full max-w-[190px] overflow-hidden rounded-2xl border-0 bg-transparent p-0 text-left transition hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:w-[180px] sm:max-w-[180px] sm:flex-none"
         >
             <img
                 src={imageSrc}
                 alt={item.name}
                 loading="lazy"
-                className="mb-2 h-24 w-full rounded-2xl object-cover transition duration-300 group-hover:scale-[1.02] sm:h-28"
+                className="mb-2 h-20 w-full rounded-2xl object-cover transition duration-300 group-hover:scale-[1.02] sm:h-24"
                 onError={(event) => {
                     event.currentTarget.src = FALLBACK_IMAGE;
                 }}
             />
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold sm:text-base">{item.name}</p>
-                    <p className="theme-muted mt-1 truncate text-xs">
+                    <p className="truncate text-xs font-semibold sm:text-sm">{item.name}</p>
+                    <p className="theme-muted mt-1 truncate text-[11px] sm:text-xs">
                         <span className="mr-1">{icon}</span>
                         {item.category || "General"} - {formatMoney(item.price)}
                     </p>
                 </div>
                 {qty > 0 ? (
-                    <span className="theme-pos-qty-badge inline-flex h-8 min-w-8 items-center justify-center rounded-2xl px-2 text-sm font-bold tabular-nums">
+                    <span className="theme-pos-qty-badge inline-flex h-7 min-w-7 items-center justify-center rounded-2xl px-2 text-xs font-bold tabular-nums">
                         {qty}
                     </span>
                 ) : null}
@@ -1115,7 +1115,7 @@ export default function Server() {
                                             No items match your search.
                                         </div>
                                     ) : (
-                                        <div className="flex flex-wrap items-start justify-center gap-3 md:justify-start">
+                                        <div className="flex flex-wrap items-start justify-center gap-2 md:justify-start">
                                             {filteredMenu.map((item) => (
                                                 <MenuCard
                                                     key={item.id}

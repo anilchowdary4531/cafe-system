@@ -8,6 +8,7 @@ import useCachedGet from "../hooks/useCachedGet";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
 import BrandLogo from "../components/BrandLogo";
 import VegModeToggle from "../components/VegModeToggle";
+import Footer from "../components/Footer";
 import { isVegModeItem } from "./restaurant/RestaurantMenu";
 
 const toRad = (deg) => (Number(deg) * Math.PI) / 180;
@@ -347,6 +348,8 @@ export default function RestaurantChooser() {
                     </div>
                 </section>
             </div>
+
+            <Footer />
         </div>
     );
 }

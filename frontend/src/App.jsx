@@ -7,6 +7,16 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Landing from "./pages/Landing";
 import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import RefundPolicy from "./pages/RefundPolicy";
+import ContactUs from "./pages/ContactUs";
+import AboutUs from "./pages/AboutUs";
+import HelpCenter from "./pages/HelpCenter";
+import Pricing from "./pages/Pricing";
+import QROrdering from "./pages/QROrdering";
+import POSDashboardPage from "./pages/POSDashboardPage";
+import ProductAnalytics from "./pages/ProductAnalytics";
+import InventoryPage from "./pages/InventoryPage";
 
 import Cart from "./pages/Cart";
 import Login from "./pages/Login";
@@ -72,6 +82,16 @@ export default function App() {
 
                     <Route path="/" element={<Landing />} />
                     <Route path="/terms" element={<Terms />} />
+                    <Route path="/privacy" element={<Privacy />} />
+                    <Route path="/refund-policy" element={<RefundPolicy />} />
+                    <Route path="/contact-us" element={<ContactUs />} />
+                    <Route path="/about-us" element={<AboutUs />} />
+                    <Route path="/help-center" element={<HelpCenter />} />
+                    <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/qr-ordering" element={<QROrdering />} />
+                    <Route path="/pos-dashboard" element={<POSDashboardPage />} />
+                    <Route path="/analytics" element={<ProductAnalytics />} />
+                    <Route path="/inventory" element={<InventoryPage />} />
 
                     <Route
                         path="/cart"

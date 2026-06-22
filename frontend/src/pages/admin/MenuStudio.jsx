@@ -10,8 +10,26 @@ const emptyForm = {
     description: "",
     category: "",
     image: "",
-    price: "",
+    originalPrice: "",
+    discountPercent: "",
     isAvailable: true,
+};
+
+const toMoney = (value) => {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number)) return 0;
+    return Math.max(0, Math.round(number * 100) / 100);
+};
+
+const formatMoney = (value) => {
+    const amount = toMoney(value);
+    return amount % 1 === 0 ? `₹${amount.toFixed(0)}` : `₹${amount.toFixed(2)}`;
+};
+
+const getDiscountedPrice = (originalPrice, discountPercent) => {
+    const base = toMoney(originalPrice);
+    const discount = Math.max(0, Number(discountPercent || 0));
+    return Math.max(0, Math.round(base * (1 - discount / 100) * 100) / 100);
 };
 
 export default function MenuStudio() {
@@ -164,8 +182,8 @@ export default function MenuStudio() {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!form.name || !form.category || !form.price) {
-            setError("Name, category, and price are required.");
+        if (!form.name || !form.category || !form.originalPrice) {
+            setError("Name, category, and original price are required.");
             return;
         }
 
@@ -173,9 +191,15 @@ export default function MenuStudio() {
             setSubmitting(true);
             setError("");
 
+            const originalPrice = toMoney(form.originalPrice);
+            const discountPercent = Math.max(0, Number(form.discountPercent || 0));
+            const price = getDiscountedPrice(originalPrice, discountPercent);
+
             const payload = {
                 ...form,
-                price: Number(form.price),
+                originalPrice,
+                discountPercent,
+                price,
             };
 
             if (editingId) {
@@ -200,7 +224,8 @@ export default function MenuStudio() {
             description: item.description || "",
             category: item.category || "",
             image: item.image || "",
-            price: item.price ?? "",
+            originalPrice: item.originalPrice ?? item.price ?? "",
+            discountPercent: item.discountPercent ?? 0,
             isAvailable: item.isAvailable ?? true,
         });
         setEditingId(item.id);
@@ -228,6 +253,8 @@ export default function MenuStudio() {
                 category: item.category,
                 image: item.image,
                 price: Number(item.price),
+                originalPrice: item.originalPrice ?? item.price,
+                discountPercent: item.discountPercent ?? 0,
                 isAvailable,
             });
 
@@ -262,9 +289,9 @@ export default function MenuStudio() {
     }, [filteredItems]);
 
     return (
-        <section>
+        <section className="text-[color:var(--app-text)]">
             <h3 className="text-3xl font-bold">Menu Studio</h3>
-            <p className="mt-1 text-sm text-gray-400">
+            <p className="mt-1 text-sm text-[color:var(--app-muted)]">
                 Create, edit, and control item availability for your restaurant menu.
             </p>
 
@@ -273,7 +300,7 @@ export default function MenuStudio() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search by item name or category..."
-                    className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 outline-none"
+                    className="theme-input w-full rounded-xl px-4 py-3 outline-none"
                 />
                 <button
                     type="button"
@@ -281,14 +308,14 @@ export default function MenuStudio() {
                         setFormOpen((prev) => !prev);
                         if (formOpen && !editingId) resetForm();
                     }}
-                    className="shrink-0 rounded-xl bg-orange-500 px-4 py-3 font-semibold text-black"
+                    className="theme-button shrink-0 rounded-xl px-4 py-3 font-semibold"
                 >
                     {formOpen ? "Hide Form" : "Add Item"}
                 </button>
             </div>
 
             {error && (
-                <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+                <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
                     {error}
                 </div>
             )}
@@ -296,29 +323,45 @@ export default function MenuStudio() {
             {formOpen && (
                 <form
                     onSubmit={handleSubmit}
-                    className="mt-6 grid gap-3 rounded-2xl border border-white/10 bg-[#111827] p-5 md:grid-cols-2"
+                    className="theme-panel mt-6 grid gap-3 rounded-2xl p-5 md:grid-cols-2"
                 >
                     <input
-                        className="rounded-xl bg-[#0f172a] px-3 py-2 outline-none"
+                        className="theme-input rounded-xl px-3 py-2 outline-none"
                         placeholder="Item name"
                         value={form.name}
                         onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                     />
                     <input
-                        className="rounded-xl bg-[#0f172a] px-3 py-2 outline-none"
+                        className="theme-input rounded-xl px-3 py-2 outline-none"
                         placeholder="Category"
                         value={form.category}
                         onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
                     />
                     <input
-                        className="rounded-xl bg-[#0f172a] px-3 py-2 outline-none"
-                        placeholder="Price"
+                        className="theme-input rounded-xl px-3 py-2 outline-none"
+                        placeholder="Original price"
                         type="number"
                         min="0"
                         step="0.01"
-                        value={form.price}
-                        onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))}
+                        value={form.originalPrice}
+                        onChange={(e) => setForm((prev) => ({ ...prev, originalPrice: e.target.value }))}
                     />
+                    <input
+                        className="theme-input rounded-xl px-3 py-2 outline-none"
+                        placeholder="Discount %"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={form.discountPercent}
+                        onChange={(e) => setForm((prev) => ({ ...prev, discountPercent: e.target.value }))}
+                    />
+                    <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 md:col-span-2">
+                        <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--app-muted)]">Final price preview</p>
+                        <p className="mt-1 text-sm font-semibold text-[color:var(--app-primary)]">
+                            {formatMoney(getDiscountedPrice(form.originalPrice, form.discountPercent))}
+                        </p>
+                    </div>
                     <div className="flex flex-col gap-2 md:col-span-2">
                         <div className="flex flex-col gap-2 md:flex-row md:items-center">
                             <input
@@ -326,25 +369,25 @@ export default function MenuStudio() {
                                 accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
                                 disabled={imageUploading}
                                 onChange={(e) => uploadMenuImage(e.target.files?.[0])}
-                                className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-slate-100 hover:file:bg-white/15 disabled:opacity-70 md:w-auto"
+                                className="block w-full text-sm text-[color:var(--app-muted)] file:mr-3 file:rounded-lg file:border-0 file:bg-[color:var(--app-primary)] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[color:var(--app-primary-text)] hover:file:bg-[color:var(--app-primary-hover)] disabled:opacity-70 md:w-auto"
                             />
                             <input
-                                className="w-full rounded-xl bg-[#0f172a] px-3 py-2 outline-none"
+                                className="theme-input w-full rounded-xl px-3 py-2 outline-none"
                                 placeholder="Image URL"
                                 value={form.image}
                                 onChange={(e) => setForm((prev) => ({ ...prev, image: e.target.value }))}
                             />
                         </div>
-                        {imageUploading && <p className="text-xs text-slate-400">Uploading image...</p>}
+                        {imageUploading && <p className="text-xs text-[color:var(--app-muted)]">Uploading image...</p>}
                     </div>
                     <textarea
-                        className="rounded-xl bg-[#0f172a] px-3 py-2 outline-none md:col-span-2"
+                        className="theme-input rounded-xl px-3 py-2 outline-none md:col-span-2"
                         placeholder="Description"
                         value={form.description}
                         onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                     />
 
-                    <label className="flex items-center gap-2 text-sm text-gray-300">
+                    <label className="flex items-center gap-2 text-sm text-[color:var(--app-muted-strong)]">
                         <input
                             type="checkbox"
                             checked={form.isAvailable}
@@ -357,14 +400,14 @@ export default function MenuStudio() {
                         <button
                             type="button"
                             onClick={() => resetForm({ close: true })}
-                            className="rounded-xl border border-white/20 px-4 py-2"
+                            className="theme-soft-button rounded-xl px-4 py-2"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={submitting}
-                            className="rounded-xl bg-orange-500 px-4 py-2 font-semibold text-black disabled:opacity-60"
+                            className="theme-button rounded-xl px-4 py-2 font-semibold disabled:opacity-60"
                         >
                             {submitting ? "Saving..." : editingId ? "Update Item" : "Add Item"}
                         </button>
@@ -374,11 +417,11 @@ export default function MenuStudio() {
 
             {!loading && groupedItems.length > 0 && (
                 <div className="mt-5 flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">Categories</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--app-muted)]">Categories</span>
                     {groupedItems.map(([category, categoryItems]) => (
                         <span
                             key={category}
-                            className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,var(--app-primary)_20%,transparent)] px-3 py-1 text-xs font-semibold text-[color:var(--app-text)]"
+                            className="theme-table-time-pill rounded-full px-3 py-1 text-xs font-semibold"
                         >
                             {category} ({categoryItems.length})
                         </span>
@@ -391,15 +434,15 @@ export default function MenuStudio() {
                     groupedItems.map(([category, categoryItems]) => (
                         <section key={category} className="p-0">
                             <div className="flex items-center justify-between gap-3">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-300">{category}</p>
-                                <p className="text-xs text-gray-400">{categoryItems.length} item(s)</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--app-muted-strong)]">{category}</p>
+                                <p className="text-xs text-[color:var(--app-muted)]">{categoryItems.length} item(s)</p>
                             </div>
 
                             <div className="mt-3 flex gap-3 overflow-x-auto pb-1 pr-1">
                                 {categoryItems.map((item) => (
                                     <article
                                         key={item.id}
-                                        className="relative w-[230px] shrink-0 overflow-visible rounded-xl border border-white/15 bg-transparent"
+                                        className="relative w-[230px] shrink-0 overflow-visible rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface)]"
                                     >
                                         <div className="relative">
                                             <img
@@ -436,7 +479,7 @@ export default function MenuStudio() {
                                                                 setOpenActionMenuId(null);
                                                                 setOpenActionMenuMeta(null);
                                                             }}
-                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-amber-700 transition hover:bg-amber-500/10"
+                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[color:var(--app-primary)] transition hover:bg-[color:color-mix(in_srgb,var(--app-primary)_14%,transparent)]"
                                                         >
                                                             Edit
                                                         </button>
@@ -448,7 +491,7 @@ export default function MenuStudio() {
                                                                 setOpenActionMenuMeta(null);
                                                             }}
                                                             disabled={item.isAvailable}
-                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-700 transition hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-45"
+                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-45"
                                                         >
                                                             Enable
                                                         </button>
@@ -460,7 +503,7 @@ export default function MenuStudio() {
                                                                 setOpenActionMenuMeta(null);
                                                             }}
                                                             disabled={!item.isAvailable}
-                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-500/10 disabled:cursor-not-allowed disabled:opacity-45"
+                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[color:var(--app-muted)] transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
                                                         >
                                                             Disable
                                                         </button>
@@ -471,7 +514,7 @@ export default function MenuStudio() {
                                                                 setOpenActionMenuId(null);
                                                                 setOpenActionMenuMeta(null);
                                                             }}
-                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-rose-700 transition hover:bg-rose-500/10"
+                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-rose-400 transition hover:bg-rose-500/10"
                                                         >
                                                             Delete
                                                         </button>
@@ -484,15 +527,28 @@ export default function MenuStudio() {
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
                                                     <p className="truncate text-lg font-semibold">{item.name}</p>
-                                                    {item.description && <p className="mt-1 text-xs text-gray-400">{item.description}</p>}
+                                                    {item.description && <p className="mt-1 text-xs text-[color:var(--app-muted)]">{item.description}</p>}
                                                 </div>
                                                 <div className="shrink-0 text-right">
-                                                    <p className="text-lg font-semibold text-orange-300">₹{item.price}</p>
+                                                    {Number(item.discountPercent || 0) > 0 && Number(item.originalPrice || 0) > Number(item.price || 0) ? (
+                                                        <div className="flex flex-col items-end">
+                                                            <p className="text-sm text-[color:var(--app-muted)] line-through">
+                                                                {formatMoney(item.originalPrice ?? item.price)}
+                                                            </p>
+                                                            <p className="text-lg font-semibold text-[color:var(--app-primary)]">
+                                                                {formatMoney(item.price)}
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-lg font-semibold text-[color:var(--app-primary)]">
+                                                            {formatMoney(item.price)}
+                                                        </p>
+                                                    )}
                                                     <span
                                                         className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${
                                                             item.isAvailable
-                                                                ? "border-emerald-500/65 bg-emerald-500/30 text-emerald-900"
-                                                                : "border-slate-500/60 bg-slate-500/25 text-slate-700"
+                                                                ? "border-emerald-500/65 bg-emerald-500/20 text-emerald-200"
+                                                                : "border-slate-500/60 bg-slate-500/20 text-[color:var(--app-muted)]"
                                                         }`}
                                                     >
                                                         {item.isAvailable ? "Available" : "Disabled"}

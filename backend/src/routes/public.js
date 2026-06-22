@@ -3,6 +3,7 @@ import {
   buildStaffLoginPayload,
   issueStaffSession,
 } from "../services/staffSessionService.js";
+import { resolveMenuPricing } from "../services/menuPricingService.js";
 
 export default async function publicRoutes(app, deps) {
   const { prisma, normalizeDbPermissions, buildQrTargetUrl } = deps;
@@ -351,8 +352,8 @@ export default async function publicRoutes(app, deps) {
 
   app.post("/menu", async (req, reply) => {
     try {
-      const { name, description, price, category, image, restaurantId, isAvailable } = req.body || {};
-      if (!name || price === undefined || price === null) {
+      const { name, description, price, originalPrice, discountPercent, category, image, restaurantId, isAvailable } = req.body || {};
+      if (!name || (price === undefined && originalPrice === undefined)) {
         return reply.code(400).send({ message: "Name and price are required" });
       }
 
@@ -363,6 +364,8 @@ export default async function publicRoutes(app, deps) {
       }
       if (!resolvedRestaurantId) return reply.code(400).send({ message: "Restaurant is required" });
 
+      const pricing = resolveMenuPricing({ price, originalPrice, discountPercent });
+
       return await prisma.menuItem.create({
         data: {
           restaurantId: resolvedRestaurantId,
@@ -370,7 +373,9 @@ export default async function publicRoutes(app, deps) {
           description: description ? String(description).trim() : "",
           category: category ? String(category).trim() : "General",
           image: image ? String(image).trim() : "",
-          price: Number(price),
+          price: pricing.price,
+          originalPrice: pricing.originalPrice,
+          discountPercent: pricing.discountPercent,
           isAvailable: isAvailable ?? true,
         },
       });
@@ -383,11 +388,13 @@ export default async function publicRoutes(app, deps) {
   app.put("/menu/:id", async (req, reply) => {
     try {
       const id = Number(req.params.id);
-      const { name, description, price, category, image, isAvailable } = req.body || {};
+      const { name, description, price, originalPrice, discountPercent, category, image, isAvailable } = req.body || {};
       if (!id) return reply.code(400).send({ message: "Invalid menu item id" });
 
       const existing = await prisma.menuItem.findUnique({ where: { id } });
       if (!existing) return reply.code(404).send({ message: "Menu item not found" });
+
+      const pricing = resolveMenuPricing({ price, originalPrice, discountPercent }, existing);
 
       return await prisma.menuItem.update({
         where: { id },
@@ -396,7 +403,9 @@ export default async function publicRoutes(app, deps) {
           description: description ?? existing.description,
           category: category ?? existing.category,
           image: image ?? existing.image,
-          price: price === undefined ? existing.price : Number(price),
+          price: pricing.price,
+          originalPrice: pricing.originalPrice,
+          discountPercent: pricing.discountPercent,
           isAvailable: isAvailable ?? existing.isAvailable,
         },
       });

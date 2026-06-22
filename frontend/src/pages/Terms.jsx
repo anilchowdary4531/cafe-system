@@ -128,10 +128,12 @@ const sections = [
         ],
     },
     {
-        title: "19. Governing Law, Copyright Notices, and Contact",
+        title: "19. Governing Law, Copyright Notices, and Contact Us",
         paragraphs: [
             "These Terms are governed by the laws of India, without affecting any mandatory consumer protections that cannot be changed by contract. Any dispute should be brought before the courts of competent jurisdiction in India, unless the law requires a different forum.",
             "If you believe content on Tiffzy infringes your copyright or another legal right, please contact us through the support channel shown in the app and include enough detail for us to identify the material, the listing or page where it appears, and your contact information. For all other questions, please use the support option inside Tiffzy or the contact details we publish from time to time.",
+            "If you have any questions regarding these Terms and Conditions or the use of the Platform, please contact us: Tiffzy, Website: https://www.tiffzy.com, Email: rameshnanda@tiffzy.com, Phone: +91 9177764632.",
+            "By using Tiffzy, you acknowledge that you have read, understood, and agreed to these Terms and Conditions.",
         ],
     },
 ];
@@ -154,7 +156,7 @@ export default function Terms() {
                         This page is written as a single, continuous legal document for Tiffzy customers, restaurant partners,
                         and business users. Please read it carefully before using the platform.
                     </p>
-                    <p className="text-sm uppercase tracking-[0.28em] text-[#8e6a45]">Last updated: June 20, 2026</p>
+                    <p className="text-sm uppercase tracking-[0.28em] text-[#8e6a45]">Last updated: June 21, 2026</p>
                 </header>
 
                 <article className="mt-12 space-y-10 text-[17px] leading-8">

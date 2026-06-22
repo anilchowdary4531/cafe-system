@@ -148,6 +148,8 @@ model MenuItem {
   image       String? @map("image_url")
 
   price Float
+  originalPrice Float? @map("original_price")
+  discountPercent Float @default(0) @map("discount_percent")
 
   // ITEM LEVEL TAX OVERRIDE (optional)
   taxPercent  Float?  @map("tax_percent")

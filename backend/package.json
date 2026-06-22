@@ -23,7 +23,6 @@
     "@prisma/client": "^5.0.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.9.0",
-    "dotenv": "^17.4.2",
     "fastify": "^4.29.1",
     "mime-types": "^3.0.2",
     "multer": "^2.1.1",
