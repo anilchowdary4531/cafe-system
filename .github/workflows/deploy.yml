@@ -42,5 +42,5 @@ jobs:
 
             npx prisma generate
 
-            pm2 restart cafe-backend --update-envø
+            pm2 restart cafe-backend
 
