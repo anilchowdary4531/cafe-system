@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Banknote, MapPin, Plus, QrCode, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -189,12 +188,6 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
     const slug = String(restaurantContext?.slug || "").trim();
     const restaurantName = String(restaurantContext?.name || "CafeKing").trim() || "CafeKing";
 
-    const { data: tablesData } = useCachedGet(slug ? `/r/${slug}/tables` : "/r/_/tables", {
-        enabled: open && Boolean(slug),
-        ttlMs: 30_000,
-        staleMs: 10 * 60_000,
-        scope: `restaurant:${slug}`,
-    });
     const { data: addressData, loading: addressLoading } = useCachedGet("/customer/address", {
         enabled: open && Boolean(customerToken),
         ttlMs: 15_000,
@@ -202,10 +195,9 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         scope: customer?.phone ? `customer:${customer.phone}` : "customer:session",
     });
 
-    const activeTables = Array.isArray(tablesData) ? tablesData.filter((t) => t && t.isActive !== false) : [];
     const savedAddresses = useMemo(
         () => (Array.isArray(addressData?.addresses) ? addressData.addresses : []),
-        [addressData?.addresses]
+        [addressData]
     );
 
     useEffect(() => {
@@ -216,6 +208,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         clearCartRef.current = clearCart;
     }, [clearCart]);
 
+    /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         if (!open) return;
         setCustomerName(customer?.name || "");
@@ -239,7 +232,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         setUpiAttemptFailed(false);
         setError("");
         setSuccess("");
-    }, [open, restaurantContext?.tableNo, restaurantContext?.slug]);
+    }, [open, restaurantContext?.tableNo, restaurantContext?.slug, customer?.name, customer?.email, customer?.phone, customerToken]);
 
     useEffect(() => {
         if (!open || !customerToken || addressMode !== "saved" || !savedAddresses.length) return;
@@ -253,6 +246,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
             return String(preferred?.id || "");
         });
     }, [addressMode, customerToken, open, savedAddresses]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     const cartSubtotal = useMemo(() => {
         const list = Array.isArray(cart) ? cart : [];
@@ -686,16 +680,15 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
     };
 
     return (
-        <div className="fixed inset-0 z-[70] flex h-[100dvh] flex-col overflow-hidden theme-page">
-            <header className="theme-nav border-b px-4 py-4">
-                <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+        <div className="fixed inset-0 z-[70] flex h-[100dvh] flex-col overflow-hidden theme-page checkout-paper-mobile">
+            <header className="theme-nav border-b px-3 py-3 sm:px-4 sm:py-4">
+                <div className="mx-auto flex w-[99%] max-w-none items-center justify-between gap-3">
                     <div className="min-w-0">
-                        <p className="theme-accent-text text-xs font-extrabold uppercase tracking-[0.28em]">Checkout</p>
-                        <h3 className="mt-1 flex items-center gap-2 text-xl font-bold">
-                            <ShieldCheck size={18} className="theme-accent-text" />
+                        <h3 className="mt-1 flex items-center gap-2 text-lg font-bold sm:text-xl">
+                            <ShieldCheck size={16} className="theme-accent-text sm:size-[18px]" />
                             {checkoutStep === "summary" ? "Order Summary" : "Secure Payment"}
                         </h3>
-                        <p className="theme-muted mt-1 text-xs sm:text-sm truncate">
+                        <p className="theme-muted mt-1 truncate text-[11px] sm:text-xs sm:text-sm">
                             {slug ? restaurantName : "Select a restaurant first"} • ₹{toInr(payableAmount)}
                         </p>
                     </div>
@@ -704,41 +697,40 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                         <button
                             type="button"
                             onClick={checkoutStep === "payment" ? () => setCheckoutStep("summary") : handleClose}
-                            className="theme-soft-button inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold"
+                            className="theme-soft-button inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold sm:px-4 sm:text-sm"
                         >
-                            <ArrowLeft size={16} />
+                            <ArrowLeft size={14} className="sm:size-4" />
                             {checkoutStep === "payment" ? "Back" : "Close"}
                         </button>
                         <button
                             type="button"
                             onClick={handleClose}
-                            className="theme-panel inline-flex items-center justify-center rounded-2xl border border-white/10 bg-black/10 p-2 hover:bg-black/20"
+                            className="theme-panel inline-flex items-center justify-center rounded-2xl border border-white/10 bg-black/10 p-1.5 hover:bg-black/20 sm:p-2"
                             aria-label="Close"
                         >
-                            <X size={18} className="theme-muted" />
+                            <X size={16} className="theme-muted sm:size-[18px]" />
                         </button>
                     </div>
                 </div>
             </header>
 
-            <main className="mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-y-auto px-4 py-5 pb-8">
-                <div className="mb-4 flex items-center gap-3 rounded-full border border-white/10 bg-black/10 px-3 py-2">
+            <main className="mx-auto min-h-0 w-[99%] max-w-none flex-1 overflow-y-auto px-0 py-4 pb-8 sm:px-2 sm:py-5">
+                <div className="mb-4 flex items-center gap-2 px-1 sm:gap-3">
                     <button
                         type="button"
                         onClick={() => setCheckoutStep("summary")}
                         className={[
-                            "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.22em] transition",
+                            "inline-flex items-center gap-2 rounded-full px-2 py-1 text-[10px] font-extrabold transition sm:px-3 sm:py-1.5 sm:text-[11px]",
                             checkoutStep === "summary"
                                 ? "bg-[color:color-mix(in_srgb,var(--app-primary)_12%,var(--app-surface)_88%)] text-[color:var(--app-text)]"
                                 : "theme-muted hover:text-[color:var(--app-text)]",
                         ].join(" ")}
                     >
-                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-current/20 text-[10px]">
+                        <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current/20 text-[9px] sm:h-5 sm:w-5 sm:text-[10px]">
                             1
                         </span>
-                        Order Summary
                     </button>
-                    <div className="h-px flex-1 bg-[var(--app-border)]" />
+                    <div className="checkout-paper-divider h-px flex-1 bg-[var(--app-border)]" />
                     <button
                         type="button"
                         onClick={() => {
@@ -751,64 +743,52 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                             setCheckoutStep("payment");
                         }}
                         className={[
-                            "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.22em] transition",
+                            "inline-flex items-center gap-2 rounded-full px-2 py-1 text-[10px] font-extrabold transition sm:px-3 sm:py-1.5 sm:text-[11px]",
                             checkoutStep === "payment"
                                 ? "bg-[color:color-mix(in_srgb,var(--app-accent)_12%,var(--app-surface)_88%)] text-[color:var(--app-text)]"
                                 : "theme-muted hover:text-[color:var(--app-text)]",
                         ].join(" ")}
                     >
-                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-current/20 text-[10px]">
+                        <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current/20 text-[9px] sm:h-5 sm:w-5 sm:text-[10px]">
                             2
                         </span>
-                        Payment
                     </button>
                 </div>
 
-                <AnimatePresence mode="wait" initial={false}>
-                    {checkoutStep === "summary" ? (
-                        <motion.section
-                            key="summary"
-                            initial={{ opacity: 0, y: 16 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -12 }}
-                            transition={{ duration: 0.22 }}
-                            className="rounded-[32px] border border-white/10 bg-black/10 p-5 md:p-6"
-                        >
-                            <div className="flex flex-wrap items-start justify-between gap-4">
+                {checkoutStep === "summary" ? (
+                    <section className="p-1 sm:p-2">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div>
-                                    <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Order Summary</p>
-                                    <p className="mt-1 text-2xl font-semibold tracking-tight">Review items before you pay</p>
-                                    <p className="theme-muted mt-1 text-sm">Check your cart here, then continue to payment.</p>
+                                    <p className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">Review items before you pay</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Total</p>
-                                    <p className="mt-1 text-3xl font-bold tabular-nums">₹{toInr(payableAmount)}</p>
+                                    <p className="mt-1 text-2xl font-bold tabular-nums sm:text-3xl">₹{toInr(payableAmount)}</p>
                                 </div>
                             </div>
 
-                            <div className="mt-6 overflow-hidden rounded-[28px] border border-white/10 bg-black/10">
+                            <div className="mt-5">
                                 {(!cart || cart.length === 0) ? (
-                                    <div className="px-6 py-12 text-center">
-                                        <p className="text-sm font-semibold">Your cart is empty</p>
-                                        <p className="theme-muted mt-1 text-xs">Add items to continue.</p>
+                                    <div className="px-2 py-8 text-center">
+                                        <p className="text-sm font-semibold sm:text-base">Your cart is empty</p>
+                                        <p className="theme-muted mt-1 text-[11px] sm:text-xs">Add items to continue.</p>
                                     </div>
                                 ) : (
-                                    <div className="divide-y divide-white/10">
+                                    <div className="space-y-3">
                                         {(cart || []).map((item) => {
                                             const qty = Math.max(1, Number(item.quantity || 1));
                                             const price = Number(item.price || 0);
                                             return (
-                                                <div key={item.id} className="flex items-start justify-between gap-4 px-5 py-4">
+                                                <div key={item.id} className="flex items-start justify-between gap-3 px-1 py-1.5">
                                                     <div className="min-w-0">
-                                                        <p className="truncate text-sm font-semibold">{item.name}</p>
-                                                        <div className="theme-muted mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                                        <p className="truncate text-sm font-semibold sm:text-[15px]">{item.name}</p>
+                                                        <div className="theme-muted mt-1.5 flex flex-wrap items-center gap-2 text-[11px] sm:text-xs">
                                                             <span className="rounded-full border border-white/10 bg-black/10 px-2 py-0.5">
                                                                 Qty {qty}
                                                             </span>
                                                             <span className="tabular-nums">₹{toInr(price)} each</span>
                                                         </div>
                                                     </div>
-                                                    <p className="shrink-0 text-sm font-semibold tabular-nums">₹{toInr(price * qty)}</p>
+                                                    <p className="shrink-0 text-sm font-semibold tabular-nums sm:text-[15px]">₹{toInr(price * qty)}</p>
                                                 </div>
                                             );
                                         })}
@@ -816,24 +796,16 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                 )}
                             </div>
 
-                            <p className="theme-muted mt-4 text-xs">
+                            <p className="theme-muted mt-3 text-[11px] sm:mt-4 sm:text-xs">
                                 The next page will handle payment details and your delivery or pickup choice.
                             </p>
-                        </motion.section>
-                    ) : (
-                        <motion.section
-                            key="payment"
-                            initial={{ opacity: 0, y: 16 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -12 }}
-                            transition={{ duration: 0.22 }}
-                            className="rounded-[32px] border border-white/10 bg-black/10 p-5 md:p-6"
-                        >
+                    </section>
+                ) : (
+                    <section className="p-1 sm:p-2">
                             <div className="flex flex-wrap items-start justify-between gap-4">
                                 <div>
-                                    <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Payment</p>
-                                    <p className="mt-1 text-2xl font-semibold tracking-tight">Choose a method</p>
-                                    <p className="theme-muted mt-1 text-sm">
+                                    <p className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">Choose a method</p>
+                                    <p className="theme-muted mt-1 hidden text-xs sm:block sm:text-sm">
                                         {isOnlineOrder
                                             ? selectedFulfillment === "pickup"
                                                 ? "Choose pickup, then place the order."
@@ -842,7 +814,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                     </p>
                                 </div>
                                 <div
-                                    className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.24em]"
+                                    className="inline-flex items-center gap-2 rounded-full border px-2.5 py-1.5 text-[9px] font-extrabold sm:px-3 sm:text-[10px]"
                                     style={{
                                         borderColor: isOnlineOrder
                                             ? "color-mix(in srgb, var(--app-accent) 34%, var(--app-border) 66%)"
@@ -865,13 +837,13 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
 
                             <div className="mt-6 flex flex-col gap-6">
                                 {isOnlineOrder && (
-                                    <div className="order-2 space-y-4">
+                                    <div className="order-2 space-y-3">
                                         <div className="inline-flex rounded-full border border-[var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface)_84%,var(--app-surface-2)_16%)] p-1">
                                             <button
                                                 type="button"
                                                 onClick={() => setFulfillment("delivery")}
                                                 className={[
-                                                    "rounded-full px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.2em] transition",
+                                                    "rounded-full px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.18em] transition sm:px-4 sm:py-2 sm:text-[11px] sm:tracking-[0.2em]",
                                                     selectedFulfillment === "delivery"
                                                         ? "bg-[color:color-mix(in_srgb,var(--app-accent)_16%,var(--app-surface)_84%)] text-[color:var(--app-text)]"
                                                         : "theme-muted hover:text-[color:var(--app-text)]",
@@ -883,7 +855,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                 type="button"
                                                 onClick={() => setFulfillment("pickup")}
                                                 className={[
-                                                    "rounded-full px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.2em] transition",
+                                                    "rounded-full px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.18em] transition sm:px-4 sm:py-2 sm:text-[11px] sm:tracking-[0.2em]",
                                                     selectedFulfillment === "pickup"
                                                         ? "bg-[color:color-mix(in_srgb,var(--app-primary)_16%,var(--app-surface)_84%)] text-[color:var(--app-text)]"
                                                         : "theme-muted hover:text-[color:var(--app-text)]",
@@ -894,11 +866,8 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                         </div>
 
                                         {selectedFulfillment === "pickup" ? (
-                                            <div className="rounded-[28px] border border-white/10 bg-black/10 p-4">
-                                                <p className="text-xs font-extrabold uppercase tracking-[0.22em] text-[color:var(--app-primary)]">
-                                                    Pickup Details
-                                                </p>
-                                                <p className="mt-2 text-sm leading-relaxed">
+                                            <div className="py-1">
+                                                <p className="mt-1.5 text-xs leading-relaxed sm:text-sm">
                                                     Pickup orders do not need a delivery address. We will prepare your order for counter collection.
                                                 </p>
                                             </div>
@@ -906,12 +875,9 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                             <>
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="min-w-0">
-                                                        <p className="text-xs font-extrabold uppercase tracking-[0.22em] text-[color:var(--app-accent)]">
-                                                            Delivery Address
-                                                        </p>
                                                     </div>
                                                     <span
-                                                        className="rounded-full border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.2em]"
+                                                        className="rounded-full border px-2 py-0.5 text-[9px] font-extrabold sm:px-2.5 sm:py-1 sm:text-[10px]"
                                                         style={{
                                                             borderColor: "color-mix(in srgb, var(--app-accent) 30%, var(--app-border) 70%)",
                                                             background: "color-mix(in srgb, var(--app-accent) 14%, var(--app-surface) 86%)",
@@ -925,11 +891,11 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                 {customerToken && savedAddresses.length > 0 && (
                                                     <div className="space-y-2">
                                                         <div className="flex items-center justify-between gap-3">
-                                                            <p className="text-sm font-semibold">Saved addresses</p>
+                                                            <p className="text-[13px] font-semibold sm:text-sm">Saved addresses</p>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setAddressMode("manual")}
-                                                                className="inline-flex items-center gap-1 rounded-full border border-transparent px-2 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] transition hover:bg-black/5"
+                                                                className="inline-flex items-center gap-1 rounded-full border border-transparent px-2 py-1 text-[10px] font-semibold text-[color:var(--app-accent)] transition hover:bg-black/5 sm:text-[11px]"
                                                             >
                                                                 <Plus size={12} />
                                                                 Use new address
@@ -949,7 +915,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                                             setAddressMode("saved");
                                                                             setSelectedAddressId(String(address.id || ""));
                                                                         }}
-                                                                        className="flex w-full items-start justify-between gap-3 rounded-2xl border p-3 text-left transition hover:-translate-y-0.5"
+                                                                        className="flex w-full items-start justify-between gap-3 border-y border-x-0 p-2.5 text-left transition hover:translate-y-0"
                                                                         style={{
                                                                             borderColor: active
                                                                                 ? "color-mix(in srgb, var(--app-accent) 40%, var(--app-border) 60%)"
@@ -973,23 +939,23 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                                             </div>
                                                                             <div className="min-w-0">
                                                                                 <div className="flex flex-wrap items-center gap-2">
-                                                                                    <p className="text-sm font-semibold leading-tight">
+                                                                                    <p className="text-[13px] font-semibold leading-tight sm:text-sm">
                                                                                         {String(address.label || "Address").trim()}
                                                                                     </p>
                                                                                     {address.isDefault && (
-                                                                                        <span className="rounded-full border border-[color:var(--app-accent)]/30 bg-[color:color-mix(in_srgb,var(--app-accent)_16%,var(--app-surface)_84%)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                                                                                        <span className="rounded-full border border-[color:var(--app-accent)]/30 bg-[color:color-mix(in_srgb,var(--app-accent)_16%,var(--app-surface)_84%)] px-2 py-0.5 text-[9px] font-bold text-[color:var(--app-accent)] sm:text-[10px]">
                                                                                             Default
                                                                                         </span>
                                                                                     )}
                                                                                 </div>
-                                                                                <p className="theme-muted mt-1 whitespace-pre-line text-xs leading-relaxed">
+                                                                                <p className="theme-muted mt-1 whitespace-pre-line text-[11px] leading-relaxed sm:text-xs">
                                                                                     {formatSavedAddress(address)}
                                                                                 </p>
                                                                             </div>
                                                                         </div>
 
                                                                         <span
-                                                                            className="ml-2 shrink-0 rounded-full border px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.18em]"
+                                                                            className="ml-2 shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-extrabold sm:py-1 sm:text-[10px]"
                                                                             style={{
                                                                                 borderColor: active
                                                                                     ? "color-mix(in srgb, var(--app-accent) 34%, var(--app-border) 66%)"
@@ -1013,43 +979,42 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                     <div className="space-y-3">
                                                         {customerToken && savedAddresses.length > 0 && (
                                                             <div className="flex items-center justify-between gap-3">
-                                                                <p className="text-sm font-semibold">New address</p>
+                                                                <p className="text-[13px] font-semibold sm:text-sm">New address</p>
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setAddressMode("saved")}
-                                                                    className="text-[11px] font-semibold text-[color:var(--app-accent)] underline decoration-dotted underline-offset-4 hover:opacity-80"
+                                                                    className="text-[10px] font-semibold text-[color:var(--app-accent)] underline decoration-dotted underline-offset-4 hover:opacity-80 sm:text-[11px]"
                                                                 >
                                                                     Back to saved
                                                                 </button>
                                                             </div>
                                                         )}
-                                                        <label className="theme-muted mb-2 block text-sm">Delivery address</label>
+                                                        <label className="theme-muted mb-2 block text-[13px] sm:text-sm">Delivery address</label>
                                                         <textarea
                                                             value={manualAddress}
                                                             onChange={(e) => setManualAddress(e.target.value)}
                                                             placeholder="House / Flat no, street, area, landmark, city, pincode"
                                                             rows={4}
-                                                            className="theme-input w-full rounded-2xl px-4 py-3 outline-none"
+                                                            className="theme-input w-full rounded-2xl px-3 py-2.5 text-[13px] outline-none sm:px-4 sm:py-3 sm:text-sm"
                                                         />
                                                     </div>
                                                 )}
 
                                                 {addressLoading && customerToken && (
-                                                    <p className="theme-muted text-xs">Loading saved addresses...</p>
+                                                    <p className="theme-muted text-[11px] sm:text-xs">Loading saved addresses...</p>
                                                 )}
                                             </>
                                         )}
                                     </div>
                                 )}
 
-                                <div className="order-1 space-y-4">
+                                <div className="order-1 space-y-3">
                                     <div className="flex items-center justify-between gap-3">
                                         <div>
-                                            <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Payment Methods</p>
-                                            <h3 className="mt-1 text-lg font-semibold">Pick one</h3>
+                                            <h3 className="mt-1 text-base font-semibold sm:text-lg">Pick one</h3>
                                         </div>
-                                        <p className="theme-muted inline-flex items-center gap-2 text-xs">
-                                            <ShieldCheck size={14} className="theme-accent-text" />
+                                        <p className="theme-muted hidden items-center gap-2 text-[11px] sm:inline-flex sm:text-xs">
+                                            <ShieldCheck size={13} className="theme-accent-text sm:size-3.5" />
                                             Secure payment
                                         </p>
                                     </div>
@@ -1059,7 +1024,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                             type="button"
                                             onClick={() => setPaymentMethod("UPI")}
                                             className={[
-                                                "group relative flex min-h-[72px] items-center justify-between gap-2 overflow-hidden rounded-[20px] border px-3 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-primary)] hover:-translate-y-0.5",
+                                                "checkout-paper-option group relative flex min-h-[64px] items-center justify-between gap-2 overflow-hidden rounded-[18px] border px-3 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-primary)] hover:-translate-y-0.5",
                                                 selectedPaymentMethod === "UPI" ? "ring-1 ring-[color:var(--app-primary)]" : "",
                                             ].join(" ")}
                                             aria-pressed={selectedPaymentMethod === "UPI"}
@@ -1067,7 +1032,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                         >
                                             <div className="flex min-w-0 items-center gap-2">
                                                 <div
-                                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border"
+                                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border"
                                                     style={{
                                                         borderColor: "color-mix(in srgb, var(--app-primary) 26%, var(--app-border) 74%)",
                                                         background: "color-mix(in srgb, var(--app-primary) 11%, transparent)",
@@ -1077,8 +1042,10 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                     <QrCode size={16} />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="text-sm font-semibold leading-tight tracking-tight">{getPaymentMethodTitle("UPI")}</p>
-                                                    <p className="theme-muted mt-0.5 text-[10px] leading-tight">{getPaymentMethodSubtitle("UPI")}</p>
+                                                    <p className="text-[13px] font-semibold leading-tight tracking-tight sm:text-sm">{getPaymentMethodTitle("UPI")}</p>
+                                                    <p className="theme-muted mt-0.5 hidden text-[9px] leading-tight sm:block sm:text-[10px]">
+                                                        {getPaymentMethodSubtitle("UPI")}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </button>
@@ -1087,7 +1054,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                             type="button"
                                             onClick={() => setPaymentMethod("CASH")}
                                             className={[
-                                                "group relative flex min-h-[72px] items-center justify-between gap-2 overflow-hidden rounded-[20px] border px-3 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] hover:-translate-y-0.5",
+                                                "checkout-paper-option group relative flex min-h-[72px] items-center justify-between gap-2 overflow-hidden rounded-[20px] border px-3 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] hover:-translate-y-0.5",
                                                 selectedPaymentMethod === "CASH" ? "ring-1 ring-[color:var(--app-accent)]" : "",
                                             ].join(" ")}
                                             aria-pressed={selectedPaymentMethod === "CASH"}
@@ -1095,7 +1062,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                         >
                                             <div className="flex min-w-0 items-center gap-2">
                                                 <div
-                                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border"
+                                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border"
                                                     style={{
                                                         borderColor: "color-mix(in srgb, var(--app-accent) 30%, var(--app-border) 70%)",
                                                         background: "color-mix(in srgb, var(--app-accent) 12%, transparent)",
@@ -1105,16 +1072,16 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                     <Banknote size={16} />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="text-sm font-semibold leading-tight tracking-tight">
+                                                    <p className="text-[13px] font-semibold leading-tight tracking-tight sm:text-sm">
                                                         {getPaymentMethodTitle("CASH", selectedFulfillment)}
                                                     </p>
-                                                    <p className="theme-muted mt-0.5 text-[10px] leading-tight">
-                                                        {getPaymentMethodSubtitle("CASH", selectedFulfillment)}
-                                                    </p>
+                                                <p className="theme-muted mt-0.5 hidden text-[9px] leading-tight sm:block sm:text-[10px]">
+                                                    {getPaymentMethodSubtitle("CASH", selectedFulfillment)}
+                                                </p>
                                                 </div>
                                             </div>
                                             <span
-                                                className="shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.2em]"
+                                                className="shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.18em] sm:text-[10px]"
                                                 style={getPaymentBadgeStyle("CASH", selectedPaymentMethod === "CASH")}
                                             >
                                                 COD
@@ -1123,24 +1090,24 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                     </div>
 
                                     {paymentMethod === "UPI" && (
-                                        <div className="space-y-3">
-                                            <div className="rounded-2xl border p-3.5" style={getPaymentInfoStyle()}>
-                                                <p className="text-xs font-extrabold uppercase tracking-[0.22em] text-[color:var(--app-primary)]">
+                                        <div className="space-y-2">
+                                            <div className="checkout-paper-flat py-1" style={getPaymentInfoStyle()}>
+                                                <p className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[color:var(--app-primary)] sm:text-xs">
                                                     Pay Via UPI ID
                                                 </p>
                                                 {upiPa ? (
-                                                    <p className="mt-1 text-sm font-semibold tracking-tight">{upiPa}</p>
+                                                    <p className="mt-1 text-[13px] font-semibold tracking-tight sm:text-sm">{upiPa}</p>
                                                 ) : (
-                                                    <p className="mt-1 text-sm font-medium text-red-400">Owner has not added a UPI ID yet.</p>
+                                                    <p className="mt-1 text-[13px] font-medium text-red-400 sm:text-sm">Owner has not added a UPI ID yet.</p>
                                                 )}
-                                                <p className="theme-muted mt-2 text-xs leading-relaxed">
+                                                <p className="theme-muted mt-2 hidden text-[11px] leading-relaxed sm:block sm:text-xs">
                                                     On mobile, this opens available apps like Google Pay, PhonePe, Paytm and others.
                                                 </p>
                                                 <div className="mt-2 flex flex-wrap gap-2">
                                                     {["Google Pay", "PhonePe", "Paytm", "BHIM"].map((appName) => (
                                                         <span
                                                             key={appName}
-                                                            className="rounded-full border px-2.5 py-1 text-[10px] font-semibold"
+                                                            className="rounded-full border px-2.5 py-1 text-[9px] font-semibold sm:text-[10px]"
                                                             style={{
                                                                 borderColor: "color-mix(in srgb, var(--app-border-strong) 44%, var(--app-border) 56%)",
                                                                 background: "color-mix(in srgb, var(--app-surface-2) 58%, var(--app-surface) 42%)",
@@ -1155,53 +1122,53 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                 {placedOrder?.id ? (
                                                     <div className="mt-3 space-y-2">
                                                         <div
-                                                            className={`rounded-2xl border px-3 py-2 text-xs ${
+                                                            className={`rounded-2xl border px-3 py-2 text-[11px] ${
                                                                 upiAttemptFailed
                                                                     ? "border-rose-500/35 bg-rose-500/10 text-rose-200"
                                                                     : "border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,var(--app-primary)_10%,var(--app-surface)_90%)] text-[color:var(--app-muted-strong)]"
                                                             }`}
                                                         >
-                                                            <p className="font-semibold">
+                                                            <p className="font-semibold text-[13px] sm:text-sm">
                                                                 Order {placedOrder.orderNo || placedOrder.id} • Rs {toInr(placedOrder.total)}
                                                             </p>
-                                                            <p className="mt-1">
+                                                            <p className="mt-1 text-[11px] sm:text-xs">
                                                                 {upiAttemptFailed
                                                                     ? "Last UPI attempt failed. Tap Open UPI Apps to retry."
                                                                     : "Complete payment in UPI app, then confirm status below."}
                                                             </p>
                                                         </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => launchUpiApps(placedOrder)}
-                                                            disabled={!upiPa || submitting}
-                                                            className="theme-button w-full rounded-2xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
-                                                        >
-                                                            Open UPI Apps
-                                                        </button>
-                                                        <div className="grid gap-2 sm:grid-cols-2">
                                                             <button
                                                                 type="button"
-                                                                onClick={() => finalizeUpiPayment("SUCCESS")}
-                                                                disabled={submitting}
-                                                                className="rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,var(--app-primary)_12%,var(--app-surface)_88%)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text)] disabled:opacity-60"
+                                                                onClick={() => launchUpiApps(placedOrder)}
+                                                                disabled={!upiPa || submitting}
+                                                                className="theme-button w-full rounded-2xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
                                                             >
-                                                                Payment Successful
+                                                                Open UPI Apps
                                                             </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => finalizeUpiPayment("FAILED")}
-                                                                disabled={submitting}
-                                                                className="rounded-2xl border border-rose-400/40 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-200 disabled:opacity-60"
-                                                            >
-                                                                Payment Failed
-                                                            </button>
-                                                        </div>
-                                                        <p className="theme-muted text-xs leading-relaxed">
+                                                            <div className="grid gap-2 sm:grid-cols-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => finalizeUpiPayment("SUCCESS")}
+                                                                    disabled={submitting}
+                                                                    className="rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,var(--app-primary)_12%,var(--app-surface)_88%)] px-3 py-2 text-[11px] font-semibold text-[color:var(--app-text)] disabled:opacity-60"
+                                                                >
+                                                                    Payment Successful
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => finalizeUpiPayment("FAILED")}
+                                                                    disabled={submitting}
+                                                                    className="rounded-2xl border border-rose-400/40 bg-rose-400/10 px-3 py-2 text-[11px] font-semibold text-rose-200 disabled:opacity-60"
+                                                                >
+                                                                    Payment Failed
+                                                                </button>
+                                                            </div>
+                                                        <p className="theme-muted hidden text-[11px] leading-relaxed sm:block">
                                                             After payment in UPI app, come back here and pick the status.
                                                         </p>
                                                     </div>
                                                 ) : (
-                                                    <p className="theme-muted mt-3 text-xs leading-relaxed">
+                                                    <p className="theme-muted mt-3 hidden text-[11px] leading-relaxed sm:block">
                                                         Place order first, then use the button above to open UPI apps.
                                                     </p>
                                                 )}
@@ -1210,45 +1177,45 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                     )}
                                 </div>
 
-                                <div className="order-3 space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2">
+                                <div className="order-3 space-y-3">
+                                    <div className="grid gap-3 md:grid-cols-2">
                                         {!customerToken && (
                                             <div>
-                                                <label className="theme-muted mb-2 block text-sm">Phone Number</label>
+                                                <label className="theme-muted mb-2 block text-[13px] sm:text-sm">Phone Number</label>
                                                 <input
                                                     value={phone}
                                                     onChange={(e) => setPhone(e.target.value)}
                                                     placeholder="Enter your phone number"
-                                                    className="theme-input w-full rounded-2xl px-4 py-3 outline-none"
+                                                    className="theme-input w-full rounded-2xl px-3 py-2.5 text-[13px] outline-none sm:px-4 sm:py-3 sm:text-sm"
                                                 />
                                             </div>
                                         )}
 
                                         {!customerToken && (
                                             <div>
-                                                <label className="theme-muted mb-2 block text-sm">Email (optional)</label>
+                                                <label className="theme-muted mb-2 block text-[13px] sm:text-sm">Email (optional)</label>
                                                 <input
                                                     value={email}
                                                     onChange={(e) => setEmail(e.target.value)}
                                                     placeholder={customer?.email || "you@example.com"}
-                                                    className="theme-input w-full rounded-2xl px-4 py-3 outline-none"
+                                                    className="theme-input w-full rounded-2xl px-3 py-2.5 text-[13px] outline-none sm:px-4 sm:py-3 sm:text-sm"
                                                 />
-                                                <p className="theme-muted mt-2 text-xs">If provided, we'll send the OTP to email too.</p>
+                                                <p className="theme-muted mt-2 hidden text-[11px] sm:block sm:text-xs">If provided, we'll send the OTP to email too.</p>
                                             </div>
                                         )}
 
                                         {otpStep === "otp" && !customerToken && (
-                                            <div className="md:col-span-2 rounded-2xl border border-white/10 bg-black/10 p-4">
-                                                <label className="theme-muted mb-2 block text-sm">OTP</label>
+                                            <div className="checkout-paper-flat md:col-span-2 py-1">
+                                                <label className="theme-muted mb-2 block text-[13px] sm:text-sm">OTP</label>
                                                 <input
                                                     value={otp}
                                                     onChange={(e) => setOtp(e.target.value)}
                                                     inputMode="numeric"
                                                     autoComplete="one-time-code"
                                                     placeholder="Enter 6-digit OTP"
-                                                    className="theme-input w-full rounded-2xl px-4 py-3 outline-none"
+                                                    className="theme-input w-full rounded-2xl px-3 py-2.5 text-[13px] outline-none sm:px-4 sm:py-3 sm:text-sm"
                                                 />
-                                                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+                                                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[11px] sm:text-sm">
                                                     <button
                                                         type="button"
                                                         onClick={() => {
@@ -1282,9 +1249,9 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                         Resend OTP
                                                     </button>
                                                 </div>
-                                                {import.meta.env.DEV && devOtp && <p className="theme-muted mt-2 text-xs">Dev OTP: {devOtp}</p>}
+                                                {import.meta.env.DEV && devOtp && <p className="theme-muted mt-2 text-[11px]">Dev OTP: {devOtp}</p>}
                                                 {otpExpiresAt && (
-                                                    <p className="theme-muted mt-1 text-xs">
+                                                    <p className="theme-muted mt-1 text-[11px]">
                                                         Expires at {new Date(otpExpiresAt).toLocaleTimeString()}
                                                     </p>
                                                 )}
@@ -1293,85 +1260,74 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
 
                                     </div>
 
-                                    <div>
+                                    <div className="checkout-paper-flat">
                                         <button
                                             type="button"
                                             onClick={() => setShowOptionalDetails((v) => !v)}
                                             className="flex w-full items-center justify-between text-left"
                                         >
-                                            <span className="text-sm font-semibold">Customer details (optional)</span>
-                                            <span className="theme-muted text-sm">{showOptionalDetails ? "Hide" : "Add / Edit"}</span>
+                                            <span className="text-[13px] font-semibold sm:text-sm">Customer details (optional)</span>
+                                            <span className="theme-muted text-[13px] sm:text-sm">{showOptionalDetails ? "Hide" : "Add / Edit"}</span>
                                         </button>
 
                                         {showOptionalDetails && (
                                             <div className="mt-4">
-                                                <label className="theme-muted mb-2 block text-sm">Name</label>
+                                                <label className="theme-muted mb-2 block text-[13px] sm:text-sm">Name</label>
                                                 <input
                                                     value={customerName}
                                                     onChange={(e) => setCustomerName(e.target.value)}
                                                     placeholder={customer?.name || "Customer name"}
-                                                    className="theme-input w-full rounded-2xl px-4 py-3 outline-none"
+                                                    className="theme-input w-full rounded-2xl px-3 py-2.5 text-[13px] outline-none sm:px-4 sm:py-3 sm:text-sm"
                                                 />
                                             </div>
                                         )}
                                     </div>
 
-                                    <div>
-                                        <label className="theme-muted mb-2 block text-sm">Notes (optional)</label>
+                                    <div className="checkout-paper-flat">
+                                        <label className="theme-muted mb-2 block text-[13px] sm:text-sm">Notes (optional)</label>
                                         <textarea
                                             value={notes}
                                             onChange={(e) => setNotes(e.target.value)}
                                             placeholder="Any special instructions?"
                                             rows={3}
-                                            className="theme-input w-full rounded-2xl px-4 py-3 outline-none"
+                                            className="theme-input w-full rounded-2xl px-3 py-2.5 text-[13px] outline-none sm:px-4 sm:py-3 sm:text-sm"
                                         />
                                     </div>
 
                                     {error && (
-                                        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                                        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-[13px] text-red-300 sm:text-sm">
                                             {error}
                                         </div>
                                     )}
 
                                     {success && (
-                                        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+                                        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-[13px] text-emerald-300 sm:text-sm">
                                             {success}
                                         </div>
                                     )}
                                 </div>
                             </div>
-                        </motion.section>
-                    )}
-                </AnimatePresence>
+                    </section>
+                )}
             </main>
 
-            <footer className="shrink-0 border-t border-white/10 bg-black/60 backdrop-blur">
-                <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+            <footer className="checkout-paper-divider shrink-0 border-t border-white/10 bg-black/60 backdrop-blur">
+                <div className="mx-auto flex w-[99%] max-w-none items-center justify-between gap-4 px-0 py-3 sm:px-1">
                     <div className="min-w-0">
-                        <p className="theme-muted text-[10px] font-extrabold uppercase tracking-[0.32em]">Total Payable</p>
-                        <p className="mt-1 truncate text-lg font-bold tabular-nums">Rs {toInr(payableAmount)}</p>
+                        <p className="mt-1 truncate text-base font-bold tabular-nums sm:text-lg">Rs {toInr(payableAmount)}</p>
                         {checkoutStep === "payment" && (
-                            <p className="theme-muted mt-0.5 text-xs">
+                            <p className="theme-muted mt-0.5 hidden text-[11px] sm:block sm:text-xs">
                                 {getPaymentFooterHint(selectedPaymentMethod, isOnlineOrder, selectedFulfillment)}
                             </p>
                         )}
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {checkoutStep === "payment" && (
-                            <button
-                                type="button"
-                                onClick={() => setCheckoutStep("summary")}
-                                className="theme-soft-button inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold"
-                            >
-                                Back to Summary
-                            </button>
-                        )}
                         <button
                             type="button"
                             onClick={handlePrimaryAction}
                             disabled={submitting || (checkoutStep === "summary" && !cart?.length)}
-                            className="theme-button inline-flex min-w-[200px] items-center justify-center rounded-2xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70"
+                            className="theme-button inline-flex min-w-[170px] items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 sm:min-w-[200px] sm:px-6"
                         >
                             {submitting
                                 ? "Working..."

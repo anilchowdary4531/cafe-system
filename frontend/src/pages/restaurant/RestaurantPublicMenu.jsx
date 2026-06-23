@@ -1,16 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
-import {
-    Coffee,
-    IceCream,
-    Pizza,
-    Search,
-    ShoppingBag,
-    Sparkles,
-    Tags,
-    Sandwich,
-    UtensilsCrossed,
-} from "lucide-react";
+import { Search, ShoppingBag, Sparkles, Tags } from "lucide-react";
 import { useCart } from "../../context/CartContext";
 import { useRestaurantContext } from "../../context/RestaurantContext";
 import CartDrawer from "../../components/CartDrawer";
@@ -18,10 +8,8 @@ import BrandLogo from "../../components/BrandLogo";
 import useCachedGet from "../../hooks/useCachedGet";
 import { getCustomerFavorites, toggleFavoriteMenuItem } from "../../utils/customerFavorites";
 import { showToast } from "../../utils/toast";
-import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import {
     EMPTY_MENU,
-    FALLBACK_IMAGE,
     compareMenuItems,
     getSectionMeta,
     normalizeText,
@@ -292,26 +280,28 @@ export default function RestaurantPublicMenu() {
             <div className="theme-nav sticky top-0 z-30 border-b px-2 py-2 sm:px-4 md:px-6">
                 <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
                     <Link to="/" className="flex min-w-0 items-center gap-3 justify-self-start">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1.5 shadow-[0_4px_14px_rgba(104,70,37,0.12)]">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1.5 shadow-[0_4px_14px_rgba(104,70,37,0.12)] sm:h-12 sm:w-12">
                             <BrandLogo className="h-full w-full" title="Tiffzy logo" />
                         </div>
 
-	                        <div className="min-w-0">
-	                            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]">
-	                                Tiffzy
-	                            </p>
-	                        </div>
-	                    </Link>
+                        <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]">
+                                Tiffzy
+                            </p>
+                        </div>
+                    </Link>
 
                     <div className="min-w-0 justify-self-center text-center">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]/80">
+                        <p className="hidden text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]/80 sm:block">
                             Restaurant
                         </p>
                         <p className="truncate text-base font-black tracking-tight text-[color:var(--app-accent)] sm:text-lg md:text-xl">
                             {restaurantName}
                         </p>
                         {restaurantLocation ? (
-                            <p className="truncate text-xs text-[color:var(--app-muted)] sm:text-sm">{restaurantLocation}</p>
+                            <p className="hidden truncate text-xs text-[color:var(--app-muted)] sm:block sm:text-sm">
+                                {restaurantLocation}
+                            </p>
                         ) : null}
                     </div>
 
@@ -319,20 +309,21 @@ export default function RestaurantPublicMenu() {
                         <VegModeToggle
                             enabled={vegModeEnabled}
                             onToggle={handleVegModeToggle}
-                            className="w-full sm:w-auto"
+                            compact
+                            className="w-auto"
                         />
 
                         <Link
                             to="/"
                             className="theme-soft-button inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition sm:px-4 sm:text-sm"
                         >
-                            <span className="hidden sm:inline">Home</span>
+                            <span>Home</span>
                         </Link>
                     </div>
                 </div>
             </div>
 
-            <div className="w-full px-3 py-5 pb-28 sm:px-4 md:px-6 md:pb-10">
+            <div className="w-full px-1 py-4 pb-28 sm:px-4 md:px-6 md:py-5 md:pb-10">
                 <div ref={menuStartRef} className="scroll-mt-32">
                     <div className="mb-4 space-y-3">
                         <div className="flex justify-end">
@@ -370,7 +361,7 @@ export default function RestaurantPublicMenu() {
                     </div>
                 </div>
 
-                <div className="space-y-5">
+                <div className="space-y-3 sm:space-y-4">
                     {menuSections.map((section) => (
                         <MenuSection
                             key={section.key}

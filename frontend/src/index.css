@@ -660,6 +660,34 @@ body,
     font-weight: 700;
 }
 
+@media (max-width: 640px) {
+    .checkout-paper-mobile .checkout-paper-flat,
+    .checkout-paper-mobile .checkout-paper-flat * {
+        box-shadow: none !important;
+    }
+
+    .checkout-paper-mobile .checkout-paper-flat {
+        border: 0 !important;
+        background: transparent !important;
+    }
+
+    .checkout-paper-mobile .checkout-paper-option {
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        min-height: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.25rem !important;
+    }
+
+    .checkout-paper-mobile .checkout-paper-divider {
+        border-color: transparent !important;
+        background: transparent !important;
+    }
+}
+
 .theme-sidebar .theme-nav-item {
     color: var(--app-sidebar-muted);
 }

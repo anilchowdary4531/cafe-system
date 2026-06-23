@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -454,36 +455,39 @@ export default function RestaurantMenu() {
     return (
         <div className="theme-page min-h-screen">
             <div className="theme-nav sticky top-0 z-30 border-b px-2 py-2 sm:px-4 md:px-6">
-                    <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
-                        <div className="flex min-w-0 items-center gap-3 justify-self-start">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1.5 shadow-[0_4px_14px_rgba(104,70,37,0.12)]">
-                                <BrandLogo className="h-full w-full" title="Tiffzy logo" />
-                            </div>
-
-	                        <div className="min-w-0">
-	                            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]">
-	                                Tiffzy
-	                            </p>
-	                        </div>
-	                    </div>
-
-                        <div className="min-w-0 justify-self-center text-center">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]/80">
-                                Restaurant
-                            </p>
-                            <p className="truncate text-base font-black tracking-tight text-[color:var(--app-accent)] sm:text-lg md:text-xl">
-                                {restaurantName}
-                            </p>
-                            {restaurantLocation ? (
-                                <p className="truncate text-xs text-[color:var(--app-muted)] sm:text-sm">{restaurantLocation}</p>
-                            ) : null}
+                <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3 justify-self-start">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1.5 shadow-[0_4px_14px_rgba(104,70,37,0.12)] sm:h-12 sm:w-12">
+                            <BrandLogo className="h-full w-full" title="Tiffzy logo" />
                         </div>
+
+                        <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]">
+                                Tiffzy
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="min-w-0 justify-self-center text-center">
+                        <p className="hidden text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]/80 sm:block">
+                            Restaurant
+                        </p>
+                        <p className="truncate text-base font-black tracking-tight text-[color:var(--app-accent)] sm:text-lg md:text-xl">
+                            {restaurantName}
+                        </p>
+                        {restaurantLocation ? (
+                            <p className="hidden truncate text-xs text-[color:var(--app-muted)] sm:block sm:text-sm">
+                                {restaurantLocation}
+                            </p>
+                        ) : null}
+                    </div>
 
                     <div className="flex shrink-0 flex-wrap items-center gap-2 justify-self-end">
                         <VegModeToggle
                             enabled={vegModeEnabled}
                             onToggle={handleVegModeToggle}
-                            className="w-full sm:w-auto"
+                            compact
+                            className="w-auto"
                         />
 
                         {isCustomerLoggedIn ? (
@@ -500,16 +504,16 @@ export default function RestaurantMenu() {
                                 className="theme-soft-button inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition sm:px-4 sm:text-sm"
                             >
                                 <LogIn size={16} />
-                                <span className="hidden sm:inline">Login</span>
+                                <span>Login</span>
                             </button>
                         )}
                     </div>
                 </div>
             </div>
 
-            <div className="w-full px-3 py-5 pb-28 sm:px-4 md:px-6 md:pb-10">
+            <div className="w-full px-1 py-4 pb-28 sm:px-4 md:px-6 md:py-5 md:pb-10">
                 <div ref={menuStartRef} className="scroll-mt-32">
-                    <div className="mb-4 space-y-3">
+                    <div className="mb-3 space-y-3 sm:mb-4">
                         <div className="flex justify-end">
                             <div className="relative w-full max-w-[360px] sm:max-w-[420px]">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 theme-muted" size={16} />
@@ -545,7 +549,7 @@ export default function RestaurantMenu() {
                     </div>
                 </div>
 
-                <div className="space-y-5">
+                <div className="space-y-3 sm:space-y-4">
                     {menuSections.map((section) => (
                         <MenuSection
                             key={section.key}
@@ -622,22 +626,24 @@ function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, o
 
     return (
         <section ref={sectionRef} data-section-key={section.key} className="scroll-mt-28">
-            <div className="mb-1.5 flex items-end justify-between gap-3 px-0.5">
+            <div className="mb-2 flex items-end justify-between gap-3 px-0.5">
                 <div className="flex items-center gap-2">
-                    <span className="theme-pill inline-flex h-8 w-8 items-center justify-center rounded-2xl">
+                    <span className="theme-pill inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl">
                         <Icon size={16} className="theme-accent-text" />
                     </span>
                     <div>
-                        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] sm:text-base">{section.title}</h2>
+                        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] sm:text-base">
+                            {section.title}
+                        </h2>
                         {section.key === "recommended" ? (
-                            <p className="theme-muted mt-0.5 text-xs">Popular picks surfaced first</p>
+                            <p className="theme-muted mt-0.5 hidden text-xs sm:block">Popular picks surfaced first</p>
                         ) : null}
                     </div>
                 </div>
-                <span className="theme-muted text-xs tabular-nums">{items.length} items</span>
+                <span className="theme-muted text-xs tabular-nums sm:text-sm">{items.length} items</span>
             </div>
 
-            <div className="divide-y divide-white/6">
+            <div className="flex gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-col sm:overflow-visible sm:pb-0 sm:space-y-3">
                 {items.map((item) => (
                     <MenuItemCard
                         key={String(item?.id || `${section.key}-${item?.name || "item"}`)}
@@ -660,10 +666,24 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
     const originalPrice = Number(item?.originalPrice || 0);
     const discountPercent = Number(item?.discountPercent || 0);
     const hasDiscount = discountPercent > 0 && originalPrice > itemPrice;
+    const handleCardClick = () => {
+        if (onAdd) onAdd(item);
+    };
 
     return (
-        <article className="group flex gap-3 py-3 sm:gap-3.5 sm:py-3.5">
-            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-white/8 bg-black/10 sm:h-24 sm:w-24">
+        <article
+            role="button"
+            tabIndex={0}
+            onClick={handleCardClick}
+            onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleCardClick();
+                }
+            }}
+            className="group flex w-[160px] shrink-0 cursor-pointer flex-col gap-2 rounded-2xl p-2 text-left sm:w-full sm:cursor-default sm:flex-row sm:gap-3.5 sm:rounded-none sm:p-0"
+        >
+            <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-2xl border border-white/8 bg-black/10 sm:h-24 sm:w-24">
                 <img
                     src={imageSrc}
                     className="h-full w-full object-cover"
@@ -681,7 +701,10 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
 
                 <button
                     type="button"
-                    onClick={() => onToggleFavorite && onToggleFavorite(item)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleFavorite && onToggleFavorite(item);
+                    }}
                     className={`absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border transition ${
                         isFavorite
                             ? "border-red-500/40 bg-red-500/10 text-red-300"
@@ -693,14 +716,14 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
                 </button>
             </div>
 
-            <div className="min-w-0 flex-1 pb-4">
-                <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2 sm:gap-3">
                     <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-[14px] font-bold leading-tight sm:text-[15px]">{item?.name}</h3>
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                            <h3 className="text-[13px] font-bold leading-tight sm:text-[15px]">{item?.name}</h3>
                             {dietBadge ? (
                                 <span
-                                    className={`inline-flex items-center gap-1.5 rounded-full border px-1.5 py-0.5 text-[8px] font-semibold ${dietBadge.className}`}
+                                    className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[7px] font-semibold sm:gap-1.5 sm:text-[8px] ${dietBadge.className}`}
                                 >
                                     <dietBadge.Icon size={9} />
                                     {dietBadge.label}
@@ -709,25 +732,28 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
                         </div>
 
                         {hasDiscount ? (
-                            <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                                <p className="text-[11px] text-[color:var(--app-muted)] line-through">
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                                <p className="text-[10px] text-[color:var(--app-muted)] line-through sm:text-[11px]">
                                     {formatPrice(originalPrice)}
                                 </p>
-                                <p className="text-[13px] font-semibold text-[color:var(--app-accent)]">
+                                <p className="text-[12px] font-semibold text-[color:var(--app-accent)] sm:text-[13px]">
                                     {formatPrice(itemPrice)}
                                 </p>
-                                <span className="inline-flex items-center rounded-full border border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,var(--app-primary)_16%,transparent)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[color:var(--app-primary)]">
+                                <span className="inline-flex items-center rounded-full border border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,var(--app-primary)_16%,transparent)] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.14em] text-[color:var(--app-primary)] sm:px-2 sm:text-[9px]">
                                     {Math.round(discountPercent)}% off
                                 </span>
                             </div>
                         ) : (
-                            <p className="mt-0.5 text-[13px] font-semibold text-[color:var(--app-accent)]">{formatPrice(itemPrice)}</p>
+                            <p className="mt-0.5 text-[12px] font-semibold text-[color:var(--app-accent)] sm:text-[13px]">{formatPrice(itemPrice)}</p>
                         )}
                     </div>
 
                     <button
-                        onClick={() => onAdd && onAdd(item)}
-                        className="theme-button inline-flex shrink-0 items-center justify-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-semibold sm:px-3"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onAdd && onAdd(item);
+                        }}
+                        className="theme-button hidden shrink-0 items-center justify-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-semibold sm:inline-flex sm:px-3"
                     >
                         <Plus size={11} />
                         Add
@@ -735,7 +761,7 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
                 </div>
 
                 <p
-                    className="theme-muted mt-1.5 text-[13px] leading-5"
+                    className="theme-muted mt-1 hidden text-[10px] leading-4 sm:mt-1.5 sm:block sm:text-[13px] sm:leading-5"
                     style={{
                         display: "-webkit-box",
                         WebkitBoxOrient: "vertical",
@@ -746,7 +772,7 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
                     {item?.description || "Freshly prepared, premium quality ingredients."}
                 </p>
 
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[color:var(--app-muted)]">
+                <div className="mt-1 hidden flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[color:var(--app-muted)] sm:mt-2 sm:flex">
                     {Number(item?.orderCount || 0) > 0 ? (
                         <span>{Number(item?.orderCount || 0).toLocaleString("en-IN")} orders</span>
                     ) : null}
