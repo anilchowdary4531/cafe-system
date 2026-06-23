@@ -125,7 +125,6 @@ export default function RestaurantChooser() {
     const visibleItems = Array.isArray(catalogData?.items)
         ? catalogData.items.filter((item) => !vegModeEnabled || isVegModeItem(item))
         : [];
-    const itemTotal = Number(catalogData?.totalItems || visibleItems.length);
     const itemSections = useMemo(() => {
         const groups = new Map();
 
@@ -276,7 +275,7 @@ export default function RestaurantChooser() {
                         </div>
                     </header>
 
-                    <div className="mt-5 space-y-4 sm:mt-6 sm:space-y-5">
+                    <div className="mt-4 space-y-3 sm:mt-5 sm:space-y-4">
                         {locationHint ? (
                             <div className="rounded-2xl border border-[var(--app-border)] bg-black/5 px-4 py-3 text-sm">
                                 {locationHint}
@@ -313,23 +312,23 @@ export default function RestaurantChooser() {
                                     </div>
                                 ) : null}
 
-                                <div className="space-y-4">
-                                    <div className="space-y-5">
+                                <div className="space-y-3">
+                                    <div className="space-y-4">
                                         {itemSections.map((section) => (
-                                            <div key={section.key} className="space-y-2">
-                                                <div className="flex items-end justify-between gap-3">
+                                            <div key={section.key} className="space-y-1.5">
+                                                <div className="flex items-end justify-between gap-2">
                                                     <div>
-                                                        <p className="theme-muted text-xs font-semibold uppercase tracking-[0.28em]">
+                                                        <p className="theme-muted text-[10px] font-semibold uppercase tracking-[0.24em] sm:text-xs">
                                                             {section.label}
                                                         </p>
-                                                        <h3 className="mt-1 text-sm font-bold sm:text-base">
+                                                        <h3 className="mt-1 text-[13px] font-bold sm:text-sm">
                                                             {section.items.length} {section.items.length === 1 ? "item" : "items"}
                                                         </h3>
                                                     </div>
                                                 </div>
 
-                                                <div className="snap-x snap-mandatory overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                                    <div className="flex w-max gap-3 pr-2 sm:gap-4">
+                                                <div className="snap-x snap-mandatory overflow-x-auto pb-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                                    <div className="flex w-max gap-2.5 pr-1 sm:gap-3">
                                                         {section.items.map((item) => (
                                                             <SearchItemCard
                                                                 key={item.id}
@@ -362,9 +361,9 @@ function SearchItemCard({ item, onClick }) {
         <button
             type="button"
             onClick={onClick}
-            className="group flex w-[170px] shrink-0 snap-start flex-col overflow-hidden rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.02)_100%)] text-left shadow-[0_14px_34px_rgba(0,0,0,0.12)] transition hover:-translate-y-1 hover:border-white/15 hover:bg-white/6 sm:w-[182px] md:w-[194px]"
+            className="group flex w-[146px] shrink-0 snap-start flex-col overflow-hidden rounded-[18px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.02)_100%)] text-left shadow-[0_12px_28px_rgba(0,0,0,0.12)] transition hover:-translate-y-1 hover:border-white/15 hover:bg-white/6 sm:w-[154px] md:w-[164px] lg:w-[172px]"
         >
-            <div className="relative aspect-[4/3] overflow-hidden bg-white/5">
+            <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
                 <img
                     src={imageSrc}
                     alt={item?.name || "Menu item"}
@@ -372,31 +371,31 @@ function SearchItemCard({ item, onClick }) {
                     loading="lazy"
                 />
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0)_35%,rgba(0,0,0,0.35)_100%)]" />
-                <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+                <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1.5">
                     {item?.category ? (
-                        <span className="theme-pill rounded-full px-2 py-0.5 text-[10px] font-semibold">{item.category}</span>
+                        <span className="theme-pill rounded-full px-1.5 py-0.5 text-[9px] font-semibold">{item.category}</span>
                     ) : null}
                     {item?.isFeatured ? (
-                        <span className="theme-pill rounded-full px-2 py-0.5 text-[10px] font-semibold">Featured</span>
+                        <span className="theme-pill rounded-full px-1.5 py-0.5 text-[9px] font-semibold">Featured</span>
                     ) : null}
                 </div>
             </div>
 
-            <div className="flex min-h-[110px] min-w-0 flex-1 flex-col p-3">
-                <h3 className="truncate text-sm font-bold sm:text-[15px]">{item?.name}</h3>
-                <p className="theme-muted mt-1 truncate text-xs">{item?.restaurant?.name || "Restaurant"}</p>
-                {placeText ? <p className="theme-muted mt-0.5 truncate text-[11px]">{placeText}</p> : null}
+            <div className="flex min-h-[88px] min-w-0 flex-1 flex-col p-2.5 sm:p-3">
+                <h3 className="truncate text-[13px] font-bold sm:text-sm">{item?.name}</h3>
+                <p className="theme-muted mt-0.5 truncate text-[10px] sm:text-xs">{item?.restaurant?.name || "Restaurant"}</p>
+                {placeText ? <p className="theme-muted mt-0.5 truncate text-[10px]">{placeText}</p> : null}
 
-                <div className="mt-auto flex items-end justify-between gap-2 pt-3">
-                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                        <span className="text-xs font-semibold text-[color:var(--app-accent)]">Rs {Math.round(Number(item?.price || 0))}</span>
+                <div className="mt-auto flex items-end justify-between gap-1.5 pt-2.5">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1">
+                        <span className="text-[11px] font-semibold text-[color:var(--app-accent)] sm:text-xs">Rs {Math.round(Number(item?.price || 0))}</span>
                         {Number(item?.orderCount || 0) > 0 ? (
-                            <span className="theme-muted truncate text-[11px]">{Number(item?.orderCount || 0).toLocaleString("en-IN")} orders</span>
+                            <span className="theme-muted truncate text-[10px]">{Number(item?.orderCount || 0).toLocaleString("en-IN")} orders</span>
                         ) : null}
                     </div>
 
-                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-accent)]">
-                        <ChevronRight size={14} />
+                    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-accent)]">
+                        <ChevronRight size={13} />
                     </span>
                 </div>
             </div>
