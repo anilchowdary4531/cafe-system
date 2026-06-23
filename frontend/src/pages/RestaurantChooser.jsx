@@ -313,23 +313,23 @@ export default function RestaurantChooser() {
                                     </div>
                                 ) : null}
 
-                                <div className="space-y-3">
-                                    <div className="space-y-4">
+                                <div className="space-y-2.5">
+                                    <div className="space-y-3">
                                         {itemSections.map((section) => (
-                                            <div key={section.key} className="space-y-1.5">
-                                                <div className="flex items-end justify-between gap-2">
+                                            <div key={section.key} className="space-y-1">
+                                                <div className="flex items-end justify-between gap-1">
                                                     <div>
-                                                        <p className="theme-muted text-[10px] font-semibold uppercase tracking-[0.24em] sm:text-xs">
+                                                        <p className="theme-muted text-[9px] font-semibold uppercase tracking-[0.2em] sm:text-[10px]">
                                                             {section.label}
                                                         </p>
-                                                        <h3 className="mt-1 text-[13px] font-bold sm:text-sm">
+                                                        <h3 className="mt-0.5 text-[12px] font-bold sm:text-[13px]">
                                                             {section.items.length} {section.items.length === 1 ? "item" : "items"}
                                                         </h3>
                                                     </div>
                                                 </div>
 
-                                                <div className="snap-x snap-mandatory overflow-x-auto pb-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                                    <div className="flex w-max gap-2.5 pr-1 sm:gap-3">
+                                                <div className="snap-x snap-mandatory overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                                    <div className="flex w-max gap-2 pr-1 sm:gap-2.5">
                                                         {section.items.map((item) => (
                                                             <SearchItemCard
                                                                 key={item.id}
@@ -374,9 +374,9 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
                     onClick?.();
                 }
             }}
-            className="chooser-item-card group flex w-[146px] shrink-0 snap-start flex-col overflow-hidden rounded-[18px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.02)_100%)] text-left shadow-[0_12px_28px_rgba(0,0,0,0.12)] transition hover:-translate-y-1 hover:border-white/15 hover:bg-white/6 sm:w-[154px] md:w-[164px] lg:w-[172px]"
+            className="chooser-item-card group flex w-[132px] shrink-0 snap-start flex-col overflow-hidden rounded-[16px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.02)_100%)] text-left shadow-[0_12px_28px_rgba(0,0,0,0.12)] transition hover:-translate-y-1 hover:border-white/15 hover:bg-white/6 sm:w-[140px] md:w-[148px] lg:w-[156px]"
         >
-            <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
+            <div className="relative aspect-[17/10] overflow-hidden bg-white/5">
                 <img
                     src={imageSrc}
                     alt={item?.name || "Menu item"}
@@ -384,7 +384,7 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
                     loading="lazy"
                 />
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0)_35%,rgba(0,0,0,0.35)_100%)]" />
-                <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1.5">
+                <div className="absolute left-2 top-2 flex flex-wrap gap-1">
                     {item?.category ? (
                         <span className="theme-pill rounded-full px-1.5 py-0.5 text-[9px] font-semibold">{item.category}</span>
                     ) : null}
@@ -395,9 +395,9 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
 
             </div>
 
-            <div className="flex min-h-[88px] min-w-0 flex-1 flex-col p-2.5 sm:p-3">
-                <div className="flex items-start justify-between gap-2">
-                    <h3 className="min-w-0 flex-1 truncate text-[13px] font-bold sm:text-sm">{item?.name}</h3>
+            <div className="flex min-h-[80px] min-w-0 flex-1 flex-col p-2 sm:p-2.5">
+                <div className="flex items-start justify-between gap-1">
+                    <h3 className="min-w-0 flex-1 truncate text-[12px] font-bold sm:text-[13px]">{item?.name}</h3>
                     <button
                         type="button"
                         onClick={(event) => {
@@ -405,31 +405,31 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
                             onToggleDetails?.();
                         }}
                         aria-label={selected ? "Hide item details" : "Show item details"}
-                        className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition ${
+                        className={`mt-0.5 inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border transition ${
                             selected
                                 ? "border-[color:var(--app-primary)] bg-[color:var(--app-primary)] text-[color:var(--app-primary-text)]"
                                 : "border-white/15 bg-black/35 text-white/85"
                         }`}
                     >
-                        <Dot size={16} strokeWidth={3.5} />
+                        <Dot size={14} strokeWidth={3.5} />
                     </button>
                 </div>
-                <p className="theme-muted mt-0.5 truncate text-[10px] sm:text-xs">{item?.restaurant?.name || "Restaurant"}</p>
+                <p className="theme-muted mt-0.25 truncate text-[9px] sm:text-[10px]">{item?.restaurant?.name || "Restaurant"}</p>
 
                 {selected ? (
-                    <div className="mt-2 space-y-1 rounded-[14px] border border-white/8 bg-white/4 px-2.5 py-2">
-                        {placeText ? <p className="truncate text-[10px] text-white/75">{placeText}</p> : null}
-                        <p className="truncate text-[10px] text-white/75">{orderCount.toLocaleString("en-IN")} orders</p>
+                    <div className="mt-1.5 space-y-0.5 rounded-[12px] border border-white/8 bg-white/4 px-2 py-1.5">
+                        {placeText ? <p className="truncate text-[9px] text-white/75">{placeText}</p> : null}
+                        <p className="truncate text-[9px] text-white/75">{orderCount.toLocaleString("en-IN")} orders</p>
                     </div>
                 ) : null}
 
-                <div className="mt-auto flex items-end justify-between gap-1.5 pt-2.5">
+                <div className="mt-auto flex items-end justify-between gap-1 pt-2">
                     <div className="flex min-w-0 flex-wrap items-center gap-1">
-                        <span className="text-[11px] font-semibold text-[color:var(--app-accent)] sm:text-xs">Rs {Math.round(Number(item?.price || 0))}</span>
+                        <span className="text-[10px] font-semibold text-[color:var(--app-accent)] sm:text-[11px]">Rs {Math.round(Number(item?.price || 0))}</span>
                     </div>
 
-                    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-accent)]">
-                        <ChevronRight size={13} />
+                    <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-accent)]">
+                        <ChevronRight size={12} />
                     </span>
                 </div>
             </div>
