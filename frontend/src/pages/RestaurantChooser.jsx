@@ -8,6 +8,7 @@ import { api, cachedGet } from "../utils/apiClient";
 import useCachedGet from "../hooks/useCachedGet";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
 import BrandLogo from "../components/BrandLogo";
+import CartDrawer from "../components/CartDrawer";
 import VegModeToggle from "../components/VegModeToggle";
 import Footer from "../components/Footer";
 import { isVegModeItem } from "./restaurant/RestaurantMenu";
@@ -74,7 +75,7 @@ const getCurrentPosition = () =>
 
 export default function RestaurantChooser() {
     const { customer } = useAuth();
-    const { addToCart } = useCart();
+    const { addToCart, cart, total } = useCart();
     const { restaurantContext, setRestaurantContext } = useRestaurantContext();
     const [search, setSearch] = useState("");
     const deferredSearch = useDeferredValue(normalizeSearch(search));
@@ -83,6 +84,7 @@ export default function RestaurantChooser() {
     const [backendState, setBackendState] = useState("checking");
     const [selectedItem, setSelectedItem] = useState(null);
     const [popupAnchor, setPopupAnchor] = useState(null);
+    const [cartOpen, setCartOpen] = useState(false);
     const vegModeEnabled = Boolean(restaurantContext?.vegOnly);
     const profilePath = customer ? "/profile/overview?scope=customer" : "/login?mode=customer";
     const profileLabel = customer ? "Profile" : "Login";
@@ -179,6 +181,8 @@ export default function RestaurantChooser() {
 
         addToCart(item);
     };
+
+    const cartItemCount = cart.reduce((sum, item) => sum + Math.max(1, Number(item.quantity || 1)), 0);
 
     const closeItemDetails = () => {
         setSelectedItem(null);
@@ -394,6 +398,25 @@ export default function RestaurantChooser() {
             </div>
 
             {selectedItem ? <ItemDetailsPopup item={selectedItem} anchor={popupAnchor} onClose={closeItemDetails} /> : null}
+
+            {cartItemCount > 0 ? (
+                <button
+                    type="button"
+                    onClick={() => setCartOpen(true)}
+                    className="fixed bottom-4 left-3 right-3 z-40 mx-auto flex max-w-[520px] items-center justify-between gap-3 rounded-[18px] border border-[var(--app-border)] bg-[color:var(--app-surface)] px-4 py-3 shadow-[0_20px_50px_rgba(0,0,0,0.28)] sm:left-auto sm:right-4 sm:w-[280px] sm:max-w-none"
+                >
+                    <div className="min-w-0 text-left">
+                        <p className="truncate text-sm font-semibold">{cartItemCount} in cart</p>
+                        <p className="theme-muted truncate text-xs">Tap to review items</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] theme-muted">Total</p>
+                        <p className="text-base font-bold text-[color:var(--app-accent)]">₹{Math.round(Number(total || 0))}</p>
+                    </div>
+                </button>
+            ) : null}
+
+            <CartDrawer open={cartOpen} setOpen={setCartOpen} />
 
             <Footer />
         </div>
