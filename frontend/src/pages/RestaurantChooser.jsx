@@ -364,9 +364,16 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
     const orderCount = Number(item?.orderCount || 0);
 
     return (
-        <button
-            type="button"
+        <div
+            role="button"
+            tabIndex={0}
             onClick={onClick}
+            onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onClick?.();
+                }
+            }}
             className="chooser-item-card group flex w-[146px] shrink-0 snap-start flex-col overflow-hidden rounded-[18px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.02)_100%)] text-left shadow-[0_12px_28px_rgba(0,0,0,0.12)] transition hover:-translate-y-1 hover:border-white/15 hover:bg-white/6 sm:w-[154px] md:w-[164px] lg:w-[172px]"
         >
             <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
@@ -386,32 +393,27 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
                     ) : null}
                 </div>
 
-                <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        onToggleDetails?.();
-                    }}
-                    onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            onToggleDetails?.();
-                        }
-                    }}
-                    aria-label={selected ? "Hide item details" : "Show item details"}
-                    className={`absolute right-2.5 top-2.5 inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
-                        selected
-                            ? "border-[color:var(--app-primary)] bg-[color:var(--app-primary)] text-[color:var(--app-primary-text)]"
-                            : "border-white/15 bg-black/35 text-white/85"
-                    }`}
-                >
-                    <Dot size={24} strokeWidth={3.5} />
-                </span>
             </div>
 
             <div className="flex min-h-[88px] min-w-0 flex-1 flex-col p-2.5 sm:p-3">
-                <h3 className="truncate text-[13px] font-bold sm:text-sm">{item?.name}</h3>
+                <div className="flex items-start justify-between gap-2">
+                    <h3 className="min-w-0 flex-1 truncate text-[13px] font-bold sm:text-sm">{item?.name}</h3>
+                    <button
+                        type="button"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            onToggleDetails?.();
+                        }}
+                        aria-label={selected ? "Hide item details" : "Show item details"}
+                        className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition ${
+                            selected
+                                ? "border-[color:var(--app-primary)] bg-[color:var(--app-primary)] text-[color:var(--app-primary-text)]"
+                                : "border-white/15 bg-black/35 text-white/85"
+                        }`}
+                    >
+                        <Dot size={16} strokeWidth={3.5} />
+                    </button>
+                </div>
                 <p className="theme-muted mt-0.5 truncate text-[10px] sm:text-xs">{item?.restaurant?.name || "Restaurant"}</p>
 
                 {selected ? (
@@ -431,7 +433,7 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
                     </span>
                 </div>
             </div>
-        </button>
+        </div>
     );
 }
 function BackendOfflineCard({ message, onRetry }) {
