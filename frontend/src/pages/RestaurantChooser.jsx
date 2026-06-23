@@ -81,6 +81,7 @@ export default function RestaurantChooser() {
     const [detecting, setDetecting] = useState(false);
     const [backendState, setBackendState] = useState("checking");
     const [selectedItem, setSelectedItem] = useState(null);
+    const [popupAnchor, setPopupAnchor] = useState(null);
     const vegModeEnabled = Boolean(restaurantContext?.vegOnly);
     const profilePath = customer ? "/profile/overview?scope=customer" : "/login?mode=customer";
     const profileLabel = customer ? "Profile" : "Login";
@@ -123,6 +124,12 @@ export default function RestaurantChooser() {
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [selectedItem]);
+
+    useEffect(() => {
+        if (!selectedItem) {
+            setPopupAnchor(null);
+        }
     }, [selectedItem]);
 
     const searchEnabled = deferredSearch.length >= MIN_SEARCH_LENGTH;
@@ -348,7 +355,31 @@ export default function RestaurantChooser() {
                                                                 key={item.id}
                                                                 item={item}
                                                                 selected={selectedItem?.id === item.id}
-                                                                onToggleDetails={() => setSelectedItem((current) => (current?.id === item.id ? null : item))}
+                                                                onToggleDetails={(event) => {
+                                                                    const isSame = selectedItem?.id === item.id;
+                                                                    if (isSame) {
+                                                                        setSelectedItem(null);
+                                                                        setPopupAnchor(null);
+                                                                        return;
+                                                                    }
+
+                                                                    const rect = event?.currentTarget?.getBoundingClientRect?.();
+                                                                    const popupWidth = 250;
+                                                                    const popupHeight = 215;
+                                                                    const gap = 10;
+                                                                    const viewportWidth = window.innerWidth;
+                                                                    const viewportHeight = window.innerHeight;
+                                                                    const left = rect
+                                                                        ? Math.max(12, Math.min(rect.left, viewportWidth - popupWidth - 12))
+                                                                        : Math.max(12, (viewportWidth - popupWidth) / 2);
+                                                                    let top = rect ? rect.bottom + gap : Math.max(12, (viewportHeight - popupHeight) / 2);
+                                                                    if (top + popupHeight > viewportHeight - 12) {
+                                                                        top = rect ? Math.max(12, rect.top - popupHeight - gap) : top;
+                                                                    }
+
+                                                                    setSelectedItem(item);
+                                                                    setPopupAnchor({ left, top });
+                                                                }}
                                                                 onClick={() => openItemRestaurant(item)}
                                                             />
                                                         ))}
@@ -364,7 +395,7 @@ export default function RestaurantChooser() {
                 </section>
             </div>
 
-            {selectedItem ? <ItemDetailsPopup item={selectedItem} onClose={() => setSelectedItem(null)} /> : null}
+            {selectedItem ? <ItemDetailsPopup item={selectedItem} anchor={popupAnchor} onClose={() => setSelectedItem(null)} /> : null}
 
             <Footer />
         </div>
@@ -406,7 +437,7 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
                         type="button"
                         onClick={(event) => {
                             event.stopPropagation();
-                            onToggleDetails?.();
+                            onToggleDetails?.(event);
                         }}
                         aria-label={selected ? "Hide item details" : "Show item details"}
                         className={`mt-0.5 inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition ${
@@ -434,39 +465,41 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
     );
 }
 
-function ItemDetailsPopup({ item, onClose }) {
+function ItemDetailsPopup({ item, anchor, onClose }) {
     const imageSrc = resolveImageUrl(item?.image) || FALLBACK_IMAGE;
     const placeText = [item?.restaurant?.city, item?.restaurant?.state].filter(Boolean).join(", ");
     const orderCount = Number(item?.orderCount || 0);
+    const popupStyle = anchor ? { left: `${anchor.left}px`, top: `${anchor.top}px` } : undefined;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 py-4 backdrop-blur-sm" onClick={onClose}>
+        <div className="fixed inset-0 z-50 bg-black/35 backdrop-blur-[2px]" onClick={onClose}>
             <div
-                className="w-full max-w-[320px] overflow-hidden rounded-[22px] border border-white/10 bg-[color:var(--app-surface)] shadow-[0_30px_80px_rgba(0,0,0,0.35)]"
+                style={popupStyle}
+                className="fixed w-[250px] max-w-[calc(100vw-24px)] overflow-hidden rounded-[18px] border border-white/10 bg-[color:var(--app-surface)] shadow-[0_22px_56px_rgba(0,0,0,0.34)]"
                 onClick={(event) => event.stopPropagation()}
             >
                 <div className="relative aspect-[16/10] overflow-hidden">
                     <img src={imageSrc} alt={item?.name || "Menu item"} className="h-full w-full object-cover" />
                 </div>
 
-                <div className="space-y-3 p-4">
-                    <div className="flex items-start justify-between gap-3">
+                <div className="space-y-2.5 p-3.5">
+                    <div className="flex items-start justify-between gap-2.5">
                         <div className="min-w-0">
-                            <h3 className="truncate text-[18px] font-bold leading-tight">{item?.name}</h3>
-                            <p className="theme-muted mt-1 truncate text-sm">{item?.restaurant?.name || "Restaurant"}</p>
+                            <h3 className="truncate text-[15px] font-bold leading-tight">{item?.name}</h3>
+                            <p className="theme-muted mt-0.5 truncate text-[12px]">{item?.restaurant?.name || "Restaurant"}</p>
                         </div>
 
                         <button
                             type="button"
                             onClick={onClose}
-                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-text)]"
+                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-text)]"
                             aria-label="Close details"
                         >
                             ×
                         </button>
                     </div>
 
-                    <div className="space-y-2 rounded-[16px] border border-white/8 bg-white/4 px-3 py-3 text-sm">
+                    <div className="space-y-1.5 rounded-[14px] border border-white/8 bg-white/4 px-3 py-2.5 text-[12px]">
                         {placeText ? <p className="theme-muted">{placeText}</p> : null}
                         <p className="theme-muted">{orderCount.toLocaleString("en-IN")} orders</p>
                         <p className="font-semibold text-[color:var(--app-accent)]">Rs {Math.round(Number(item?.price || 0))}</p>
