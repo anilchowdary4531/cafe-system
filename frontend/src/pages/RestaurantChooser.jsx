@@ -1,6 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronRight, Navigation, Search, UserCircle2 } from "lucide-react";
+import { ChevronRight, Dot, Navigation, Search, UserCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import { api, cachedGet } from "../utils/apiClient";
@@ -80,6 +80,7 @@ export default function RestaurantChooser() {
     const [locationHint, setLocationHint] = useState("");
     const [detecting, setDetecting] = useState(false);
     const [backendState, setBackendState] = useState("checking");
+    const [expandedItemId, setExpandedItemId] = useState(null);
     const vegModeEnabled = Boolean(restaurantContext?.vegOnly);
     const profilePath = customer ? "/profile/overview?scope=customer" : "/login?mode=customer";
     const profileLabel = customer ? "Profile" : "Login";
@@ -269,7 +270,7 @@ export default function RestaurantChooser() {
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     placeholder="Search dishes..."
-                                className="chooser-input theme-input w-full rounded-full border border-[var(--app-border)] bg-white/70 py-2.5 pl-11 pr-4 text-sm shadow-[0_10px_24px_rgba(104,70,37,0.08)] outline-none placeholder:text-[color:var(--app-muted)] sm:py-3"
+                                    className="chooser-input theme-input w-full rounded-full border border-[var(--app-border)] bg-white/70 py-2.5 pl-11 pr-4 text-sm shadow-[0_10px_24px_rgba(104,70,37,0.08)] outline-none placeholder:text-[color:var(--app-muted)] sm:py-3"
                                 />
                             </div>
                         </div>
@@ -333,6 +334,10 @@ export default function RestaurantChooser() {
                                                             <SearchItemCard
                                                                 key={item.id}
                                                                 item={item}
+                                                                selected={expandedItemId === item.id}
+                                                                onToggleDetails={() =>
+                                                                    setExpandedItemId((current) => (current === item.id ? null : item.id))
+                                                                }
                                                                 onClick={() => openItemRestaurant(item)}
                                                             />
                                                         ))}
@@ -353,9 +358,10 @@ export default function RestaurantChooser() {
     );
 }
 
-function SearchItemCard({ item, onClick }) {
+function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
     const imageSrc = resolveImageUrl(item?.image) || FALLBACK_IMAGE;
     const placeText = [item?.restaurant?.city, item?.restaurant?.state].filter(Boolean).join(", ");
+    const orderCount = Number(item?.orderCount || 0);
 
     return (
         <button
@@ -379,19 +385,45 @@ function SearchItemCard({ item, onClick }) {
                         <span className="theme-pill rounded-full px-1.5 py-0.5 text-[9px] font-semibold">Featured</span>
                     ) : null}
                 </div>
+
+                <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        onToggleDetails?.();
+                    }}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            onToggleDetails?.();
+                        }
+                    }}
+                    aria-label={selected ? "Hide item details" : "Show item details"}
+                    className={`absolute right-2.5 top-2.5 inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
+                        selected
+                            ? "border-[color:var(--app-primary)] bg-[color:var(--app-primary)] text-[color:var(--app-primary-text)]"
+                            : "border-white/15 bg-black/35 text-white/85"
+                    }`}
+                >
+                    <Dot size={24} strokeWidth={3.5} />
+                </span>
             </div>
 
             <div className="flex min-h-[88px] min-w-0 flex-1 flex-col p-2.5 sm:p-3">
                 <h3 className="truncate text-[13px] font-bold sm:text-sm">{item?.name}</h3>
                 <p className="theme-muted mt-0.5 truncate text-[10px] sm:text-xs">{item?.restaurant?.name || "Restaurant"}</p>
-                {placeText ? <p className="theme-muted mt-0.5 truncate text-[10px]">{placeText}</p> : null}
+
+                {selected ? (
+                    <div className="mt-2 space-y-1 rounded-[14px] border border-white/8 bg-white/4 px-2.5 py-2">
+                        {placeText ? <p className="truncate text-[10px] text-white/75">{placeText}</p> : null}
+                        <p className="truncate text-[10px] text-white/75">{orderCount.toLocaleString("en-IN")} orders</p>
+                    </div>
+                ) : null}
 
                 <div className="mt-auto flex items-end justify-between gap-1.5 pt-2.5">
                     <div className="flex min-w-0 flex-wrap items-center gap-1">
                         <span className="text-[11px] font-semibold text-[color:var(--app-accent)] sm:text-xs">Rs {Math.round(Number(item?.price || 0))}</span>
-                        {Number(item?.orderCount || 0) > 0 ? (
-                            <span className="theme-muted truncate text-[10px]">{Number(item?.orderCount || 0).toLocaleString("en-IN")} orders</span>
-                        ) : null}
                     </div>
 
                     <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-accent)]">
