@@ -321,9 +321,9 @@ export default function Login() {
             </div>
 
             {/* RIGHT SIDE LOGIN */}
-            <div className="flex items-center justify-center px-6 py-10">
+            <div className="login-shell flex items-center justify-center px-2 py-3 sm:px-4 sm:py-6 md:px-6 md:py-10">
 
-                <div className="theme-panel w-full max-w-md rounded-3xl p-8 backdrop-blur-2xl">
+                <div className="login-card theme-panel w-[99%] max-w-[99vw] rounded-3xl p-5 backdrop-blur-2xl sm:w-full sm:max-w-md sm:p-8">
                     <div className="mb-6 grid grid-cols-2 gap-2">
                         <button
                             type="button"
@@ -342,7 +342,7 @@ export default function Login() {
                     </div>
 
                     {/* MOBILE LOGO */}
-                    <div className="md:hidden flex items-center justify-center gap-2 mb-6">
+                    <div className="login-mobile-brand md:hidden flex items-center justify-center gap-2 mb-6">
                         <BrandLogo className="h-7 w-7" title="Brand logo" />
                         <h1 className="text-3xl font-bold">Tiffzy</h1>
                     </div>

@@ -661,6 +661,42 @@ body,
 }
 
 @media (max-width: 640px) {
+    .login-shell {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+        align-items: flex-start;
+    }
+
+    .login-card {
+        width: 99% !important;
+        max-width: 99vw !important;
+        border: 0 !important;
+        border-radius: 22px !important;
+        background: color-mix(in srgb, var(--app-surface) 92%, transparent) !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        padding: 1.15rem !important;
+    }
+
+    .login-card .theme-button,
+    .login-card .theme-soft-button,
+    .login-card .theme-input {
+        box-shadow: none !important;
+    }
+
+    .login-card .theme-input {
+        background: color-mix(in srgb, var(--app-surface) 88%, transparent) !important;
+    }
+
+    .login-card .theme-button,
+    .login-card .theme-soft-button {
+        border-radius: 16px !important;
+    }
+
+    .login-mobile-brand {
+        margin-bottom: 1rem !important;
+    }
+
     .chooser-shell {
         width: 99vw;
         max-width: 99vw;
