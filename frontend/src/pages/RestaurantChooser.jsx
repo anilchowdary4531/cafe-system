@@ -397,15 +397,6 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
                     loading="lazy"
                 />
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0)_35%,rgba(0,0,0,0.35)_100%)]" />
-                <div className="absolute left-2 top-2 flex flex-wrap gap-1">
-                    {item?.category ? (
-                        <span className="theme-pill rounded-full px-1.5 py-0.5 text-[9px] font-semibold">{item.category}</span>
-                    ) : null}
-                    {item?.isFeatured ? (
-                        <span className="theme-pill rounded-full px-1.5 py-0.5 text-[9px] font-semibold">Featured</span>
-                    ) : null}
-                </div>
-
             </div>
 
             <div className="flex min-h-[80px] min-w-0 flex-1 flex-col p-2 sm:p-2.5">
@@ -456,14 +447,6 @@ function ItemDetailsPopup({ item, onClose }) {
             >
                 <div className="relative aspect-[16/10] overflow-hidden">
                     <img src={imageSrc} alt={item?.name || "Menu item"} className="h-full w-full object-cover" />
-                    <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
-                        {item?.category ? (
-                            <span className="theme-pill rounded-full px-2 py-0.5 text-[10px] font-semibold">{item.category}</span>
-                        ) : null}
-                        {item?.isFeatured ? (
-                            <span className="theme-pill rounded-full px-2 py-0.5 text-[10px] font-semibold">Featured</span>
-                        ) : null}
-                    </div>
                 </div>
 
                 <div className="space-y-3 p-4">
