@@ -80,7 +80,7 @@ export default function RestaurantChooser() {
     const [locationHint, setLocationHint] = useState("");
     const [detecting, setDetecting] = useState(false);
     const [backendState, setBackendState] = useState("checking");
-    const [expandedItemId, setExpandedItemId] = useState(null);
+    const [selectedItem, setSelectedItem] = useState(null);
     const vegModeEnabled = Boolean(restaurantContext?.vegOnly);
     const profilePath = customer ? "/profile/overview?scope=customer" : "/login?mode=customer";
     const profileLabel = customer ? "Profile" : "Login";
@@ -111,6 +111,19 @@ export default function RestaurantChooser() {
     useEffect(() => {
         probeBackend();
     }, [probeBackend]);
+
+    useEffect(() => {
+        if (!selectedItem) return undefined;
+
+        const handleKeyDown = (event) => {
+            if (event.key === "Escape") {
+                setSelectedItem(null);
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [selectedItem]);
 
     const searchEnabled = deferredSearch.length >= MIN_SEARCH_LENGTH;
     const { data: catalogData, loading: catalogLoading, error: catalogError, refresh: refreshCatalog } = useCachedGet("/catalog/search", {
@@ -334,10 +347,8 @@ export default function RestaurantChooser() {
                                                             <SearchItemCard
                                                                 key={item.id}
                                                                 item={item}
-                                                                selected={expandedItemId === item.id}
-                                                                onToggleDetails={() =>
-                                                                    setExpandedItemId((current) => (current === item.id ? null : item.id))
-                                                                }
+                                                                selected={selectedItem?.id === item.id}
+                                                                onToggleDetails={() => setSelectedItem((current) => (current?.id === item.id ? null : item))}
                                                                 onClick={() => openItemRestaurant(item)}
                                                             />
                                                         ))}
@@ -352,6 +363,8 @@ export default function RestaurantChooser() {
                     </div>
                 </section>
             </div>
+
+            {selectedItem ? <ItemDetailsPopup item={selectedItem} onClose={() => setSelectedItem(null)} /> : null}
 
             <Footer />
         </div>
@@ -405,7 +418,7 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
                             onToggleDetails?.();
                         }}
                         aria-label={selected ? "Hide item details" : "Show item details"}
-                        className={`mt-0.5 inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border transition ${
+                        className={`mt-0.5 inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition ${
                             selected
                                 ? "border-[color:var(--app-primary)] bg-[color:var(--app-primary)] text-[color:var(--app-primary-text)]"
                                 : "border-white/15 bg-black/35 text-white/85"
@@ -414,14 +427,7 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
                         <Dot size={14} strokeWidth={3.5} />
                     </button>
                 </div>
-                <p className="theme-muted mt-0.25 truncate text-[9px] sm:text-[10px]">{item?.restaurant?.name || "Restaurant"}</p>
-
-                {selected ? (
-                    <div className="mt-1.5 space-y-0.5 rounded-[12px] border border-white/8 bg-white/4 px-2 py-1.5">
-                        {placeText ? <p className="truncate text-[9px] text-white/75">{placeText}</p> : null}
-                        <p className="truncate text-[9px] text-white/75">{orderCount.toLocaleString("en-IN")} orders</p>
-                    </div>
-                ) : null}
+                <p className="theme-muted mt-[1px] truncate text-[9px] sm:text-[10px]">{item?.restaurant?.name || "Restaurant"}</p>
 
                 <div className="mt-auto flex items-end justify-between gap-1 pt-2">
                     <div className="flex min-w-0 flex-wrap items-center gap-1">
@@ -431,6 +437,57 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
                     <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-accent)]">
                         <ChevronRight size={12} />
                     </span>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ItemDetailsPopup({ item, onClose }) {
+    const imageSrc = resolveImageUrl(item?.image) || FALLBACK_IMAGE;
+    const placeText = [item?.restaurant?.city, item?.restaurant?.state].filter(Boolean).join(", ");
+    const orderCount = Number(item?.orderCount || 0);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 py-4 backdrop-blur-sm" onClick={onClose}>
+            <div
+                className="w-full max-w-[320px] overflow-hidden rounded-[22px] border border-white/10 bg-[color:var(--app-surface)] shadow-[0_30px_80px_rgba(0,0,0,0.35)]"
+                onClick={(event) => event.stopPropagation()}
+            >
+                <div className="relative aspect-[16/10] overflow-hidden">
+                    <img src={imageSrc} alt={item?.name || "Menu item"} className="h-full w-full object-cover" />
+                    <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+                        {item?.category ? (
+                            <span className="theme-pill rounded-full px-2 py-0.5 text-[10px] font-semibold">{item.category}</span>
+                        ) : null}
+                        {item?.isFeatured ? (
+                            <span className="theme-pill rounded-full px-2 py-0.5 text-[10px] font-semibold">Featured</span>
+                        ) : null}
+                    </div>
+                </div>
+
+                <div className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <h3 className="truncate text-[18px] font-bold leading-tight">{item?.name}</h3>
+                            <p className="theme-muted mt-1 truncate text-sm">{item?.restaurant?.name || "Restaurant"}</p>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-text)]"
+                            aria-label="Close details"
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                    <div className="space-y-2 rounded-[16px] border border-white/8 bg-white/4 px-3 py-3 text-sm">
+                        {placeText ? <p className="theme-muted">{placeText}</p> : null}
+                        <p className="theme-muted">{orderCount.toLocaleString("en-IN")} orders</p>
+                        <p className="font-semibold text-[color:var(--app-accent)]">Rs {Math.round(Number(item?.price || 0))}</p>
+                    </div>
                 </div>
             </div>
         </div>
