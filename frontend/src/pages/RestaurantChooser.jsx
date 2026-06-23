@@ -1,7 +1,8 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ChevronRight, Dot, Navigation, Search, UserCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useCart } from "../context/CartContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import { api, cachedGet } from "../utils/apiClient";
 import useCachedGet from "../hooks/useCachedGet";
@@ -72,8 +73,8 @@ const getCurrentPosition = () =>
     });
 
 export default function RestaurantChooser() {
-    const navigate = useNavigate();
     const { customer } = useAuth();
+    const { addToCart } = useCart();
     const { restaurantContext, setRestaurantContext } = useRestaurantContext();
     const [search, setSearch] = useState("");
     const deferredSearch = useDeferredValue(normalizeSearch(search));
@@ -119,17 +120,12 @@ export default function RestaurantChooser() {
         const handleKeyDown = (event) => {
             if (event.key === "Escape") {
                 setSelectedItem(null);
+                setPopupAnchor(null);
             }
         };
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [selectedItem]);
-
-    useEffect(() => {
-        if (!selectedItem) {
-            setPopupAnchor(null);
-        }
     }, [selectedItem]);
 
     const searchEnabled = deferredSearch.length >= MIN_SEARCH_LENGTH;
@@ -169,21 +165,24 @@ export default function RestaurantChooser() {
     }, [visibleItems]);
     const activeSearchError = catalogError || "";
 
-    const openItemRestaurant = (item) => {
+    const addItemToCart = (item) => {
         const slug = String(item?.restaurant?.slug || "").trim();
-        if (!slug) return;
+        if (slug) {
+            setRestaurantContext({
+                id: item?.restaurant?.id || null,
+                name: item?.restaurant?.name || null,
+                slug,
+                logo: item?.restaurant?.logo || null,
+                tableNo: null,
+            });
+        }
 
-        setRestaurantContext({
-            id: item?.restaurant?.id || null,
-            name: item?.restaurant?.name || null,
-            slug,
-            logo: item?.restaurant?.logo || null,
-            tableNo: null,
-        });
+        addToCart(item);
+    };
 
-        const itemName = String(item?.name || "").trim();
-        const path = itemName ? `/r/${slug}/menu?search=${encodeURIComponent(itemName)}` : `/r/${slug}/menu`;
-        navigate(path, { replace: true });
+    const closeItemDetails = () => {
+        setSelectedItem(null);
+        setPopupAnchor(null);
     };
 
     const detectNearest = async ({ userTriggered = false } = {}) => {
@@ -358,8 +357,7 @@ export default function RestaurantChooser() {
                                                                 onToggleDetails={(event) => {
                                                                     const isSame = selectedItem?.id === item.id;
                                                                     if (isSame) {
-                                                                        setSelectedItem(null);
-                                                                        setPopupAnchor(null);
+                                                                        closeItemDetails();
                                                                         return;
                                                                     }
 
@@ -380,7 +378,7 @@ export default function RestaurantChooser() {
                                                                     setSelectedItem(item);
                                                                     setPopupAnchor({ left, top });
                                                                 }}
-                                                                onClick={() => openItemRestaurant(item)}
+                                                                onClick={() => addItemToCart(item)}
                                                             />
                                                         ))}
                                                     </div>
@@ -395,7 +393,7 @@ export default function RestaurantChooser() {
                 </section>
             </div>
 
-            {selectedItem ? <ItemDetailsPopup item={selectedItem} anchor={popupAnchor} onClose={() => setSelectedItem(null)} /> : null}
+            {selectedItem ? <ItemDetailsPopup item={selectedItem} anchor={popupAnchor} onClose={closeItemDetails} /> : null}
 
             <Footer />
         </div>
@@ -404,8 +402,6 @@ export default function RestaurantChooser() {
 
 function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
     const imageSrc = resolveImageUrl(item?.image) || FALLBACK_IMAGE;
-    const placeText = [item?.restaurant?.city, item?.restaurant?.state].filter(Boolean).join(", ");
-    const orderCount = Number(item?.orderCount || 0);
 
     return (
         <div
