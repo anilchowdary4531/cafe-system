@@ -661,6 +661,57 @@ body,
 }
 
 @media (max-width: 640px) {
+    .chooser-shell {
+        width: 99vw;
+        max-width: 99vw;
+        margin: 0 auto;
+        padding: 0.5rem;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .chooser-shell .theme-card,
+    .chooser-shell .theme-soft-button,
+    .chooser-shell .theme-input,
+    .chooser-shell .theme-pill {
+        box-shadow: none !important;
+    }
+
+    .chooser-shell .chooser-logo-shell {
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .chooser-shell .chooser-chip {
+        border-color: transparent !important;
+        background: transparent !important;
+        padding-left: 0.2rem !important;
+        padding-right: 0.2rem !important;
+    }
+
+    .chooser-shell .chooser-input {
+        border-color: color-mix(in srgb, var(--app-border) 55%, transparent) !important;
+        background: color-mix(in srgb, var(--app-surface) 92%, transparent) !important;
+        box-shadow: none !important;
+    }
+
+    .chooser-shell .chooser-item-card {
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .chooser-shell .chooser-item-card:hover {
+        transform: none !important;
+    }
+
+    .chooser-shell .chooser-item-card .theme-pill {
+        border-color: transparent !important;
+    }
+
     .checkout-paper-mobile .checkout-paper-flat,
     .checkout-paper-mobile .checkout-paper-flat * {
         box-shadow: none !important;

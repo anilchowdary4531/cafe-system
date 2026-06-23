@@ -216,15 +216,15 @@ export default function RestaurantChooser() {
     };
 
     return (
-        <div className="theme-page min-h-screen px-3 py-4 sm:px-4 sm:py-6 md:px-8 md:py-12">
+        <div className="theme-page min-h-screen px-1 py-1.5 sm:px-4 sm:py-6 md:px-8 md:py-12">
             <div className="mx-auto w-full max-w-none">
-                <section className="theme-panel relative overflow-hidden rounded-[24px] p-4 backdrop-blur sm:rounded-[28px] sm:p-5 md:rounded-[32px] md:p-8">
+                <section className="chooser-shell theme-panel relative overflow-hidden rounded-[24px] p-4 backdrop-blur sm:rounded-[28px] sm:p-5 md:rounded-[32px] md:p-8">
                     <div className="pointer-events-none absolute -right-10 top-0 h-40 w-40 rounded-full bg-[color:var(--app-accent)]/10 blur-3xl" />
                     <div className="pointer-events-none absolute -left-12 bottom-0 h-52 w-52 rounded-full bg-[#c78f4a]/10 blur-3xl" />
 
                     <header className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex w-full items-start gap-3 sm:items-center sm:gap-4 lg:max-w-[58%]">
-                            <div className="theme-card flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:h-14 sm:w-14">
+                            <div className="chooser-logo-shell theme-card flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:h-14 sm:w-14">
                                 <BrandLogo className="h-8 w-8 sm:h-9 sm:w-9" title="Brand logo" />
                             </div>
                             <div className="min-w-0">
@@ -246,7 +246,7 @@ export default function RestaurantChooser() {
                                 <Link
                                     to={profilePath}
                                     style={{ border: "none", boxShadow: "none" }}
-                                    className="theme-soft-button inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-3 py-2 text-[11px] font-semibold sm:px-4 sm:py-3 sm:text-sm"
+                                    className="chooser-chip theme-soft-button inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-3 py-2 text-[11px] font-semibold sm:px-4 sm:py-3 sm:text-sm"
                                 >
                                     <UserCircle2 size={16} />
                                     {profileLabel}
@@ -256,7 +256,7 @@ export default function RestaurantChooser() {
                                     onClick={() => detectNearest({ userTriggered: true })}
                                     disabled={detecting || restaurantLoading || browseRestaurants.length === 0}
                                     style={{ border: "none", boxShadow: "none" }}
-                                    className="theme-soft-button inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-3 py-2 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-70 sm:px-4 sm:py-3 sm:text-sm"
+                                    className="chooser-chip theme-soft-button inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-3 py-2 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-70 sm:px-4 sm:py-3 sm:text-sm"
                                 >
                                     <Navigation size={16} />
                                     {detecting ? "Detecting..." : "Use my location"}
@@ -269,7 +269,7 @@ export default function RestaurantChooser() {
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     placeholder="Search dishes..."
-                                    className="theme-input w-full rounded-full border border-[var(--app-border)] bg-white/70 py-2.5 pl-11 pr-4 text-sm shadow-[0_10px_24px_rgba(104,70,37,0.08)] outline-none placeholder:text-[color:var(--app-muted)] sm:py-3"
+                                className="chooser-input theme-input w-full rounded-full border border-[var(--app-border)] bg-white/70 py-2.5 pl-11 pr-4 text-sm shadow-[0_10px_24px_rgba(104,70,37,0.08)] outline-none placeholder:text-[color:var(--app-muted)] sm:py-3"
                                 />
                             </div>
                         </div>
@@ -361,7 +361,7 @@ function SearchItemCard({ item, onClick }) {
         <button
             type="button"
             onClick={onClick}
-            className="group flex w-[146px] shrink-0 snap-start flex-col overflow-hidden rounded-[18px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.02)_100%)] text-left shadow-[0_12px_28px_rgba(0,0,0,0.12)] transition hover:-translate-y-1 hover:border-white/15 hover:bg-white/6 sm:w-[154px] md:w-[164px] lg:w-[172px]"
+            className="chooser-item-card group flex w-[146px] shrink-0 snap-start flex-col overflow-hidden rounded-[18px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.02)_100%)] text-left shadow-[0_12px_28px_rgba(0,0,0,0.12)] transition hover:-translate-y-1 hover:border-white/15 hover:bg-white/6 sm:w-[154px] md:w-[164px] lg:w-[172px]"
         >
             <div className="relative aspect-[16/10] overflow-hidden bg-white/5">
                 <img
