@@ -1,11 +1,35 @@
 import { useState } from "react";
 import { AnimatePresence } from "framer-motion";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import CheckoutPrompt from "./CheckoutPrompt";
 
 export default function CartDrawer({ open, setOpen }) {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { customer, customerToken } = useAuth();
     const { cart, increaseQty, decreaseQty, total, clearCart } = useCart();
     const [checkoutOpen, setCheckoutOpen] = useState(false);
+    const isCustomerLoggedIn = Boolean(customerToken || customer);
+
+    const handleCheckout = () => {
+        if (isCustomerLoggedIn) {
+            setCheckoutOpen(true);
+            return;
+        }
+
+        setOpen(false);
+        navigate("/login?mode=customer", {
+            state: {
+                from: {
+                    pathname: location.pathname,
+                    search: location.search,
+                    hash: location.hash,
+                },
+            },
+        });
+    };
 
     return (
         <AnimatePresence>
@@ -79,7 +103,7 @@ export default function CartDrawer({ open, setOpen }) {
                             </div>
 
                             <button
-                                onClick={() => setCheckoutOpen(true)}
+                                onClick={handleCheckout}
                                 className="theme-button w-full rounded-xl py-3 font-bold"
                             >
                                 Checkout

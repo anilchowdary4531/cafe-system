@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import CheckoutPrompt from "../components/CheckoutPrompt";
+import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import useCachedGet from "../hooks/useCachedGet";
@@ -10,6 +11,9 @@ import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
 
 export default function Cart() {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { customer, customerToken } = useAuth();
     const {
         cart,
         removeFromCart,
@@ -37,10 +41,28 @@ export default function Cart() {
     const taxPercent = Number(menuData?.restaurant?.taxPercent || 0);
     const tax = taxEnabled ? (subtotal * taxPercent) / 100 : 0;
     const total = subtotal + tax;
+    const isCustomerLoggedIn = Boolean(customerToken || customer);
     const toMoney = (value) => {
         const n = Number(value || 0);
         if (!Number.isFinite(n)) return "0.00";
         return n.toFixed(2);
+    };
+
+    const handleCheckout = () => {
+        if (isCustomerLoggedIn) {
+            setCheckoutOpen(true);
+            return;
+        }
+
+        navigate("/login?mode=customer", {
+            state: {
+                from: {
+                    pathname: location.pathname,
+                    search: location.search,
+                    hash: location.hash,
+                },
+            },
+        });
     };
 
     return (
@@ -136,7 +158,7 @@ export default function Cart() {
                                 </div>
 
                                 <button
-                                    onClick={() => setCheckoutOpen(true)}
+                                    onClick={handleCheckout}
                                     className="theme-button mt-6 hidden w-full rounded-2xl py-4 text-lg font-bold transition md:block"
                                 >
                                     Pay ₹{toMoney(total)}
@@ -163,7 +185,7 @@ export default function Cart() {
                         </div>
                         <button
                             type="button"
-                            onClick={() => setCheckoutOpen(true)}
+                            onClick={handleCheckout}
                             className="theme-button rounded-2xl px-6 py-3 text-sm font-semibold"
                         >
                             Pay ₹{toMoney(total)}

@@ -88,6 +88,20 @@ export default function Login() {
         navigate(redirectTarget, { replace: true });
     };
 
+    const getCustomerRedirectTarget = () => {
+        const from = location.state?.from;
+        if (typeof from === "string" && from.trim()) {
+            return from.trim();
+        }
+        if (from && typeof from === "object") {
+            const pathname = String(from.pathname || "").trim();
+            if (pathname) {
+                return `${pathname}${from.search || ""}${from.hash || ""}`;
+            }
+        }
+        return customerMenuPath;
+    };
+
     const getRedirectPath = (role, designation, userId) => {
         const normalizedRole = resolveEffectiveStaffRole(role, designation);
         const isSeniorChef = /SENIOR/i.test(String(designation || ""));
@@ -261,7 +275,7 @@ export default function Login() {
                 verified: true,
             });
 
-            navigate(customerMenuPath, { replace: true });
+            navigate(getCustomerRedirectTarget(), { replace: true });
         } catch (err) {
             setCustomerError(err.response?.data?.message || err.message || "Invalid OTP");
         } finally {
