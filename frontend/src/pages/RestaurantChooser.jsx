@@ -11,6 +11,7 @@ import BrandLogo from "../components/BrandLogo";
 import CartDrawer from "../components/CartDrawer";
 import VegModeToggle from "../components/VegModeToggle";
 import Footer from "../components/Footer";
+import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 import { isVegModeItem } from "./restaurant/RestaurantMenu";
 
 const toRad = (deg) => (Number(deg) * Math.PI) / 180;
@@ -489,6 +490,7 @@ function ItemDetailsPopup({ item, anchor, onClose }) {
     const placeText = [item?.restaurant?.city, item?.restaurant?.state].filter(Boolean).join(", ");
     const orderCount = Number(item?.orderCount || 0);
     const popupStyle = anchor ? { left: `${anchor.left}px`, top: `${anchor.top}px` } : undefined;
+    const restaurantPath = buildRestaurantMenuPath(String(item?.restaurant?.slug || "").trim(), "");
 
     return (
         <div className="fixed inset-0 z-50 bg-black/35 backdrop-blur-[2px]" onClick={onClose}>
@@ -505,7 +507,16 @@ function ItemDetailsPopup({ item, anchor, onClose }) {
                     <div className="flex items-start justify-between gap-2.5">
                         <div className="min-w-0">
                             <h3 className="truncate text-[15px] font-bold leading-tight">{item?.name}</h3>
-                            <p className="theme-muted mt-0.5 truncate text-[12px]">{item?.restaurant?.name || "Restaurant"}</p>
+                            {restaurantPath ? (
+                                <Link
+                                    to={restaurantPath}
+                                    className="theme-muted mt-0.5 block truncate text-[12px] underline decoration-dotted underline-offset-4 hover:text-[color:var(--app-text)]"
+                                >
+                                    {item?.restaurant?.name || "Restaurant"}
+                                </Link>
+                            ) : (
+                                <p className="theme-muted mt-0.5 truncate text-[12px]">{item?.restaurant?.name || "Restaurant"}</p>
+                            )}
                         </div>
 
                         <button
