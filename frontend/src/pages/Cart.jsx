@@ -24,6 +24,7 @@ export default function Cart() {
     const [checkoutOpen, setCheckoutOpen] = useState(false);
     const { restaurantContext } = useRestaurantContext();
     const slug = String(restaurantContext?.slug || "").trim();
+    const isTableSession = Boolean(String(restaurantContext?.tableNo || "").trim());
 
     const subtotal = cart.reduce(
         (sum, item) => sum + Number(item.price || 0) * Math.max(1, Number(item.quantity || 1)),
@@ -49,7 +50,7 @@ export default function Cart() {
     };
 
     const handleCheckout = () => {
-        if (isCustomerLoggedIn) {
+        if (isCustomerLoggedIn || isTableSession) {
             setCheckoutOpen(true);
             return;
         }

@@ -3,6 +3,7 @@ import { AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
+import { useRestaurantContext } from "../context/RestaurantContext";
 import CheckoutPrompt from "./CheckoutPrompt";
 
 export default function CartDrawer({ open, setOpen }) {
@@ -10,11 +11,16 @@ export default function CartDrawer({ open, setOpen }) {
     const location = useLocation();
     const { customer, customerToken } = useAuth();
     const { cart, increaseQty, decreaseQty, total, clearCart } = useCart();
+    const { restaurantContext } = useRestaurantContext();
     const [checkoutOpen, setCheckoutOpen] = useState(false);
     const isCustomerLoggedIn = Boolean(customerToken || customer);
+    const isTableSession =
+        String(location.pathname || "").startsWith("/m/") ||
+        String(location.pathname || "").startsWith("/debug/menu/") ||
+        Boolean(String(restaurantContext?.tableNo || "").trim());
 
     const handleCheckout = () => {
-        if (isCustomerLoggedIn) {
+        if (isCustomerLoggedIn || isTableSession) {
             setCheckoutOpen(true);
             return;
         }

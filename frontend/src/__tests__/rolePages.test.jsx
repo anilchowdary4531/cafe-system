@@ -190,6 +190,26 @@ describe("restaurant customer menu pages", () => {
     });
 });
 
+describe("public navigation aliases", () => {
+    it("redirects the profile root to the overview section", () => {
+        renderAt("/profile");
+
+        expect(screen.getByTestId("profile")).toHaveAttribute("data-section", "overview");
+    });
+
+    it("redirects the legacy order history route to the profile order history page", () => {
+        renderAt("/orders/history");
+
+        expect(screen.getByTestId("profile")).toHaveAttribute("data-section", "orders");
+    });
+
+    it("redirects the kitchen assignment route back to the kitchen page", () => {
+        renderAt("/kitchen/assigned-items");
+
+        expect(screen.getByTestId("kitchen-page")).toBeInTheDocument();
+    });
+});
+
 describe("owner panel pages", () => {
     it("renders the owner dashboard", () => {
         renderAt("/owner");

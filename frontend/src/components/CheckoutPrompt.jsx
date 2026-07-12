@@ -139,6 +139,7 @@ const getCheckoutActionLabel = ({
     if (method === "UPI") {
         if (placedOrder?.id) return "Open UPI Apps";
         if (customerToken) return isOnlineOrder ? `Place ${orderMode} Order & Continue` : "Place Order & Continue";
+        if (!isOnlineOrder) return "Place Table Order & Continue";
         return otpStep === "otp"
             ? `Verify & Pay Rs ${toInr(payableAmount)}`
             : isOnlineOrder
@@ -147,6 +148,7 @@ const getCheckoutActionLabel = ({
     }
 
     if (customerToken) return isOnlineOrder ? `Place ${orderMode} Order` : "Place Order";
+    if (!isOnlineOrder) return "Place Table Order";
     return otpStep === "otp"
         ? isOnlineOrder
             ? `Verify & Place ${orderMode} Order`
@@ -215,7 +217,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         setEmail(customer?.email || "");
         setPhone(customer?.phone || "");
         setTableChoice(String(restaurantContext?.tableNo || ""));
-        setOtpStep(customerToken ? "ready" : "phone");
+        setOtpStep(customerToken || !String(restaurantContext?.tableNo || "").trim() ? "ready" : "phone");
         setOtp("");
         setOtpExpiresAt(null);
         setDevOtp("");
@@ -253,7 +255,8 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         return list.reduce((sum, it) => sum + Number(it.price || 0) * Math.max(1, Number(it.quantity || 1)), 0);
     }, [cart]);
     const payableAmount = Number(placedOrder?.total || cartSubtotal || 0);
-    const isOnlineOrder = !String(tableChoice || restaurantContext?.tableNo || "").trim();
+    const isTableOrder = Boolean(String(tableChoice || restaurantContext?.tableNo || "").trim());
+    const isOnlineOrder = !isTableOrder;
     const selectedFulfillment = isOnlineOrder ? normalizeFulfillment(fulfillment) : "dinein";
     const selectedPaymentMethod = normalizePaymentMethod(paymentMethod);
     const selectedSavedAddress = useMemo(
@@ -515,7 +518,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
             return;
         }
 
-        if (!normalizedPhone) {
+        if (isOnlineOrder && !normalizedPhone) {
             setError("Phone number is required to continue.");
             return;
         }
@@ -540,8 +543,8 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
             setError("");
             setSuccess("");
 
-            // Enforce OTP login the first time, then keep the session for the next order.
-            if (!customerToken) {
+            // Enforce OTP login for pickup/delivery guests; table orders can proceed without login.
+            if (!customerToken && isOnlineOrder) {
                 if (otpStep === "phone") {
                     await requestOtp(normalizedPhone);
                     return;
@@ -595,13 +598,15 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
 
             const res = await api.post(`/r/${slug}/order`, payload);
 
-            loginCustomer({
-                name: normalizedName,
-                email: normalizedEmail,
-                phone: normalizedPhone,
-                latestOrderId: res.data?.order?.id || null,
-                verified: true,
-            });
+            if (normalizedPhone || customerToken) {
+                loginCustomer({
+                    name: normalizedName,
+                    email: normalizedEmail,
+                    phone: normalizedPhone,
+                    latestOrderId: res.data?.order?.id || null,
+                    verified: true,
+                });
+            }
 
             setRestaurantContext({ tableNo: tableNo || null });
             invalidateGetCache({ urlStartsWith: `/r/${slug}/orders` });
@@ -795,10 +800,6 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                     </div>
                                 )}
                             </div>
-
-                            <p className="theme-muted mt-3 text-[11px] sm:mt-4 sm:text-xs">
-                                The next page will handle payment details and your delivery or pickup choice.
-                            </p>
                     </section>
                 ) : (
                     <section className="p-1 sm:p-2">

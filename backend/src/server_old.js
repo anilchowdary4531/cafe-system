@@ -63,9 +63,9 @@ const fallbackRestaurantSettingsStore = {
     isActive: true,
   },
   12: {
-    legalName: "Bean House LLP",
+    legalName: "Bean House LLP","
     ownerName: "Bean House Owner",
-    email: "owner@beanhouse.com",
+    email: "owner@beanhouse.com,
     phone: "8888888888",
     addressLine1: "Banjara Hills",
     city: "Hyderabad",
