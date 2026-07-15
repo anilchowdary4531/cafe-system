@@ -443,9 +443,9 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected, quantity = 0
                     onClick?.();
                 }
             }}
-            className={`chooser-item-card group flex w-[132px] shrink-0 snap-start flex-col overflow-hidden rounded-[16px] border text-left shadow-[0_12px_28px_rgba(0,0,0,0.12)] transition duration-300 hover:-translate-y-1 sm:w-[140px] md:w-[148px] lg:w-[156px] ${
+            className={`chooser-item-card group flex w-[115px] shrink-0 snap-start flex-col overflow-hidden rounded-[14px] border text-left shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition duration-300 hover:-translate-y-0.5 sm:w-[124px] md:w-[132px] lg:w-[140px] ${
                 quantity > 0
-                    ? "border-emerald-500/35 bg-[linear-gradient(180deg,rgba(16,185,129,0.12)_0%,rgba(16,185,129,0.04)_100%)] shadow-[0_12px_28px_rgba(16,185,129,0.18)]"
+                    ? "border-emerald-500/35 bg-[linear-gradient(180deg,rgba(16,185,129,0.12)_0%,rgba(16,185,129,0.04)_100%)] shadow-[0_10px_24px_rgba(16,185,129,0.18)]"
                     : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.02)_100%)] hover:border-white/15 hover:bg-white/6"
             }`}
         >
@@ -459,9 +459,9 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected, quantity = 0
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0)_35%,rgba(0,0,0,0.35)_100%)]" />
             </div>
 
-            <div className="flex min-h-[80px] min-w-0 flex-1 flex-col p-2 sm:p-2.5">
+            <div className="flex min-h-[72px] min-w-0 flex-1 flex-col p-1.5 sm:p-2">
                 <div className="flex items-start justify-between gap-1">
-                    <h3 className="min-w-0 flex-1 truncate text-[12px] font-bold sm:text-[13px]">{item?.name}</h3>
+                    <h3 className="min-w-0 flex-1 truncate text-[11px] font-bold sm:text-[12px]">{item?.name}</h3>
                     <button
                         type="button"
                         onClick={(event) => {
@@ -469,29 +469,29 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected, quantity = 0
                             onToggleDetails?.(event);
                         }}
                         aria-label={selected ? "Hide item details" : "Show item details"}
-                        className={`mt-0.5 inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition ${
+                        className={`mt-0.5 inline-flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full border transition ${
                             selected
                                 ? "border-[color:var(--app-primary)] bg-[color:var(--app-primary)] text-[color:var(--app-primary-text)]"
                                 : "border-white/15 bg-black/35 text-white/85"
                         }`}
                     >
-                        <Dot size={14} strokeWidth={3.5} />
+                        <Dot size={12} strokeWidth={3.5} />
                     </button>
                 </div>
-                <p className="theme-muted mt-[1px] truncate text-[9px] sm:text-[10px]">{item?.restaurant?.name || "Restaurant"}</p>
+                <p className="theme-muted mt-[0.5px] truncate text-[8.5px] sm:text-[9.5px]">{item?.restaurant?.name || "Restaurant"}</p>
 
-                <div className="mt-auto flex items-end justify-between gap-1 pt-2">
+                <div className="mt-auto flex items-end justify-between gap-1 pt-1.5">
                     <div className="flex min-w-0 flex-wrap items-center gap-1">
-                        <span className="text-[10px] font-semibold text-[color:var(--app-accent)] sm:text-[11px]">Rs {Math.round(Number(item?.price || 0))}</span>
+                        <span className="text-[9.5px] font-semibold text-[color:var(--app-accent)] sm:text-[10.5px]">Rs {Math.round(Number(item?.price || 0))}</span>
                     </div>
 
                     {quantity > 0 ? (
-                        <span className="inline-flex h-6 px-2 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+                        <span className="inline-flex h-5 px-1.5 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/20 text-emerald-400 text-[9.5px] font-bold">
                             {quantity}
                         </span>
                     ) : (
-                        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-accent)]">
-                            <ChevronRight size={12} />
+                        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-accent)]">
+                            <ChevronRight size={10} />
                         </span>
                     )}
                 </div>
