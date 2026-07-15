@@ -560,6 +560,7 @@ export default function RestaurantMenu() {
                             onToggleFavorite={handleToggleFavorite}
                             onAdd={addToCart}
                             sectionRef={registerSectionRef(section.key)}
+                            cart={cart}
                         />
                     ))}
 
@@ -619,7 +620,7 @@ export default function RestaurantMenu() {
     );
 }
 
-function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, onAdd, sectionRef }) {
+function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, onAdd, sectionRef, cart = [] }) {
     if (!Array.isArray(items) || !items.length) return null;
 
     const Icon = section?.Icon || Tags;
@@ -644,22 +645,27 @@ function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, o
             </div>
 
             <div className="flex gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-col sm:overflow-visible sm:pb-0 sm:space-y-3">
-                {items.map((item) => (
-                    <MenuItemCard
-                        key={String(item?.id || `${section.key}-${item?.name || "item"}`)}
-                        item={item}
-                        slug={slug}
-                        isFavorite={favoriteKeySet.has(`${String(slug || "").trim()}:${Number(item?.id || 0)}`)}
-                        onToggleFavorite={onToggleFavorite}
-                        onAdd={onAdd}
-                    />
-                ))}
+                {items.map((item) => {
+                    const cartItem = cart.find((i) => i.id === item.id);
+                    const qty = cartItem ? cartItem.quantity : 0;
+                    return (
+                        <MenuItemCard
+                            key={String(item?.id || `${section.key}-${item?.name || "item"}`)}
+                            item={item}
+                            slug={slug}
+                            isFavorite={favoriteKeySet.has(`${String(slug || "").trim()}:${Number(item?.id || 0)}`)}
+                            onToggleFavorite={onToggleFavorite}
+                            onAdd={onAdd}
+                            quantity={qty}
+                        />
+                    );
+                })}
             </div>
         </section>
     );
 }
 
-function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
+function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, quantity = 0 }) {
     const imageSrc = resolveImageUrl(item?.image) || FALLBACK_IMAGE;
     const dietBadge = getDietBadge(item);
     const itemPrice = Number(item?.price || 0);
@@ -681,7 +687,11 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
                     handleCardClick();
                 }
             }}
-            className="group flex w-[160px] shrink-0 cursor-pointer flex-col gap-2 rounded-2xl p-2 text-left sm:w-full sm:cursor-default sm:flex-row sm:gap-3.5 sm:rounded-none sm:p-0"
+            className={`group flex w-[160px] shrink-0 cursor-pointer flex-col gap-2 rounded-2xl p-2 text-left transition duration-300 sm:w-full sm:cursor-default sm:flex-row sm:gap-3.5 sm:p-3 sm:rounded-2xl border ${
+                quantity > 0
+                    ? "bg-[linear-gradient(180deg,rgba(16,185,129,0.12)_0%,rgba(16,185,129,0.04)_100%)] border-emerald-500/30 shadow-[0_8px_20px_rgba(16,185,129,0.08)]"
+                    : "bg-white/[0.02] border-white/5 sm:border-transparent sm:bg-transparent hover:bg-white/[0.04] sm:hover:bg-white/[0.02] sm:hover:border-white/10"
+            }`}
         >
             <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-2xl border border-white/8 bg-black/10 sm:h-24 sm:w-24">
                 <img
@@ -748,16 +758,22 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd }) {
                         )}
                     </div>
 
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onAdd && onAdd(item);
-                        }}
-                        className="theme-button hidden shrink-0 items-center justify-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-semibold sm:inline-flex sm:px-3"
-                    >
-                        <Plus size={11} />
-                        Add
-                    </button>
+                    {quantity > 0 ? (
+                        <div className="hidden shrink-0 items-center gap-1.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 text-[11px] font-bold sm:inline-flex">
+                            <span>{quantity} selected</span>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onAdd && onAdd(item);
+                            }}
+                            className="theme-button hidden shrink-0 items-center justify-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-semibold sm:inline-flex sm:px-3"
+                        >
+                            <Plus size={11} />
+                            Add
+                        </button>
+                    )}
                 </div>
 
                 <p

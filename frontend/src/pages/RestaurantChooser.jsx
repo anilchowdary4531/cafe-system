@@ -354,38 +354,43 @@ export default function RestaurantChooser() {
 
                                                 <div className="snap-x snap-mandatory overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                                                     <div className="flex w-max gap-2 pr-1 sm:gap-2.5">
-                                                        {section.items.map((item) => (
-                                                            <SearchItemCard
-                                                                key={item.id}
-                                                                item={item}
-                                                                selected={selectedItem?.id === item.id}
-                                                                onToggleDetails={(event) => {
-                                                                    const isSame = selectedItem?.id === item.id;
-                                                                    if (isSame) {
-                                                                        closeItemDetails();
-                                                                        return;
-                                                                    }
+                                                        {section.items.map((item) => {
+                                                            const cartItem = cart.find((c) => c.id === item.id);
+                                                            const qty = cartItem ? cartItem.quantity : 0;
+                                                            return (
+                                                                <SearchItemCard
+                                                                    key={item.id}
+                                                                    item={item}
+                                                                    selected={selectedItem?.id === item.id}
+                                                                    quantity={qty}
+                                                                    onToggleDetails={(event) => {
+                                                                        const isSame = selectedItem?.id === item.id;
+                                                                        if (isSame) {
+                                                                            closeItemDetails();
+                                                                            return;
+                                                                        }
 
-                                                                    const rect = event?.currentTarget?.getBoundingClientRect?.();
-                                                                    const popupWidth = 250;
-                                                                    const popupHeight = 215;
-                                                                    const gap = 10;
-                                                                    const viewportWidth = window.innerWidth;
-                                                                    const viewportHeight = window.innerHeight;
-                                                                    const left = rect
-                                                                        ? Math.max(12, Math.min(rect.left, viewportWidth - popupWidth - 12))
-                                                                        : Math.max(12, (viewportWidth - popupWidth) / 2);
-                                                                    let top = rect ? rect.bottom + gap : Math.max(12, (viewportHeight - popupHeight) / 2);
-                                                                    if (top + popupHeight > viewportHeight - 12) {
-                                                                        top = rect ? Math.max(12, rect.top - popupHeight - gap) : top;
-                                                                    }
+                                                                        const rect = event?.currentTarget?.getBoundingClientRect?.();
+                                                                        const popupWidth = 250;
+                                                                        const popupHeight = 215;
+                                                                        const gap = 10;
+                                                                        const viewportWidth = window.innerWidth;
+                                                                        const viewportHeight = window.innerHeight;
+                                                                        const left = rect
+                                                                            ? Math.max(12, Math.min(rect.left, viewportWidth - popupWidth - 12))
+                                                                            : Math.max(12, (viewportWidth - popupWidth) / 2);
+                                                                        let top = rect ? rect.bottom + gap : Math.max(12, (viewportHeight - popupHeight) / 2);
+                                                                        if (top + popupHeight > viewportHeight - 12) {
+                                                                            top = rect ? Math.max(12, rect.top - popupHeight - gap) : top;
+                                                                        }
 
-                                                                    setSelectedItem(item);
-                                                                    setPopupAnchor({ left, top });
-                                                                }}
-                                                                onClick={() => addItemToCart(item)}
-                                                            />
-                                                        ))}
+                                                                        setSelectedItem(item);
+                                                                        setPopupAnchor({ left, top });
+                                                                    }}
+                                                                    onClick={() => addItemToCart(item)}
+                                                                />
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             </div>
@@ -424,7 +429,7 @@ export default function RestaurantChooser() {
     );
 }
 
-function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
+function SearchItemCard({ item, onClick, onToggleDetails, selected, quantity = 0 }) {
     const imageSrc = resolveImageUrl(item?.image) || FALLBACK_IMAGE;
 
     return (
@@ -438,7 +443,11 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
                     onClick?.();
                 }
             }}
-            className="chooser-item-card group flex w-[132px] shrink-0 snap-start flex-col overflow-hidden rounded-[16px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.02)_100%)] text-left shadow-[0_12px_28px_rgba(0,0,0,0.12)] transition hover:-translate-y-1 hover:border-white/15 hover:bg-white/6 sm:w-[140px] md:w-[148px] lg:w-[156px]"
+            className={`chooser-item-card group flex w-[132px] shrink-0 snap-start flex-col overflow-hidden rounded-[16px] border text-left shadow-[0_12px_28px_rgba(0,0,0,0.12)] transition duration-300 hover:-translate-y-1 sm:w-[140px] md:w-[148px] lg:w-[156px] ${
+                quantity > 0
+                    ? "border-emerald-500/35 bg-[linear-gradient(180deg,rgba(16,185,129,0.12)_0%,rgba(16,185,129,0.04)_100%)] shadow-[0_12px_28px_rgba(16,185,129,0.18)]"
+                    : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.02)_100%)] hover:border-white/15 hover:bg-white/6"
+            }`}
         >
             <div className="relative aspect-[17/10] overflow-hidden bg-white/5">
                 <img
@@ -476,9 +485,15 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected }) {
                         <span className="text-[10px] font-semibold text-[color:var(--app-accent)] sm:text-[11px]">Rs {Math.round(Number(item?.price || 0))}</span>
                     </div>
 
-                    <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-accent)]">
-                        <ChevronRight size={12} />
-                    </span>
+                    {quantity > 0 ? (
+                        <span className="inline-flex h-6 px-2 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+                            {quantity}
+                        </span>
+                    ) : (
+                        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-accent)]">
+                            <ChevronRight size={12} />
+                        </span>
+                    )}
                 </div>
             </div>
         </div>

@@ -6,7 +6,7 @@ import {
 import { resolveMenuPricing } from "../services/menuPricingService.js";
 
 export default async function publicRoutes(app, deps) {
-  const { prisma, normalizeDbPermissions, buildQrTargetUrl } = deps;
+  const { prisma, normalizeDbPermissions, buildQrTargetUrl, STAFF_ACCESS_MODULES } = deps;
 
   const parsePositiveInt = (value, fallback, max = null) => {
     const parsed = Number.parseInt(String(value ?? "").trim(), 10);
@@ -541,6 +541,152 @@ export default async function publicRoutes(app, deps) {
     } catch (err) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to fetch restaurant tables" });
+    }
+  });
+
+  const slugify = (value) =>
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+  app.post("/register-restaurant", async (req, reply) => {
+    try {
+      const body = req.body || {};
+      const restaurantName = String(body.restaurantName || "").trim();
+      const ownerName = String(body.ownerName || "").trim();
+      const ownerEmail = String(body.ownerEmail || "").trim().toLowerCase();
+      const ownerPhone = String(body.ownerPhone || "").trim();
+      const ownerPassword = String(body.ownerPassword || "").trim();
+
+      if (!restaurantName || !ownerName || !ownerEmail || !ownerPassword) {
+        return reply.code(400).send({
+          message: "Restaurant name, owner name, owner email, and password are required",
+        });
+      }
+
+      if (ownerPassword.length < 6) {
+        return reply.code(400).send({
+          message: "Password must be at least 6 characters",
+        });
+      }
+
+      const slug = slugify(restaurantName);
+      if (!slug) {
+        return reply.code(400).send({
+          message: "Invalid restaurant name",
+        });
+      }
+
+      // Check slug uniqueness
+      const existingRestaurant = await prisma.restaurant.findUnique({
+        where: { slug },
+        select: { id: true },
+      });
+      if (existingRestaurant) {
+        return reply.code(409).send({
+          message: "A restaurant with a similar name already exists. Please choose a different name.",
+        });
+      }
+
+      // Check email uniqueness
+      const existingUser = await prisma.user.findUnique({
+        where: { email: ownerEmail },
+        select: { id: true },
+      });
+      if (existingUser) {
+        return reply.code(409).send({
+          message: "Email address is already registered.",
+        });
+      }
+
+      const modulesList = STAFF_ACCESS_MODULES || [
+        "dashboard",
+        "orders",
+        "menu",
+        "tables",
+        "kitchen",
+        "analytics",
+        "finance",
+        "staff",
+        "settings",
+        "notifications",
+      ];
+      const access = modulesList.reduce((acc, key) => ({ ...acc, [key]: true }), {});
+
+      const result = await prisma.$transaction(async (tx) => {
+        const restaurant = await tx.restaurant.create({
+          data: {
+            name: restaurantName,
+            slug,
+            ownerName,
+            email: ownerEmail,
+            phone: ownerPhone || null,
+            timezone: "Asia/Kolkata",
+            currency: "INR",
+            taxEnabled: true,
+            taxType: "EXCLUSIVE",
+            defaultTaxPercent: 5,
+            invoicePrefix: "INV",
+            nextInvoiceNumber: 1001,
+            isActive: true,
+          },
+        });
+
+        const owner = await tx.user.create({
+          data: {
+            name: ownerName,
+            email: ownerEmail,
+            phone: ownerPhone || null,
+            password: bcrypt.hashSync(ownerPassword, 10),
+            role: "OWNER",
+            restaurantId: restaurant.id,
+            isActive: true,
+          },
+        });
+
+        await tx.staffAccess.create({
+          data: {
+            restaurantId: restaurant.id,
+            userId: owner.id,
+            role: "OWNER",
+            permissions: access,
+          },
+        });
+
+        return { restaurant, owner };
+      });
+
+      // Automatically log the newly registered user in!
+      const user = await prisma.user.findUnique({
+        where: { id: result.owner.id },
+        include: {
+          restaurant: true,
+          staffAccess: {
+            select: { permissions: true, role: true },
+          },
+        },
+      });
+
+      const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
+      const { token, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
+      userPayload.sessionVersion = sessionVersion;
+
+      return {
+        message: "Registration success",
+        token,
+        user: userPayload,
+        offlineMode: false,
+      };
+    } catch (err) {
+      console.error(err);
+      return reply.code(500).send({
+        message:
+          process.env.NODE_ENV === "development"
+            ? `Registration failed: ${err?.message || "Unknown error"}`
+            : "Registration failed",
+      });
     }
   });
 }

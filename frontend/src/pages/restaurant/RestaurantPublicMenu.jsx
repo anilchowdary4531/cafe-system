@@ -372,6 +372,7 @@ export default function RestaurantPublicMenu() {
                             onToggleFavorite={handleToggleFavorite}
                             onAdd={addToCart}
                             sectionRef={registerSectionRef(section.key)}
+                            cart={cart}
                         />
                     ))}
 

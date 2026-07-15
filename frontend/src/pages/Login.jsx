@@ -17,7 +17,7 @@ export default function Login() {
 
     const initialMode = useMemo(() => {
         const mode = String(searchParams.get("mode") || "").trim().toLowerCase();
-        return mode === "staff" ? "staff" : "customer";
+        return mode === "staff" ? "staff" : mode === "register" ? "register" : "customer";
     }, [searchParams]);
 
     const [mode, setMode] = useState(initialMode);
@@ -43,6 +43,15 @@ export default function Login() {
     const [customerError, setCustomerError] = useState("");
     const autoLoginTokenRef = useRef("");
     const staffLink = String(searchParams.get("staffLink") || "").trim();
+
+    // Registration states
+    const [registerRestaurantName, setRegisterRestaurantName] = useState("");
+    const [registerOwnerName, setRegisterOwnerName] = useState("");
+    const [registerOwnerEmail, setRegisterOwnerEmail] = useState("");
+    const [registerOwnerPhone, setRegisterOwnerPhone] = useState("");
+    const [registerOwnerPassword, setRegisterOwnerPassword] = useState("");
+    const [registerLoading, setRegisterLoading] = useState(false);
+    const [registerError, setRegisterError] = useState("");
 
     const customerMenuPath = useMemo(() => {
         const slug = String(restaurantContext?.slug || "").trim();
@@ -185,7 +194,7 @@ export default function Login() {
     }, [mode, staffLink]);
 
     const setModeAndUrl = (nextMode) => {
-        const value = nextMode === "staff" ? "staff" : "customer";
+        const value = nextMode === "staff" ? "staff" : nextMode === "register" ? "register" : "customer";
         setMode(value);
         setSearchParams(
             (prev) => {
@@ -194,6 +203,47 @@ export default function Login() {
             },
             { replace: true }
         );
+    };
+
+    const handleRegister = async () => {
+        const restaurantName = String(registerRestaurantName || "").trim();
+        const ownerName = String(registerOwnerName || "").trim();
+        const ownerEmail = String(registerOwnerEmail || "").trim().toLowerCase();
+        const ownerPhone = String(registerOwnerPhone || "").trim();
+        const ownerPassword = String(registerOwnerPassword || "").trim();
+
+        if (!restaurantName || !ownerName || !ownerEmail || !ownerPassword) {
+            setRegisterError("Restaurant name, owner name, owner email, and password are required.");
+            return;
+        }
+
+        if (ownerPassword.length < 6) {
+            setRegisterError("Password must be at least 6 characters.");
+            return;
+        }
+
+        try {
+            setRegisterLoading(true);
+            setRegisterError("");
+
+            const res = await api.post("/register-restaurant", {
+                restaurantName,
+                ownerName,
+                ownerEmail,
+                ownerPhone,
+                ownerPassword,
+            });
+
+            handleSuccessfulStaffLogin(res.data);
+        } catch (err) {
+            setRegisterError(
+                err.response?.data?.message ||
+                err.message ||
+                "Failed to register restaurant"
+            );
+        } finally {
+            setRegisterLoading(false);
+        }
     };
 
     const handleLogin = async () => {
@@ -335,7 +385,7 @@ export default function Login() {
                         <button
                             type="button"
                             onClick={() => setModeAndUrl("staff")}
-                            className={`rounded-2xl px-4 py-2 text-sm font-semibold ${mode === "staff" ? "theme-button" : "theme-soft-button"}`}
+                            className={`rounded-2xl px-4 py-2 text-sm font-semibold ${mode === "staff" || mode === "register" ? "theme-button" : "theme-soft-button"}`}
                         >
                             Staff
                         </button>
@@ -398,6 +448,113 @@ export default function Login() {
                                 >
                                     {loading ? "Logging in..." : "Login"}
                                 </button>
+
+                                <div className="mt-4 text-center">
+                                    <span className="theme-muted text-sm">Don't have a restaurant? </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setModeAndUrl("register")}
+                                        className="text-sm font-semibold theme-accent-text hover:underline"
+                                    >
+                                        Register here
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    ) : mode === "register" ? (
+                        <>
+                            <h2 className="text-3xl font-bold mb-2">Register Restaurant</h2>
+                            <p className="theme-muted mb-8">Set up your restaurant operating system.</p>
+
+                            {registerError && (
+                                <div className="mb-5 bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl text-sm">
+                                    {registerError}
+                                </div>
+                            )}
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="theme-muted mb-1 block text-sm">Restaurant Name *</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Bean House"
+                                        value={registerRestaurantName}
+                                        onChange={(e) => setRegisterRestaurantName(e.target.value)}
+                                        className="theme-input w-full rounded-xl px-4 py-2.5 outline-none transition"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="theme-muted mb-1 block text-sm">Owner Name *</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Your full name"
+                                        value={registerOwnerName}
+                                        onChange={(e) => setRegisterOwnerName(e.target.value)}
+                                        className="theme-input w-full rounded-xl px-4 py-2.5 outline-none transition"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="theme-muted mb-1 block text-sm">Owner Email *</label>
+                                    <input
+                                        type="email"
+                                        placeholder="you@example.com"
+                                        value={registerOwnerEmail}
+                                        onChange={(e) => setRegisterOwnerEmail(e.target.value)}
+                                        className="theme-input w-full rounded-xl px-4 py-2.5 outline-none transition"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="theme-muted mb-1 block text-sm">Owner Phone</label>
+                                    <input
+                                        type="tel"
+                                        placeholder="Enter phone number"
+                                        value={registerOwnerPhone}
+                                        onChange={(e) => setRegisterOwnerPhone(e.target.value)}
+                                        className="theme-input w-full rounded-xl px-4 py-2.5 outline-none transition"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="theme-muted mb-1 block text-sm">Password *</label>
+                                    <div className="relative">
+                                        <input
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="Min 6 characters"
+                                            value={registerOwnerPassword}
+                                            onChange={(e) => setRegisterOwnerPassword(e.target.value)}
+                                            className="theme-input w-full rounded-xl px-4 py-2.5 pr-12 outline-none transition"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="theme-muted absolute right-4 top-3 hover:opacity-80"
+                                        >
+                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleRegister}
+                                    disabled={registerLoading}
+                                    className="theme-button w-full rounded-xl py-3 font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70 mt-2"
+                                >
+                                    {registerLoading ? "Registering..." : "Register & Login"}
+                                </button>
+
+                                <div className="mt-4 text-center">
+                                    <span className="theme-muted text-sm">Already have a restaurant? </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setModeAndUrl("staff")}
+                                        className="text-sm font-semibold theme-accent-text hover:underline"
+                                    >
+                                        Login here
+                                    </button>
+                                </div>
                             </div>
                         </>
                     ) : (
