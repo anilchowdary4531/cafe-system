@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.TiffzyApp" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.TiffzyApp" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/tiffzy_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/tiffzy_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.TiffzyApp.Main</item>
+    </style>
+
+    <style name="Theme.TiffzyApp.Main" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/tiffzy_background</item>
+        <item name="android:statusBarColor">@color/tiffzy_background</item>
+        <item name="android:navigationBarColor">@color/tiffzy_background</item>
+    </style>
 </resources>

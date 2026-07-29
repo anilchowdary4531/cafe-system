@@ -14,22 +14,23 @@ android {
     defaultConfig {
         applicationId = "com.tiffzy.app"
 
-        minSdk = 29
+        minSdk = 24
         targetSdk = 36
 
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:3000/\"")
-            manifestPlaceholders["usesCleartextTraffic"] = "true"
+            buildConfigField("String", "BASE_URL", "\"https://api.tiffzy.com/\"")
+            manifestPlaceholders["usesCleartextTraffic"] = "false"
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             buildConfigField("String", "BASE_URL", "\"https://api.tiffzy.com/\"")
             manifestPlaceholders["usesCleartextTraffic"] = "false"
 
@@ -64,6 +65,7 @@ dependencies {
 
     // AndroidX
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.datastore.preferences)

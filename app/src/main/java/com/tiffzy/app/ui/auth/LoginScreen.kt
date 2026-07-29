@@ -10,7 +10,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.tiffzy.app.ui.components.*
 import com.tiffzy.app.ui.theme.Dimens
 
@@ -18,30 +17,21 @@ import com.tiffzy.app.ui.theme.Dimens
 fun LoginScreen(
     viewModel: AuthViewModel,
     onOtpSent: () -> Unit,
-    onStaffLoggedIn: () -> Unit
+    onStaffLoggedIn: () -> Unit // Kept for signature compatibility in NavGraph for now
 ) {
-    var mode by remember { mutableStateOf("customer") } // "customer" or "staff"
-    
-    // Customer fields
     var phone by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
-    
-    // Staff fields
-    var staffEmail by remember { mutableStateOf("") }
-    var staffPassword by remember { mutableStateOf("") }
     
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(uiState) {
         if (uiState is AuthUiState.OtpSent) {
             onOtpSent()
-        } else if (uiState is AuthUiState.Authenticated && mode == "staff") {
-            onStaffLoggedIn()
         }
     }
 
     Scaffold(
-        topBar = { TiffzyTopBar(title = if (mode == "customer") "Customer Sign In" else "Staff Sign In") },
+        topBar = { TiffzyTopBar(title = "Customer Sign In") },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
@@ -52,42 +42,6 @@ fun LoginScreen(
                 .padding(Dimens.PaddingLarge),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Tab Selector
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = Dimens.PaddingLarge),
-                horizontalArrangement = Arrangement.spacedBy(Dimens.SpacingSmall)
-            ) {
-                if (mode == "customer") {
-                    TiffzyPrimaryButton(
-                        text = "Customer",
-                        onClick = { },
-                        modifier = Modifier.weight(1f),
-                        fullWidth = false
-                    )
-                    TiffzySoftButton(
-                        text = "Staff",
-                        onClick = { mode = "staff" },
-                        modifier = Modifier.weight(1f),
-                        fullWidth = false
-                    )
-                } else {
-                    TiffzySoftButton(
-                        text = "Customer",
-                        onClick = { mode = "customer" },
-                        modifier = Modifier.weight(1f),
-                        fullWidth = false
-                    )
-                    TiffzyPrimaryButton(
-                        text = "Staff",
-                        onClick = { },
-                        modifier = Modifier.weight(1f),
-                        fullWidth = false
-                    )
-                }
-            }
-
             Text(
                 text = "Welcome to Tiffzy",
                 style = MaterialTheme.typography.displaySmall,
@@ -97,7 +51,7 @@ fun LoginScreen(
             )
             
             Text(
-                text = if (mode == "customer") "Premium Dining, Delivered to You" else "Login to manage your restaurant",
+                text = "Premium Dining, Delivered to You",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -105,43 +59,23 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
-            if (mode == "customer") {
-                TiffzyTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = "Phone Number",
-                    placeholder = "e.g. 9876543210",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
-                )
+            TiffzyTextField(
+                value = phone,
+                onValueChange = { phone = it },
+                label = "Phone Number",
+                placeholder = "e.g. 9876543210",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+            )
 
-                Spacer(modifier = Modifier.height(Dimens.SpacingMedium))
+            Spacer(modifier = Modifier.height(Dimens.SpacingMedium))
 
-                TiffzyTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = "Email (Optional)",
-                    placeholder = "you@example.com",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
-                )
-            } else {
-                TiffzyTextField(
-                    value = staffEmail,
-                    onValueChange = { staffEmail = it },
-                    label = "Staff Email",
-                    placeholder = "admin@cafe.com",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
-                )
-
-                Spacer(modifier = Modifier.height(Dimens.SpacingMedium))
-
-                TiffzyTextField(
-                    value = staffPassword,
-                    onValueChange = { staffPassword = it },
-                    label = "Password",
-                    placeholder = "Enter password",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-                )
-            }
+            TiffzyTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = "Email (Optional)",
+                placeholder = "you@example.com",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+            )
 
             Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
@@ -149,17 +83,11 @@ fun LoginScreen(
                 TiffzyLoadingIndicator()
             } else {
                 TiffzyPrimaryButton(
-                    text = if (mode == "customer") "Send OTP" else "Login",
+                    text = "Send OTP",
                     onClick = {
-                        if (mode == "customer") {
-                            viewModel.phone = phone
-                            viewModel.email = email.ifEmpty { null }
-                            viewModel.sendOtp()
-                        } else {
-                            viewModel.staffEmail = staffEmail
-                            viewModel.staffPassword = staffPassword
-                            viewModel.staffLogin()
-                        }
+                        viewModel.phone = phone
+                        viewModel.email = email.ifEmpty { null }
+                        viewModel.sendOtp()
                     }
                 )
             }

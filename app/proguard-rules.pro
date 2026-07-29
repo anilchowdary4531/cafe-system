@@ -16,6 +16,12 @@
 # debugging stack traces.
 #-keepattributes SourceFile,LineNumberTable
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Razorpay Proguard Rules
+-keep class com.razorpay.** {*;}
+-dontwarn com.razorpay.**
+-keep class com.google.android.apps.nbu.paisa.** {*;}
+-dontwarn com.google.android.apps.nbu.paisa.**
+-dontwarn proguard.annotation.**
+
+# Jetpack Compose / Material3
+-keep class androidx.compose.material3.** { *; }

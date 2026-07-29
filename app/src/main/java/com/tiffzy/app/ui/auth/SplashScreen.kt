@@ -8,34 +8,23 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tiffzy.app.R
-import com.tiffzy.app.ui.components.BrandLogo
-import com.tiffzy.app.ui.theme.Dimens
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 
 @Composable
 fun SplashScreen(
     viewModel: AuthViewModel,
     onNavigateToHome: () -> Unit,
     onNavigateToLogin: () -> Unit,
-    onNavigateToRestaurantDashboard: () -> Unit
+    onNavigateToRestaurantDashboard: () -> Unit // Kept for signature compatibility in NavGraph for now
 ) {
     LaunchedEffect(Unit) {
-        delay(2000) // Brand exposure
+        delay(800) // Brand exposure
         if (viewModel.checkAuthStatus()) {
-            val accountType = com.tiffzy.app.data.local.AuthDataStore(
-                com.tiffzy.app.MainActivity.getInstance()?.applicationContext ?: return@LaunchedEffect
-            ).accountType.first()
-            
-            if (accountType == "staff") {
-                onNavigateToRestaurantDashboard()
-            } else {
-                onNavigateToHome()
-            }
+            // Customer app always goes to Home (Location selection)
+            onNavigateToHome()
         } else {
             onNavigateToLogin()
         }

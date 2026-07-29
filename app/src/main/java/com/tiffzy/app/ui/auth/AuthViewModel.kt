@@ -41,10 +41,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     var email: String? = null
     var otp: String = ""
     var name: String? = null
-    
-    // Staff login fields
-    var staffEmail: String = ""
-    var staffPassword: String = ""
 
     fun sendOtp() {
         if (phone.length < 10) {
@@ -108,22 +104,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resetState() {
         _uiState.value = AuthUiState.Idle
-    }
-
-    fun staffLogin() {
-        if (staffEmail.isEmpty() || staffPassword.isEmpty()) {
-            _uiState.value = AuthUiState.Error("Email and password are required")
-            return
-        }
-        viewModelScope.launch {
-            _uiState.value = AuthUiState.Loading
-            try {
-                repository.login(staffEmail, staffPassword)
-                _uiState.value = AuthUiState.Authenticated
-            } catch (e: Exception) {
-                _uiState.value = AuthUiState.Error(e.message ?: "Login failed")
-            }
-        }
     }
 
     suspend fun checkAuthStatus(): Boolean {
