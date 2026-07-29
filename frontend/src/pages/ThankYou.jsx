@@ -93,7 +93,9 @@ export default function ThankYou() {
                     <div className="mt-8 grid gap-3 sm:grid-cols-3">
                         <div className="rounded-2xl border border-white/10 bg-black/10 p-4 text-left">
                             <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Order ID</p>
-                            <p className="mt-2 text-lg font-bold tabular-nums">{orderId || orderNo || "-"}</p>
+                            <p className="mt-2 text-lg font-bold tabular-nums">
+                                {orderNo ? `Order #${orderNo}` : orderId ? `Order #${orderId}` : "-"}
+                            </p>
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-black/10 p-4 text-left">
                             <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Amount</p>

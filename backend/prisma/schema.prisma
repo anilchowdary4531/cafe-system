@@ -76,6 +76,9 @@ model Restaurant {
   branches      Branch[]
   payments      Payment[]
   inventory     InventoryStock[]
+  payLaterAccounts     PayLaterAccount[]
+  payLaterTransactions PayLaterTransaction[]
+  customerNotifications CustomerNotification[]
 
   @@map("restaurants")
 }
@@ -237,6 +240,7 @@ model Order {
   items        OrderItem[]
   statusEvents OrderStatusEvent[]
   payments     Payment[]
+  payLaterTransactions PayLaterTransaction[]
 
   @@unique([restaurantId, orderNo])
   @@index([restaurantId, customerId, createdAt])
@@ -279,7 +283,12 @@ model Customer {
   phone String
   email String?
 
+  rewardPoints Int @default(0) @map("reward_points")
+
   orders Order[]
+  payLaterAccounts     PayLaterAccount[]
+  payLaterTransactions PayLaterTransaction[]
+  customerNotifications CustomerNotification[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -294,6 +303,8 @@ model CustomerAccount {
   id Int @id @default(autoincrement())
 
   phone String  @unique
+  username String? @unique
+  password String? @map("password_hash")
   name  String?
   email String?
 
@@ -303,6 +314,7 @@ model CustomerAccount {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@index([phone, createdAt])
+  @@index([username])
   @@index([email])
   @@map("customer_accounts")
 }
@@ -532,3 +544,69 @@ model InventoryStock {
   @@index([restaurantId])
   @@map("inventory_stocks")
 }
+
+model PayLaterAccount {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  customerId Int      @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  totalBorrowed Float @default(0) @map("total_borrowed")
+  totalPaid     Float @default(0) @map("total_paid")
+  pendingBalance Float @default(0) @map("pending_balance")
+  status        String @default("ACTIVE") // ACTIVE, SUSPENDED
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  transactions PayLaterTransaction[]
+
+  @@unique([restaurantId, customerId])
+  @@map("pay_later_accounts")
+}
+
+model PayLaterTransaction {
+  id Int @id @default(autoincrement())
+
+  accountId Int             @map("account_id")
+  account   PayLaterAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  customerId Int      @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  orderId Int?   @map("order_id")
+  order   Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  type   String // ORDER_CREDIT, MANUAL_CREDIT, ONLINE_REPAYMENT, OFFLINE_REPAYMENT, ADJUSTMENT
+  amount Float
+  description String?
+  paymentReference String? @map("payment_reference")
+  status String @default("SUCCESS") // SUCCESS, PENDING, FAILED
+
+  createdBy String @map("created_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("pay_later_transactions")
+}
+
+model CustomerNotification {
+  id           Int      @id @default(autoincrement())
+  restaurantId Int      @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customerId   Int      @map("customer_id")
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  title        String
+  message      String
+  read         Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("customer_notifications")
+}
+

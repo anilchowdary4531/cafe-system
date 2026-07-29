@@ -8,6 +8,7 @@ import {
   inferRoleFromDesignation,
 } from "../services/staffSessionService.js";
 import { resolveMenuPricing } from "../services/menuPricingService.js";
+import { buildPayLaterController } from "../controllers/payLaterController.js";
 
 export default async function ownerRoutes(app, deps) {
   const { prisma, buildQrTargetUrl, FRONTEND_URL, STAFF_ACCESS_MODULES, STAFF_ALLOWED_ROLES, normalizeAccess, normalizeDbPermissions, serializeAccess, realtime } = deps;
@@ -1434,4 +1435,12 @@ export default async function ownerRoutes(app, deps) {
       return reply.code(500).send({ message: "Failed to settle table bill" });
     }
   });
+
+  const payLaterController = buildPayLaterController({ prisma });
+  app.get("/owner/:restaurantId/pay-later/customers", payLaterController.getCustomers);
+  app.post("/owner/:restaurantId/pay-later/customers", payLaterController.addCustomer);
+  app.post("/owner/:restaurantId/pay-later/customers/:customerId/adjust", payLaterController.adjustBalance);
+  app.post("/owner/:restaurantId/pay-later/customers/:customerId/points", payLaterController.adjustPoints);
+  app.post("/owner/:restaurantId/pay-later/customers/:customerId/reminder", payLaterController.sendReminder);
+  app.get("/owner/:restaurantId/pay-later/accounts/:accountId/details", payLaterController.getDetails);
 }

@@ -52,6 +52,7 @@ import OwnerFinance from "./pages/admin/OwnerFinance";
 import OwnerStaff from "./pages/admin/OwnerStaff";
 import OwnerSettings from "./pages/admin/OwnerSettings";
 import OwnerNotifications from "./pages/admin/OwnerNotifications";
+import OwnerPayLater from "./pages/admin/OwnerPayLater";
 import RestaurantPublicMenu from "./pages/restaurant/RestaurantPublicMenu";
 import RestaurantMenu from "./pages/restaurant/RestaurantMenu";
 import SuperAdminDashboard from "./pages/super-admin/SuperAdminDashboard";
@@ -162,6 +163,36 @@ export default function App() {
                             <>
                                 <Navbar />
                                 <Profile section="wallet" />
+                                <Footer />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/profile/pay-later"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="pay-later" />
+                                <Footer />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/profile/pay-later/:accountId"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="pay-later-detail" />
+                                <Footer />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/profile/notifications"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="notifications" />
                                 <Footer />
                             </>
                         }
@@ -350,6 +381,8 @@ export default function App() {
                         <Route path="kitchen" element={<OwnerKitchenLive />} />
                         <Route path="analytics" element={<OwnerAnalytics />} />
                         <Route path="finance" element={<OwnerFinance />} />
+                        <Route path="pay-later" element={<OwnerPayLater />} />
+                        <Route path="pay-later/:accountId" element={<OwnerPayLater />} />
                         <Route path="staff" element={<OwnerStaff />} />
                         <Route path="settings" element={<OwnerSettings />} />
                         <Route path="notifications" element={<OwnerNotifications />} />

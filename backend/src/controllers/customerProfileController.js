@@ -10,7 +10,25 @@ export const buildCustomerProfileController = ({ prisma }) => {
       const account = await getCustomerAccountByPhone({ prisma, phone });
       if (!account) return reply.code(404).send({ message: "Customer not found" });
 
-      return { customer: account };
+      const slug = req.query.slug || "";
+      let rewardPoints = 0;
+      if (slug) {
+        const scoped = await prisma.customer.findFirst({
+          where: { phone, restaurant: { slug } },
+          select: { rewardPoints: true }
+        });
+        if (scoped) {
+          rewardPoints = scoped.rewardPoints;
+        }
+      } else {
+        const scopedSum = await prisma.customer.aggregate({
+          where: { phone },
+          _sum: { rewardPoints: true }
+        });
+        rewardPoints = scopedSum._sum?.rewardPoints || 0;
+      }
+
+      return { customer: { ...account, rewardPoints } };
     } catch (err) {
       // eslint-disable-next-line no-console
       console.log(err);

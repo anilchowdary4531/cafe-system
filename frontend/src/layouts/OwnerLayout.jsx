@@ -1,4 +1,4 @@
-﻿import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
     ShoppingBag,
@@ -17,6 +17,7 @@ import {
     X,
     MoreHorizontal,
     Printer,
+    IndianRupee,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
@@ -495,6 +496,12 @@ export default function OwnerLayout() {
             accessKey: "analytics",
         },
         {
+            label: "Pay Later",
+            path: "/owner/pay-later",
+            icon: <IndianRupee size={18} />,
+            accessKey: "finance",
+        },
+        {
             label: "Staff",
             path: "/owner/staff",
             icon: <Users size={18} />,
@@ -533,6 +540,7 @@ export default function OwnerLayout() {
         "/owner/tables",
         "/owner/kitchen",
         "/owner/finance",
+        "/owner/pay-later",
         "/owner/analytics",
         "/owner/settings",
     ];

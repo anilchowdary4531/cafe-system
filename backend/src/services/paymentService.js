@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { toSubunit } from "./moneyService.js";
+import { normalizePhone } from "./phoneService.js";
 
 const normalizeVerificationStatus = (value) => {
   const s = String(value || "").trim().toUpperCase();
@@ -12,8 +13,8 @@ const normalizeVerificationStatus = (value) => {
 
 const normalizePaymentMode = (value) => {
   const s = String(value || "").trim().toUpperCase();
-  if (!s) return null;
-  return s;
+  if (["CASH", "UPI", "CARD", "ONLINE", "PAY_LATER"].includes(s)) return s;
+  return null;
 };
 
 const razorpayAuthHeader = () => {
@@ -65,24 +66,49 @@ const createRazorpayOrder = async ({ amountSubunit, currency, receipt, notes }) 
 
 export const createPayment = async ({ prisma, actor, input } = {}) => {
   const body = input || {};
-  const orderId = Number(body.orderId || 0);
-  if (!orderId) {
+  const rawOrderId = body.orderId || body.orderNo || "";
+  if (!rawOrderId) {
     const err = new Error("order_id_required");
     err.code = "order_id_required";
     throw err;
   }
 
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: { restaurant: { select: { id: true, currency: true } } },
-  });
+  let order = null;
+  const isNumeric = Number.isInteger(Number(rawOrderId)) && Number(rawOrderId) > 0;
+  if (isNumeric) {
+    order = await prisma.order.findUnique({
+      where: { id: Number(rawOrderId) },
+      include: { restaurant: { select: { id: true, currency: true } } },
+    });
+  } else if (typeof rawOrderId === "string" && rawOrderId.trim().length > 0) {
+    order = await prisma.order.findFirst({
+      where: { orderNo: rawOrderId.trim() },
+      include: { restaurant: { select: { id: true, currency: true } } },
+    });
+  }
+
   if (!order) {
     const err = new Error("order_not_found");
     err.code = "order_not_found";
     throw err;
   }
 
-  if (actor?.restaurantId && Number(order.restaurantId) !== Number(actor.restaurantId) && String(actor.role).toUpperCase() !== "SUPER_ADMIN") {
+  // Check if order is eligible for payment (i.e. not already paid)
+  if (order.paymentStatus === "SUCCESS" || order.paymentStatus === "PAID") {
+    const err = new Error("order_already_paid");
+    err.code = "order_already_paid";
+    throw err;
+  }
+
+  if (actor?.type === "customer") {
+    const orderPhone = normalizePhone(order.phone || "");
+    const actorPhone = normalizePhone(actor.phone || "");
+    if (!orderPhone || orderPhone !== actorPhone) {
+      const err = new Error("order_access_denied");
+      err.code = "order_access_denied";
+      throw err;
+    }
+  } else if (actor?.restaurantId && Number(order.restaurantId) !== Number(actor.restaurantId) && String(actor.role).toUpperCase() !== "SUPER_ADMIN") {
     const err = new Error("restaurant_access_denied");
     err.code = "restaurant_access_denied";
     throw err;
@@ -103,7 +129,7 @@ export const createPayment = async ({ prisma, actor, input } = {}) => {
 
     const payment = await prisma.payment.create({
       data: {
-        orderId,
+        orderId: order.id,
         restaurantId: order.restaurantId,
         amountSubunit,
         currency,
@@ -129,7 +155,7 @@ export const createPayment = async ({ prisma, actor, input } = {}) => {
 
   const payment = await prisma.payment.create({
     data: {
-      orderId,
+      orderId: order.id,
       restaurantId: order.restaurantId,
       amountSubunit,
       currency,
@@ -145,34 +171,58 @@ export const createPayment = async ({ prisma, actor, input } = {}) => {
 export const verifyPayment = async ({ prisma, actor, input } = {}) => {
   const body = input || {};
   const paymentId = Number(body.paymentId || 0);
-  const orderId = Number(body.orderId || 0);
+  const orderId = body.orderId || body.orderNo || "";
   if (!paymentId && !orderId) {
     const err = new Error("payment_id_required");
     err.code = "payment_id_required";
     throw err;
   }
 
-  // Lightweight verification: update the order directly by orderId.
-  // Used by POS cash/UPI flows where a provider webhook is not available in Phase-1.
+  // Lightweight verification: update the order directly by orderId (Staff and Customer fallback).
   if (!paymentId && orderId) {
-    const status = normalizeVerificationStatus(body.status);
+    let status = normalizeVerificationStatus(body.status);
     if (!status) {
       const err = new Error("status_required");
       err.code = "status_required";
       throw err;
     }
 
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      select: { id: true, restaurantId: true, paymentMode: true },
-    });
+    let order = null;
+    const isNumeric = Number.isInteger(Number(orderId)) && Number(orderId) > 0;
+    if (isNumeric) {
+      order = await prisma.order.findUnique({
+        where: { id: Number(orderId) },
+        select: { id: true, restaurantId: true, phone: true, paymentMode: true, paymentStatus: true, total: true },
+      });
+    } else if (typeof orderId === "string" && orderId.trim().length > 0) {
+      order = await prisma.order.findFirst({
+        where: { orderNo: orderId.trim() },
+        select: { id: true, restaurantId: true, phone: true, paymentMode: true, paymentStatus: true, total: true },
+      });
+    }
+
     if (!order) {
       const err = new Error("order_not_found");
       err.code = "order_not_found";
       throw err;
     }
 
-    if (actor?.restaurantId && Number(order.restaurantId) !== Number(actor.restaurantId) && String(actor.role).toUpperCase() !== "SUPER_ADMIN") {
+    if (order.paymentStatus === "SUCCESS" || order.paymentStatus === "PAID") {
+      const err = new Error("order_already_paid");
+      err.code = "order_already_paid";
+      throw err;
+    }
+
+    // Access check:
+    if (actor?.type === "customer") {
+      const orderPhone = normalizePhone(order.phone || "");
+      const actorPhone = normalizePhone(actor.phone || "");
+      if (!orderPhone || orderPhone !== actorPhone) {
+        const err = new Error("order_access_denied");
+        err.code = "order_access_denied";
+        throw err;
+      }
+    } else if (actor?.restaurantId && Number(order.restaurantId) !== Number(actor.restaurantId) && String(actor.role).toUpperCase() !== "SUPER_ADMIN") {
       const err = new Error("restaurant_access_denied");
       err.code = "restaurant_access_denied";
       throw err;
@@ -182,8 +232,73 @@ export const verifyPayment = async ({ prisma, actor, input } = {}) => {
       normalizePaymentMode(body.paymentMode || body.paymentMethod || body.method) ||
       (order.paymentMode ? normalizePaymentMode(order.paymentMode) : null);
 
+    if (nextMode === "PAY_LATER") {
+      const normPhone = normalizePhone(order.phone || "");
+      if (!normPhone) {
+        const err = new Error("pay_later_phone_required");
+        err.code = "pay_later_phone_required";
+        throw err;
+      }
+
+      const account = await prisma.payLaterAccount.findFirst({
+        where: {
+          restaurantId: order.restaurantId,
+          customer: { phone: normPhone },
+          status: "ACTIVE",
+        },
+      });
+
+      if (!account) {
+        const err = new Error("pay_later_not_approved");
+        err.code = "pay_later_not_approved";
+        throw err;
+      }
+
+      const nextOrder = await prisma.$transaction(async (tx) => {
+        // Create order credit transaction
+        await tx.payLaterTransaction.create({
+          data: {
+            accountId: account.id,
+            restaurantId: order.restaurantId,
+            customerId: account.customerId,
+            orderId: order.id,
+            type: "ORDER_CREDIT",
+            amount: order.total,
+            status: "SUCCESS",
+            createdBy: actor?.type === "customer" ? "Customer" : `${actor.role} (ID: ${actor.userId})`,
+            description: "Food Order Credit",
+          },
+        });
+
+        // Increment account balances
+        await tx.payLaterAccount.update({
+          where: { id: account.id },
+          data: {
+            totalBorrowed: { increment: order.total },
+            pendingBalance: { increment: order.total },
+          },
+        });
+
+        // Update the order itself to PAID/SUCCESS
+        return await tx.order.update({
+          where: { id: order.id },
+          data: {
+            paymentStatus: "SUCCESS",
+            paymentMode: "PAY_LATER",
+          },
+        });
+      });
+
+      return { order: nextOrder, verified: true };
+    }
+
+    // Force status to PENDING for customer cash/offline payments
+    if (actor?.type === "customer") {
+      status = "PENDING";
+    }
+
     const updatedOrder = await prisma.order.update({
-      where: { id: orderId },
+      where: { id: order.id },
       data: {
         paymentStatus: status,
         ...(nextMode ? { paymentMode: nextMode } : {}),
@@ -203,7 +318,16 @@ export const verifyPayment = async ({ prisma, actor, input } = {}) => {
     throw err;
   }
 
-  if (actor?.restaurantId && Number(payment.restaurantId) !== Number(actor.restaurantId) && String(actor.role).toUpperCase() !== "SUPER_ADMIN") {
+  // Check permissions:
+  if (actor?.type === "customer") {
+    const orderPhone = normalizePhone(payment.order?.phone || "");
+    const actorPhone = normalizePhone(actor.phone || "");
+    if (!orderPhone || orderPhone !== actorPhone) {
+      const err = new Error("order_access_denied");
+      err.code = "order_access_denied";
+      throw err;
+    }
+  } else if (actor?.restaurantId && Number(payment.restaurantId) !== Number(actor.restaurantId) && String(actor.role).toUpperCase() !== "SUPER_ADMIN") {
     const err = new Error("restaurant_access_denied");
     err.code = "restaurant_access_denied";
     throw err;
@@ -218,13 +342,20 @@ export const verifyPayment = async ({ prisma, actor, input } = {}) => {
       throw err;
     }
 
-    const razorpayOrderId = String(body.razorpayOrderId || body.razorpay_order_id || payment.providerOrderId || "");
+    const razorpayOrderId = String(body.razorpayOrderId || body.razorpay_order_id || "");
     const razorpayPaymentId = String(body.razorpayPaymentId || body.razorpay_payment_id || "");
     const razorpaySignature = String(body.razorpaySignature || body.razorpay_signature || "");
 
     if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
       const err = new Error("razorpay_fields_required");
       err.code = "razorpay_fields_required";
+      throw err;
+    }
+
+    // Verify client-submitted order ID matches stored providerOrderId
+    if (razorpayOrderId !== payment.providerOrderId) {
+      const err = new Error("razorpay_order_id_mismatch");
+      err.code = "razorpay_order_id_mismatch";
       throw err;
     }
 
@@ -266,6 +397,13 @@ export const verifyPayment = async ({ prisma, actor, input } = {}) => {
     });
 
     return { payment: updated, verified: true };
+  }
+
+  // Non-Razorpay payment verification (Staff only)
+  if (actor?.type === "customer") {
+    const err = new Error("razorpay_verification_required");
+    err.code = "razorpay_verification_required";
+    throw err;
   }
 
   const updated = await prisma.$transaction(async (tx) => {

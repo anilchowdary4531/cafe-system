@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Eye, EyeOff, Phone, UserCircle2 } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, Phone, User, UserCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useRestaurantContext } from "../context/RestaurantContext";
@@ -41,6 +41,15 @@ export default function Login() {
     const [customerDevOtp, setCustomerDevOtp] = useState("");
     const [customerLoading, setCustomerLoading] = useState(false);
     const [customerError, setCustomerError] = useState("");
+    const [customerSubMode, setCustomerSubMode] = useState(() => {
+        const sub = String(searchParams.get("submode") || searchParams.get("tab") || "").trim().toLowerCase();
+        if (sub === "register" || sub === "signup") return "register";
+        if (sub === "otp") return "otp";
+        return "password";
+    });
+    const [customerUsername, setCustomerUsername] = useState("");
+    const [customerPassword, setCustomerPassword] = useState("");
+    const [showCustomerPassword, setShowCustomerPassword] = useState(false);
     const autoLoginTokenRef = useRef("");
     const staffLink = String(searchParams.get("staffLink") || "").trim();
 
@@ -334,8 +343,92 @@ export default function Login() {
     };
 
     const handleCustomerLogin = async () => {
+        if (customerSubMode === "password") return handleCustomerPasswordLogin();
+        if (customerSubMode === "register") return handleCustomerRegister();
         if (customerStep === "phone") return handleCustomerRequestOtp();
         return handleCustomerVerifyOtp();
+    };
+
+    const handleCustomerPasswordLogin = async () => {
+        const identifier = String(customerUsername || "").trim();
+        const pwd = String(customerPassword || "").trim();
+
+        if (!identifier || !pwd) {
+            setCustomerError("Username/phone/email and password are required.");
+            return;
+        }
+
+        try {
+            setCustomerLoading(true);
+            setCustomerError("");
+            const res = await api.post("/customer/password-login", { username: identifier, password: pwd });
+
+            const customer = res.data?.customer || {};
+
+            loginCustomer({
+                id: customer?.id || null,
+                username: customer?.username || "",
+                name: customer?.name || "",
+                email: customer?.email || "",
+                phone: customer?.phone || "",
+                token: res.data?.token || "",
+                verified: true,
+            });
+
+            navigate(getCustomerRedirectTarget(), { replace: true });
+        } catch (err) {
+            setCustomerError(err.response?.data?.message || err.message || "Invalid username or password");
+        } finally {
+            setCustomerLoading(false);
+        }
+    };
+
+    const handleCustomerRegister = async () => {
+        const username = String(customerUsername || "").trim().toLowerCase();
+        const pwd = String(customerPassword || "").trim();
+        const phone = String(customerPhone || "").trim();
+        const name = String(customerName || "").trim();
+        const email = String(customerEmail || "").trim().toLowerCase();
+
+        if (!username || !phone || !pwd) {
+            setCustomerError("Username, phone number, and password are required.");
+            return;
+        }
+
+        if (pwd.length < 6) {
+            setCustomerError("Password must be at least 6 characters.");
+            return;
+        }
+
+        try {
+            setCustomerLoading(true);
+            setCustomerError("");
+            const res = await api.post("/customer/register", {
+                username,
+                password: pwd,
+                phone,
+                name,
+                email,
+            });
+
+            const customer = res.data?.customer || {};
+
+            loginCustomer({
+                id: customer?.id || null,
+                username: customer?.username || username,
+                name: customer?.name || name,
+                email: customer?.email || email,
+                phone: customer?.phone || phone,
+                token: res.data?.token || "",
+                verified: true,
+            });
+
+            navigate(getCustomerRedirectTarget(), { replace: true });
+        } catch (err) {
+            setCustomerError(err.response?.data?.message || err.message || "Failed to create account");
+        } finally {
+            setCustomerLoading(false);
+        }
     };
 
     return (
@@ -559,8 +652,23 @@ export default function Login() {
                         </>
                     ) : (
                         <>
-                            <h2 className="text-3xl font-bold mb-2">Customer Login</h2>
-                            <p className="theme-muted mb-8">Secure OTP login to view your orders and reorder faster.</p>
+
+                            {customerSubMode === "password" ? (
+                                <>
+                                    <h2 className="text-3xl font-bold mb-2">Customer Login</h2>
+                                    <p className="theme-muted mb-6">Enter your username, phone or email and password to log in.</p>
+                                </>
+                            ) : customerSubMode === "register" ? (
+                                <>
+                                    <h2 className="text-3xl font-bold mb-2">Create Account</h2>
+                                    <p className="theme-muted mb-6">Sign up to view your orders, earn rewards and reorder faster.</p>
+                                </>
+                            ) : (
+                                <>
+                                    <h2 className="text-3xl font-bold mb-2">Customer OTP Login</h2>
+                                    <p className="theme-muted mb-6">Secure OTP login to view your orders and reorder faster.</p>
+                                </>
+                            )}
 
                             {customerError && (
                                 <div className="mb-5 bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl text-sm">
@@ -568,107 +676,307 @@ export default function Login() {
                                 </div>
                             )}
 
-                            <div className="space-y-5">
-                                <div>
-                                    <label className="theme-muted mb-2 block text-sm">Phone Number</label>
-                                    <div className="relative">
-                                        <Phone size={18} className="theme-muted absolute left-4 top-3.5" />
-                                        <input
-                                            type="tel"
-                                            placeholder="Enter phone number"
-                                            value={customerPhone}
-                                            onChange={(e) => setCustomerPhone(e.target.value)}
-                                            className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="theme-muted mb-2 block text-sm">Email (optional)</label>
-                                    <input
-                                        type="email"
-                                        placeholder="you@example.com"
-                                        value={customerEmail}
-                                        onChange={(e) => setCustomerEmail(e.target.value)}
-                                        className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
-                                    />
-                                    <p className="theme-muted mt-2 text-xs">If provided, we’ll send the OTP to email too.</p>
-                                </div>
-
-                                {customerStep === "otp" && (
+                            <div className="space-y-4">
+                                {customerSubMode === "password" && (
                                     <>
                                         <div>
-                                            <label className="theme-muted mb-2 block text-sm">OTP</label>
-                                            <input
-                                                type="text"
-                                                inputMode="numeric"
-                                                autoComplete="one-time-code"
-                                                placeholder="Enter 6-digit OTP"
-                                                value={customerOtp}
-                                                onChange={(e) => setCustomerOtp(e.target.value)}
-                                                className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
-                                            />
-                                            <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleCustomerRequestOtp()}
-                                                    disabled={customerLoading}
-                                                    className="theme-muted underline decoration-dotted underline-offset-4 hover:opacity-80 disabled:opacity-60"
-                                                >
-                                                    Resend OTP
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setCustomerStep("phone");
-                                                        setCustomerOtp("");
-                                                        setCustomerOtpExpiresAt(null);
-                                                        setCustomerDevOtp("");
-                                                    }}
-                                                    className="theme-muted underline decoration-dotted underline-offset-4 hover:opacity-80"
-                                                >
-                                                    Change number
-                                                </button>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Username / Phone / Email</label>
+                                            <div className="relative">
+                                                <User size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Username, phone number or email"
+                                                    value={customerUsername}
+                                                    onChange={(e) => setCustomerUsername(e.target.value)}
+                                                    className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
+                                                />
                                             </div>
-                                            {import.meta.env.DEV && customerDevOtp && (
-                                                <p className="theme-muted mt-2 text-xs">Dev OTP: {customerDevOtp}</p>
-                                            )}
-                                            {customerOtpExpiresAt && (
-                                                <p className="theme-muted mt-1 text-xs">
-                                                    Expires at {new Date(customerOtpExpiresAt).toLocaleTimeString()}
-                                                </p>
-                                            )}
                                         </div>
 
                                         <div>
-                                            <label className="theme-muted mb-2 block text-sm">Name (optional)</label>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Password</label>
+                                            <div className="relative">
+                                                <Lock size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                <input
+                                                    type={showCustomerPassword ? "text" : "password"}
+                                                    placeholder="Enter your password"
+                                                    value={customerPassword}
+                                                    onChange={(e) => setCustomerPassword(e.target.value)}
+                                                    className="theme-input w-full rounded-xl px-11 py-3 pr-12 outline-none transition"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowCustomerPassword(!showCustomerPassword)}
+                                                    className="theme-muted absolute right-4 top-3.5 hover:opacity-80"
+                                                >
+                                                    {showCustomerPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={handleCustomerLogin}
+                                            disabled={customerLoading}
+                                            className="theme-button w-full rounded-xl py-3 font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70 mt-2"
+                                        >
+                                            {customerLoading ? "Logging in..." : "Login"}
+                                        </button>
+
+                                        <div className="mt-4 flex flex-col items-center gap-2 text-center text-sm">
+                                            <div>
+                                                <span className="theme-muted">Don't have an account? </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setCustomerSubMode("register"); setCustomerError(""); }}
+                                                    className="font-semibold theme-accent-text hover:underline"
+                                                >
+                                                    Create Account
+                                                </button>
+                                            </div>
+                                            <div>
+                                                <span className="theme-muted">Or prefer OTP? </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setCustomerSubMode("otp"); setCustomerError(""); }}
+                                                    className="font-semibold theme-accent-text hover:underline"
+                                                >
+                                                    Use OTP Login
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {customerSubMode === "register" && (
+                                    <>
+                                        <div>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Username *</label>
+                                            <div className="relative">
+                                                <User size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Choose a unique username (e.g. alex_99)"
+                                                    value={customerUsername}
+                                                    onChange={(e) => setCustomerUsername(e.target.value)}
+                                                    className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Phone Number *</label>
+                                            <div className="relative">
+                                                <Phone size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                <input
+                                                    type="tel"
+                                                    placeholder="Enter phone number"
+                                                    value={customerPhone}
+                                                    onChange={(e) => setCustomerPhone(e.target.value)}
+                                                    className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Full Name (optional)</label>
                                             <div className="relative">
                                                 <UserCircle2 size={18} className="theme-muted absolute left-4 top-3.5" />
                                                 <input
                                                     type="text"
-                                                    placeholder="Your name"
+                                                    placeholder="Your full name"
                                                     value={customerName}
                                                     onChange={(e) => setCustomerName(e.target.value)}
                                                     className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
                                                 />
                                             </div>
                                         </div>
+
+                                        <div>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Email Address (optional)</label>
+                                            <div className="relative">
+                                                <Mail size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                <input
+                                                    type="email"
+                                                    placeholder="you@example.com"
+                                                    value={customerEmail}
+                                                    onChange={(e) => setCustomerEmail(e.target.value)}
+                                                    className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Password *</label>
+                                            <div className="relative">
+                                                <Lock size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                <input
+                                                    type={showCustomerPassword ? "text" : "password"}
+                                                    placeholder="Min 6 characters"
+                                                    value={customerPassword}
+                                                    onChange={(e) => setCustomerPassword(e.target.value)}
+                                                    className="theme-input w-full rounded-xl px-11 py-3 pr-12 outline-none transition"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowCustomerPassword(!showCustomerPassword)}
+                                                    className="theme-muted absolute right-4 top-3.5 hover:opacity-80"
+                                                >
+                                                    {showCustomerPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={handleCustomerLogin}
+                                            disabled={customerLoading}
+                                            className="theme-button w-full rounded-xl py-3 font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70 mt-2"
+                                        >
+                                            {customerLoading ? "Creating Account..." : "Create Account & Continue"}
+                                        </button>
+
+                                        <div className="mt-4 text-center">
+                                            <span className="theme-muted text-sm">Already have an account? </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setCustomerSubMode("password"); setCustomerError(""); }}
+                                                className="text-sm font-semibold theme-accent-text hover:underline"
+                                            >
+                                                Login here
+                                            </button>
+                                        </div>
                                     </>
                                 )}
 
-                                <button
-                                    onClick={handleCustomerLogin}
-                                    disabled={customerLoading}
-                                    className="theme-button w-full rounded-xl py-3 font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70"
-                                >
-                                    {customerStep === "phone"
-                                        ? customerLoading
-                                            ? "Sending OTP..."
-                                            : "Send OTP"
-                                        : customerLoading
-                                            ? "Verifying..."
-                                            : "Verify & Continue"}
-                                </button>
+                                {customerSubMode === "otp" && (
+                                    <>
+                                        <div>
+                                            <label className="theme-muted mb-2 block text-sm font-medium">Phone Number</label>
+                                            <div className="relative">
+                                                <Phone size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                <input
+                                                    type="tel"
+                                                    placeholder="Enter phone number"
+                                                    value={customerPhone}
+                                                    onChange={(e) => setCustomerPhone(e.target.value)}
+                                                    className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="theme-muted mb-2 block text-sm font-medium">Email (optional)</label>
+                                            <div className="relative">
+                                                <Mail size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                <input
+                                                    type="email"
+                                                    placeholder="you@example.com"
+                                                    value={customerEmail}
+                                                    onChange={(e) => setCustomerEmail(e.target.value)}
+                                                    className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
+                                                />
+                                            </div>
+                                            <p className="theme-muted mt-2 text-xs">If provided, we’ll send the OTP to email too.</p>
+                                        </div>
+
+                                        {customerStep === "otp" && (
+                                            <>
+                                                <div>
+                                                    <label className="theme-muted mb-2 block text-sm font-medium">OTP</label>
+                                                    <input
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        autoComplete="one-time-code"
+                                                        placeholder="Enter 6-digit OTP"
+                                                        value={customerOtp}
+                                                        onChange={(e) => setCustomerOtp(e.target.value)}
+                                                        className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
+                                                    />
+                                                    <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleCustomerRequestOtp()}
+                                                            disabled={customerLoading}
+                                                            className="theme-muted underline decoration-dotted underline-offset-4 hover:opacity-80 disabled:opacity-60"
+                                                        >
+                                                            Resend OTP
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setCustomerStep("phone");
+                                                                setCustomerOtp("");
+                                                                setCustomerOtpExpiresAt(null);
+                                                                setCustomerDevOtp("");
+                                                            }}
+                                                            className="theme-muted underline decoration-dotted underline-offset-4 hover:opacity-80"
+                                                        >
+                                                            Change number
+                                                        </button>
+                                                    </div>
+                                                    {import.meta.env.DEV && customerDevOtp && (
+                                                        <p className="theme-muted mt-2 text-xs">Dev OTP: {customerDevOtp}</p>
+                                                    )}
+                                                    {customerOtpExpiresAt && (
+                                                        <p className="theme-muted mt-1 text-xs">
+                                                            Expires at {new Date(customerOtpExpiresAt).toLocaleTimeString()}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                <div>
+                                                    <label className="theme-muted mb-2 block text-sm font-medium">Name (optional)</label>
+                                                    <div className="relative">
+                                                        <UserCircle2 size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Your name"
+                                                            value={customerName}
+                                                            onChange={(e) => setCustomerName(e.target.value)}
+                                                            className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+
+                                        <button
+                                            onClick={handleCustomerLogin}
+                                            disabled={customerLoading}
+                                            className="theme-button w-full rounded-xl py-3 font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70 mt-2"
+                                        >
+                                            {customerStep === "phone"
+                                                ? customerLoading
+                                                    ? "Sending OTP..."
+                                                    : "Send OTP"
+                                                : customerLoading
+                                                    ? "Verifying..."
+                                                    : "Verify & Continue"}
+                                        </button>
+
+                                        <div className="mt-4 flex flex-col items-center gap-2 text-center text-sm">
+                                            <div>
+                                                <span className="theme-muted">Have a password? </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setCustomerSubMode("password"); setCustomerError(""); }}
+                                                    className="font-semibold theme-accent-text hover:underline"
+                                                >
+                                                    Password Login
+                                                </button>
+                                            </div>
+                                            <div>
+                                                <span className="theme-muted">Don't have an account? </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setCustomerSubMode("register"); setCustomerError(""); }}
+                                                    className="font-semibold theme-accent-text hover:underline"
+                                                >
+                                                    Create Account
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </>
                     )}

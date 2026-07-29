@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Banknote, MapPin, Plus, QrCode, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, Banknote, MapPin, Plus, QrCode, ShieldCheck, X, IndianRupee } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import useCachedGet from "../hooks/useCachedGet";
@@ -14,8 +14,12 @@ const toInr = (value) => {
     return n.toFixed(2);
 };
 
-const normalizePaymentMethod = (value) =>
-    String(value || "UPI").trim().toUpperCase() === "CASH" ? "CASH" : "UPI";
+const normalizePaymentMethod = (value) => {
+    const s = String(value || "UPI").trim().toUpperCase();
+    if (s === "CASH") return "CASH";
+    if (s === "PAY_LATER") return "PAY_LATER";
+    return "UPI";
+};
 
 const normalizeFulfillment = (value) => {
     const fulfillment = String(value || "").trim().toLowerCase();
@@ -25,43 +29,60 @@ const normalizeFulfillment = (value) => {
     return "delivery";
 };
 
-const getPaymentMethodTitle = (value, fulfillment = "delivery") =>
-    normalizePaymentMethod(value) === "CASH"
-        ? fulfillment === "pickup"
+const getPaymentMethodTitle = (value, fulfillment = "delivery") => {
+    const m = normalizePaymentMethod(value);
+    if (m === "CASH") {
+        return fulfillment === "pickup"
             ? "Cash on Pickup"
             : fulfillment === "dinein"
                 ? "Cash on Table"
-            : "Cash on Delivery"
-        : "UPI";
+            : "Cash on Delivery";
+    }
+    if (m === "PAY_LATER") return "Pay Later";
+    return "UPI";
+};
 
-const getPaymentMethodSubtitle = (value, fulfillment = "delivery") =>
-    normalizePaymentMethod(value) === "CASH"
-        ? fulfillment === "pickup"
+const getPaymentMethodSubtitle = (value, fulfillment = "delivery") => {
+    const m = normalizePaymentMethod(value);
+    if (m === "CASH") {
+        return fulfillment === "pickup"
             ? "Pay when you collect your order"
             : fulfillment === "dinein"
                 ? "Pay when your order is served"
-            : "Pay when your order arrives"
-        : "Pay with any UPI app";
+            : "Pay when your order arrives";
+    }
+    if (m === "PAY_LATER") return "Charge to Khata Credit";
+    return "Pay with any UPI app";
+};
 
-const getPaymentFooterHint = (value, isOnlineOrder = false, fulfillment = "delivery") =>
-    isOnlineOrder
-        ? fulfillment === "pickup"
-            ? normalizePaymentMethod(value) === "CASH"
-                ? "Online order - cash on pickup"
-                : "Online order - pickup"
-            : fulfillment === "dinein"
-                ? normalizePaymentMethod(value) === "CASH"
-                    ? "Table order - cash on table"
-                    : "Table order"
-            : normalizePaymentMethod(value) === "CASH"
-                ? "Online order - cash on delivery"
-                : "Online order - delivery"
-        : normalizePaymentMethod(value) === "CASH"
-            ? "Cash on table - pay when your order is served"
-            : "Secure payment - UPI recommended";
+const getPaymentFooterHint = (value, isOnlineOrder = false, fulfillment = "delivery") => {
+    const m = normalizePaymentMethod(value);
+    if (isOnlineOrder) {
+        if (fulfillment === "pickup") {
+            if (m === "CASH") return "Online order - cash on pickup";
+            if (m === "PAY_LATER") return "Online order - Pay Later";
+            return "Online order - pickup";
+        }
+        if (fulfillment === "dinein") {
+            if (m === "CASH") return "Table order - cash on table";
+            if (m === "PAY_LATER") return "Table order - Pay Later";
+            return "Table order";
+        }
+        if (m === "CASH") return "Online order - cash on delivery";
+        if (m === "PAY_LATER") return "Online order - Pay Later";
+        return "Online order - delivery";
+    }
+    if (m === "CASH") return "Cash on table - pay when your order is served";
+    if (m === "PAY_LATER") return "Secure credit - charged to your account";
+    return "Secure payment - UPI recommended";
+};
 
-const getPaymentTone = (value) =>
-    normalizePaymentMethod(value) === "CASH" ? "var(--app-accent)" : "var(--app-primary)";
+const getPaymentTone = (value) => {
+    const m = normalizePaymentMethod(value);
+    if (m === "CASH") return "var(--app-accent)";
+    if (m === "PAY_LATER") return "#10B981";
+    return "var(--app-primary)";
+};
 
 const getPaymentTileStyle = (value, active) => {
     const tone = getPaymentTone(value);
@@ -147,6 +168,10 @@ const getCheckoutActionLabel = ({
                 : "Send OTP to Place Order";
     }
 
+    if (method === "PAY_LATER") {
+        return "Place Order & Charge Khata";
+    }
+
     if (customerToken) return isOnlineOrder ? `Place ${orderMode} Order` : "Place Order";
     if (!isOnlineOrder) return "Place Table Order";
     return otpStep === "otp"
@@ -177,6 +202,9 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
     const [selectedAddressId, setSelectedAddressId] = useState("");
     const [manualAddress, setManualAddress] = useState("");
     const [paymentMethod, setPaymentMethod] = useState("UPI"); // UPI | CASH
+    const [payLaterEligible, setPayLaterEligible] = useState(false);
+    const [payLaterAccountId, setPayLaterAccountId] = useState(null);
+    const [payLaterBalance, setPayLaterBalance] = useState(0);
     const [checkoutStep, setCheckoutStep] = useState("summary"); // summary | payment
     const [placedOrder, setPlacedOrder] = useState(null);
     const [upiPendingOrder, setUpiPendingOrder] = useState(null);
@@ -210,6 +238,23 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         clearCartRef.current = clearCart;
     }, [clearCart]);
 
+    useEffect(() => {
+        if (!open || !slug || !customerToken) return;
+        const checkEligibility = async () => {
+            try {
+                const res = await api.get(`/customer/pay-later/eligibility?slug=${slug}`, getCustomerAuthConfig());
+                if (res.data?.eligible) {
+                    setPayLaterEligible(true);
+                    setPayLaterAccountId(res.data.accountId);
+                    setPayLaterBalance(res.data.pendingBalance);
+                }
+            } catch (err) {
+                // ignore eligibility check failures
+            }
+        };
+        checkEligibility();
+    }, [open, slug, customerToken]);
+
     /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         if (!open) return;
@@ -228,6 +273,9 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         setSelectedAddressId("");
         setManualAddress("");
         setPaymentMethod("UPI");
+        setPayLaterEligible(false);
+        setPayLaterAccountId(null);
+        setPayLaterBalance(0);
         setCheckoutStep("summary");
         setPlacedOrder(null);
         setUpiPendingOrder(null);
@@ -623,8 +671,34 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
 
             setPlacedOrder({ id: orderId, orderNo, total: orderTotal, fulfillment: isOnlineOrder ? selectedFulfillment : "dinein" });
 
+            // Pay Later checkout flow
+            if (selectedPaymentMethod === "PAY_LATER") {
+                await api.post("/payments/verify", { orderId, status: "SUCCESS", paymentMode: "PAY_LATER" }, getCustomerAuthConfig());
+                clearCart();
+                onClose();
+                navigate(
+                    `/orders/thank-you?slug=${encodeURIComponent(slug)}&orderNo=${encodeURIComponent(orderNo)}&orderId=${encodeURIComponent(
+                        String(orderId)
+                    )}&amount=${encodeURIComponent(String(toInr(orderTotal)))}&fulfillment=${encodeURIComponent(
+                        isOnlineOrder ? selectedFulfillment : "dinein"
+                    )}`,
+                    {
+                        replace: true,
+                        state: {
+                            slug,
+                            orderNo,
+                            orderId,
+                            amount: orderTotal,
+                            paymentStatus: "SUCCESS",
+                            fulfillment: isOnlineOrder ? selectedFulfillment : "dinein",
+                        },
+                    }
+                );
+                return;
+            }
+
             // Cash on delivery: verify immediately and go to success page.
-            if (!isUpiPayment) {
+            if (selectedPaymentMethod === "CASH") {
                 await api.post("/payments/verify", { orderId, status: "SUCCESS", paymentMode: "CASH" }, getCustomerAuthConfig());
                 clearCart();
                 onClose();
@@ -1020,7 +1094,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                         </p>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className={payLaterEligible ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
                                         <button
                                             type="button"
                                             onClick={() => setPaymentMethod("UPI")}
@@ -1046,7 +1120,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                     <p className="text-[13px] font-semibold leading-tight tracking-tight sm:text-sm">{getPaymentMethodTitle("UPI")}</p>
                                                     <p className="theme-muted mt-0.5 hidden text-[9px] leading-tight sm:block sm:text-[10px]">
                                                         {getPaymentMethodSubtitle("UPI")}
-                                                    </p>
+                                                     </p>
                                                 </div>
                                             </div>
                                         </button>
@@ -1088,6 +1162,46 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                 COD
                                             </span>
                                         </button>
+
+                                        {payLaterEligible && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setPaymentMethod("PAY_LATER")}
+                                                className={[
+                                                    "checkout-paper-option group relative flex min-h-[72px] items-center justify-between gap-2 overflow-hidden rounded-[20px] border px-3 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 hover:-translate-y-0.5",
+                                                    selectedPaymentMethod === "PAY_LATER" ? "ring-1 ring-emerald-500" : "",
+                                                ].join(" ")}
+                                                aria-pressed={selectedPaymentMethod === "PAY_LATER"}
+                                                style={getPaymentTileStyle("PAY_LATER", selectedPaymentMethod === "PAY_LATER")}
+                                            >
+                                                <div className="flex min-w-0 items-center gap-2">
+                                                    <div
+                                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border"
+                                                        style={{
+                                                            borderColor: "color-mix(in srgb, #10B981 30%, var(--app-border) 70%)",
+                                                            background: "color-mix(in srgb, #10B981 12%, transparent)",
+                                                            color: "#10B981",
+                                                        }}
+                                                    >
+                                                        <IndianRupee size={16} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-[13px] font-semibold leading-tight tracking-tight sm:text-sm">
+                                                            {getPaymentMethodTitle("PAY_LATER")}
+                                                        </p>
+                                                    <p className="theme-muted mt-0.5 hidden text-[9px] leading-tight sm:block sm:text-[10px]">
+                                                        {getPaymentMethodSubtitle("PAY_LATER")}
+                                                    </p>
+                                                    </div>
+                                                </div>
+                                                <span
+                                                    className="shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.18em] sm:text-[10px]"
+                                                    style={getPaymentBadgeStyle("PAY_LATER", selectedPaymentMethod === "PAY_LATER")}
+                                                >
+                                                    KHATA
+                                                </span>
+                                            </button>
+                                        )}
                                     </div>
 
                                     {paymentMethod === "UPI" && (

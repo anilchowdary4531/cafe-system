@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import { Link, NavLink, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Gift, Heart, IndianRupee, MapPin, Settings, Sparkles, Star, UserCircle2 } from "lucide-react";
+import { ArrowLeft, Gift, Heart, IndianRupee, MapPin, Settings, Sparkles, Star, UserCircle2, Bell } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import useCustomerProfile from "../hooks/useCustomerProfile";
 import useCachedGet from "../hooks/useCachedGet";
@@ -12,6 +12,9 @@ import WalletSection from "./customer/profile/WalletSection";
 import FavoritesSection from "./customer/profile/FavoritesSection";
 import SettingsSection from "./customer/profile/SettingsSection";
 import EditProfileSection from "./customer/profile/EditProfileSection";
+import PayLaterSection from "./customer/profile/PayLaterSection";
+import PayLaterDetailSection from "./customer/profile/PayLaterDetailSection";
+import CustomerNotifications from "./customer/profile/CustomerNotifications";
 
 const formatMoney = (value) => `Rs ${Math.round(Number(value || 0))}`;
 const formatStatus = (status) => {
@@ -74,6 +77,12 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
             ? "Address"
             : activeSection === "wallet"
             ? "Wallet"
+            : activeSection === "pay-later"
+            ? "Pay Later Accounts"
+            : activeSection === "pay-later-detail"
+            ? "Pay Later Transactions"
+            : activeSection === "notifications"
+            ? "Notifications"
             : activeSection === "edit"
             ? "Edit profile"
             : activeSection === "favorites"
@@ -89,6 +98,9 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
             return <AddressesSection profile={profile} customerToken={customerToken} />;
         }
         if (activeSection === "wallet") return <WalletSection profile={profile} customerToken={customerToken} />;
+        if (activeSection === "pay-later") return <PayLaterSection />;
+        if (activeSection === "pay-later-detail") return <PayLaterDetailSection />;
+        if (activeSection === "notifications") return <CustomerNotifications />;
         if (activeSection === "edit") {
             return (
                 <EditProfileSection
@@ -159,6 +171,18 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
                                 caption="Your liked dishes"
                             />
                             <OverviewActionCard
+                                to={buildProfilePath("/profile/pay-later")}
+                                icon={<IndianRupee size={19} />}
+                                label="Pay Later"
+                                caption="Manage restaurant credits"
+                            />
+                            <OverviewActionCard
+                                to={buildProfilePath("/profile/notifications")}
+                                icon={<Bell size={19} />}
+                                label="Notifications"
+                                caption="View updates & alerts"
+                            />
+                            <OverviewActionCard
                                 to={buildProfilePath("/profile/settings")}
                                 icon={<Settings size={19} />}
                                 label="Settings"
@@ -194,7 +218,7 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
                                     icon={<Star size={18} />}
                                     label="Reward points"
                                     hint="1 point per Rs 10"
-                                    value="399"
+                                    value={profile?.rewardPoints !== undefined ? String(profile.rewardPoints) : "0"}
                                     toneClass="from-yellow-500/18 to-lime-500/8"
                                 />
                                 <ProfileValueCard

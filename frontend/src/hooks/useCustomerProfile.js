@@ -19,7 +19,11 @@ export default function useCustomerProfile({ enabled = true } = {}) {
         setLoading(true);
         setError("");
         try {
-            const res = await api.get("/customer/profile");
+            const urlParams = new URLSearchParams(window.location.search);
+            const slug = urlParams.get("slug") || "";
+            const res = await api.get("/customer/profile", {
+                params: slug ? { slug } : undefined
+            });
             if (requestIdRef.current !== requestId) return null;
             const next = res.data?.customer || null;
             setProfile(next);

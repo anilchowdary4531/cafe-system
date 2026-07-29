@@ -27,7 +27,35 @@ const METRICS = [
     },
 ];
 
-export default function WalletSection() {
+export default function WalletSection({ profile }) {
+    const pointsValue = profile?.rewardPoints !== undefined ? String(profile.rewardPoints) : "0";
+
+    const metrics = [
+        {
+            key: "wallet",
+            icon: <IndianRupee size={19} />,
+            label: "Wallet balance",
+            hint: "Coming soon",
+            value: "Rs 0",
+            toneClass: "from-orange-500/20 to-amber-500/10",
+        },
+        {
+            key: "points",
+            icon: <Star size={19} />,
+            label: "Reward points",
+            hint: "1 point per Rs 10",
+            value: pointsValue,
+            toneClass: "from-yellow-500/20 to-lime-500/10",
+        },
+        {
+            key: "offers",
+            icon: <Gift size={19} />,
+            label: "Offers",
+            hint: "Coming soon",
+            value: "Coming soon",
+            toneClass: "from-fuchsia-500/15 to-rose-500/10",
+        },
+    ];
 
     return (
         <div className="space-y-4">
@@ -38,7 +66,7 @@ export default function WalletSection() {
             </div>
 
             <div className="grid gap-3 px-1 md:grid-cols-3">
-                {METRICS.map((metric) => (
+                {metrics.map((metric) => (
                     <WalletCard
                         key={metric.key}
                         icon={metric.icon}

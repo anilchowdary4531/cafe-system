@@ -4,6 +4,8 @@ import { requireCustomerPhoneFromJwt } from "../services/customerProfileService.
 import { buildCustomerOtpController } from "../controllers/customerOtpController.js";
 import { buildCustomerProfileController } from "../controllers/customerProfileController.js";
 import { buildCustomerAddressController } from "../controllers/customerAddressController.js";
+import { buildCustomerAuthController } from "../controllers/customerAuthController.js";
+import { buildPayLaterController } from "../controllers/payLaterController.js";
 
 const normalizeDeliveryAddress = (value) => {
   if (!value) return "";
@@ -58,6 +60,7 @@ export default async function customerRoutes(app, deps) {
   const otpController = buildCustomerOtpController({ prisma, app });
   const profileController = buildCustomerProfileController({ prisma });
   const addressController = buildCustomerAddressController({ prisma });
+  const authController = buildCustomerAuthController({ prisma, app });
 
   app.get("/customer/orders", async (req, reply) => {
     try {
@@ -146,6 +149,10 @@ export default async function customerRoutes(app, deps) {
 
   app.post("/customer/send-otp", otpController.sendOtp);
   app.post("/customer/verify-otp", otpController.verifyOtp);
+
+  app.post("/customer/register", authController.registerCustomer);
+  app.post("/customer/login-password", authController.loginWithPassword);
+  app.post("/customer/password-login", authController.loginWithPassword);
 
   // Backward compatible alias.
   app.post("/customer/login", async (req, reply) => {
@@ -446,4 +453,13 @@ export default async function customerRoutes(app, deps) {
       });
     }
   });
+
+  const payLaterController = buildPayLaterController({ prisma });
+  app.get("/customer/pay-later/eligibility", payLaterController.getEligibility);
+  app.get("/customer/pay-later/accounts", payLaterController.getAccounts);
+  app.get("/customer/pay-later/accounts/:accountId/details", payLaterController.getDetails);
+  app.post("/customer/pay-later/accounts/:accountId/repay", payLaterController.repay);
+  app.post("/customer/pay-later/accounts/:accountId/repay/verify", payLaterController.verifyRepay);
+  app.get("/customer/notifications", payLaterController.getNotifications);
+  app.post("/customer/notifications/:notificationId/read", payLaterController.readNotification);
 }

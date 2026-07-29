@@ -9,10 +9,15 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
   const sendOtp = async (req, reply) => {
     try {
       const body = req.body || {};
-      const phone = normalizePhone(body.phone || "");
+      let phone = normalizePhone(body.phone || "");
       const email = String(body.email || "").trim().toLowerCase();
 
-      if (!phone) return reply.code(400).send({ message: "Phone number is required" });
+      // If no phone but email is provided, we use email as the identifier
+      if (!phone && email) {
+        phone = email;
+      }
+
+      if (!phone) return reply.code(400).send({ message: "Phone number or Email is required" });
 
       const otpRes = await requestOtp({ prisma, phone });
       if (!otpRes.ok) return reply.code(otpRes.status).send(otpRes.payload);
@@ -72,13 +77,17 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
   const verifyOtpHandler = async (req, reply) => {
     try {
       const body = req.body || {};
-      const phone = normalizePhone(body.phone || "");
+      let phone = normalizePhone(body.phone || "");
       const accessToken = String(body.accessToken || body.access_token || "").trim();
       const otp = String(body.otp || "").trim();
       const name = String(body.name || "").trim();
       const email = String(body.email || "").trim().toLowerCase();
 
-      if (!phone) return reply.code(400).send({ message: "Phone number is required" });
+      if (!phone && email) {
+        phone = email;
+      }
+
+      if (!phone) return reply.code(400).send({ message: "Phone number or Email is required" });
       if (!accessToken && !otp) return reply.code(400).send({ message: "OTP (or accessToken) is required" });
 
       if (accessToken) {

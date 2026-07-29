@@ -171,6 +171,7 @@ export default function AuthProvider({ children }) {
     const loginCustomer = (profile) => {
         const nextCustomer = {
             id: profile?.id || null,
+            username: String(profile?.username || "").trim(),
             name: String(profile?.name || "").trim(),
             email: String(profile?.email || "").trim(),
             phone: String(profile?.phone || "").trim(),
