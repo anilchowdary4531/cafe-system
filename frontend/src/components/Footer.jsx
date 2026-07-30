@@ -106,6 +106,11 @@ export default function Footer({
                                     Refund Policy
                                 </Link>
                             </li>
+                            <li>
+                                <Link to="/delete-account" className="hover:opacity-80">
+                                    Delete Account
+                                </Link>
+                            </li>
                         </ul>
                     </div>
 

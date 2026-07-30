@@ -21,6 +21,7 @@ import InventoryPage from "./pages/InventoryPage";
 import Cart from "./pages/Cart";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
+import DeleteAccount from "./pages/DeleteAccount";
 import ThankYou from "./pages/ThankYou";
 
 // ============================
@@ -238,8 +239,17 @@ export default function App() {
                         }
                     />
 
-                    {/* Backward compatible aliases */}
-                    <Route path="/delete-account" element={<Navigate to="/profile/delete-account" replace />} />
+                    {/* Public Play Store Account Deletion URL */}
+                    <Route
+                        path="/delete-account"
+                        element={
+                            <>
+                                <Navbar />
+                                <DeleteAccount />
+                                <Footer />
+                            </>
+                        }
+                    />
                     <Route path="/orders/history" element={<Navigate to="/profile/order-history" replace />} />
 
                     <Route
