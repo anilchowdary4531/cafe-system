@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Bell, Lock, Mail, MapPin, Phone, Save, Trash2, UserCircle2 } from "lucide-react";
+import { AlertTriangle, Bell, Lock, Mail, MapPin, Phone, Save, Trash2, UserCircle2, X } from "lucide-react";
 import ThemeSelector from "../../../components/ThemeSelector";
 import LanguageSelector from "../../../components/LanguageSelector";
+import { useLanguage } from "../../../context/LanguageContext";
 import { clearAllCache } from "../../../utils/localCache";
 import { getCustomerSettings, setCustomerSettings } from "../../../utils/customerSettings";
 import { showToast } from "../../../utils/toast";
@@ -32,11 +33,55 @@ const normalizeCoordinate = (value) => {
 
 export default function SettingsSection({ profile, customerToken, loading, saving, error, updateProfile, setError }) {
     const { logoutCustomer } = useAuth();
+    const { t } = useLanguage();
     const [settings, setSettingsState] = useState(() => getCustomerSettings());
     const [name, setName] = useState(() => String(profile?.name || "").trim());
     const [email, setEmail] = useState(() => String(profile?.email || "").trim());
     const [addressDraft, setAddressDraft] = useState(() => emptyAddress(profile));
     const [addressSaving, setAddressSaving] = useState(false);
+
+    // Delete Account State
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteStep, setDeleteStep] = useState("confirm"); // "confirm" | "otp"
+    const [deleteOtp, setDeleteOtp] = useState("");
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState("");
+    const [deleteDevOtp, setDeleteDevOtp] = useState("");
+
+    const handleRequestDeleteOtp = async () => {
+        try {
+            setDeleteLoading(true);
+            setDeleteError("");
+            const res = await api.post("/customer/delete-account/request-otp");
+            if (res.data?.devOtp) {
+                setDeleteDevOtp(res.data.devOtp);
+            }
+            setDeleteStep("otp");
+            showToast({ title: "OTP Sent", message: "OTP sent to your registered phone/email.", variant: "info" });
+        } catch (err) {
+            setDeleteError(err.response?.data?.message || err.message || "Failed to send OTP");
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
+
+    const handleConfirmDeleteAccount = async () => {
+        if (!deleteOtp.trim()) {
+            setDeleteError("Please enter the OTP.");
+            return;
+        }
+        try {
+            setDeleteLoading(true);
+            setDeleteError("");
+            await api.post("/customer/delete-account/verify", { otp: deleteOtp.trim() });
+            showToast({ title: "Account Deleted", message: "Your account has been deleted.", variant: "success" });
+            logoutCustomer();
+        } catch (err) {
+            setDeleteError(err.response?.data?.message || err.message || "Failed to delete account");
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
 
     useEffect(() => {
         setName(String(profile?.name || "").trim());
@@ -441,6 +486,124 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                     </button>
                 </div>
             </section>
+
+            <section className="space-y-2 px-1 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-500">Danger Zone</p>
+                <h2 className="text-lg font-semibold text-red-500">{t("deleteAccount")}</h2>
+                <p className="theme-muted text-xs">{t("deleteAccountDesc")}</p>
+                <div className="pt-2">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setShowDeleteModal(true);
+                            setDeleteStep("confirm");
+                            setDeleteOtp("");
+                            setDeleteError("");
+                        }}
+                        className="w-full rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-500 transition hover:bg-red-500/20"
+                    >
+                        {t("deleteAccount")}
+                    </button>
+                </div>
+            </section>
+
+            {/* DELETE ACCOUNT MODAL */}
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="w-full max-w-md rounded-3xl border border-red-500/20 bg-white p-6 shadow-2xl dark:bg-slate-900">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-red-500">
+                                <AlertTriangle size={22} />
+                                <h3 className="text-lg font-bold">{t("deleteAccountTitle")}</h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowDeleteModal(false)}
+                                className="rounded-full p-1 text-gray-400 hover:bg-black/5 dark:hover:bg-white/10"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {deleteError && (
+                            <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/15 px-4 py-2.5 text-xs text-red-400">
+                                {deleteError}
+                            </div>
+                        )}
+
+                        {deleteStep === "confirm" ? (
+                            <div className="mt-4 space-y-4">
+                                <p className="text-sm theme-muted leading-relaxed">
+                                    {t("deleteAccountDesc")}
+                                </p>
+                                <div className="flex items-center justify-end gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDeleteModal(false)}
+                                        className="theme-soft-button rounded-xl px-4 py-2 text-xs font-semibold"
+                                    >
+                                        {t("cancel")}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleRequestDeleteOtp}
+                                        disabled={deleteLoading}
+                                        className="rounded-xl bg-red-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-red-600 disabled:opacity-60"
+                                    >
+                                        {deleteLoading ? "Sending OTP..." : t("requestDeleteOtp")}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="mt-4 space-y-4">
+                                <p className="text-sm theme-muted">
+                                    {t("enterDeleteOtp")}
+                                </p>
+                                <div>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        placeholder={t("placeholderOtp")}
+                                        value={deleteOtp}
+                                        onChange={(e) => setDeleteOtp(e.target.value)}
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-center text-lg font-bold tracking-widest outline-none"
+                                    />
+                                    {deleteDevOtp && (
+                                        <p className="mt-1 text-xs theme-muted">Dev OTP: {deleteDevOtp}</p>
+                                    )}
+                                </div>
+                                <div className="flex items-center justify-between pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleRequestDeleteOtp}
+                                        disabled={deleteLoading}
+                                        className="text-xs theme-muted underline decoration-dotted"
+                                    >
+                                        {t("resendOtp")}
+                                    </button>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowDeleteModal(false)}
+                                            className="theme-soft-button rounded-xl px-4 py-2 text-xs font-semibold"
+                                        >
+                                            {t("cancel")}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleConfirmDeleteAccount}
+                                            disabled={deleteLoading}
+                                            className="rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+                                        >
+                                            {deleteLoading ? t("deletingAccount") : t("confirmDeleteAccount")}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

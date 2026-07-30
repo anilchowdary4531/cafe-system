@@ -81,6 +81,14 @@ const TRANSLATIONS = {
     notifications: "Notifications",
     settings: "Settings",
     logOut: "Log Out",
+
+    deleteAccount: "Delete Account",
+    deleteAccountTitle: "Permanently Delete Account",
+    deleteAccountDesc: "Once deleted, all your profile data and saved addresses will be permanently removed. This action cannot be undone.",
+    requestDeleteOtp: "Send OTP to Delete Account",
+    enterDeleteOtp: "Enter OTP to Confirm Deletion",
+    confirmDeleteAccount: "Verify & Permanently Delete Account",
+    deletingAccount: "Deleting Account...",
   },
   te: {
     selectLanguage: "భాషను ఎంచుకోండి",
@@ -156,6 +164,14 @@ const TRANSLATIONS = {
     notifications: "నోటిఫికేషన్‌లు",
     settings: "సెట్టింగ్‌లు",
     logOut: "లాగ్ అవుట్",
+
+    deleteAccount: "ఖాతాను తొలగించండి",
+    deleteAccountTitle: "ఖాతాను శాశ్వతంగా తొలగించండి",
+    deleteAccountDesc: "తొలగించిన తర్వాత మీ సమాచారం మరియు సేవ్ చేసిన చిరునామాలు శాశ్వతంగా తొలగించబడతాయి.",
+    requestDeleteOtp: "ఖాతాను తొలగించడానికి OTP పంపండి",
+    enterDeleteOtp: "తొలగింపును నిర్ధారించడానికి OTP ఎంటర్ చేయండి",
+    confirmDeleteAccount: "ధృవీకరించి ఖాతాను శాశ్వతంగా తొలగించండి",
+    deletingAccount: "ఖాతా తొలగించబడుతోంది...",
   },
   hi: {
     selectLanguage: "भाषा चुनें",
@@ -231,6 +247,14 @@ const TRANSLATIONS = {
     notifications: "सूचनाएं",
     settings: "सेटिंग्स",
     logOut: "लॉग आउट",
+
+    deleteAccount: "खाता हटाएं",
+    deleteAccountTitle: "खाता स्थायी रूप से हटाएं",
+    deleteAccountDesc: "एक बार हटाए जाने के बाद, आपका प्रोफ़ाइल डेटा और सहेजे गए पते स्थायी रूप से हटा दिए जाएंगे। इस कार्रवाई को पूर्ववत नहीं किया जा सकता।",
+    requestDeleteOtp: "खाता हटाने के लिए ओटीपी भेजें",
+    enterDeleteOtp: "हटाने की पुष्टि के लिए ओटीपी दर्ज करें",
+    confirmDeleteAccount: "सत्यापित करें और खाता स्थायी रूप से हटाएं",
+    deletingAccount: "खाता हटाया जा रहा है...",
   },
 };
 

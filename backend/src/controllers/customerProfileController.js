@@ -1,5 +1,8 @@
 import { normalizePhone } from "../services/phoneService.js";
 import { requireCustomerPhoneFromJwt, getCustomerAccountByPhone, upsertCustomerAccount } from "../services/customerProfileService.js";
+import { requestOtp, verifyOtp } from "../services/otpService.js";
+import { sendEmailOtp } from "../services/emailService.js";
+import { sendSmsOtp } from "../services/smsService.js";
 
 export const buildCustomerProfileController = ({ prisma }) => {
   const getProfile = async (req, reply) => {
@@ -61,9 +64,73 @@ export const buildCustomerProfileController = ({ prisma }) => {
     }
   };
 
+  const requestDeleteOtp = async (req, reply) => {
+    try {
+      const phone = await requireCustomerPhoneFromJwt(req);
+      if (!phone) return reply.code(401).send({ message: "Unauthorized" });
+
+      const account = await getCustomerAccountByPhone({ prisma, phone });
+      if (!account) return reply.code(404).send({ message: "Customer account not found" });
+
+      const otpRes = await requestOtp({ prisma, phone });
+      if (!otpRes.ok) return reply.code(otpRes.status).send(otpRes.payload);
+
+      const devOtp = otpRes.devOtp || "";
+      const otpToSend = otpRes.code;
+      const email = account.email || "";
+
+      await Promise.all([
+        sendSmsOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }),
+        email ? sendEmailOtp({ email, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
+      ]);
+
+      const payload = {
+        message: "Deletion OTP sent to your registered phone",
+        phone: account.phone,
+        email: account.email || null,
+        expiresAt: otpRes.expiresAt,
+      };
+      if (devOtp) payload.devOtp = devOtp;
+      return payload;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to send deletion OTP" });
+    }
+  };
+
+  const deleteAccount = async (req, reply) => {
+    try {
+      const phone = await requireCustomerPhoneFromJwt(req);
+      if (!phone) return reply.code(401).send({ message: "Unauthorized" });
+
+      const body = req.body || {};
+      const otp = String(body.otp || "").trim();
+      if (!otp) return reply.code(400).send({ message: "OTP is required to delete account" });
+
+      const okRes = await verifyOtp({ prisma, phone, otp });
+      if (!okRes.ok) return reply.code(okRes.status).send(okRes.payload);
+
+      const account = await getCustomerAccountByPhone({ prisma, phone });
+      if (account) {
+        await prisma.customerAccount.delete({
+          where: { id: account.id },
+        });
+      }
+
+      return { success: true, message: "Account deleted successfully." };
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to delete account" });
+    }
+  };
+
   return {
     getProfile,
     putProfile,
+    requestDeleteOtp,
+    deleteAccount,
   };
 };
 

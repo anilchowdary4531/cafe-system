@@ -165,6 +165,9 @@ export default async function customerRoutes(app, deps) {
 
   app.get("/customer/profile", profileController.getProfile);
   app.put("/customer/profile", profileController.putProfile);
+  app.post("/customer/delete-account/request-otp", profileController.requestDeleteOtp);
+  app.post("/customer/delete-account/verify", profileController.deleteAccount);
+  app.delete("/customer/account", profileController.deleteAccount);
 
   app.get("/customer/address", addressController.getAddresses);
   app.post("/customer/address", addressController.postAddress);
