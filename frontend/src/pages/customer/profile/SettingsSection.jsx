@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bell, Lock, Mail, MapPin, Phone, Save, Trash2, UserCircle2 } from "lucide-react";
 import ThemeSelector from "../../../components/ThemeSelector";
+import LanguageSelector from "../../../components/LanguageSelector";
 import { clearAllCache } from "../../../utils/localCache";
 import { getCustomerSettings, setCustomerSettings } from "../../../utils/customerSettings";
 import { showToast } from "../../../utils/toast";
@@ -398,6 +399,14 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                         </div>
                     </>
                 )}
+            </section>
+
+            <section className="space-y-2 px-1 py-2">
+                <p className="theme-muted text-[11px] font-semibold uppercase tracking-[0.16em]">Preferences</p>
+                <h2 className="text-lg font-semibold">App Language</h2>
+                <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-1)] overflow-hidden">
+                    <LanguageSelector variant="menu-item" />
+                </div>
             </section>
 
             <section className="space-y-2 px-1 py-2">
