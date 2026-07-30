@@ -21,13 +21,30 @@ export const upsertCustomerAccount = async ({ prisma, phone, name, email } = {})
   const normalizedName = String(name || "").trim();
   const normalizedEmail = String(email || "").trim().toLowerCase();
 
-  return prisma.customerAccount.upsert({
+  const existing = await prisma.customerAccount.findUnique({
     where: { phone: normalizedPhone },
-    update: {
-      name: normalizedName || null,
-      email: normalizedEmail || null,
-    },
-    create: {
+  });
+
+  if (existing) {
+    const updateData = {};
+    if (normalizedName && normalizedName !== existing.name) {
+      updateData.name = normalizedName;
+    }
+    if (normalizedEmail && normalizedEmail !== existing.email) {
+      updateData.email = normalizedEmail;
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      return prisma.customerAccount.update({
+        where: { id: existing.id },
+        data: updateData,
+      });
+    }
+    return existing;
+  }
+
+  return prisma.customerAccount.create({
+    data: {
       phone: normalizedPhone,
       name: normalizedName || null,
       email: normalizedEmail || null,
