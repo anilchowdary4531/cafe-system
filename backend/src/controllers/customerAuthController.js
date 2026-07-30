@@ -78,7 +78,11 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
       };
     } catch (err) {
       console.error("[registerCustomer] Error:", err);
-      return reply.code(500).send({ message: "Internal server error. Database schema might be out of sync." });
+      // Temporarily return the actual error message to diagnose the 500 error
+      return reply.code(500).send({
+        message: `Backend Error: ${err.message}`,
+        detail: "If this mentions a missing column, you MUST run 'npx prisma db push' on your server."
+      });
     }
   };
 
@@ -131,7 +135,10 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
       };
     } catch (err) {
       console.error("[loginWithPassword] Error:", err);
-      return reply.code(500).send({ message: "Login failed" });
+      return reply.code(500).send({
+        message: `Backend Error: ${err.message}`,
+        detail: "If this mentions a missing column, you MUST run 'npx prisma db push' on your server."
+      });
     }
   };
 
