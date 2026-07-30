@@ -7,34 +7,17 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
       const body = req.body || {};
       const username = String(body.username || "").trim().toLowerCase();
       const password = String(body.password || "").trim();
-      const phone = normalizePhone(body.phone || "");
       const name = String(body.name || "").trim();
       const email = String(body.email || "").trim().toLowerCase();
 
-      if (!username) {
-        return reply.code(400).send({ message: "Username is required" });
-      }
-      if (username.length < 3) {
-        return reply.code(400).send({ message: "Username must be at least 3 characters" });
-      }
-      if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
-        return reply.code(400).send({ message: "Username can only contain letters, numbers, underscores, dots, and hyphens" });
-      }
-      if (!password || password.length < 6) {
-        return reply.code(400).send({ message: "Password must be at least 6 characters" });
-      }
+      // Use email as fallback for phone if phone is missing
+      const rawPhone = String(body.phone || "").trim();
+      const phone = normalizePhone(rawPhone || email);
 
-      // If no phone but email is provided, we use email as the phone identifier to satisfy the DB schema
-      if (!phone && email) {
-        // eslint-disable-next-line no-param-reassign
-        body.phone = email;
-      }
-
-      const normalizedPhone = normalizePhone(body.phone || "");
-
-      if (!normalizedPhone) {
-        return reply.code(400).send({ message: "Phone number or Email is required" });
-      }
+      if (!username) return reply.code(400).send({ message: "Username is required" });
+      if (username.length < 3) return reply.code(400).send({ message: "Username must be at least 3 characters" });
+      if (!password || password.length < 6) return reply.code(400).send({ message: "Password must be at least 6 characters" });
+      if (!phone) return reply.code(400).send({ message: "Identifier (Phone or Email) is required" });
 
       // Check username uniqueness
       const existingUsername = await prisma.customerAccount.findUnique({
@@ -44,25 +27,25 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         return reply.code(400).send({ message: "Username is already taken" });
       }
 
-      // Check phone uniqueness
-      const existingPhoneAccount = await prisma.customerAccount.findUnique({
+      // Check identifier uniqueness
+      const existingAccount = await prisma.customerAccount.findUnique({
         where: { phone },
       });
 
       const hashedPassword = bcrypt.hashSync(password, 10);
 
       let account;
-      if (existingPhoneAccount) {
-        if (existingPhoneAccount.password) {
-          return reply.code(400).send({ message: "An account with this phone number already exists. Please login." });
+      if (existingAccount) {
+        if (existingAccount.password) {
+          return reply.code(400).send({ message: "An account with this identifier already exists. Please login." });
         }
         account = await prisma.customerAccount.update({
-          where: { id: existingPhoneAccount.id },
+          where: { id: existingAccount.id },
           data: {
             username,
             password: hashedPassword,
-            name: name || existingPhoneAccount.name || null,
-            email: email || existingPhoneAccount.email || null,
+            name: name || existingAccount.name || null,
+            email: email || existingAccount.email || null,
           },
         });
       } else {
@@ -94,8 +77,8 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         customer: accountWithoutPassword,
       };
     } catch (err) {
-      console.log(err);
-      return reply.code(500).send({ message: "Failed to create account" });
+      console.error("[registerCustomer] Error:", err);
+      return reply.code(500).send({ message: "Internal server error. Database schema might be out of sync." });
     }
   };
 
@@ -109,20 +92,20 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         return reply.code(400).send({ message: "Username/Phone/Email and password are required" });
       }
 
-      const normalizedPhone = normalizePhone(identifier);
+      const normalizedIdentifier = normalizePhone(identifier);
 
       let account = await prisma.customerAccount.findFirst({
         where: {
           OR: [
             { username: identifier },
             { email: identifier },
-            ...(normalizedPhone ? [{ phone: normalizedPhone }] : []),
+            { phone: normalizedIdentifier },
           ],
         },
       });
 
       if (!account || !account.password) {
-        return reply.code(401).send({ message: "Invalid credentials or account does not have a password set." });
+        return reply.code(401).send({ message: "Invalid credentials." });
       }
 
       const valid = bcrypt.compareSync(password, account.password);
@@ -147,7 +130,7 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         customer: accountWithoutPassword,
       };
     } catch (err) {
-      console.log(err);
+      console.error("[loginWithPassword] Error:", err);
       return reply.code(500).send({ message: "Login failed" });
     }
   };
