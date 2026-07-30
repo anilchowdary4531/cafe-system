@@ -15,6 +15,7 @@ import EditProfileSection from "./customer/profile/EditProfileSection";
 import PayLaterSection from "./customer/profile/PayLaterSection";
 import PayLaterDetailSection from "./customer/profile/PayLaterDetailSection";
 import CustomerNotifications from "./customer/profile/CustomerNotifications";
+import DeleteAccountSection from "./customer/profile/DeleteAccountSection";
 
 const formatMoney = (value) => `Rs ${Math.round(Number(value || 0))}`;
 const formatStatus = (status) => {
@@ -89,9 +90,12 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
             ? "Favorites"
             : activeSection === "settings"
             ? "Settings"
+            : activeSection === "delete-account"
+            ? "Delete account"
             : "Profile";
 
     const sectionNode = (() => {
+        if (activeSection === "delete-account") return <DeleteAccountSection />;
         if (activeSection === "ordersdetail") return <OrderDetailsPage />;
         if (activeSection === "orders") return <OrdersSection />;
         if (activeSection === "addresses") {

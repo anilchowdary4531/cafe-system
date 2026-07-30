@@ -227,8 +227,19 @@ export default function App() {
                             </>
                         }
                     />
+                    <Route
+                        path="/profile/delete-account"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="delete-account" />
+                                <Footer />
+                            </>
+                        }
+                    />
 
-                    {/* Backward compatible alias */}
+                    {/* Backward compatible aliases */}
+                    <Route path="/delete-account" element={<Navigate to="/profile/delete-account" replace />} />
                     <Route path="/orders/history" element={<Navigate to="/profile/order-history" replace />} />
 
                     <Route
