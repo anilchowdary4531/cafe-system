@@ -126,11 +126,96 @@ export const buildCustomerProfileController = ({ prisma }) => {
     }
   };
 
+  const publicRequestDeleteOtp = async (req, reply) => {
+    try {
+      const body = req.body || {};
+      const identifier = String(body.identifier || "").trim().toLowerCase();
+      if (!identifier) return reply.code(400).send({ message: "Identifier (Email or Phone) is required" });
+
+      const normalizedPhone = normalizePhone(identifier);
+
+      const account = await prisma.customerAccount.findFirst({
+        where: {
+          OR: [
+            { phone: identifier },
+            { email: identifier },
+            ...(normalizedIdentifier ? [{ phone: normalizedIdentifier }] : []),
+          ],
+        },
+      });
+
+      if (!account) return reply.code(404).send({ message: "Account not found" });
+
+      const phone = account.phone;
+      const otpRes = await requestOtp({ prisma, phone });
+      if (!otpRes.ok) return reply.code(otpRes.status).send(otpRes.payload);
+
+      const devOtp = otpRes.devOtp || "";
+      const otpToSend = otpRes.code;
+      const email = account.email || "";
+
+      await Promise.all([
+        sendSmsOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }),
+        email ? sendEmailOtp({ email, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
+      ]);
+
+      const payload = {
+        message: "Deletion OTP sent to your registered contact",
+        expiresAt: otpRes.expiresAt,
+      };
+      if (devOtp) payload.devOtp = devOtp;
+      return payload;
+    } catch (err) {
+      console.error(err);
+      return reply.code(500).send({ message: "Failed to send deletion OTP" });
+    }
+  };
+
+  const publicDeleteAccount = async (req, reply) => {
+    try {
+      const body = req.body || {};
+      const identifier = String(body.identifier || "").trim().toLowerCase();
+      const otp = String(body.otp || "").trim();
+
+      if (!identifier || !otp) {
+        return reply.code(400).send({ message: "Identifier and OTP are required" });
+      }
+
+      const normalizedIdentifier = normalizePhone(identifier);
+
+      const account = await prisma.customerAccount.findFirst({
+        where: {
+          OR: [
+            { phone: identifier },
+            { email: identifier },
+            { phone: normalizedIdentifier },
+          ],
+        },
+      });
+
+      if (!account) return reply.code(404).send({ message: "Account not found" });
+
+      const okRes = await verifyOtp({ prisma, phone: account.phone, otp });
+      if (!okRes.ok) return reply.code(okRes.status).send(okRes.payload);
+
+      await prisma.customerAccount.delete({
+        where: { id: account.id },
+      });
+
+      return { success: true, message: "Account deleted successfully." };
+    } catch (err) {
+      console.error(err);
+      return reply.code(500).send({ message: "Failed to delete account" });
+    }
+  };
+
   return {
     getProfile,
     putProfile,
     requestDeleteOtp,
     deleteAccount,
+    publicRequestDeleteOtp,
+    publicDeleteAccount,
   };
 };
 

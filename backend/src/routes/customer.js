@@ -153,6 +153,8 @@ export default async function customerRoutes(app, deps) {
   app.post("/customer/register", authController.registerCustomer);
   app.post("/customer/login-password", authController.loginWithPassword);
   app.post("/customer/password-login", authController.loginWithPassword);
+  app.post("/customer/google-auth", authController.googleLogin);
+  app.post("/customer/google-login", authController.googleLogin);
 
   // Backward compatible alias.
   app.post("/customer/login", async (req, reply) => {
@@ -167,6 +169,8 @@ export default async function customerRoutes(app, deps) {
   app.put("/customer/profile", profileController.putProfile);
   app.post("/customer/delete-account/request-otp", profileController.requestDeleteOtp);
   app.post("/customer/delete-account/verify", profileController.deleteAccount);
+  app.post("/customer/public/delete-account/request-otp", profileController.publicRequestDeleteOtp);
+  app.post("/customer/public/delete-account/verify", profileController.publicDeleteAccount);
   app.delete("/customer/account", profileController.deleteAccount);
 
   app.get("/customer/address", addressController.getAddresses);

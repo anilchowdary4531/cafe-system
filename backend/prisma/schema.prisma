@@ -302,9 +302,10 @@ model Customer {
 model CustomerAccount {
   id Int @id @default(autoincrement())
 
-  phone String  @unique
+  phone String?  @unique
   username String? @unique
   password String? @map("password_hash")
+  googleId String? @unique @map("google_id")
   name  String?
   email String?
 
@@ -316,6 +317,7 @@ model CustomerAccount {
   @@index([phone, createdAt])
   @@index([username])
   @@index([email])
+  @@index([googleId])
   @@map("customer_accounts")
 }
 

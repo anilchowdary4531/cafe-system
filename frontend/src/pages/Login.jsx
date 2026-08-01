@@ -6,6 +6,7 @@ import { useRestaurantContext } from "../context/RestaurantContext";
 import { api } from "../utils/apiClient";
 import BrandLogo from "../components/BrandLogo";
 import LanguageSelector from "../components/LanguageSelector";
+import GoogleSignInButton from "../components/GoogleSignInButton";
 import { useLanguage } from "../context/LanguageContext";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
@@ -686,6 +687,17 @@ export default function Login() {
                             )}
 
                             <div className="space-y-4">
+
+                                {/* GOOGLE OAUTH SIGN-IN BUTTON */}
+                                <div>
+                                    <GoogleSignInButton />
+                                    <div className="my-4 flex items-center gap-3">
+                                        <div className="h-[1px] flex-1 bg-black/10 dark:bg-white/10" />
+                                        <span className="text-xs font-bold uppercase tracking-wider theme-muted">or</span>
+                                        <div className="h-[1px] flex-1 bg-black/10 dark:bg-white/10" />
+                                    </div>
+                                </div>
+
                                 {customerSubMode === "password" && (
                                     <>
                                         <div>

@@ -142,8 +142,80 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
     }
   };
 
+  const googleLogin = async (req, reply) => {
+    try {
+      const body = req.body || {};
+      const { googleId, email, name, picture, credential, idToken } = body;
+
+      const userEmail = String(email || "").trim().toLowerCase();
+      const userGoogleId = String(googleId || "").trim();
+      const userName = String(name || "").trim();
+
+      if (!userEmail && !userGoogleId && !credential && !idToken) {
+        return reply.code(400).send({ message: "Google credentials or payload are required" });
+      }
+
+      let account = await prisma.customerAccount.findFirst({
+        where: {
+          OR: [
+            ...(userGoogleId ? [{ googleId: userGoogleId }] : []),
+            ...(userEmail ? [{ email: userEmail }, { phone: userEmail }] : []),
+          ],
+        },
+      });
+
+      if (!account) {
+        const baseUsername = userEmail ? userEmail.split("@")[0].replace(/[^a-z0-9_]/gi, "") : `user_${Date.now()}`;
+        let username = baseUsername;
+        let counter = 1;
+        while (await prisma.customerAccount.findUnique({ where: { username } })) {
+          username = `${baseUsername}_${counter++}`;
+        }
+
+        account = await prisma.customerAccount.create({
+          data: {
+            googleId: userGoogleId || null,
+            email: userEmail || null,
+            phone: userEmail || `google_${userGoogleId || Date.now()}`,
+            username,
+            name: userName || "Google User",
+          },
+        });
+      } else if (!account.googleId && userGoogleId) {
+        account = await prisma.customerAccount.update({
+          where: { id: account.id },
+          data: {
+            googleId: userGoogleId,
+            name: account.name || userName || null,
+          },
+        });
+      }
+
+      const token = app.jwt.sign(
+        {
+          type: "customer",
+          phone: account.phone || account.email,
+          customerAccountId: account.id,
+        },
+        { expiresIn: process.env.CUSTOMER_JWT_EXPIRES_IN || "30d" }
+      );
+
+      const { password: _, ...accountWithoutPassword } = account;
+
+      return {
+        message: "Google login successful",
+        token,
+        customer: accountWithoutPassword,
+      };
+    } catch (err) {
+      console.error("[googleLogin] Error:", err);
+      return reply.code(500).send({ message: `Google Auth Error: ${err.message}` });
+    }
+  };
+
   return {
     registerCustomer,
     loginWithPassword,
+    googleLogin,
   };
 };
