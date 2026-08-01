@@ -158,6 +158,12 @@ export default async function customerRoutes(app, deps) {
 
   // Backward compatible alias.
   app.post("/customer/login", async (req, reply) => {
+    console.log("========== AUTH REQUEST ==========");
+    console.log("URL:", req.url);
+    console.log("Method:", req.method);
+    console.log("Headers:", req.headers);
+    console.log("Body:", req.body);
+    console.log("==================================");
     const body = req.body || {};
     const otp = String(body.otp || "").trim();
     const step = String(body.step || (otp ? "verify" : "request")).trim().toLowerCase();

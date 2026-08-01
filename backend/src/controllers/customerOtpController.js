@@ -7,6 +7,12 @@ import { extractVerifiedIdentifier, verifyMsg91AccessToken } from "../services/m
 
 export const buildCustomerOtpController = ({ prisma, app }) => {
   const sendOtp = async (req, reply) => {
+    console.log("========== AUTH REQUEST ==========");
+    console.log("URL:", req.url);
+    console.log("Method:", req.method);
+    console.log("Headers:", req.headers);
+    console.log("Body:", req.body);
+    console.log("==================================");
     try {
       const body = req.body || {};
       let phone = normalizePhone(body.phone || "");

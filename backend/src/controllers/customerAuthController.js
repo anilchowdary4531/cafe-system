@@ -3,6 +3,12 @@ import { normalizePhone } from "../services/phoneService.js";
 
 export const buildCustomerAuthController = ({ prisma, app }) => {
   const registerCustomer = async (req, reply) => {
+    console.log("========== AUTH REQUEST ==========");
+    console.log("URL:", req.url);
+    console.log("Method:", req.method);
+    console.log("Headers:", req.headers);
+    console.log("Body:", req.body);
+    console.log("==================================");
     try {
       const body = req.body || {};
       const username = String(body.username || "").trim().toLowerCase();
@@ -87,6 +93,12 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
   };
 
   const loginWithPassword = async (req, reply) => {
+    console.log("========== AUTH REQUEST ==========");
+    console.log("URL:", req.url);
+    console.log("Method:", req.method);
+    console.log("Headers:", req.headers);
+    console.log("Body:", req.body);
+    console.log("==================================");
     try {
       const body = req.body || {};
       const identifier = String(body.username || body.identifier || "").trim().toLowerCase();
@@ -143,6 +155,12 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
   };
 
   const googleLogin = async (req, reply) => {
+    console.log("========== AUTH REQUEST ==========");
+    console.log("URL:", req.url);
+    console.log("Method:", req.method);
+    console.log("Headers:", req.headers);
+    console.log("Body:", req.body);
+    console.log("==================================");
     try {
       const body = req.body || {};
       const { googleId, email, name, picture, credential, idToken } = body;
