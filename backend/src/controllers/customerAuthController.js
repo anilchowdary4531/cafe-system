@@ -39,30 +39,64 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         return reply.code(400).send({ message: "Identifier (Phone or Email) is required" });
       }
 
-      // Check username uniqueness
-      const existingUsername = await prisma.customerAccount.findUnique({
-        where: { username },
-      });
-      if (existingUsername) {
-        console.log("FAILED HERE -> duplicate username", username);
-        return reply.code(400).send({ message: "Username is already taken" });
+      // 1. Strict duplicate email check
+      if (email) {
+        const existingEmailAccount = await prisma.customerAccount.findFirst({
+          where: { email: email.toLowerCase() },
+        });
+        if (existingEmailAccount && existingEmailAccount.password) {
+          return reply.code(400).send({
+            message: "An account with this email address already exists. Please login instead.",
+          });
+        }
       }
 
-      // Check identifier uniqueness
-      const existingAccount = await prisma.customerAccount.findUnique({
-        where: { phone },
+      // 2. Strict duplicate phone check
+      if (phone) {
+        const phoneVariants = getPhoneVariants(phone);
+        const existingPhoneAccount = await prisma.customerAccount.findFirst({
+          where: {
+            OR: [
+              { phone },
+              ...(phoneVariants.length > 0 ? [{ phone: { in: phoneVariants } }] : []),
+            ],
+          },
+        });
+        if (existingPhoneAccount && existingPhoneAccount.password) {
+          return reply.code(400).send({
+            message: "An account with this phone number already exists. Please login instead.",
+          });
+        }
+      }
+
+      // 3. Strict duplicate username check
+      if (username) {
+        const existingUsername = await prisma.customerAccount.findFirst({
+          where: { username: { equals: username, mode: "insensitive" } },
+        });
+        if (existingUsername && existingUsername.password) {
+          return reply.code(400).send({
+            message: "This username is already taken. Please choose another username or log in.",
+          });
+        }
+      }
+
+      const existingAccount = await prisma.customerAccount.findFirst({
+        where: {
+          OR: [
+            { phone },
+            ...(email ? [{ email: email.toLowerCase() }] : []),
+          ],
+        },
       });
-      console.log("DEBUG [registerCustomer] existingAccount check:", !!existingAccount);
 
       const hashedPassword = bcrypt.hashSync(password, 10);
 
       let account;
       if (existingAccount) {
         if (existingAccount.password) {
-          console.log("FAILED HERE -> duplicate identifier (account exists and has password)", phone);
           return reply.code(400).send({ message: "An account with this identifier already exists. Please login." });
         }
-        console.log("DEBUG [registerCustomer] upgrading existing partial account");
         account = await prisma.customerAccount.update({
           where: { id: existingAccount.id },
           data: {
