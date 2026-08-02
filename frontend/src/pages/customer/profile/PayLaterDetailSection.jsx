@@ -20,7 +20,8 @@ import {
     Sparkles,
     Building2,
     X,
-    Filter
+    Filter,
+    Coins
 } from "lucide-react";
 
 const toInr = (val) => {
@@ -309,6 +310,10 @@ export default function PayLaterDetailSection() {
                             <span>Customer: <strong className="text-white">{account.customer?.name || "Customer"}</strong></span>
                             <span>•</span>
                             <span>Contact: <strong className="text-white">{account.customer?.phone}</strong></span>
+                            <span>•</span>
+                            <span className="inline-flex items-center gap-1 font-bold text-emerald-400">
+                                <Coins size={14} /> {account.customer?.rewardPoints || 0} pts
+                            </span>
                         </div>
                     </div>
 
@@ -372,7 +377,15 @@ export default function PayLaterDetailSection() {
             </div>
 
             {/* BALANCE METRICS SUMMARY */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="theme-panel rounded-2xl p-5 text-left border border-black/5 dark:border-white/5">
+                    <p className="theme-muted text-xs font-bold uppercase tracking-wider">Loyalty Balance</p>
+                    <h4 className="mt-1.5 text-2xl font-black text-emerald-400 flex items-center gap-2">
+                        <Coins size={22} className="text-emerald-400" />
+                        {account.customer?.rewardPoints || 0} pts
+                    </h4>
+                    <p className="theme-muted mt-1 text-[11px]">Earned on timely settlements</p>
+                </div>
                 <div className="theme-panel rounded-2xl p-5 text-left border border-black/5 dark:border-white/5">
                     <p className="theme-muted text-xs font-bold uppercase tracking-wider">Pending Dues</p>
                     <h4 className="mt-1.5 text-2xl font-black text-amber-500">₹{toInr(account.pendingBalance)}</h4>

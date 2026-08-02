@@ -14,7 +14,8 @@ import {
     Receipt,
     Sparkles,
     ChevronRight,
-    HelpCircle
+    HelpCircle,
+    Coins
 } from "lucide-react";
 
 const toInr = (val) => {
@@ -52,7 +53,7 @@ export default function PayLaterSection() {
     }, []);
 
     const totalPendingDues = accounts.reduce((acc, a) => acc + Number(a.pendingBalance || 0), 0);
-    const totalBorrowedAll = accounts.reduce((acc, a) => acc + Number(a.totalBorrowed || 0), 0);
+    const totalLoyaltyPoints = accounts.reduce((acc, a) => Math.max(acc, Number(a.rewardPoints || 0)), 0);
 
     if (loading) {
         return (
@@ -77,19 +78,34 @@ export default function PayLaterSection() {
                         </div>
                         <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Pay Later Accounts</h1>
                         <p className="theme-muted text-sm max-w-md leading-relaxed">
-                            Track your dining credit, view itemized receipts, and clear pending dues across restaurant partners.
+                            Track your dining credit, view itemized receipts, earn loyalty points, and clear pending dues across restaurant partners.
                         </p>
                     </div>
 
-                    {/* OVERALL PORTFOLIO CARD */}
-                    <div className="rounded-2xl border border-black/10 bg-white/50 p-5 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/60 shrink-0 min-w-[240px]">
-                        <p className="theme-muted text-xs font-bold uppercase tracking-wider">Total Outstanding Dues</p>
-                        <h2 className="mt-1 text-3xl font-black text-amber-500">
-                            ₹{toInr(totalPendingDues)}
-                        </h2>
-                        <div className="mt-2 flex items-center justify-between text-xs theme-muted pt-2 border-t border-black/5 dark:border-white/5">
-                            <span>{accounts.length} Active {accounts.length === 1 ? "Partner" : "Partners"}</span>
-                            <span className="font-semibold text-emerald-500">0 Overdue</span>
+                    {/* OVERALL PORTFOLIO & LOYALTY CARDS */}
+                    <div className="flex flex-wrap sm:flex-nowrap gap-4 shrink-0">
+                        {/* LOYALTY BALANCE CARD */}
+                        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 backdrop-blur-md dark:bg-emerald-950/40 min-w-[180px] flex-1">
+                            <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">Loyalty Balance</p>
+                            <h2 className="mt-1 text-3xl font-black text-emerald-400 flex items-center gap-2">
+                                <Coins size={26} className="text-emerald-400" />
+                                {totalLoyaltyPoints} pts
+                            </h2>
+                            <p className="mt-2 text-[11px] text-emerald-300/80 font-medium pt-2 border-t border-emerald-500/20">
+                                Earned on Khata repayments
+                            </p>
+                        </div>
+
+                        {/* OUTSTANDING DUES CARD */}
+                        <div className="rounded-2xl border border-black/10 bg-white/50 p-5 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/60 min-w-[200px] flex-1">
+                            <p className="theme-muted text-xs font-bold uppercase tracking-wider">Total Outstanding Dues</p>
+                            <h2 className="mt-1 text-3xl font-black text-amber-500">
+                                ₹{toInr(totalPendingDues)}
+                            </h2>
+                            <div className="mt-2 flex items-center justify-between text-xs theme-muted pt-2 border-t border-black/5 dark:border-white/5">
+                                <span>{accounts.length} Active {accounts.length === 1 ? "Partner" : "Partners"}</span>
+                                <span className="font-semibold text-emerald-500">0 Overdue</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -137,6 +153,9 @@ export default function PayLaterSection() {
                                                     <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-500 border border-emerald-500/20">
                                                         Active Khata
                                                     </span>
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20">
+                                                        <Coins size={11} /> {acc.rewardPoints || 0} pts
+                                                    </span>
                                                 </div>
 
                                                 <div className="mt-2 flex flex-wrap items-center gap-4 text-xs theme-muted">
@@ -171,19 +190,25 @@ export default function PayLaterSection() {
             <div className="theme-panel rounded-3xl p-6 sm:p-8 space-y-4">
                 <h4 className="text-base font-bold flex items-center gap-2">
                     <HelpCircle size={18} className="text-amber-500" />
-                    How Tiffzy Pay Later (Digital Khata) Works
+                    How Tiffzy Pay Later & Loyalty Points Work
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs theme-muted leading-relaxed">
                     <div className="space-y-1.5 p-4 rounded-2xl bg-black/5 dark:bg-white/5">
-                        <strong className="block theme-text text-sm font-semibold">1. Interest-Free Credit</strong>
+                        <strong className="block theme-text text-sm font-semibold flex items-center gap-1.5 text-amber-500">
+                            <ShieldCheck size={16} /> 1. Interest-Free Credit
+                        </strong>
                         <p>Enjoy dining now and paying later without interest charges or hidden fees.</p>
                     </div>
                     <div className="space-y-1.5 p-4 rounded-2xl bg-black/5 dark:bg-white/5">
-                        <strong className="block theme-text text-sm font-semibold">2. Live Ledger Sync</strong>
-                        <p>Every food order and payment is logged instantly with full itemized receipts.</p>
+                        <strong className="block theme-text text-sm font-semibold flex items-center gap-1.5 text-emerald-400">
+                            <Coins size={16} /> 2. Earn Loyalty Rewards
+                        </strong>
+                        <p>Earn +20 pts (within 15 days) or +10 pts (within 30 days) per ₹500 repaid on time.</p>
                     </div>
                     <div className="space-y-1.5 p-4 rounded-2xl bg-black/5 dark:bg-white/5">
-                        <strong className="block theme-text text-sm font-semibold">3. Instant Online Repayment</strong>
+                        <strong className="block theme-text text-sm font-semibold flex items-center gap-1.5 text-amber-500">
+                            <CreditCard size={16} /> 3. Instant Online Repayment
+                        </strong>
                         <p>Repay anytime using UPI, Google Pay, PhonePe, Paytm, or debit/credit cards.</p>
                     </div>
                 </div>
