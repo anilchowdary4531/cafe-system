@@ -243,37 +243,31 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         });
       }
 
-      // 2. If not found by Google ID, try finding by Email / Phone
-      if (!account && userEmail) {
+      // 2. If not found by Google ID, try finding by Email or Phone in CustomerAccount or Customer
+      if (!account) {
+        const phoneVariants = body.phone ? getPhoneVariants(body.phone) : [];
         account = await prisma.customerAccount.findFirst({
           where: {
             OR: [
-              { email: userEmail },
-              { phone: userEmail }
+              ...(userEmail ? [{ email: userEmail }, { phone: userEmail }, { username: userEmail }] : []),
+              ...(phoneVariants.length > 0 ? [{ phone: { in: phoneVariants } }, { username: { in: phoneVariants } }] : []),
             ]
           }
         });
 
-        // 3. If found by email, try to link the Google ID
-        if (account && userGoogleId && !account.googleId) {
+        // 3. If found, link Google ID and update email/name
+        if (account) {
           try {
             account = await prisma.customerAccount.update({
               where: { id: account.id },
               data: {
-                googleId: userGoogleId,
+                googleId: userGoogleId || account.googleId || null,
+                email: userEmail || account.email || null,
                 name: account.name || userName || null,
               },
             });
           } catch (updateErr) {
-            // If linking fails (e.g. Google ID already exists on another record P2002),
-            // find that other record and use it instead to avoid crashing
-            if (updateErr.code === "P2002") {
-              account = await prisma.customerAccount.findFirst({
-                where: { googleId: userGoogleId }
-              });
-            } else {
-              throw updateErr;
-            }
+            console.warn("[googleLogin] Update warning:", updateErr.message);
           }
         }
       }

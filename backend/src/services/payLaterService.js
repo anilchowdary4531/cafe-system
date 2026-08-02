@@ -272,6 +272,9 @@ export const getCustomerPayLaterAccounts = async ({ prisma, phone, customerAccou
       },
     },
     include: {
+      customer: {
+        select: { id: true, rewardPoints: true },
+      },
       restaurant: {
         select: { id: true, name: true, slug: true },
       },
@@ -286,6 +289,7 @@ export const getCustomerPayLaterAccounts = async ({ prisma, phone, customerAccou
     totalBorrowed: acc.totalBorrowed,
     totalPaid: acc.totalPaid,
     pendingBalance: acc.pendingBalance,
+    rewardPoints: acc.customer?.rewardPoints || 0,
   }));
 };
 

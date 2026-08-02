@@ -1,4 +1,4 @@
-import { normalizePhone } from "../services/phoneService.js";
+import { normalizePhone, getPhoneVariants } from "../services/phoneService.js";
 import { requireCustomerPhoneFromJwt, getCustomerAccountByPhone, upsertCustomerAccount } from "../services/customerProfileService.js";
 import { requestOtp, verifyOtp } from "../services/otpService.js";
 import { sendEmailOtp } from "../services/emailService.js";
@@ -45,21 +45,58 @@ export const buildCustomerProfileController = ({ prisma }) => {
       if (!phoneFromToken) return reply.code(401).send({ message: "Unauthorized" });
 
       const body = req.body || {};
-      const phone = normalizePhone(body.phone || phoneFromToken || "");
-      if (!phone) return reply.code(400).send({ message: "Phone number is required" });
-      if (phone !== phoneFromToken) return reply.code(403).send({ message: "Phone mismatch" });
+      const newName = String(body.name || "").trim();
+      const newEmail = String(body.email || "").trim().toLowerCase();
+      const newPhone = normalizePhone(body.phone || phoneFromToken || "");
 
-      const account = await upsertCustomerAccount({
-        prisma,
-        phone,
-        name: body.name,
-        email: body.email,
+      const phoneVariants = getPhoneVariants(phoneFromToken);
+      let account = await prisma.customerAccount.findFirst({
+        where: {
+          OR: [
+            { phone: { in: phoneVariants } },
+            ...(phoneFromToken.includes("@") ? [{ email: phoneFromToken.toLowerCase() }] : []),
+          ],
+        },
       });
 
-      return { message: "Profile updated", customer: account };
+      if (!account) {
+        account = await prisma.customerAccount.create({
+          data: {
+            phone: newPhone || phoneFromToken,
+            name: newName || null,
+            email: newEmail || null,
+          },
+        });
+      } else {
+        account = await prisma.customerAccount.update({
+          where: { id: account.id },
+          data: {
+            name: newName || account.name || null,
+            email: newEmail || account.email || null,
+            phone: newPhone || account.phone || null,
+          },
+        });
+      }
+
+      // Sync matching Customer records in restaurant tables
+      const allPhoneVariants = getPhoneVariants(account.phone || newPhone || phoneFromToken);
+      await prisma.customer.updateMany({
+        where: {
+          OR: [
+            ...(allPhoneVariants.length > 0 ? [{ phone: { in: allPhoneVariants } }] : []),
+            ...(account.email ? [{ email: account.email.toLowerCase() }] : []),
+          ],
+        },
+        data: {
+          name: newName || account.name || undefined,
+          phone: account.phone || newPhone || undefined,
+          email: account.email || newEmail || undefined,
+        },
+      });
+
+      return { message: "Profile updated successfully", customer: account };
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.log(err);
+      console.error("[putProfile] Error:", err);
       return reply.code(500).send({ message: "Failed to update profile" });
     }
   };
