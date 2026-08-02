@@ -10,6 +10,7 @@ import {
     Store,
     UserRound,
     Users,
+    UserCheck,
     X,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -45,7 +46,8 @@ const shortName = (value) => {
 const SUPER_ADMIN_MENU_ITEMS = [
     { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, to: "/super-admin" },
     { key: "profile", label: "Profile", icon: UserRound, to: "/super-admin#profile-section" },
-    { key: "users", label: "Users", icon: Users, to: "/super-admin/users" },
+    { key: "staff", label: "Staff", icon: UserCheck, to: "/super-admin/staff" },
+    { key: "users", label: "Users / Customers", icon: Users, to: "/super-admin/users" },
     { key: "restaurants", label: "Restaurants", icon: Building2, to: "/super-admin#restaurants-section" },
     { key: "create-restaurant", label: "Create Restaurant", icon: Store, to: "/super-admin/create-restaurant" },
     { key: "settings", label: "Settings", icon: Settings, to: "/super-admin/settings" },

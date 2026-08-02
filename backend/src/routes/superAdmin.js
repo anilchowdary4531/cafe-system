@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { requireStaffJwt } from "../services/staffAuthService.js";
+import { getPhoneVariants } from "../services/phoneService.js";
 
 const slugify = (value) =>
   String(value || "")
@@ -114,7 +115,7 @@ export default async function superAdminRoutes(app, deps) {
     }
   });
 
-  app.get("/super-admin/users", { preHandler: requireSuperAdmin }, async (req, reply) => {
+  const getStaffUsersHandler = async (req, reply) => {
     try {
       const q = String(req.query?.q || "").trim();
 
@@ -184,11 +185,76 @@ export default async function superAdminRoutes(app, deps) {
         summary: {
           restaurants: items.length,
           users: items.reduce((sum, item) => sum + (item.users?.length || 0), 0),
+          staffCount: items.reduce((sum, item) => sum + (item.users?.length || 0), 0),
         },
       };
     } catch (err) {
       console.log(err);
-      return reply.code(500).send({ message: "Failed to fetch users" });
+      return reply.code(500).send({ message: "Failed to fetch staff users" });
+    }
+  };
+
+  app.get("/super-admin/users", { preHandler: requireSuperAdmin }, getStaffUsersHandler);
+  app.get("/super-admin/staff", { preHandler: requireSuperAdmin }, getStaffUsersHandler);
+
+  app.get("/super-admin/customers", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const q = String(req.query?.q || "").trim();
+
+      const customerAccounts = await prisma.customerAccount.findMany({
+        where: q
+          ? {
+              OR: [
+                { name: { contains: q, mode: "insensitive" } },
+                { username: { contains: q, mode: "insensitive" } },
+                { email: { contains: q, mode: "insensitive" } },
+                { phone: { contains: q, mode: "insensitive" } },
+              ],
+            }
+          : {},
+        orderBy: { createdAt: "desc" },
+      });
+
+      const customersData = await Promise.all(
+        customerAccounts.map(async (acc) => {
+          const phoneVariants = acc.phone ? getPhoneVariants(acc.phone) : [];
+          const linkedCustomerRecords = await prisma.customer.findMany({
+            where: {
+              OR: [
+                ...(phoneVariants.length > 0 ? [{ phone: { in: phoneVariants } }] : []),
+                ...(acc.email ? [{ email: acc.email.toLowerCase() }] : []),
+              ],
+            },
+            select: { rewardPoints: true },
+          });
+
+          const maxPoints = linkedCustomerRecords.reduce(
+            (max, c) => Math.max(max, Number(c.rewardPoints || 0)),
+            0
+          );
+
+          return {
+            id: acc.id,
+            name: acc.name || "Customer",
+            username: acc.username || "Not set",
+            phone: acc.phone || "Not set",
+            email: acc.email || "Not set",
+            googleId: acc.googleId,
+            rewardPoints: maxPoints,
+            createdAt: acc.createdAt,
+          };
+        })
+      );
+
+      return {
+        customers: customersData,
+        summary: {
+          totalCustomers: customersData.length,
+        },
+      };
+    } catch (err) {
+      console.error("[/super-admin/customers] Error:", err);
+      return reply.code(500).send({ message: "Failed to fetch customer accounts" });
     }
   });
 

@@ -374,6 +374,14 @@ export default function App() {
                         }
                     />
                     <Route
+                        path="/super-admin/staff"
+                        element={
+                            <ProtectedRoute role="SUPER_ADMIN">
+                                <SuperAdminUsers />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/super-admin/settings"
                         element={
                             <ProtectedRoute role="SUPER_ADMIN">
