@@ -183,6 +183,10 @@ export default async function customerRoutes(app, deps) {
   app.post("/customer/address", addressController.postAddress);
   app.delete("/customer/address/:id", addressController.deleteAddress);
 
+  app.post("/customer/fcm-token", async (req, reply) => {
+    return { success: true };
+  });
+
   app.post("/r/:slug/order", async (req, reply) => {
     try {
       const { slug } = req.params;

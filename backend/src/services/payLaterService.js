@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { normalizePhone } from "./phoneService.js";
+import { normalizePhone, getPhoneVariants } from "./phoneService.js";
 import { toSubunit } from "./moneyService.js";
 
 const razorpayAuthHeader = () => {
@@ -51,12 +51,18 @@ const createRazorpayOrder = async ({ amountSubunit, currency, receipt, notes }) 
 
 export const checkPayLaterEligibility = async ({ prisma, phone, restaurantSlug }) => {
   const normPhone = normalizePhone(phone);
-  if (!normPhone) return { eligible: false };
+  const variants = getPhoneVariants(phone);
+  if (!normPhone && variants.length === 0) return { eligible: false };
 
   const account = await prisma.payLaterAccount.findFirst({
     where: {
-      customer: { phone: normPhone },
       restaurant: { slug: restaurantSlug },
+      customer: {
+        OR: [
+          { phone: { in: variants } },
+          ...(phone?.includes("@") ? [{ email: phone.toLowerCase() }] : []),
+        ],
+      },
     },
     select: { id: true, status: true, pendingBalance: true },
   });
@@ -70,7 +76,8 @@ export const checkPayLaterEligibility = async ({ prisma, phone, restaurantSlug }
 
 export const addCustomerToPayLater = async ({ prisma, restaurantId, phone, actor }) => {
   const normPhone = normalizePhone(phone);
-  if (!normPhone) {
+  const variants = getPhoneVariants(phone);
+  if (!normPhone && variants.length === 0) {
     const err = new Error("invalid_phone");
     err.code = "invalid_phone";
     throw err;
@@ -83,9 +90,14 @@ export const addCustomerToPayLater = async ({ prisma, restaurantId, phone, actor
     throw err;
   }
 
-  // 2. Look up global CustomerAccount
-  const globalAccount = await prisma.customerAccount.findUnique({
-    where: { phone: normPhone },
+  // 2. Look up global CustomerAccount by phone variants or email
+  let globalAccount = await prisma.customerAccount.findFirst({
+    where: {
+      OR: [
+        { phone: { in: variants } },
+        ...(phone?.includes("@") ? [{ email: phone.toLowerCase() }] : []),
+      ],
+    },
   });
 
   if (!globalAccount) {
@@ -94,16 +106,24 @@ export const addCustomerToPayLater = async ({ prisma, restaurantId, phone, actor
     throw err;
   }
 
+  const matchedPhone = globalAccount.phone || normPhone;
+
   // 3. Upsert restaurant-scoped Customer record
-  let customer = await prisma.customer.findUnique({
-    where: { restaurantId_phone: { restaurantId, phone: normPhone } },
+  let customer = await prisma.customer.findFirst({
+    where: {
+      restaurantId,
+      OR: [
+        { phone: { in: getPhoneVariants(matchedPhone) } },
+        ...(globalAccount.email ? [{ email: globalAccount.email }] : []),
+      ],
+    },
   });
 
   if (!customer) {
     customer = await prisma.customer.create({
       data: {
         restaurantId,
-        phone: normPhone,
+        phone: matchedPhone,
         name: globalAccount.name,
         email: globalAccount.email,
       },
@@ -166,14 +186,59 @@ export const getRestaurantPayLaterCustomers = async ({ prisma, restaurantId, act
   }));
 };
 
-export const getCustomerPayLaterAccounts = async ({ prisma, phone }) => {
-  const normPhone = normalizePhone(phone);
-  if (!normPhone) return [];
+export const getCustomerPayLaterAccounts = async ({ prisma, phone, customerAccountId }) => {
+  let customerAccount = null;
+
+  if (customerAccountId) {
+    customerAccount = await prisma.customerAccount.findUnique({
+      where: { id: Number(customerAccountId) },
+    });
+  }
+
+  if (!customerAccount && phone) {
+    const variants = getPhoneVariants(phone);
+    customerAccount = await prisma.customerAccount.findFirst({
+      where: {
+        OR: [
+          { phone: { in: variants } },
+          ...(phone.includes("@") ? [{ email: phone.toLowerCase() }] : []),
+        ],
+      },
+    });
+  }
+
+  const phoneVariantsSet = new Set();
+  const emailSet = new Set();
+
+  if (phone) {
+    getPhoneVariants(phone).forEach((v) => phoneVariantsSet.add(v));
+    if (phone.includes("@")) emailSet.add(phone.toLowerCase());
+  }
+
+  if (customerAccount) {
+    if (customerAccount.phone) {
+      getPhoneVariants(customerAccount.phone).forEach((v) => phoneVariantsSet.add(v));
+      if (customerAccount.phone.includes("@")) emailSet.add(customerAccount.phone.toLowerCase());
+    }
+    if (customerAccount.email) {
+      emailSet.add(customerAccount.email.toLowerCase());
+    }
+  }
+
+  const phoneList = Array.from(phoneVariantsSet);
+  const emailList = Array.from(emailSet);
+
+  if (phoneList.length === 0 && emailList.length === 0) return [];
 
   const accounts = await prisma.payLaterAccount.findMany({
     where: {
-      customer: { phone: normPhone },
       status: "ACTIVE",
+      customer: {
+        OR: [
+          ...(phoneList.length > 0 ? [{ phone: { in: phoneList } }] : []),
+          ...(emailList.length > 0 ? [{ email: { in: emailList } }] : []),
+        ],
+      },
     },
     include: {
       restaurant: {
@@ -223,7 +288,16 @@ export const getPayLaterAccountDetails = async ({ prisma, accountId, actor }) =>
 
   // Auth check: Customer must match the account owner. Staff must belong to the restaurant.
   if (actor.type === "customer") {
-    if (normalizePhone(account.customer.phone) !== normalizePhone(actor.phone)) {
+    const actorVariants = new Set(getPhoneVariants(actor.phone));
+    if (actor.email) actorVariants.add(actor.email.toLowerCase());
+
+    const isOwner =
+      actorVariants.has(account.customer.phone) ||
+      (account.customer.email && actorVariants.has(account.customer.email.toLowerCase())) ||
+      (actor.phone && normalizePhone(account.customer.phone).includes(normalizePhone(actor.phone))) ||
+      (actor.phone && normalizePhone(actor.phone).includes(normalizePhone(account.customer.phone)));
+
+    if (!isOwner) {
       const err = new Error("access_denied");
       err.code = "access_denied";
       throw err;

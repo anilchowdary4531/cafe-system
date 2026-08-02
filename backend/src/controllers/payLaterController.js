@@ -86,9 +86,10 @@ export const buildPayLaterController = ({ prisma }) => {
   const getAccounts = async (req, reply) => {
     try {
       const phone = await requireCustomerPhoneFromJwt(req);
-      if (!phone) return reply.code(401).send({ message: "Authentication required" });
+      const customerAccountId = req.user?.customerAccountId;
+      if (!phone && !customerAccountId) return reply.code(401).send({ message: "Authentication required" });
 
-      const accounts = await payLaterService.getCustomerPayLaterAccounts({ prisma, phone });
+      const accounts = await payLaterService.getCustomerPayLaterAccounts({ prisma, phone, customerAccountId });
       return { accounts };
     } catch (err) {
       return mapError(err, reply);

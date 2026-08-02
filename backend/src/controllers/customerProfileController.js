@@ -139,7 +139,7 @@ export const buildCustomerProfileController = ({ prisma }) => {
           OR: [
             { phone: identifier },
             { email: identifier },
-            ...(normalizedIdentifier ? [{ phone: normalizedIdentifier }] : []),
+            { phone: normalizedPhone }
           ],
         },
       });

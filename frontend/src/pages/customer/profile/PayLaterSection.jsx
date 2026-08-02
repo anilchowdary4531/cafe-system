@@ -2,99 +2,192 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../../utils/apiClient";
 import { showToast } from "../../../utils/toast";
-import { IndianRupee, ArrowRight, ShieldCheck } from "lucide-react";
+import { useLanguage } from "../../../context/LanguageContext";
+import {
+    IndianRupee,
+    ArrowRight,
+    ShieldCheck,
+    CreditCard,
+    Building2,
+    CheckCircle2,
+    AlertCircle,
+    Receipt,
+    Sparkles,
+    ChevronRight,
+    HelpCircle
+} from "lucide-react";
 
 const toInr = (val) => {
-  const n = Number(val || 0);
-  return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+    const n = Number(val || 0);
+    return Number.isFinite(n) ? n.toFixed(2) : "0.00";
 };
 
 export default function PayLaterSection() {
-  const [searchParams] = useSearchParams();
-  const forceCustomerMode = searchParams.get("scope") === "customer";
-  const buildProfilePath = (path) => (forceCustomerMode ? `${path}?scope=customer` : path);
+    const { t } = useLanguage();
+    const [searchParams] = useSearchParams();
+    const forceCustomerMode = searchParams.get("scope") === "customer";
+    const buildProfilePath = (path) => (forceCustomerMode ? `${path}?scope=customer` : path);
 
-  const [loading, setLoading] = useState(true);
-  const [accounts, setAccounts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [accounts, setAccounts] = useState([]);
 
-  useEffect(() => {
     const fetchAccounts = async () => {
-      try {
-        setLoading(true);
-        const res = await api.get("/customer/pay-later/accounts");
-        setAccounts(res.data?.accounts || []);
-      } catch (err) {
-        showToast({
-          title: "Error",
-          message: err.response?.data?.message || "Failed to load credit accounts",
-          variant: "error"
-        });
-      } finally {
-        setLoading(false);
-      }
+        try {
+            setLoading(true);
+            const res = await api.get("/customer/pay-later/accounts");
+            setAccounts(res.data?.accounts || []);
+        } catch (err) {
+            showToast({
+                title: "Error",
+                message: err.response?.data?.message || "Failed to load credit accounts",
+                variant: "error"
+            });
+        } finally {
+            setLoading(false);
+        }
     };
-    fetchAccounts();
-  }, []);
 
-  if (loading) {
-    return <div className="py-12 text-center theme-muted">Loading your credit summaries...</div>;
-  }
+    useEffect(() => {
+        fetchAccounts();
+    }, []);
 
-  return (
-    <div className="space-y-6">
-      <header className="theme-panel rounded-[32px] p-6 text-left">
-        <p className="theme-accent-text text-xs font-semibold uppercase tracking-[0.32em]">Khata Balances</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">Pay Later Accounts</h1>
-        <p className="theme-muted mt-2 text-sm leading-relaxed max-w-xl">
-          Track your outstanding balances across approved dining partners. Repay pending dues safely using any online payment mode.
-        </p>
-      </header>
+    const totalPendingDues = accounts.reduce((acc, a) => acc + Number(a.pendingBalance || 0), 0);
+    const totalBorrowedAll = accounts.reduce((acc, a) => acc + Number(a.totalBorrowed || 0), 0);
 
-      {accounts.length === 0 ? (
-        <div className="theme-panel rounded-[32px] p-10 text-center">
-          <p className="text-base font-semibold">No credit accounts found</p>
-          <p className="theme-muted mt-1.5 text-xs">
-            Pay Later is only available at restaurants where the owner has approved your phone number.
-          </p>
+    if (loading) {
+        return (
+            <div className="py-16 text-center space-y-3">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 animate-spin">
+                    <Sparkles size={24} />
+                </div>
+                <p className="theme-muted text-sm font-medium">Loading your Pay Later Khata accounts...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-8 text-left max-w-4xl mx-auto">
+            {/* HERO SUMMARY BANNER */}
+            <div className="relative overflow-hidden rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-amber-500/5 to-transparent p-6 sm:p-8">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                    <div className="space-y-2">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-amber-500">
+                            <ShieldCheck size={14} />
+                            Verified Digital Khata
+                        </div>
+                        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Pay Later Accounts</h1>
+                        <p className="theme-muted text-sm max-w-md leading-relaxed">
+                            Track your dining credit, view itemized receipts, and clear pending dues across restaurant partners.
+                        </p>
+                    </div>
+
+                    {/* OVERALL PORTFOLIO CARD */}
+                    <div className="rounded-2xl border border-black/10 bg-white/50 p-5 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/60 shrink-0 min-w-[240px]">
+                        <p className="theme-muted text-xs font-bold uppercase tracking-wider">Total Outstanding Dues</p>
+                        <h2 className="mt-1 text-3xl font-black text-amber-500">
+                            ₹{toInr(totalPendingDues)}
+                        </h2>
+                        <div className="mt-2 flex items-center justify-between text-xs theme-muted pt-2 border-t border-black/5 dark:border-white/5">
+                            <span>{accounts.length} Active {accounts.length === 1 ? "Partner" : "Partners"}</span>
+                            <span className="font-semibold text-emerald-500">0 Overdue</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ACCOUNTS LIST */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                        <Building2 size={20} className="text-amber-500" />
+                        Dining Khata Partners ({accounts.length})
+                    </h3>
+                </div>
+
+                {accounts.length === 0 ? (
+                    <div className="theme-panel rounded-3xl p-10 text-center space-y-3">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
+                            <CreditCard size={28} />
+                        </div>
+                        <h4 className="text-lg font-bold">No Active Credit Accounts Found</h4>
+                        <p className="theme-muted text-sm max-w-md mx-auto leading-relaxed">
+                            Pay Later is a digital Khata service. Once a restaurant owner approves your phone number or adds credit for you, your account will automatically appear here.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                        {accounts.map((acc) => {
+                            const hasDue = Number(acc.pendingBalance || 0) > 0;
+                            return (
+                                <Link
+                                    key={acc.accountId}
+                                    to={buildProfilePath(`/profile/pay-later/${acc.accountId}`)}
+                                    className="group relative overflow-hidden rounded-3xl border border-black/10 bg-white p-6 shadow-sm transition hover:border-amber-500/40 hover:shadow-md dark:border-white/10 dark:bg-slate-900/80"
+                                >
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div className="flex items-start gap-4">
+                                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white font-black text-xl shadow-md">
+                                                {acc.restaurantName.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className="text-xl font-bold group-hover:text-amber-500 transition">
+                                                        {acc.restaurantName}
+                                                    </h4>
+                                                    <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-500 border border-emerald-500/20">
+                                                        Active Khata
+                                                    </span>
+                                                </div>
+
+                                                <div className="mt-2 flex flex-wrap items-center gap-4 text-xs theme-muted">
+                                                    <span>Total Borrowed: <strong className="theme-text">₹{toInr(acc.totalBorrowed)}</strong></span>
+                                                    <span>•</span>
+                                                    <span>Total Repaid: <strong className="text-emerald-500">₹{toInr(acc.totalPaid)}</strong></span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between sm:justify-end gap-4 pt-3 sm:pt-0 border-t sm:border-t-0 border-black/5 dark:border-white/5">
+                                            <div className="text-left sm:text-right">
+                                                <p className="text-[11px] font-bold uppercase tracking-wider theme-muted">Pending Dues</p>
+                                                <p className={`text-2xl font-black ${hasDue ? "text-amber-500" : "text-emerald-500"}`}>
+                                                    ₹{toInr(acc.pendingBalance)}
+                                                </p>
+                                            </div>
+
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 theme-text group-hover:bg-amber-500 group-hover:text-black transition">
+                                                <ChevronRight size={20} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* HOW IT WORKS INFO FOOTER */}
+            <div className="theme-panel rounded-3xl p-6 sm:p-8 space-y-4">
+                <h4 className="text-base font-bold flex items-center gap-2">
+                    <HelpCircle size={18} className="text-amber-500" />
+                    How Tiffzy Pay Later (Digital Khata) Works
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs theme-muted leading-relaxed">
+                    <div className="space-y-1.5 p-4 rounded-2xl bg-black/5 dark:bg-white/5">
+                        <strong className="block theme-text text-sm font-semibold">1. Interest-Free Credit</strong>
+                        <p>Enjoy dining now and paying later without interest charges or hidden fees.</p>
+                    </div>
+                    <div className="space-y-1.5 p-4 rounded-2xl bg-black/5 dark:bg-white/5">
+                        <strong className="block theme-text text-sm font-semibold">2. Live Ledger Sync</strong>
+                        <p>Every food order and payment is logged instantly with full itemized receipts.</p>
+                    </div>
+                    <div className="space-y-1.5 p-4 rounded-2xl bg-black/5 dark:bg-white/5">
+                        <strong className="block theme-text text-sm font-semibold">3. Instant Online Repayment</strong>
+                        <p>Repay anytime using UPI, Google Pay, PhonePe, Paytm, or debit/credit cards.</p>
+                    </div>
+                </div>
+            </div>
         </div>
-      ) : (
-        <div className="divide-y divide-white/10 rounded-[28px] border border-white/5 bg-black/10 overflow-hidden">
-          {accounts.map((acc) => (
-            <Link
-              key={acc.accountId}
-              to={buildProfilePath(`/profile/pay-later/${acc.accountId}`)}
-              className="group flex items-center justify-between p-5 hover:bg-white/5 transition duration-150 text-left"
-            >
-              <div className="min-w-0 flex-1">
-                <h3 className="font-bold text-base truncate group-hover:text-[color:var(--app-primary)] transition">
-                  {acc.restaurantName}
-                </h3>
-                <div className="mt-1 flex items-center gap-4 text-xs">
-                  <p className="theme-muted">
-                    Borrowed: <span className="font-semibold text-white/70">₹{toInr(acc.totalBorrowed)}</span>
-                  </p>
-                  <span className="text-white/20">•</span>
-                  <p className="theme-muted">
-                    Total Paid: <span className="font-semibold text-white/70">₹{toInr(acc.totalPaid || 0)}</span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-right shrink-0 ml-4 flex items-center gap-4">
-                <div>
-                  <p className="theme-muted text-[9px] font-extrabold uppercase tracking-wider">Pending Due</p>
-                  <p className={`text-[15px] font-extrabold mt-0.5 ${acc.pendingBalance > 0 ? "text-amber-200" : "text-white/40"}`}>
-                    ₹{toInr(acc.pendingBalance)}
-                  </p>
-                </div>
-                <div className="theme-soft-button flex h-8 w-8 items-center justify-center rounded-xl group-hover:bg-[color:var(--app-primary)] group-hover:text-black transition">
-                  <ArrowRight size={14} />
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+    );
 }
