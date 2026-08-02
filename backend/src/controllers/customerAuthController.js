@@ -191,15 +191,51 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         return reply.code(400).send({ message: "Google credentials or payload are required" });
       }
 
-      let account = await prisma.customerAccount.findFirst({
-        where: {
-          OR: [
-            ...(userGoogleId ? [{ googleId: userGoogleId }] : []),
-            ...(userEmail ? [{ email: userEmail }, { phone: userEmail }] : []),
-          ],
-        },
-      });
+      let account = null;
 
+      // 1. Try finding by Google ID first (Highest priority)
+      if (userGoogleId) {
+        account = await prisma.customerAccount.findFirst({
+          where: { googleId: userGoogleId }
+        });
+      }
+
+      // 2. If not found by Google ID, try finding by Email / Phone
+      if (!account && userEmail) {
+        account = await prisma.customerAccount.findFirst({
+          where: {
+            OR: [
+              { email: userEmail },
+              { phone: userEmail }
+            ]
+          }
+        });
+
+        // 3. If found by email, try to link the Google ID
+        if (account && userGoogleId && !account.googleId) {
+          try {
+            account = await prisma.customerAccount.update({
+              where: { id: account.id },
+              data: {
+                googleId: userGoogleId,
+                name: account.name || userName || null,
+              },
+            });
+          } catch (updateErr) {
+            // If linking fails (e.g. Google ID already exists on another record P2002),
+            // find that other record and use it instead to avoid crashing
+            if (updateErr.code === "P2002") {
+              account = await prisma.customerAccount.findFirst({
+                where: { googleId: userGoogleId }
+              });
+            } else {
+              throw updateErr;
+            }
+          }
+        }
+      }
+
+      // 4. If still not found, create new CustomerAccount
       if (!account) {
         const baseUsername = userEmail ? userEmail.split("@")[0].replace(/[^a-z0-9_]/gi, "") : `user_${Date.now()}`;
         let username = baseUsername;
@@ -208,23 +244,34 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
           username = `${baseUsername}_${counter++}`;
         }
 
-        account = await prisma.customerAccount.create({
-          data: {
-            googleId: userGoogleId || null,
-            email: userEmail || null,
-            phone: userEmail || `google_${userGoogleId || Date.now()}`,
-            username,
-            name: userName || "Google User",
-          },
-        });
-      } else if (!account.googleId && userGoogleId) {
-        account = await prisma.customerAccount.update({
-          where: { id: account.id },
-          data: {
-            googleId: userGoogleId,
-            name: account.name || userName || null,
-          },
-        });
+        try {
+          account = await prisma.customerAccount.create({
+            data: {
+              googleId: userGoogleId || null,
+              email: userEmail || null,
+              phone: userEmail || `google_${userGoogleId || Date.now()}`,
+              username,
+              name: userName || "Google User",
+            },
+          });
+        } catch (createErr) {
+          if (createErr.code === "P2002") {
+            account = await prisma.customerAccount.findFirst({
+              where: {
+                OR: [
+                  ...(userGoogleId ? [{ googleId: userGoogleId }] : []),
+                  ...(userEmail ? [{ email: userEmail }, { phone: userEmail }] : []),
+                ],
+              },
+            });
+          } else {
+            throw createErr;
+          }
+        }
+      }
+
+      if (!account) {
+        return reply.code(500).send({ message: "Unable to process Google login account creation." });
       }
 
       const token = app.jwt.sign(
