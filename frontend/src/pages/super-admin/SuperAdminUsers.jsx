@@ -409,7 +409,7 @@ export default function SuperAdminUsers() {
                                 <table className="w-full min-w-[700px] text-sm">
                                     <thead>
                                         <tr className="theme-muted text-left border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider">
-                                            <th className="px-4 py-3 font-bold">Customer Name</th>
+                                            <th className="px-4 py-3 font-bold">Full Name</th>
                                             <th className="px-4 py-3 font-bold">Username</th>
                                             <th className="px-4 py-3 font-bold">Phone Number</th>
                                             <th className="px-4 py-3 font-bold">Email Address</th>
