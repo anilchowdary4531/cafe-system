@@ -11,25 +11,40 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
     console.log("==================================");
     try {
       const body = req.body || {};
-      const username = String(body.username || "").trim().toLowerCase();
-      const password = String(body.password || "").trim();
-      const name = String(body.name || "").trim();
-      const email = String(body.email || "").trim().toLowerCase();
+      const username = String(body.username || body.a || "").trim().toLowerCase();
+      const password = String(body.password || body.c || body.b || "").trim();
+      const name = String(body.name || body.d || "").trim();
+      const email = String(body.email || (String(body.phone || body.b || "").includes("@") ? (body.phone || body.b) : "") || "").trim().toLowerCase();
 
       // Use email as fallback for phone if phone is missing
-      const rawPhone = String(body.phone || "").trim();
+      const rawPhone = String(body.phone || body.b || body.identifier || "").trim();
       const phone = normalizePhone(rawPhone || email);
 
-      if (!username) return reply.code(400).send({ message: "Username is required" });
-      if (username.length < 3) return reply.code(400).send({ message: "Username must be at least 3 characters" });
-      if (!password || password.length < 6) return reply.code(400).send({ message: "Password must be at least 6 characters" });
-      if (!phone) return reply.code(400).send({ message: "Identifier (Phone or Email) is required" });
+      console.log("DEBUG [registerCustomer] values:", { username, passwordLength: password.length, name, email, rawPhone, phone });
+
+      if (!username) {
+        console.log("FAILED HERE -> username missing");
+        return reply.code(400).send({ message: "Username is required" });
+      }
+      if (username.length < 3) {
+        console.log("FAILED HERE -> username too short", username);
+        return reply.code(400).send({ message: "Username must be at least 3 characters" });
+      }
+      if (!password || password.length < 6) {
+        console.log("FAILED HERE -> password invalid/too short");
+        return reply.code(400).send({ message: "Password must be at least 6 characters" });
+      }
+      if (!phone) {
+        console.log("FAILED HERE -> phone/email missing");
+        return reply.code(400).send({ message: "Identifier (Phone or Email) is required" });
+      }
 
       // Check username uniqueness
       const existingUsername = await prisma.customerAccount.findUnique({
         where: { username },
       });
       if (existingUsername) {
+        console.log("FAILED HERE -> duplicate username", username);
         return reply.code(400).send({ message: "Username is already taken" });
       }
 
@@ -37,14 +52,17 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
       const existingAccount = await prisma.customerAccount.findUnique({
         where: { phone },
       });
+      console.log("DEBUG [registerCustomer] existingAccount check:", !!existingAccount);
 
       const hashedPassword = bcrypt.hashSync(password, 10);
 
       let account;
       if (existingAccount) {
         if (existingAccount.password) {
+          console.log("FAILED HERE -> duplicate identifier (account exists and has password)", phone);
           return reply.code(400).send({ message: "An account with this identifier already exists. Please login." });
         }
+        console.log("DEBUG [registerCustomer] upgrading existing partial account");
         account = await prisma.customerAccount.update({
           where: { id: existingAccount.id },
           data: {
