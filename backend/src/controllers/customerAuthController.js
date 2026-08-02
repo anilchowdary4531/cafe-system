@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { normalizePhone } from "../services/phoneService.js";
+import { normalizePhone, getPhoneVariants } from "../services/phoneService.js";
 
 export const buildCustomerAuthController = ({ prisma, app }) => {
   const registerCustomer = async (req, reply) => {
@@ -111,46 +111,55 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
   };
 
   const loginWithPassword = async (req, reply) => {
-    console.log("========== AUTH REQUEST ==========");
-    console.log("URL:", req.url);
-    console.log("Method:", req.method);
-    console.log("Headers:", req.headers);
-    console.log("Body:", req.body);
-    console.log("==================================");
     try {
       const body = req.body || {};
-      const identifier = String(body.username || body.identifier || "").trim().toLowerCase();
-      const password = String(body.password || "").trim();
+      const rawIdentifier = String(body.username || body.identifier || body.a || "").trim();
+      const password = String(body.password || body.c || body.b || "").trim();
 
-      if (!identifier || !password) {
+      if (!rawIdentifier || !password) {
         return reply.code(400).send({ message: "Username/Phone/Email and password are required" });
       }
 
-      const normalizedIdentifier = normalizePhone(identifier);
+      const inputLower = rawIdentifier.toLowerCase();
+      const phoneVariants = getPhoneVariants(rawIdentifier);
 
       let account = await prisma.customerAccount.findFirst({
         where: {
           OR: [
-            { username: identifier },
-            { email: identifier },
-            { phone: normalizedIdentifier },
+            { username: { equals: rawIdentifier, mode: "insensitive" } },
+            { email: { equals: inputLower, mode: "insensitive" } },
+            { phone: rawIdentifier },
+            ...(phoneVariants.length > 0 ? [{ phone: { in: phoneVariants } }] : []),
+            ...(phoneVariants.length > 0 ? [{ username: { in: phoneVariants } }] : []),
           ],
         },
       });
 
-      if (!account || !account.password) {
-        return reply.code(401).send({ message: "Invalid credentials." });
+      if (!account) {
+        return reply.code(401).send({ message: "No account found with this username, phone, or email." });
       }
 
-      const valid = bcrypt.compareSync(password, account.password);
-      if (!valid) {
-        return reply.code(401).send({ message: "Invalid username or password" });
+      // If account exists but password was not set yet (e.g. created via Google/OTP), set password on login
+      if (!account.password) {
+        const hashedPassword = bcrypt.hashSync(password, 10);
+        account = await prisma.customerAccount.update({
+          where: { id: account.id },
+          data: {
+            password: hashedPassword,
+            username: account.username || (rawIdentifier.includes("@") ? null : rawIdentifier),
+          },
+        });
+      } else {
+        const valid = bcrypt.compareSync(password, account.password);
+        if (!valid) {
+          return reply.code(401).send({ message: "Incorrect password. Please try again or use OTP Login." });
+        }
       }
 
       const token = app.jwt.sign(
         {
           type: "customer",
-          phone: account.phone,
+          phone: account.phone || account.email || account.username,
           customerAccountId: account.id,
         },
         { expiresIn: process.env.CUSTOMER_JWT_EXPIRES_IN || "30d" }

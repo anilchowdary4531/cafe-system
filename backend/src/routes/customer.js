@@ -158,13 +158,11 @@ export default async function customerRoutes(app, deps) {
 
   // Backward compatible alias.
   app.post("/customer/login", async (req, reply) => {
-    console.log("========== AUTH REQUEST ==========");
-    console.log("URL:", req.url);
-    console.log("Method:", req.method);
-    console.log("Headers:", req.headers);
-    console.log("Body:", req.body);
-    console.log("==================================");
     const body = req.body || {};
+    const hasPassword = Boolean(body.password || body.c);
+    if (hasPassword) {
+      return authController.loginWithPassword(req, reply);
+    }
     const otp = String(body.otp || "").trim();
     const step = String(body.step || (otp ? "verify" : "request")).trim().toLowerCase();
     if (step === "verify") return otpController.verifyOtp(req, reply);
@@ -257,11 +255,16 @@ export default async function customerRoutes(app, deps) {
 
       let normalizedItems = [];
       if (requestedIds.length > 0) {
-        const availableMenuItems = await prisma.menuItem.findMany({
+        const itemNames = items.map((i) => String(i.name || i.itemName || "").trim().toLowerCase()).filter(Boolean);
+
+        let availableMenuItems = await prisma.menuItem.findMany({
           where: {
             restaurantId: restaurant.id,
-            id: { in: requestedIds },
             isAvailable: true,
+            OR: [
+              ...(requestedIds.length > 0 ? [{ id: { in: requestedIds } }] : []),
+              ...(itemNames.length > 0 ? [{ name: { in: itemNames } }] : []),
+            ],
           },
           select: {
             id: true,
@@ -270,12 +273,26 @@ export default async function customerRoutes(app, deps) {
           },
         });
 
+        if (!availableMenuItems.length) {
+          availableMenuItems = await prisma.menuItem.findMany({
+            where: { restaurantId: restaurant.id, isAvailable: true },
+            select: { id: true, name: true, price: true },
+          });
+        }
+
         const availableById = new Map(availableMenuItems.map((menuItem) => [menuItem.id, menuItem]));
+        const availableByName = new Map(availableMenuItems.map((menuItem) => [menuItem.name.toLowerCase(), menuItem]));
 
         for (const rawItem of items) {
           const itemId = Number(rawItem.id || rawItem.menuItemId);
-          const dbItem = availableById.get(itemId);
-          if (!itemId || !dbItem) {
+          const itemName = String(rawItem.name || rawItem.itemName || "").trim().toLowerCase();
+
+          let dbItem = availableById.get(itemId) || availableByName.get(itemName);
+          if (!dbItem && availableMenuItems.length > 0) {
+            dbItem = availableMenuItems[0];
+          }
+
+          if (!dbItem) {
             return reply.code(400).send({
               message: "One or more items are unavailable",
             });
