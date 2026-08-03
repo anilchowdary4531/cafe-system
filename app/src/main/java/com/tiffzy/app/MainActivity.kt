@@ -26,7 +26,6 @@ import com.tiffzy.app.ui.theme.TiffzyAppTheme
 import com.tiffzy.app.utils.LanguageHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     
@@ -51,15 +50,21 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         
         val dataStore = AuthDataStore(this)
         
-        // Load initial language synchronously to avoid flicker and recreation loop
-        val initialLang = runBlocking { 
+        // Setup condition to keep splash screen visible during initialization
+        var isReady by mutableStateOf(false)
+        splashScreen.setKeepOnScreenCondition { !isReady }
+        
+        // Initialize language and other startup tasks asynchronously
+        lifecycleScope.launch {
             try {
-                dataStore.appLanguage.first()
+                val lang = dataStore.appLanguage.first()
+                LanguageHelper.applyLanguage(this@MainActivity, lang)
             } catch (e: Exception) {
-                "en"
+                LanguageHelper.applyLanguage(this@MainActivity, "en")
+            } finally {
+                isReady = true
             }
         }
-        LanguageHelper.applyLanguage(this, initialLang)
         
         askNotificationPermission()
         
@@ -67,24 +72,18 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
             val controller = rememberNavController()
             navController = controller
             
-            // Collected as state for UI updates, but we don't recreate the activity here anymore
-            val languageCode by dataStore.appLanguage.collectAsState(initial = initialLang)
+            // Re-fetch language code to handle dynamic changes (e.g. from Settings)
+            val languageCode by dataStore.appLanguage.collectAsState(initial = "en")
             
-            LaunchedEffect(languageCode) {
-                // If language changes after startup (e.g. from Settings), apply it
-                if (languageCode != initialLang) {
-                    LanguageHelper.applyLanguage(this@MainActivity, languageCode)
-                    // Control the restart logic from where the language is changed, 
-                    // not automatically in a loop.
-                }
-            }
-
-            TiffzyAppTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
-                ) {
-                    NavGraph(navController = controller)
+            // Keying the entire theme/nav on languageCode forces a safe recomposition when language changes
+            key(languageCode) {
+                TiffzyAppTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background,
+                    ) {
+                        NavGraph(navController = controller)
+                    }
                 }
             }
         }

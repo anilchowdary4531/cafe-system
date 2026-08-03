@@ -1,42 +1,42 @@
+# Add project specific ProGuard rules here.
+
 # Project Specific Rules
 -keep class com.tiffzy.app.** { *; }
 
-# Gson / Retrofit / OkHttp
+# Serialization and Networking Rules
 -keepattributes Signature, InnerClasses, EnclosingMethod, *Annotation*
+
+# GSON and Generic Types (CRITICAL for DataStore/Lists)
+-keep class com.google.gson.** { *; }
+-keep class com.google.gson.reflect.TypeToken
+-keep class * extends com.google.gson.reflect.TypeToken
+
+# Retrofit / OkHttp
 -keep class retrofit2.** { *; }
 -keep class okhttp3.** { *; }
--keep class com.google.gson.** { *; }
 -dontwarn retrofit2.**
 -dontwarn okhttp3.**
--dontwarn com.google.gson.**
 
-# DataStore & Preferences
+# DataStore & Preferences (Startup CRASH fix)
 -keep class androidx.datastore.** { *; }
 -keep class androidx.preferences.** { *; }
 -keep class com.google.protobuf.** { *; }
 -dontwarn androidx.datastore.**
 
-# Coroutines
+# Coroutines & Lifecycle
 -keep class kotlinx.coroutines.** { *; }
+-keep class androidx.lifecycle.** { *; }
 -dontwarn kotlinx.coroutines.**
 
-# AndroidX Core & Lifecycle
--keep class androidx.core.** { *; }
--keep class androidx.lifecycle.** { *; }
--keep class androidx.activity.** { *; }
--keep class androidx.navigation.** { *; }
--dontwarn androidx.**
+# CameraX & ML Kit (Scanner stability)
+-keep class androidx.camera.** { *; }
+-keep class com.google.mlkit.** { *; }
+-dontwarn androidx.camera.**
+-dontwarn com.google.mlkit.**
 
-# Jetpack Compose / Material3
--keep class androidx.compose.** { *; }
--keep class androidx.compose.material3.** { *; }
--dontwarn androidx.compose.**
-
-# Firebase
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
--dontwarn com.google.firebase.**
--dontwarn com.google.android.gms.**
+# Socket.io
+-keep class io.socket.** { *; }
+-dontwarn io.socket.**
 
 # Razorpay
 -keep class com.razorpay.** { *; }
@@ -44,16 +44,12 @@
 -keep class com.google.android.apps.nbu.paisa.** { *; }
 -dontwarn com.google.android.apps.nbu.paisa.**
 
-# Coil (Image Loading)
--keep class io.coilkt.** { *; }
--dontwarn io.coilkt.**
+# Firebase
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.firebase.**
+-dontwarn com.google.android.gms.**
 
-# ML Kit & CameraX
--keep class com.google.mlkit.** { *; }
--keep class androidx.camera.** { *; }
--dontwarn com.google.mlkit.**
--dontwarn androidx.camera.**
-
-# Socket.io
--keep class io.socket.** { *; }
--dontwarn io.socket.**
+# Jetpack Compose
+-keep class androidx.compose.** { *; }
+-dontwarn androidx.compose.**
