@@ -38,12 +38,13 @@ class HomeViewModel(
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             try {
-                // In production, we might skip health check if restaurants endpoint is known-good
+                // Wrap in a safe check
                 val restaurants = repository.getRestaurants()
                 allRestaurants = restaurants
                 _uiState.value = HomeUiState.Success(restaurants)
             } catch (e: Exception) {
-                _uiState.value = HomeUiState.Error(e.message ?: "Failed to load restaurants")
+                android.util.Log.e("HomeViewModel", "Failed to load restaurants", e)
+                _uiState.value = HomeUiState.Error(e.message ?: "Could not connect to server. Please check your internet.")
             }
         }
     }

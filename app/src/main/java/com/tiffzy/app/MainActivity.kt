@@ -26,6 +26,7 @@ import com.tiffzy.app.ui.theme.TiffzyAppTheme
 import com.tiffzy.app.utils.LanguageHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     
@@ -46,21 +47,19 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
-        
-        // Keep splash screen until language is loaded or max 1 sec
-        var isReady = false
-        splashScreen.setKeepOnScreenCondition { !isReady }
-        
         instance = this
         
         val dataStore = AuthDataStore(this)
         
-        // Load language safely
-        lifecycleScope.launch {
-            val lang = dataStore.appLanguage.first()
-            LanguageHelper.applyLanguage(this@MainActivity, lang)
-            isReady = true
+        // Load initial language synchronously to avoid flicker and recreation loop
+        val initialLang = runBlocking { 
+            try {
+                dataStore.appLanguage.first()
+            } catch (e: Exception) {
+                "en"
+            }
         }
+        LanguageHelper.applyLanguage(this, initialLang)
         
         askNotificationPermission()
         
@@ -68,17 +67,16 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
             val controller = rememberNavController()
             navController = controller
             
-            val languageCode by dataStore.appLanguage.collectAsState(initial = "en")
-            
-            // Local state to track if we've already applied the initial language to avoid flicker
-            var lastAppliedLang by remember { mutableStateOf<String?>(null) }
+            // Collected as state for UI updates, but we don't recreate the activity here anymore
+            val languageCode by dataStore.appLanguage.collectAsState(initial = initialLang)
             
             LaunchedEffect(languageCode) {
-                if (lastAppliedLang != null && languageCode != lastAppliedLang) {
+                // If language changes after startup (e.g. from Settings), apply it
+                if (languageCode != initialLang) {
                     LanguageHelper.applyLanguage(this@MainActivity, languageCode)
-                    recreate()
+                    // Control the restart logic from where the language is changed, 
+                    // not automatically in a loop.
                 }
-                lastAppliedLang = languageCode
             }
 
             TiffzyAppTheme {

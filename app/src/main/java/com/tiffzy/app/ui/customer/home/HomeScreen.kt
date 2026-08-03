@@ -65,9 +65,6 @@ fun HomeScreen(
                     IconButton(onClick = onChangeLocation) {
                         Icon(Icons.Default.LocationOn, contentDescription = "Select Location")
                     }
-                    IconButton(onClick = onScanClick) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan QR")
-                    }
                     IconButton(onClick = onViewProfile) {
                         Icon(Icons.Default.AccountCircle, contentDescription = "Profile")
                     }
