@@ -1,3 +1,39 @@
 <resources>
-    <string name="app_name">Tiffzy</string>
+    <string name="app_name">టిఫ్జీ</string>
+    <string name="default_notification_channel_id">order_updates_channel</string>
+    <string name="default_notification_channel_name">ऑर्डर अपडेट</string>
+
+    <string name="welcome_to_tiffzy">టిఫ్జీ में आपका स्वागत है</string>
+    <string name="welcome_subtitle">प्रीमियम डाइनिंग, आप तक पहुंचाई गई</string>
+    <string name="username_or_email">यूजरनेम या ईमेल</string>
+    <string name="password">पासवर्ड</string>
+    <string name="login">लॉगिन</string>
+    <string name="send_otp">OTP भेजें</string>
+    <string name="continue_with_google">गूगल के साथ जारी रखें</string>
+    <string name="login_with_otp_instead">बजाय इसके OTP के साथ लॉगिन करें</string>
+    <string name="login_with_password_instead">बजाय इसके पासवर्ड के साथ लॉगिन करें</string>
+    <string name="dont_have_account">खाता नहीं है? एक बनाएं</string>
+    <string name="need_to_delete_account">अपना खाता हटाना चाहते हैं?</string>
+    <string name="email_address">ईमेल पता</string>
+    <string name="sign_in">साइन इन करें</string>
+
+    <!-- Register -->
+    <string name="create_account">खाता बनाएं</string>
+    <string name="join_tiffzy">టిఫ్జీ में शामिल हों</string>
+    <string name="join_subtitle">प्रीमियम लग्जरी डाइनिंग का अनुभव करें</string>
+    <string name="username">यूजरनेम</string>
+    <string name="phone_number">फ़ोन नंबर</string>
+    <string name="full_name_optional">पूरा नाम (वैकल्पिक)</string>
+    <string name="email_optional">ईमेल (वैकल्पिक)</string>
+    <string name="register">रजिस्टर करें</string>
+
+    <!-- Home -->
+    <string name="detecting">पहचान हो रही है...</string>
+    <string name="select_location">स्थान चुनें</string>
+    <string name="search_placeholder">रेस्टोरेंट या व्यंजनों की खोज करें...</string>
+    <string name="whats_on_your_mind">आपके मन में क्या है?</string>
+    <string name="restaurants_to_explore">खोजने के लिए रेस्टोरेंट</string>
+    <string name="no_results_found">\"%1$s\" के लिए कोई परिणाम नहीं मिला</string>
+    <string name="restaurants">रेस्टोरेंट</string>
+    <string name="dishes">व्यंजन</string>
 </resources>

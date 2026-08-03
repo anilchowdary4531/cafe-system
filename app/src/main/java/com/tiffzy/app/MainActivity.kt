@@ -5,7 +5,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,7 +26,6 @@ import com.tiffzy.app.ui.theme.TiffzyAppTheme
 import com.tiffzy.app.utils.LanguageHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     
@@ -46,11 +44,23 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     ) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        
+        // Keep splash screen until language is loaded or max 1 sec
+        var isReady = false
+        splashScreen.setKeepOnScreenCondition { !isReady }
+        
         instance = this
         
         val dataStore = AuthDataStore(this)
+        
+        // Load language safely
+        lifecycleScope.launch {
+            val lang = dataStore.appLanguage.first()
+            LanguageHelper.applyLanguage(this@MainActivity, lang)
+            isReady = true
+        }
         
         askNotificationPermission()
         
@@ -60,14 +70,15 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
             
             val languageCode by dataStore.appLanguage.collectAsState(initial = "en")
             
-            var currentLang by remember { mutableStateOf(languageCode) }
+            // Local state to track if we've already applied the initial language to avoid flicker
+            var lastAppliedLang by remember { mutableStateOf<String?>(null) }
             
             LaunchedEffect(languageCode) {
-                if (languageCode != currentLang) {
+                if (lastAppliedLang != null && languageCode != lastAppliedLang) {
                     LanguageHelper.applyLanguage(this@MainActivity, languageCode)
-                    currentLang = languageCode
                     recreate()
                 }
+                lastAppliedLang = languageCode
             }
 
             TiffzyAppTheme {

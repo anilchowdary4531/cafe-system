@@ -1,5 +1,8 @@
 <resources>
     <string name="app_name">టిఫ్జీ</string>
+    <string name="default_notification_channel_id">order_updates_channel</string>
+    <string name="default_notification_channel_name">ఆర్డర్ అప్‌డేట్‌లు</string>
+
     <string name="welcome_to_tiffzy">టిఫ్జీకి స్వాగతం</string>
     <string name="welcome_subtitle">ప్రీమియం డైనింగ్, మీకు అందించబడుతుంది</string>
     <string name="username_or_email">వినియోగదారు పేరు లేదా ఇమెయిల్</string>
