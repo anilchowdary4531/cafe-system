@@ -31,7 +31,11 @@ object RetrofitClient {
         // Skip adding Authorization header for auth endpoints
         if (path.contains("customer/send-otp") || 
             path.contains("customer/verify-otp") ||
-            path.equals("/login", ignoreCase = true)) {
+            path.contains("customer/register") ||
+            path.contains("customer/password-login") ||
+            path.contains("customer/google-login") ||
+            path.contains("customer/public/delete-account") ||
+            path.contains("login")) {
             return@Interceptor chain.proceed(request)
         }
 
@@ -52,11 +56,8 @@ object RetrofitClient {
     }
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = if (BuildConfig.DEBUG) {
-            HttpLoggingInterceptor.Level.BODY
-        } else {
-            HttpLoggingInterceptor.Level.NONE
-        }
+        // ALWAYS enable basic logging for debugging production issues
+        level = HttpLoggingInterceptor.Level.BASIC
         // Redact sensitive headers
         redactHeader("Authorization")
     }

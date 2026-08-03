@@ -63,7 +63,7 @@ fun OtpScreen(
             )
             
             Text(
-                text = "We've sent a 6-digit verification code to ${viewModel.phone}",
+                text = "We've sent a 6-digit verification code to ${viewModel.email}",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -114,7 +114,7 @@ fun OtpScreen(
                 
                 TextButton(onClick = onBack) {
                     Text(
-                        text = "Change Number",
+                        text = "Change Email",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

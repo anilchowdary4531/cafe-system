@@ -89,7 +89,7 @@ fun SavedAddressesScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding),
-                        contentPadding = PaddingValues(Dimens.PaddingLarge),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = Dimens.PaddingLarge),
                         verticalArrangement = Arrangement.spacedBy(Dimens.SpacingMedium)
                     ) {
                         items(state.addresses) { address ->
@@ -194,9 +194,12 @@ fun AddAddressDialog(
     var line1 by remember { mutableStateOf("") }
     var line2 by remember { mutableStateOf("") }
     var city by remember { mutableStateOf("") }
-    var state by remember { mutableStateOf("") }
+    var mandal by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
+    var lat by remember { mutableStateOf("") }
+    var lng by remember { mutableStateOf("") }
+    var isDefault by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -206,15 +209,27 @@ fun AddAddressDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.verticalScroll(rememberScrollState())
             ) {
-                TiffzyTextField(value = label, onValueChange = { label = it }, label = "Label (e.g. Home, Office, Gym)")
-                TiffzyTextField(value = line1, onValueChange = { line1 = it }, label = "Address Line 1")
-                TiffzyTextField(value = line2, onValueChange = { line2 = it }, label = "Address Line 2 (Optional)")
-                TiffzyTextField(value = city, onValueChange = { city = it }, label = "City")
+                TiffzyTextField(value = label, onValueChange = { label = it }, label = "Label (e.g. Home, Office)")
+                TiffzyTextField(value = line1, onValueChange = { line1 = it }, label = "House / Flat / Building")
+                TiffzyTextField(value = line2, onValueChange = { line2 = it }, label = "Street / Area (Optional)")
+                TiffzyTextField(value = notes, onValueChange = { notes = it }, label = "Landmark / Instructions (Optional)", placeholder = "Near gate, Ring bell")
+                
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TiffzyTextField(value = state, onValueChange = { state = it }, label = "State", modifier = Modifier.weight(1f))
-                    TiffzyTextField(value = pin, onValueChange = { pin = it }, label = "Pincode", modifier = Modifier.weight(1f))
+                    TiffzyTextField(value = city, onValueChange = { city = it }, label = "City", modifier = Modifier.weight(1f))
+                    TiffzyTextField(value = mandal, onValueChange = { mandal = it }, label = "Mandal/Area", modifier = Modifier.weight(1f))
                 }
-                TiffzyTextField(value = notes, onValueChange = { notes = it }, label = "Instructions (Optional)", placeholder = "e.g. Near gate, Ring bell")
+                
+                TiffzyTextField(value = pin, onValueChange = { pin = it }, label = "Postal Code")
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TiffzyTextField(value = lat, onValueChange = { lat = it }, label = "Latitude (Opt)", modifier = Modifier.weight(1f))
+                    TiffzyTextField(value = lng, onValueChange = { lng = it }, label = "Longitude (Opt)", modifier = Modifier.weight(1f))
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = isDefault, onCheckedChange = { isDefault = it })
+                    Text("Make this my default address", style = MaterialTheme.typography.bodyMedium)
+                }
             }
         },
         confirmButton = {
@@ -226,14 +241,16 @@ fun AddAddressDialog(
                             line1 = line1,
                             line2 = line2.ifBlank { null },
                             city = city,
-                            state = state,
+                            state = mandal, // Using mandal as state for now or we can update model
                             postalCode = pin.ifBlank { null },
                             notes = notes.ifBlank { null },
-                            isDefault = false
+                            latitude = lat.toDoubleOrNull(),
+                            longitude = lng.toDoubleOrNull(),
+                            isDefault = isDefault
                         )
                     )
                 },
-                enabled = line1.isNotBlank() && city.isNotBlank() && state.isNotBlank()
+                enabled = line1.isNotBlank() && city.isNotBlank() && mandal.isNotBlank()
             ) {
                 Text("Save Address")
             }

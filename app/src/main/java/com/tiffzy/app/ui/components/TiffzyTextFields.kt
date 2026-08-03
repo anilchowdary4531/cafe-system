@@ -3,10 +3,15 @@ package com.tiffzy.app.ui.components
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import com.tiffzy.app.ui.theme.TiffzyInput
 
 @Composable
@@ -18,8 +23,12 @@ fun TiffzyTextField(
     placeholder: String? = null,
     isError: Boolean = false,
     enabled: Boolean = true,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    isPassword: Boolean = false
 ) {
+    var passwordVisible by remember { mutableStateOf(false) }
+
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -30,6 +39,20 @@ fun TiffzyTextField(
         isError = isError,
         enabled = enabled,
         keyboardOptions = keyboardOptions,
+        visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else visualTransformation,
+        trailingIcon = if (isPassword) {
+            {
+                val image = if (passwordVisible)
+                    Icons.Filled.Visibility
+                else Icons.Filled.VisibilityOff
+
+                val description = if (passwordVisible) "Hide password" else "Show password"
+
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(imageVector = image, contentDescription = description, tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        } else null,
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = TiffzyInput,
             unfocusedContainerColor = TiffzyInput,

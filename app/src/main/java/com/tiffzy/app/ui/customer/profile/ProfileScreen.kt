@@ -1,8 +1,11 @@
 package com.tiffzy.app.ui.customer.profile
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -14,28 +17,46 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.tiffzy.app.data.model.Customer
-import com.tiffzy.app.ui.components.TiffzyLoadingIndicator
-import com.tiffzy.app.ui.components.TiffzyTopBar
+import com.tiffzy.app.data.model.OrderDetails
+import com.tiffzy.app.ui.auth.AuthViewModel
+import com.tiffzy.app.ui.components.*
 import com.tiffzy.app.ui.theme.Dimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     onEditProfile: () -> Unit,
-    onAddressesClick: () -> Unit,
     onOrdersClick: () -> Unit,
+    onFavoritesClick: () -> Unit = {},
+    onPayLaterClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onDeleteAccount: () -> Unit,
     onLogout: () -> Unit,
     onBack: () -> Unit,
-    viewModel: ProfileViewModel = viewModel()
+    viewModel: ProfileViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val nickname by viewModel.nickname.collectAsState()
+    val avatar by viewModel.avatar.collectAsState()
+    val lastOrder by viewModel.lastOrder.collectAsState()
+    
+    var showLanguageSelector by remember { mutableStateOf(false) }
+    val currentLanguageCode by authViewModel.appLanguage.collectAsState()
+    val currentLanguage = supportedLanguages.find { it.code == currentLanguageCode } ?: supportedLanguages[0]
 
     LaunchedEffect(Unit) {
         viewModel.loadProfile()
@@ -44,8 +65,7 @@ fun ProfileScreen(
     Scaffold(
         topBar = {
             TiffzyTopBar(
-                title = "Profile",
-                subtitle = "Account Overview",
+                title = "My Account",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -54,26 +74,39 @@ fun ProfileScreen(
             )
         }
     ) { innerPadding ->
+        if (showLanguageSelector) {
+            LanguageSelectorDialog(
+                currentLanguageCode = currentLanguageCode,
+                onLanguageSelected = { authViewModel.changeLanguage(it) },
+                onDismiss = { showLanguageSelector = false }
+            )
+        }
+
         when (val state = uiState) {
             is ProfileUiState.Loading -> TiffzyLoadingIndicator()
             is ProfileUiState.Error -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(state.message, color = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { viewModel.loadProfile() }) {
-                            Text("Retry")
-                        }
-                    }
-                }
+                TiffzyErrorState(
+                    message = state.message,
+                    onRetry = { viewModel.loadProfile() },
+                    onLogin = onLogout
+                )
             }
             is ProfileUiState.Success -> {
                 ProfileContent(
                     customer = state.customer,
+                    nickname = nickname,
+                    avatarUrl = avatar,
+                    lastOrder = lastOrder,
                     onEditProfile = onEditProfile,
-                    onAddressesClick = onAddressesClick,
                     onOrdersClick = onOrdersClick,
+                    onFavoritesClick = onFavoritesClick,
+                    onPayLaterClick = onPayLaterClick,
+                    onNotificationsClick = onNotificationsClick,
+                    onSettingsClick = onSettingsClick,
                     onLogout = { viewModel.logout(onLogout) },
+                    onLanguageClick = { showLanguageSelector = true },
+                    onDeleteAccount = onDeleteAccount,
+                    currentLanguage = currentLanguage,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
@@ -87,158 +120,410 @@ fun ProfileScreen(
 @Composable
 fun ProfileContent(
     customer: Customer,
+    nickname: String?,
+    avatarUrl: String?,
+    lastOrder: OrderDetails?,
     onEditProfile: () -> Unit,
-    onAddressesClick: () -> Unit,
     onOrdersClick: () -> Unit,
+    onFavoritesClick: () -> Unit,
+    onPayLaterClick: () -> Unit,
+    onNotificationsClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     onLogout: () -> Unit,
+    onLanguageClick: () -> Unit,
+    onDeleteAccount: () -> Unit,
+    currentLanguage: Language,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(Dimens.PaddingLarge)
+            .padding(horizontal = Dimens.PaddingLarge)
     ) {
-        // Overview Header
-        Text(
-            text = "OVERVIEW",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            letterSpacing = 4.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "Customer profile",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Black,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-        Text(
-            text = "Manage your account, orders and saved addresses.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp)
+        Spacer(modifier = Modifier.height(Dimens.PaddingLarge))
+
+        // 1. Unified Identity Card
+        ProfileHeaderCard(
+            customer = customer, 
+            nickname = nickname, 
+            avatarUrl = avatarUrl, 
+            onEditClick = onEditProfile
         )
 
         Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
 
-        // Profile Details Section
+        // 2. Latest Activity (Recent Order)
         Text(
-            text = "ACCOUNT DETAILS",
+            text = "LATEST ACTIVITY",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             letterSpacing = 2.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp)
         )
         Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
         
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
-            shape = MaterialTheme.shapes.large
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onOrdersClick() },
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = MaterialTheme.shapes.large,
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            Column(modifier = Modifier.padding(Dimens.PaddingMedium)) {
-                ProfileInfoRow(Icons.Default.Person, "Name", customer.name ?: "Not provided")
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                ProfileInfoRow(Icons.Default.Email, "Email", customer.email ?: "Not provided")
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                ProfileInfoRow(Icons.Default.Phone, "Phone", customer.phone)
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                ProfileInfoRow(Icons.Default.CheckCircle, "Status", "OTP Verified")
+            if (lastOrder != null) {
+                Row(
+                    modifier = Modifier.padding(Dimens.PaddingLarge),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(MaterialTheme.colorScheme.primaryContainer, shape = CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.ShoppingBag, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(modifier = Modifier.width(Dimens.SpacingMedium))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "Order #${lastOrder.orderNo}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                        Text(text = lastOrder.status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Text(text = "₹${lastOrder.total.toInt()}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+                }
+            } else {
+                Box(modifier = Modifier.padding(Dimens.PaddingLarge).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(text = "No recent orders found.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
 
-        // Menu Actions
+        // 3. Rewards Section (Visual Stats)
         Text(
-            text = "ACTIONS",
+            text = "REWARDS & WALLET",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             letterSpacing = 2.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp)
         )
         Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
 
-        ProfileMenuItem(
-            icon = Icons.Default.Edit,
-            title = "Edit Profile",
-            onClick = onEditProfile
-        )
-        ProfileMenuItem(
-            icon = Icons.Default.LocationOn,
-            title = "Saved Addresses",
-            onClick = onAddressesClick
-        )
-        ProfileMenuItem(
-            icon = Icons.AutoMirrored.Filled.List,
-            title = "My Order History",
-            onClick = onOrdersClick
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.SpacingSmall)
+        ) {
+            ModernRewardCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Default.AccountBalanceWallet,
+                label = "Wallet",
+                value = "₹0",
+                color = Color(0xFFF59E0B) // Amber
+            )
+            ModernRewardCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Default.Star,
+                label = "Points",
+                value = "${customer.rewardPoints ?: 0}",
+                color = Color(0xFF10B981) // Emerald
+            )
+            ModernRewardCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Default.CardGiftcard,
+                label = "Offers",
+                value = "0",
+                color = Color(0xFF8B5CF6) // Violet
+            )
+        }
 
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+
+        // 4. Action Groups
+        Text(
+            text = "ACTIVITY",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 2.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+        Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+        
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = MaterialTheme.shapes.large,
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column {
+                ProfileMenuItem(
+                    icon = Icons.AutoMirrored.Filled.List,
+                    title = "My Orders",
+                    subtitle = "History & tracking",
+                    onClick = onOrdersClick
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.PaddingLarge), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                ProfileMenuItem(
+                    icon = Icons.Default.Favorite,
+                    title = "Favorites",
+                    subtitle = "Your liked dishes",
+                    onClick = onFavoritesClick
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.PaddingLarge), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                ProfileMenuItem(
+                    icon = Icons.Default.Payments,
+                    title = "Digital Khata",
+                    subtitle = "Pay later accounts",
+                    onClick = onPayLaterClick
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+
+        Text(
+            text = "PREFERENCES",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 2.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+        Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = MaterialTheme.shapes.large,
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column {
+                ProfileMenuItem(
+                    icon = Icons.Default.Notifications,
+                    title = "Notifications",
+                    onClick = onNotificationsClick
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.PaddingLarge), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                ProfileMenuItem(
+                    icon = Icons.Default.Settings,
+                    title = "Settings",
+                    onClick = onSettingsClick
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.PaddingLarge), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                ProfileMenuItem(
+                    icon = Icons.Default.Language,
+                    title = "App Language",
+                    subtitle = "${currentLanguage.flag} ${currentLanguage.name}",
+                    onClick = onLanguageClick
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
 
         TiffzyLogoutButton(onClick = onLogout)
         
+        Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+        
+        TextButton(
+            onClick = onDeleteAccount,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.7f))
+        ) {
+            Text("Delete Account", style = MaterialTheme.typography.labelMedium)
+        }
+
         Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
     }
 }
 
 @Composable
-fun ProfileInfoRow(icon: ImageVector, label: String, value: String) {
-    Row(
+fun ProfileHeaderCard(
+    customer: Customer, 
+    nickname: String? = null,
+    avatarUrl: String? = null,
+    onEditClick: () -> Unit
+) {
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(Dimens.SpacingMedium))
-        Column {
-            Text(
-                text = label.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                letterSpacing = 1.sp
-            )
+        Row(
+            modifier = Modifier
+                .padding(Dimens.PaddingLarge)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Profile Picture or Initials Avatar
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!avatarUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = avatarUrl,
+                        contentDescription = "Profile Picture",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    val initials = nickname?.take(1)?.uppercase() ?: customer.name?.take(1)?.uppercase() ?: customer.phone.take(1)
+                    Text(
+                        text = initials,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(Dimens.SpacingLarge))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (!nickname.isNullOrEmpty()) nickname else customer.name ?: "Hello Guest",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = customer.email ?: customer.phone,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Surface(
+                    color = Color(0xFF10B981).copy(alpha = 0.1f),
+                    shape = MaterialTheme.shapes.extraSmall,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.2f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF10B981), modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "VERIFIED ACCOUNT",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF10B981),
+                            fontSize = 8.sp
+                        )
+                    }
+                }
+            }
+
+            IconButton(onClick = onEditClick) {
+                Icon(Icons.Default.ChevronRight, contentDescription = "Edit")
+            }
+        }
+    }
+}
+
+@Composable
+fun ModernRewardCard(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    label: String,
+    value: String,
+    color: Color
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = MaterialTheme.shapes.large,
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(Dimens.PaddingMedium)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(color.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+            }
+            
+            Spacer(modifier = Modifier.height(Dimens.SpacingSmall))
+            
             Text(
                 text = value,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Black,
+                textAlign = TextAlign.Center
+            )
+            
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
         }
     }
 }
 
 @Composable
-fun ProfileMenuItem(icon: ImageVector, title: String, onClick: () -> Unit) {
+fun ProfileMenuItem(icon: ImageVector, title: String, subtitle: String? = null, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp
+        color = Color.Transparent
     ) {
         Row(
-            modifier = Modifier.padding(Dimens.PaddingMedium),
+            modifier = Modifier.padding(horizontal = Dimens.PaddingMedium, vertical = Dimens.PaddingLarge),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            }
+            
             Spacer(modifier = Modifier.width(Dimens.SpacingMedium))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f),
-                fontWeight = FontWeight.SemiBold
-            )
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(20.dp)
             )
         }
     }
@@ -246,17 +531,19 @@ fun ProfileMenuItem(icon: ImageVector, title: String, onClick: () -> Unit) {
 
 @Composable
 fun TiffzyLogoutButton(onClick: () -> Unit) {
-    OutlinedButton(
+    Button(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-        border = ButtonDefaults.outlinedButtonBorder.copy(
-            brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
-        )
+        shape = MaterialTheme.shapes.large,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+            contentColor = MaterialTheme.colorScheme.error
+        ),
+        elevation = null
     ) {
         Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
         Spacer(modifier = Modifier.width(8.dp))
-        Text("Logout from Tiffzy", modifier = Modifier.padding(vertical = 8.dp), fontWeight = FontWeight.Bold)
+        Text("Logout", modifier = Modifier.padding(vertical = 8.dp), fontWeight = FontWeight.Bold)
     }
 }
+

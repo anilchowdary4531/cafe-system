@@ -10,4 +10,39 @@
     <string name="results_placeholder">(Results will appear here)</string>
     <string name="default_notification_channel_id">order_updates_channel</string>
     <string name="default_notification_channel_name">Order Updates</string>
+
+    <!-- Login & Register -->
+    <string name="welcome_to_tiffzy">Welcome to Tiffzy</string>
+    <string name="welcome_subtitle">Premium Dining, Delivered to You</string>
+    <string name="username_or_email">Username or Email</string>
+    <string name="password">Password</string>
+    <string name="login">Login</string>
+    <string name="send_otp">Send OTP</string>
+    <string name="continue_with_google">Continue with Google</string>
+    <string name="login_with_otp_instead">Login with OTP instead</string>
+    <string name="login_with_password_instead">Login with Password instead</string>
+    <string name="dont_have_account">Don\'t have an account? Create one</string>
+    <string name="need_to_delete_account">Need to delete your account?</string>
+    <string name="email_address">Email Address</string>
+    <string name="sign_in">Sign In</string>
+
+    <!-- Register -->
+    <string name="create_account">Create Account</string>
+    <string name="join_tiffzy">Join Tiffzy</string>
+    <string name="join_subtitle">Experience premium luxury dining</string>
+    <string name="username">Username</string>
+    <string name="phone_number">Phone Number</string>
+    <string name="full_name_optional">Full Name (Optional)</string>
+    <string name="email_optional">Email (Optional)</string>
+    <string name="register">Register</string>
+
+    <!-- Home -->
+    <string name="detecting">Detecting...</string>
+    <string name="select_location">Select Location</string>
+    <string name="search_placeholder">Search restaurants or dishes...</string>
+    <string name="whats_on_your_mind">What\'s on your mind?</string>
+    <string name="restaurants_to_explore">Restaurants to explore</string>
+    <string name="no_results_found">No results found for \"%1$s\"</string>
+    <string name="restaurants">Restaurants</string>
+    <string name="dishes">Dishes</string>
 </resources>

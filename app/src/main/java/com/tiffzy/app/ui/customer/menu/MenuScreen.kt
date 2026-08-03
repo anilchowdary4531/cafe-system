@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,9 +25,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -43,10 +46,14 @@ fun MenuScreen(
     slug: String,
     onBack: () -> Unit,
     onViewCart: () -> Unit,
+    onLogin: (() -> Unit)? = null,
+    onViewLiveBill: ((Int) -> Unit)? = null,
     viewModel: MenuViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val cartItems by CartRepository.getInstance().cartItems.collectAsState()
+    val activeSessionId by viewModel.activeSessionId.collectAsState()
+    
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var filterVeg by remember { mutableStateOf(false) }
@@ -59,15 +66,45 @@ fun MenuScreen(
 
     Scaffold(
         topBar = {
-            val restaurantName = (uiState as? MenuUiState.Success)?.restaurant?.name ?: "Menu"
-            TiffzyTopBar(
-                title = restaurantName,
-                subtitle = "Restaurant Menu",
+            val restaurant = (uiState as? MenuUiState.Success)?.restaurant
+            val restaurantName = restaurant?.name ?: "Menu"
+            CenterAlignedTopAppBar(
+                title = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = restaurantName.uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            letterSpacing = 4.sp,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        if (restaurant != null) {
+                            Text(
+                                text = "${restaurant.city ?: "Local"} • ${restaurant.addressLine1 ?: ""}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                actions = {
+                    if (activeSessionId != null && onViewLiveBill != null) {
+                        IconButton(onClick = { onViewLiveBill(activeSessionId!!) }) {
+                            Icon(Icons.Default.Receipt, contentDescription = "Live Bill", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.primary
+                )
             )
         },
         bottomBar = {
@@ -92,7 +129,8 @@ fun MenuScreen(
             is MenuUiState.Loading -> TiffzyLoadingIndicator()
             is MenuUiState.Error -> TiffzyErrorState(
                 message = state.message,
-                onRetry = { viewModel.loadMenu(slug) }
+                onRetry = { viewModel.loadMenu(slug) },
+                onLogin = onLogin
             )
             is MenuUiState.Success -> {
                 val categories = state.categories
@@ -112,7 +150,7 @@ fun MenuScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = Dimens.PaddingSmall),
-                        contentPadding = PaddingValues(horizontal = Dimens.PaddingMedium),
+                        contentPadding = PaddingValues(horizontal = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(Dimens.SpacingMedium)
                     ) {
                         item {
@@ -143,7 +181,7 @@ fun MenuScreen(
                     }
 
                     // Search Bar for Dishes
-                    Box(modifier = Modifier.padding(horizontal = Dimens.PaddingMedium, vertical = Dimens.PaddingSmall)) {
+                    Box(modifier = Modifier.padding(horizontal = 4.dp, vertical = Dimens.PaddingSmall)) {
                         TiffzySearchBar(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
@@ -156,7 +194,7 @@ fun MenuScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = Dimens.PaddingSmall),
-                        contentPadding = PaddingValues(horizontal = Dimens.PaddingMedium),
+                        contentPadding = PaddingValues(horizontal = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(Dimens.SpacingSmall)
                     ) {
                         item {
@@ -267,7 +305,7 @@ fun MenuItemGridCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.small,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -281,8 +319,8 @@ fun MenuItemGridCard(
                     contentDescription = item.name,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(140.dp)
-                        .clip(MaterialTheme.shapes.medium),
+                        .height(180.dp)
+                        .clip(MaterialTheme.shapes.small),
                     contentScale = ContentScale.Crop,
                     placeholder = androidx.compose.ui.res.painterResource(id = com.tiffzy.app.R.drawable.baked_goods_2),
                     error = androidx.compose.ui.res.painterResource(id = com.tiffzy.app.R.drawable.baked_goods_3)
@@ -337,33 +375,28 @@ fun MenuItemGridCard(
                 }
             }
 
-            Column(modifier = Modifier.padding(Dimens.PaddingSmall)) {
+            Column(modifier = Modifier.padding(8.dp)) {
                 DietIcon(item)
                 
                 Text(
-                    text = item.name,
+                    text = item.name.uppercase(),
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 
                 Row(
                     modifier = Modifier.padding(top = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val originalPrice = (item.price * 1.2).toInt() // Mock original price
-                    Text(
-                        text = "₹$originalPrice",
-                        style = MaterialTheme.typography.labelMedium,
-                        textDecoration = TextDecoration.LineThrough,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "₹${item.price.toInt()}",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontFamily = FontFamily.Monospace
                     )
                     
                     Spacer(modifier = Modifier.weight(1f))
@@ -372,8 +405,8 @@ fun MenuItemGridCard(
                         onClick = onAdd,
                         enabled = item.isAvailable,
                         modifier = Modifier
-                            .width(70.dp)
-                            .height(34.dp)
+                            .width(64.dp)
+                            .height(32.dp)
                     )
                 }
             }

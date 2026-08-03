@@ -35,6 +35,9 @@ class MenuViewModel(
     private val _uiState = MutableStateFlow<MenuUiState>(MenuUiState.Loading)
     val uiState: StateFlow<MenuUiState> = _uiState.asStateFlow()
 
+    private val _activeSessionId = MutableStateFlow<Int?>(null)
+    val activeSessionId: StateFlow<Int?> = _activeSessionId.asStateFlow()
+
     fun loadMenu(slug: String) {
         viewModelScope.launch {
             _uiState.value = MenuUiState.Loading
@@ -64,6 +67,17 @@ class MenuViewModel(
                     categories = categories.sortedBy { if (it.name == "Recommended") 0 else 1 },
                     menu = allItems
                 )
+
+                // Check for active table session
+                val tableNo = cartRepository.selectedTable.value
+                if (tableNo != null) {
+                    try {
+                        val session = repository.openTable(response.restaurant.id, tableNo)
+                        _activeSessionId.value = session.id
+                    } catch (e: Exception) {
+                        _activeSessionId.value = null
+                    }
+                }
             } catch (e: Exception) {
                 _uiState.value = MenuUiState.Error(e.message ?: "Failed to load menu")
             }

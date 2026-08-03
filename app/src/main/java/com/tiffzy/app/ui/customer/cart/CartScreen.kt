@@ -1,29 +1,27 @@
 package com.tiffzy.app.ui.customer.cart
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ClearAll
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.tiffzy.app.data.model.CartItem
 import com.tiffzy.app.ui.components.*
 import com.tiffzy.app.ui.theme.Dimens
@@ -40,15 +38,8 @@ fun CartScreen(
     Scaffold(
         topBar = {
             TiffzyTopBar(
-                title = "Your Cart",
-                subtitle = if (uiState.items.isNotEmpty()) "${uiState.items.size} items" else null,
-                actions = {
-                    if (uiState.items.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.clearCart() }) {
-                            Icon(Icons.Default.ClearAll, contentDescription = "Clear Cart", tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                }
+                title = "YOUR CART",
+                subtitle = if (uiState.items.isNotEmpty()) "${uiState.items.size} ITEMS" else null
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -74,56 +65,49 @@ fun CartScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                // Restaurant info header in cart
+                // Restaurant info header - Simple Text Style
                 uiState.restaurant?.let { restaurant ->
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                        tonalElevation = 1.dp
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(Dimens.PaddingMedium),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            AsyncImage(
-                                model = restaurant.logo,
-                                contentDescription = null,
-                                modifier = Modifier.size(40.dp).clip(CircleShape),
-                                contentScale = ContentScale.Crop
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = restaurant.name.uppercase(),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 2.sp
                             )
-                            Spacer(modifier = Modifier.width(Dimens.SpacingMedium))
-                            Column {
-                                Text(
-                                    text = restaurant.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = restaurant.city ?: "Local",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            Text(
+                                text = "LOCATION: ${restaurant.city?.uppercase() ?: "LOCAL"}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
 
+                // Main Cart Items - Paper Style
                 LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(Dimens.PaddingMedium),
-                    verticalArrangement = Arrangement.spacedBy(Dimens.SpacingMedium)
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
                     items(uiState.items, key = { it.menuItem.id }) { item ->
-                        CartItemRow(
+                        CartItemPaperRow(
                             item = item,
                             onIncrease = { viewModel.increaseQuantity(item.menuItem.id) },
                             onDecrease = { viewModel.decreaseQuantity(item.menuItem.id) },
                             onRemove = { viewModel.removeItem(item.menuItem.id) }
                         )
+                        HorizontalDivider(
+                            modifier = Modifier.fillMaxWidth(),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                        )
                     }
                 }
 
-                BillingSection(
+                BillingSectionPaper(
                     subtotal = uiState.subtotal,
                     tax = uiState.tax,
                     taxPercent = uiState.restaurant?.taxPercent ?: 0.0,
@@ -136,98 +120,92 @@ fun CartScreen(
 }
 
 @Composable
-fun CartItemRow(
+fun CartItemPaperRow(
     item: CartItem,
     onIncrease: () -> Unit,
     onDecrease: () -> Unit,
     onRemove: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = MaterialTheme.shapes.large
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.2f))
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .padding(Dimens.PaddingMedium)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        // 1. Remove Button at the start
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier.size(32.dp)
         ) {
-            AsyncImage(
-                model = item.menuItem.image,
-                contentDescription = item.menuItem.name,
-                modifier = Modifier
-                    .size(70.dp)
-                    .clip(MaterialTheme.shapes.medium),
-                contentScale = ContentScale.Crop,
-                placeholder = androidx.compose.ui.res.painterResource(id = com.tiffzy.app.R.drawable.baked_goods_2),
-                error = androidx.compose.ui.res.painterResource(id = com.tiffzy.app.R.drawable.baked_goods_3)
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Remove",
+                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                modifier = Modifier.size(16.dp)
             )
-
-            Spacer(modifier = Modifier.width(Dimens.SpacingMedium))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.menuItem.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "₹${String.format(Locale.getDefault(), "%.2f", item.menuItem.price)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = "Delete",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.clickable { onRemove() }
-                )
-            }
-
-            // Quantity Controls - Luxury pill style
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                shape = CircleShape,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                ) {
-                    IconButton(
-                        onClick = onDecrease,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Text("-", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    }
-                    Text(
-                        text = item.quantity.toString(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                        textAlign = TextAlign.Center
-                    )
-                    IconButton(
-                        onClick = onIncrease,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Text("+", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
         }
+
+        // 2. Item Details
+        Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp)) {
+            Text(
+                text = item.menuItem.name.uppercase(),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "UNIT: Rs ${item.menuItem.price.toInt()}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+
+        // 3. Quantity Controls
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "-",
+                modifier = Modifier.clickable { onDecrease() }.padding(horizontal = 8.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = item.quantity.toString().padStart(2, '0'),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = "+",
+                modifier = Modifier.clickable { onIncrease() }.padding(horizontal = 8.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // 4. Subtotal for item
+        Text(
+            text = "Rs ${(item.menuItem.price * item.quantity).toInt()}",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Black,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.width(64.dp),
+            textAlign = TextAlign.End
+        )
     }
 }
 
 @Composable
-fun BillingSection(
+fun BillingSectionPaper(
     subtotal: Double,
     tax: Double,
     taxPercent: Double,
@@ -237,66 +215,77 @@ fun BillingSection(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp
+        tonalElevation = 4.dp
     ) {
         Column(
-            modifier = Modifier.padding(Dimens.PaddingLarge)
+            modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "Billing Details",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                text = "SUMMARY",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 2.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            Spacer(modifier = Modifier.height(Dimens.SpacingMedium))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            BillingRow("Subtotal", subtotal)
+            BillingRowPaper("SUBTOTAL", subtotal)
             if (tax > 0) {
-                BillingRow("Tax (${String.format(Locale.getDefault(), "%.1f", taxPercent)}%)", tax)
+                BillingRowPaper("TAX (${String.format(Locale.getDefault(), "%.1f", taxPercent)}%)", tax)
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = Dimens.PaddingSmall))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 1.dp)
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Total",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    text = "TOTAL PAYABLE",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace
                 )
                 Text(
                     text = "Rs ${String.format(Locale.getDefault(), "%.2f", total)}",
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontFamily = FontFamily.Monospace
                 )
             }
 
-            Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
+            Spacer(modifier = Modifier.height(24.dp))
 
             TiffzyPrimaryButton(
-                text = "Checkout - Rs ${String.format(Locale.getDefault(), "%.2f", total)}",
-                onClick = onCheckout
+                text = "CONFIRM ORDER",
+                onClick = onCheckout,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
 }
 
 @Composable
-fun BillingRow(label: String, amount: Double) {
+fun BillingRowPaper(label: String, amount: Double) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = label, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = label, 
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Text(
             text = "Rs ${String.format(Locale.getDefault(), "%.2f", amount)}",
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
         )
     }
 }

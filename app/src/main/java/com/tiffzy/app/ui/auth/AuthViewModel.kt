@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.messaging.FirebaseMessaging
 import com.tiffzy.app.data.local.AuthDataStore
+import com.tiffzy.app.data.model.*
 import com.tiffzy.app.data.remote.RetrofitClient
 import com.tiffzy.app.data.repository.AuthRepository
 import kotlinx.coroutines.Job
@@ -14,19 +15,23 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import org.json.JSONObject
+import retrofit2.HttpException
 
 sealed class AuthUiState {
     object Idle : AuthUiState()
     object Loading : AuthUiState()
     object OtpSent : AuthUiState()
     object Authenticated : AuthUiState()
+    object AccountDeleted : AuthUiState()
     data class Error(val message: String) : AuthUiState()
 }
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
+    private val authDataStore = AuthDataStore(application)
     private val repository = AuthRepository(
         RetrofitClient.apiService,
-        AuthDataStore(application)
+        authDataStore
     )
 
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
@@ -35,50 +40,169 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val _timerValue = MutableStateFlow(0)
     val timerValue: StateFlow<Int> = _timerValue.asStateFlow()
 
+    private val _appLanguage = MutableStateFlow("en")
+    val appLanguage: StateFlow<String> = _appLanguage.asStateFlow()
+
+    val rememberSession = authDataStore.rememberSession
+    val autoDetectLocation = authDataStore.autoDetectLocation
+    val notificationsEnabled = authDataStore.notificationsEnabled
+
     private var timerJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            authDataStore.appLanguage.collect { code ->
+                _appLanguage.value = code
+            }
+        }
+    }
+
+    fun updateSettings(remember: Boolean? = null, autoDetect: Boolean? = null, notify: Boolean? = null) {
+        viewModelScope.launch {
+            authDataStore.updateSettings(remember, autoDetect, notify)
+        }
+    }
+
+    fun changeLanguage(languageCode: String) {
+        viewModelScope.launch {
+            authDataStore.saveLanguage(languageCode)
+            _appLanguage.value = languageCode
+        }
+    }
 
     var phone: String = ""
     var email: String? = null
     var otp: String = ""
     var name: String? = null
+    
+    // Login & Register fields
+    var username: String = ""
+    var password: String = ""
 
-    fun sendOtp() {
-        if (phone.length < 10) {
-            _uiState.value = AuthUiState.Error("Enter a valid 10-digit phone number")
+    private fun handleError(e: Exception, defaultMessage: String) {
+        val message = if (e is HttpException) {
+            try {
+                val errorBody = e.response()?.errorBody()?.string()
+                android.util.Log.e("AUTH_ERROR", "HTTP ${e.code()} Body=$errorBody")
+                // Try to get the "message" field, otherwise show the raw body
+                val json = JSONObject(errorBody ?: "")
+                if (json.has("message")) json.getString("message") else errorBody ?: defaultMessage
+            } catch (inner: Exception) {
+                // If not JSON, show the HTTP code and message
+                "Error ${e.code()}: ${e.message()}"
+            }
+        } else {
+            android.util.Log.e("AUTH_ERROR", "Exception: ${e.message}", e)
+            e.message ?: defaultMessage
+        }
+        _uiState.value = AuthUiState.Error(message)
+    }
+
+    fun registerCustomer(request: CustomerRegisterRequest) {
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            try {
+                repository.register(request)
+                _uiState.value = AuthUiState.Authenticated
+                registerFcm()
+            } catch (e: Exception) {
+                handleError(e, "Registration failed")
+            }
+        }
+    }
+
+    fun loginCustomer() {
+        if (username.isEmpty() || password.isEmpty()) {
+            _uiState.value = AuthUiState.Error("Username and password are required")
             return
         }
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             try {
-                repository.sendOtp(phone, email)
+                repository.customerLogin(CustomerLoginRequest(username, password))
+                _uiState.value = AuthUiState.Authenticated
+                registerFcm()
+            } catch (e: Exception) {
+                handleError(e, "Login failed")
+            }
+        }
+    }
+
+    fun loginWithGoogle(idToken: String, email: String?, name: String?, googleId: String?, picture: String?) {
+        android.util.Log.d("GOOGLE_AUTH", "AuthViewModel.loginWithGoogle() called with email: $email")
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            try {
+                android.util.Log.d("GOOGLE_AUTH", "Executing repository.googleLogin")
+                repository.googleLogin(
+                    GoogleLoginRequest(
+                        googleId = googleId,
+                        email = email,
+                        name = name,
+                        picture = picture,
+                        idToken = idToken
+                    )
+                )
+                android.util.Log.d("GOOGLE_AUTH", "repository.googleLogin success")
+                _uiState.value = AuthUiState.Authenticated
+                registerFcm()
+            } catch (e: Exception) {
+                android.util.Log.e("GOOGLE_AUTH", "Backend Google Login Failed", e)
+                handleError(e, "Google login failed")
+            }
+        }
+    }
+
+    private fun registerFcm() {
+        viewModelScope.launch {
+            try {
+                val token = FirebaseMessaging.getInstance().token.await()
+                repository.registerFcmToken(token)
+            } catch (e: Exception) {
+                android.util.Log.e("AuthViewModel", "FCM registration failed: ${e.message}")
+            }
+        }
+    }
+
+    fun sendOtp() {
+        val currentEmail = email
+        if (currentEmail == null || !android.util.Patterns.EMAIL_ADDRESS.matcher(currentEmail).matches()) {
+            _uiState.value = AuthUiState.Error("Enter a valid email address")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            try {
+                repository.sendOtp(currentEmail)
                 _uiState.value = AuthUiState.OtpSent
                 startTimer()
             } catch (e: Exception) {
-                _uiState.value = AuthUiState.Error(e.message ?: "Failed to send OTP")
+                if (e is HttpException) {
+                    val body = e.response()?.errorBody()?.string()
+                    android.util.Log.e("SEND_OTP", "HTTP ${e.code()} Body=$body")
+                    handleError(e, "HTTP ${e.code()} : $body")
+                } else {
+                    android.util.Log.e("SEND_OTP", e.toString())
+                    handleError(e, e.toString())
+                }
             }
         }
     }
 
     fun verifyOtp() {
-        if (otp.length != 6) {
+        val currentEmail = email
+        if (currentEmail == null || otp.length != 6) {
             _uiState.value = AuthUiState.Error("Enter a valid 6-digit OTP")
             return
         }
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             try {
-                repository.verifyOtp(phone, otp, name, email)
+                repository.verifyOtp(currentEmail, otp, name)
                 _uiState.value = AuthUiState.Authenticated
                 
                 // Register FCM Token after successful login
-                // We wrap this in a more robust check because google-services.json might be missing
-                try {
-                    val token = FirebaseMessaging.getInstance().token.await()
-                    repository.registerFcmToken(token)
-                } catch (e: Exception) {
-                    // Log but don't block navigation if Firebase fails
-                    android.util.Log.e("AuthViewModel", "Firebase token registration failed: ${e.message}")
-                }
+                registerFcm()
             } catch (e: Exception) {
                 _uiState.value = AuthUiState.Error(e.message ?: "Invalid OTP")
             }
@@ -129,6 +253,39 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.logout()
             _uiState.value = AuthUiState.Idle
+        }
+    }
+
+    fun clearCache() {
+        viewModelScope.launch {
+            authDataStore.clearAuth()
+            // Clear other local stores if any
+            _uiState.value = AuthUiState.Idle
+        }
+    }
+
+    fun requestDeleteOtp(identifier: String) {
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            try {
+                repository.requestDeleteOtp(identifier)
+                _uiState.value = AuthUiState.OtpSent
+            } catch (e: Exception) {
+                handleError(e, "Failed to send deletion OTP")
+            }
+        }
+    }
+
+    fun confirmDeleteAccount(identifier: String, otp: String) {
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            try {
+                repository.verifyDeleteAccount(identifier, otp)
+                repository.logout()
+                _uiState.value = AuthUiState.AccountDeleted
+            } catch (e: Exception) {
+                handleError(e, "Failed to delete account")
+            }
         }
     }
 }

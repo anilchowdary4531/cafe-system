@@ -23,15 +23,39 @@ class AuthRepository(
         }
     }
 
-    suspend fun sendOtp(phone: String, email: String? = null): SendOtpResponse {
-        return apiService.sendOtp(SendOtpRequest(phone, email))
+    suspend fun sendOtp(email: String): SendOtpResponse {
+        return apiService.sendOtp(SendOtpRequest(email = email, phone = email))
     }
 
-    suspend fun verifyOtp(phone: String, otp: String, name: String? = null, email: String? = null): VerifyOtpResponse {
-        val response = apiService.verifyOtp(VerifyOtpRequest(phone, otp, name, email))
+    suspend fun verifyOtp(email: String, otp: String, name: String? = null): VerifyOtpResponse {
+        val response = apiService.verifyOtp(VerifyOtpRequest(email = email, otp = otp, name = name, phone = email))
+        handleCustomerAuth(response)
+        return response
+    }
+
+    suspend fun register(request: CustomerRegisterRequest): VerifyOtpResponse {
+        val response = apiService.register(request)
+        handleCustomerAuth(response)
+        return response
+    }
+
+    suspend fun customerLogin(request: CustomerLoginRequest): VerifyOtpResponse {
+        val response = apiService.customerLogin(request)
+        handleCustomerAuth(response)
+        return response
+    }
+
+    suspend fun googleLogin(request: GoogleLoginRequest): VerifyOtpResponse {
+        android.util.Log.d("GOOGLE_AUTH", "AuthRepository.googleLogin() calling API")
+        val response = apiService.googleLogin(request)
+        android.util.Log.d("GOOGLE_AUTH", "AuthRepository.googleLogin() received response")
+        handleCustomerAuth(response)
+        return response
+    }
+
+    private suspend fun handleCustomerAuth(response: VerifyOtpResponse) {
         saveAuthToken(response.token)
         authDataStore.saveCustomerInfo(response.customer.name, response.customer.phone)
-        return response
     }
 
     suspend fun login(email: String, password: String): LoginResponse {
@@ -63,5 +87,13 @@ class AuthRepository(
     suspend fun logout() {
         authDataStore.clearAuth()
         RetrofitClient.setToken(null)
+    }
+
+    suspend fun requestDeleteOtp(identifier: String): SendOtpResponse {
+        return apiService.requestDeleteOtp(mapOf("identifier" to identifier))
+    }
+
+    suspend fun verifyDeleteAccount(identifier: String, otp: String): SimpleResponse {
+        return apiService.verifyDeleteAccount(mapOf("identifier" to identifier, "otp" to otp))
     }
 }

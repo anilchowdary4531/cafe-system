@@ -1,0 +1,63 @@
+{
+  "project_info": {
+    "project_number": "508607286319",
+    "project_id": "tiffzy-d4ad2",
+    "storage_bucket": "tiffzy-d4ad2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:508607286319:android:c92b800a2262c826db0ada",
+        "android_client_info": {
+          "package_name": "com.tiffzy.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "508607286319-7t2fed97nl50ll13evflkjjm6cc2ff4i.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.tiffzy.app",
+            "certificate_hash": "0f4518415e31ebf9a936335139fbce81cad5d755"
+          }
+        },
+        {
+          "client_id": "508607286319-d1ppjhs28a4sdfkvccbbpjvr4bs1oske.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.tiffzy.app",
+            "certificate_hash": "fb86a0145836e048df727c44c813a70ee7b6fa61"
+          }
+        },
+        {
+          "client_id": "508607286319-q78ko2e1j2964jk3c7v3o7qvucgq2jlf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.tiffzy.app",
+            "certificate_hash": "dbfb736c6e54af3fb9c7b18f1dd43948065999d5"
+          }
+        },
+        {
+          "client_id": "508607286319-gdke04tjvlmttvf5ppcm45j0ncqtuhks.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5_Z29tj5VjWrY-_oLoMTIrGXmpIU4Pr4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "508607286319-gdke04tjvlmttvf5ppcm45j0ncqtuhks.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

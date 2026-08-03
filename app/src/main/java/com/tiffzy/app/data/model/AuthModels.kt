@@ -1,63 +1,94 @@
 package com.tiffzy.app.data.model
 
+import com.google.gson.annotations.SerializedName
+
 data class SendOtpRequest(
-    val phone: String,
-    val email: String? = null
+    @SerializedName("email") val email: String,
+    @SerializedName("phone") val phone: String
 )
 
 data class SendOtpResponse(
-    val message: String,
-    val phone: String,
-    val expiresAt: String,
-    val devOtp: String? = null
+    @SerializedName("message") val message: String,
+    @SerializedName("phone") val phone: String? = null,
+    @SerializedName("email") val email: String? = null,
+    @SerializedName("expiresAt") val expiresAt: String,
+    @SerializedName("devOtp") val devOtp: String? = null
 )
 
 data class VerifyOtpRequest(
-    val phone: String,
-    val otp: String,
-    val name: String? = null,
-    val email: String? = null
+    @SerializedName("email") val email: String,
+    @SerializedName("phone") val phone: String,
+    @SerializedName("otp") val otp: String,
+    @SerializedName("name") val name: String? = null
 )
 
 data class VerifyOtpResponse(
-    val message: String,
-    val token: String,
-    val customer: Customer
+    @SerializedName("message") val message: String,
+    @SerializedName("token") val token: String,
+    @SerializedName("customer") val customer: Customer
 )
 
 data class Customer(
-    val id: Int,
-    val phone: String,
-    val name: String?,
-    val email: String?
+    @SerializedName("id") val id: Int,
+    @SerializedName("username") val username: String? = null,
+    @SerializedName("phone") val phone: String,
+    @SerializedName("name") val name: String?,
+    @SerializedName("email") val email: String?,
+    @SerializedName("rewardPoints") val rewardPoints: Int? = 0
+)
+
+data class CustomerRegisterRequest(
+    @SerializedName("username") val username: String,
+    @SerializedName("phone") val phone: String,
+    @SerializedName("password") val password: String,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("email") val email: String? = null
+)
+
+data class CustomerLoginRequest(
+    @SerializedName("username") val username: String,
+    @SerializedName("password") val password: String
+)
+
+data class GoogleLoginRequest(
+    @SerializedName("googleId") val googleId: String? = null,
+    @SerializedName("email") val email: String? = null,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("picture") val picture: String? = null,
+    @SerializedName("idToken") val idToken: String? = null
 )
 
 data class CustomerProfileResponse(
-    val customer: Customer
+    @SerializedName("customer") val customer: Customer
 )
 
 data class UpdateProfileRequest(
-    val name: String?,
-    val email: String?
+    @SerializedName("name") val name: String?,
+    @SerializedName("email") val email: String?
 )
 
 data class LoginRequest(
-    val email: String,
-    val password: String
+    @SerializedName("email") val email: String,
+    @SerializedName("password") val password: String
 )
 
 data class LoginResponse(
-    val message: String,
-    val token: String,
-    val user: StaffUser
+    @SerializedName("message") val message: String,
+    @SerializedName("token") val token: String,
+    @SerializedName("user") val user: StaffUser
+)
+
+data class SimpleResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("message") val message: String
 )
 
 data class StaffUser(
-    val id: Int,
-    val name: String,
-    val email: String,
-    val phone: String?,
-    val role: String,
-    val restaurantId: Int?,
-    val restaurant: Restaurant? = null
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("email") val email: String,
+    @SerializedName("phone") val phone: String?,
+    @SerializedName("role") val role: String,
+    @SerializedName("restaurantId") val restaurantId: Int?,
+    @SerializedName("restaurant") val restaurant: Restaurant? = null
 )

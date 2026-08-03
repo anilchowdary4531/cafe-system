@@ -29,6 +29,7 @@ import com.tiffzy.app.ui.components.TiffzyPrimaryButton
 import com.tiffzy.app.ui.components.TiffzySoftButton
 import com.tiffzy.app.ui.components.TiffzyTopBar
 import com.tiffzy.app.ui.theme.Dimens
+import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -200,12 +201,12 @@ fun OrderHistoryCard(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = formatDate(order.createdAt),
+                        text = order.createdAt,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                StatusChip(order.status)
+                LocalStatusChip(order.status)
             }
             
             Spacer(modifier = Modifier.height(12.dp))
@@ -274,5 +275,30 @@ fun getOrderTypeLabel(order: OrderDetails): String {
         listOf("DELIVERY", "HOME_DELIVERY", "DOOR_DELIVERY").contains(source) -> "Delivery"
         listOf("POS", "PICKUP", "TAKEAWAY", "COUNTER").contains(source) -> "Pickup"
         else -> "Takeaway"
+    }
+}
+
+@Composable
+fun LocalStatusChip(status: String) {
+    val color = when (status.uppercase()) {
+        "PLACED", "ACCEPTED" -> Color(0xFF3B82F6) // Blue
+        "PREPARING" -> Color(0xFFF59E0B) // Amber
+        "READY", "DELIVERED", "PICKED_UP" -> Color(0xFF10B981) // Emerald
+        "CANCELLED" -> Color(0xFFEF4444) // Red
+        else -> Color.Gray
+    }
+
+    Surface(
+        color = color.copy(alpha = 0.1f),
+        shape = CircleShape,
+        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.2f))
+    ) {
+        Text(
+            text = status,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = FontWeight.Bold
+        )
     }
 }

@@ -17,6 +17,15 @@ interface ApiService {
     @POST("customer/verify-otp")
     suspend fun verifyOtp(@Body request: VerifyOtpRequest): VerifyOtpResponse
 
+    @POST("customer/register")
+    suspend fun register(@Body request: CustomerRegisterRequest): VerifyOtpResponse
+
+    @POST("customer/password-login")
+    suspend fun customerLogin(@Body request: CustomerLoginRequest): VerifyOtpResponse
+
+    @POST("customer/google-login")
+    suspend fun googleLogin(@Body request: GoogleLoginRequest): VerifyOtpResponse
+
     @POST("login")
     suspend fun login(@Body request: LoginRequest): LoginResponse
 
@@ -55,4 +64,46 @@ interface ApiService {
 
     @POST("customer/fcm-token")
     suspend fun registerFcmToken(@Body request: RegisterFcmTokenRequest)
+
+    @GET("customer/pay-later/accounts")
+    suspend fun getPayLaterAccounts(): PayLaterAccountsResponse
+
+    @GET("customer/pay-later/accounts/{accountId}/details")
+    suspend fun getPayLaterDetails(@Path("accountId") accountId: Int): PayLaterDetailsResponse
+
+    @GET("customer/pay-later/eligibility")
+    suspend fun checkPayLaterEligibility(@Query("slug") restaurantSlug: String): PayLaterEligibilityResponse
+
+    @POST("customer/pay-later/accounts/{accountId}/repay")
+    suspend fun repayPayLater(
+        @Path("accountId") accountId: Int,
+        @Body request: PayLaterRepayRequest
+    ): CreatePaymentResponse
+
+    @POST("customer/pay-later/accounts/{accountId}/repay/verify")
+    suspend fun verifyPayLaterRepay(
+        @Path("accountId") accountId: Int,
+        @Body request: VerifyPaymentRequest
+    ): SimpleResponse
+
+    @GET("customer/notifications")
+    suspend fun getNotifications(): NotificationsResponse
+
+    @POST("customer/notifications/{id}/read")
+    suspend fun markNotificationRead(@Path("id") id: Int): SimpleResponse
+
+    @POST("customer/public/delete-account/request-otp")
+    suspend fun requestDeleteOtp(@Body body: Map<String, String>): SendOtpResponse
+
+    @POST("customer/public/delete-account/verify")
+    suspend fun verifyDeleteAccount(@Body body: Map<String, String>): SimpleResponse
+
+    @GET("customer/bill/{sessionId}")
+    suspend fun getLiveBill(@Path("sessionId") sessionId: Int): TableSession
+
+    @POST("customer/open-table")
+    suspend fun openTable(@Body body: Map<String, String>): TableSession
+
+    @POST("customer/order")
+    suspend fun placeDineInOrder(@Body body: Map<String, Any>): SimpleResponse
 }

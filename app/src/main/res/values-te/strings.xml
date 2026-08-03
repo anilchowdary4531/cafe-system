@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">టిఫ్జీ</string>
+    <string name="welcome_to_tiffzy">టిఫ్జీకి స్వాగతం</string>
+    <string name="welcome_subtitle">ప్రీమియం డైనింగ్, మీకు అందించబడుతుంది</string>
+    <string name="username_or_email">వినియోగదారు పేరు లేదా ఇమెయిల్</string>
+    <string name="password">పాస్‌వర్డ్</string>
+    <string name="login">లాగిన్</string>
+    <string name="send_otp">OTP పంపండి</string>
+    <string name="continue_with_google">గూగుల్‌తో కొనసాగండి</string>
+    <string name="login_with_otp_instead">బదులుగా OTPతో లాగిన్ చేయండి</string>
+    <string name="login_with_password_instead">బదులుగా పాస్‌వర్డ్‌తో లాగిన్ చేయండి</string>
+    <string name="dont_have_account">ఖాతా లేదా? ఒకదాన్ని సృష్టించండి</string>
+    <string name="need_to_delete_account">మీ ఖాతాను తొలగించాలా?</string>
+    <string name="email_address">ఇమెయిల్ చిరునామా</string>
+    <string name="sign_in">సైన్ ఇన్</string>
+
+    <!-- Register -->
+    <string name="create_account">ఖాతాను సృష్టించండి</string>
+    <string name="join_tiffzy">టిఫ్జీలో చేరండి</string>
+    <string name="join_subtitle">ప్రీమియం లగ్జరీ డైనింగ్‌ని అనుభవించండి</string>
+    <string name="username">వినియోగదారు పేరు</string>
+    <string name="phone_number">ఫోన్ నంబర్</string>
+    <string name="full_name_optional">పూర్తి పేరు (ఐచ్ఛికం)</string>
+    <string name="email_optional">ఇమెయిల్ (ఐచ్ఛికం)</string>
+    <string name="register">నమోదు చేయండి</string>
+
+    <!-- Home -->
+    <string name="detecting">గుర్తిస్తోంది...</string>
+    <string name="select_location">స్థలాన్ని ఎంచుకోండి</string>
+    <string name="search_placeholder">రెస్టారెంట్లు లేదా వంటకాల కోసం వెతకండి...</string>
+    <string name="whats_on_your_mind">మీ మనసులో ఏముంది?</string>
+    <string name="restaurants_to_explore">అన్వేషించడానికి రెస్టారెంట్లు</string>
+    <string name="no_results_found">\"%1$s\" కోసం ఫలితాలు కనుగొనబడలేదు</string>
+    <string name="restaurants">రెస్టారెంట్లు</string>
+    <string name="dishes">వంటకాలు</string>
+</resources>

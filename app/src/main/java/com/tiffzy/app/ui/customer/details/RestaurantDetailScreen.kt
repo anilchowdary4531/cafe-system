@@ -37,6 +37,7 @@ fun RestaurantDetailScreen(
     slug: String,
     onBack: () -> Unit,
     onViewMenu: (String) -> Unit,
+    onLogin: (() -> Unit)? = null,
     viewModel: RestaurantDetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -62,7 +63,8 @@ fun RestaurantDetailScreen(
             is RestaurantDetailUiState.Loading -> TiffzyLoadingIndicator()
             is RestaurantDetailUiState.Error -> TiffzyErrorState(
                 message = state.message,
-                onRetry = { viewModel.loadRestaurantDetails(slug) }
+                onRetry = { viewModel.loadRestaurantDetails(slug) },
+                onLogin = onLogin
             )
             is RestaurantDetailUiState.Success -> {
                 val restaurant = state.restaurant

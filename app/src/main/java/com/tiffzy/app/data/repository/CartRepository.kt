@@ -70,6 +70,12 @@ class CartRepository {
         }
     }
 
+    fun reorderItems(items: List<CartItem>, restaurant: Restaurant) {
+        // Clear current cart and set new restaurant
+        _currentRestaurant.value = restaurant
+        _cartItems.value = items
+    }
+
     fun clearCart() {
         _cartItems.value = emptyList()
         _currentRestaurant.value = null

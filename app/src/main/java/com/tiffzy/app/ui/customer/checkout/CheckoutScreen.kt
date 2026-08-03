@@ -45,11 +45,9 @@ fun CheckoutScreen(
     viewModel: CheckoutViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val addresses by viewModel.addresses.collectAsState()
-    val selectedAddress by viewModel.selectedAddress.collectAsState()
     val fulfillment by viewModel.fulfillment.collectAsState()
     val paymentMethod by viewModel.paymentMethod.collectAsState()
-    val manualAddress by viewModel.manualAddress.collectAsState()
+    val isPayLaterEligible by viewModel.isPayLaterEligible.collectAsState()
     val customerName by viewModel.customerName.collectAsState()
     val customerPhone by viewModel.customerPhone.collectAsState()
     
@@ -58,8 +56,6 @@ fun CheckoutScreen(
 
     val context = LocalContext.current
     val activity = context as? MainActivity
-
-    var showAddAddressDialog by remember { mutableStateOf(false) }
 
     if (uiState is CheckoutUiState.Success) {
         val order = (uiState as CheckoutUiState.Success).orderDetails
@@ -170,61 +166,24 @@ fun CheckoutScreen(
                 Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
                 // 2. Fulfillment
+                val tableNo = CartRepository.getInstance().selectedTable.collectAsState().value
                 SectionHeader("Fulfillment", Icons.Default.LocationOn)
                 Row(
                     modifier = Modifier.padding(horizontal = Dimens.PaddingLarge),
                     horizontalArrangement = Arrangement.spacedBy(Dimens.SpacingMedium)
                 ) {
+                    if (tableNo != null) {
+                        FulfillmentChip(
+                            label = "Dine-in (Table $tableNo)",
+                            selected = fulfillment == "dinein",
+                            modifier = Modifier.weight(1f)
+                        ) { viewModel.fulfillment.value = "dinein" }
+                    }
                     FulfillmentChip(
-                        label = "Delivery",
-                        selected = fulfillment == "delivery",
-                        modifier = Modifier.weight(1f)
-                    ) { viewModel.fulfillment.value = "delivery" }
-                    FulfillmentChip(
-                        label = "Pickup",
+                        label = "Self-Pickup",
                         selected = fulfillment == "pickup",
                         modifier = Modifier.weight(1f)
                     ) { viewModel.fulfillment.value = "pickup" }
-                }
-
-                Spacer(modifier = Modifier.height(Dimens.SpacingMedium))
-
-                // 3. Address Section
-                if (fulfillment == "delivery") {
-                    Column(modifier = Modifier.padding(horizontal = Dimens.PaddingLarge)) {
-                        if (addresses.isNotEmpty()) {
-                            Text(
-                                text = "Saved Addresses",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            addresses.forEach { address ->
-                                AddressItem(
-                                    address = address,
-                                    selected = selectedAddress?.id == address.id,
-                                    onClick = { viewModel.selectAddress(address) }
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                            }
-                        }
-                        
-                        TiffzySecondaryButton(
-                            text = "Add New Address",
-                            onClick = { showAddAddressDialog = true },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Spacer(modifier = Modifier.height(Dimens.SpacingMedium))
-
-                        TiffzyTextField(
-                            value = manualAddress,
-                            onValueChange = { viewModel.manualAddress.value = it },
-                            label = "Delivery Instructions",
-                            placeholder = "e.g. Leave at gate, Ring bell...",
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
                 }
 
                 Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
@@ -235,15 +194,19 @@ fun CheckoutScreen(
                     modifier = Modifier.padding(horizontal = Dimens.PaddingLarge),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (isPayLaterEligible) {
+                        PaymentOptionItem(
+                            title = "Tiffzy Pay Later",
+                            subtitle = "Digital Khata - Pay monthly",
+                            selected = paymentMethod == "PAY_LATER",
+                            onClick = { viewModel.paymentMethod.value = "PAY_LATER" },
+                            icon = Icons.Default.CheckCircle,
+                            iconTint = Color(0xFFF59E0B)
+                        )
+                    }
                     PaymentOptionItem(
-                        title = "Pay Online",
-                        subtitle = "Cards, UPI, Netbanking",
-                        selected = paymentMethod == "ONLINE",
-                        onClick = { viewModel.paymentMethod.value = "ONLINE" }
-                    )
-                    PaymentOptionItem(
-                        title = "Cash on Delivery",
-                        subtitle = "Pay when you receive",
+                        title = "Counter Payment",
+                        subtitle = "Pay at the restaurant",
                         selected = paymentMethod == "CASH",
                         onClick = { viewModel.paymentMethod.value = "CASH" }
                     )
@@ -305,16 +268,6 @@ fun CheckoutScreen(
             }
         }
     }
-
-    if (showAddAddressDialog) {
-        AddAddressDialog(
-            onDismiss = { showAddAddressDialog = false },
-            onConfirm = { label, line1, city, state, pin ->
-                viewModel.addAddress(label, line1, city, state, pin)
-                showAddAddressDialog = false
-            }
-        )
-    }
 }
 
 @Composable
@@ -353,7 +306,14 @@ fun BillingRowItem(label: String, amount: Double) {
 }
 
 @Composable
-fun PaymentOptionItem(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
+fun PaymentOptionItem(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    icon: ImageVector? = null,
+    iconTint: Color = MaterialTheme.colorScheme.primary
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -373,9 +333,12 @@ fun PaymentOptionItem(title: String, subtitle: String, selected: Boolean, onClic
         ) {
             RadioButton(selected = selected, onClick = onClick)
             Spacer(modifier = Modifier.width(Dimens.SpacingSmall))
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                 Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (icon != null) {
+                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
             }
         }
     }

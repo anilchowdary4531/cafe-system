@@ -20,10 +20,30 @@ class AuthDataStore(private val context: Context) {
         private val USER_ROLE = stringPreferencesKey("user_role")
         private val ACCOUNT_TYPE = stringPreferencesKey("account_type") // "customer" or "staff"
         private val RESTAURANT_ID = stringPreferencesKey("restaurant_id")
+        private val APP_LANGUAGE = stringPreferencesKey("app_language")
+        private val REMEMBER_SESSION = androidx.datastore.preferences.core.booleanPreferencesKey("remember_session")
+        private val AUTO_DETECT_LOCATION = androidx.datastore.preferences.core.booleanPreferencesKey("auto_detect_location")
+        private val NOTIFICATIONS_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("notifications_enabled")
     }
 
     val authToken: Flow<String?> = context.dataStore.data.map { preferences ->
         preferences[AUTH_TOKEN]
+    }
+
+    val appLanguage: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[APP_LANGUAGE] ?: "en"
+    }
+
+    val rememberSession: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[REMEMBER_SESSION] ?: true
+    }
+
+    val autoDetectLocation: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[AUTO_DETECT_LOCATION] ?: true
+    }
+
+    val notificationsEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[NOTIFICATIONS_ENABLED] ?: true
     }
 
     val userRole: Flow<String?> = context.dataStore.data.map { preferences ->
@@ -52,6 +72,14 @@ class AuthDataStore(private val context: Context) {
         }
     }
 
+    suspend fun updateSettings(remember: Boolean? = null, autoDetect: Boolean? = null, notify: Boolean? = null) {
+        context.dataStore.edit { preferences ->
+            remember?.let { preferences[REMEMBER_SESSION] = it }
+            autoDetect?.let { preferences[AUTO_DETECT_LOCATION] = it }
+            notify?.let { preferences[NOTIFICATIONS_ENABLED] = it }
+        }
+    }
+
     suspend fun saveCustomerInfo(name: String?, phone: String) {
         context.dataStore.edit { preferences ->
             name?.let { preferences[CUSTOMER_NAME] = it }
@@ -66,6 +94,12 @@ class AuthDataStore(private val context: Context) {
             preferences[USER_ROLE] = role
             preferences[ACCOUNT_TYPE] = "staff"
             restaurantId?.let { preferences[RESTAURANT_ID] = it.toString() }
+        }
+    }
+
+    suspend fun saveLanguage(languageCode: String) {
+        context.dataStore.edit { preferences ->
+            preferences[APP_LANGUAGE] = languageCode
         }
     }
 

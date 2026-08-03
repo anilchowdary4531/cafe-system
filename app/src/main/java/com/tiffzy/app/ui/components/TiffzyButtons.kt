@@ -17,7 +17,9 @@ fun TiffzyPrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     fullWidth: Boolean = true,
-    icon: ImageVector? = null
+    icon: ImageVector? = null,
+    containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
+    contentColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onPrimary
 ) {
     Button(
         onClick = onClick,
@@ -30,8 +32,8 @@ fun TiffzyPrimaryButton(
         },
         enabled = enabled,
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
+            containerColor = containerColor,
+            contentColor = contentColor
         ),
         shape = MaterialTheme.shapes.medium
     ) {

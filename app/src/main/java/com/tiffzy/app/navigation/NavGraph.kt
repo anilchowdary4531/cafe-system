@@ -10,6 +10,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tiffzy.app.ui.auth.AuthViewModel
 import com.tiffzy.app.ui.auth.LoginScreen
+import com.tiffzy.app.ui.auth.RegisterScreen
+import com.tiffzy.app.ui.auth.DeleteAccountScreen
 import com.tiffzy.app.ui.auth.OtpScreen
 import com.tiffzy.app.ui.auth.SplashScreen
 import com.tiffzy.app.ui.customer.cart.CartScreen
@@ -27,8 +29,16 @@ import com.tiffzy.app.ui.customer.order.OrderTrackingScreen
 import com.tiffzy.app.ui.customer.profile.ProfileScreen
 import com.tiffzy.app.ui.customer.profile.EditProfileScreen
 import com.tiffzy.app.ui.customer.profile.SavedAddressesScreen
+import com.tiffzy.app.ui.customer.profile.FavoritesScreen
+import com.tiffzy.app.ui.customer.profile.PayLaterScreen
+import com.tiffzy.app.ui.customer.profile.PayLaterDetailScreen
+import com.tiffzy.app.ui.customer.profile.NotificationsScreen
+import com.tiffzy.app.ui.customer.profile.SettingsScreen
+import com.tiffzy.app.ui.customer.menu.LiveBillScreen
 import com.tiffzy.app.ui.customer.scanner.ScannerScreen
+import com.tiffzy.app.ui.components.PlaceholderScreen
 import com.tiffzy.app.data.repository.CartRepository
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.navigation.NavType
@@ -38,6 +48,7 @@ import androidx.navigation.navDeepLink
 object Routes {
     const val Splash = "splash"
     const val Login = "login"
+    const val Register = "register"
     const val Otp = "otp"
     const val Location = "location"
     const val Home = "home"
@@ -52,13 +63,22 @@ object Routes {
     const val Profile = "profile"
     const val EditProfile = "edit_profile"
     const val SavedAddresses = "saved_addresses"
+    const val Favorites = "favorites"
+    const val PayLater = "pay_later"
+    const val PayLaterDetail = "pay_later/{accountId}"
+    const val Notifications = "notifications"
+    const val Settings = "settings"
+    const val LiveBill = "live_bill/{sessionId}"
     const val Scanner = "scanner"
+    const val DeleteAccount = "delete_account"
     
     fun restaurantDetail(slug: String) = "restaurant/$slug"
     fun menu(slug: String) = "menu/$slug"
     fun orderSuccess(orderNo: String, orderId: String) = "order_success/$orderNo/$orderId"
     fun orderDetail(orderId: Int) = "order_detail/$orderId"
     fun orderTracking(orderId: Int) = "order_tracking/$orderId"
+    fun payLaterDetail(accountId: Int) = "pay_later/$accountId"
+    fun liveBill(sessionId: Int) = "live_bill/$sessionId"
 }
 
 @Composable
@@ -70,6 +90,13 @@ fun NavGraph(
     val locationViewModel: LocationViewModel = viewModel(activity)
     val homeViewModel: HomeViewModel = viewModel()
 
+    val navigateToLogin = {
+        authViewModel.logout()
+        navController.navigate(Routes.Login) {
+            popUpTo(0) { inclusive = true }
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = Routes.Splash
@@ -78,7 +105,7 @@ fun NavGraph(
             SplashScreen(
                 viewModel = authViewModel,
                 onNavigateToHome = {
-                    navController.navigate(Routes.Location) {
+                    navController.navigate(Routes.Scanner) {
                         popUpTo(Routes.Splash) { inclusive = true }
                     }
                 },
@@ -88,7 +115,6 @@ fun NavGraph(
                     }
                 },
                 onNavigateToRestaurantDashboard = {
-                    // Redirect to login as Restaurant Dashboard is removed from this app
                     navController.navigate(Routes.Login) {
                         popUpTo(Routes.Splash) { inclusive = true }
                     }
@@ -102,9 +128,43 @@ fun NavGraph(
                 onOtpSent = {
                     navController.navigate(Routes.Otp)
                 },
-                onStaffLoggedIn = {
-                    // Staff/Restaurant login is no longer supported in Customer app
-                    navController.navigate(Routes.Login)
+                onNavigateToRegister = {
+                    navController.navigate(Routes.Register)
+                },
+                onNavigateToDeleteAccount = {
+                    navController.navigate(Routes.DeleteAccount)
+                },
+                onAuthenticated = {
+                    navController.navigate(Routes.Scanner) {
+                        popUpTo(Routes.Login) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Routes.Register) {
+            RegisterScreen(
+                viewModel = authViewModel,
+                onAuthenticated = {
+                    navController.navigate(Routes.Scanner) {
+                        popUpTo(Routes.Login) { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.DeleteAccount) {
+            DeleteAccountScreen(
+                viewModel = authViewModel,
+                onAccountDeleted = {
+                    navController.navigate(Routes.Login) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+                onBack = { 
+                    authViewModel.resetState()
+                    navController.popBackStack() 
                 }
             )
         }
@@ -113,7 +173,7 @@ fun NavGraph(
             OtpScreen(
                 viewModel = authViewModel,
                 onAuthenticated = {
-                    navController.navigate(Routes.Location) {
+                    navController.navigate(Routes.Scanner) {
                         popUpTo(Routes.Login) { inclusive = true }
                     }
                 },
@@ -139,17 +199,12 @@ fun NavGraph(
             HomeScreen(
                 viewModel = homeViewModel,
                 authViewModel = authViewModel,
-                locationViewModel = locationViewModel,
-                onLogout = {
-                    navController.navigate(Routes.Login) {
-                        popUpTo(Routes.Home) { inclusive = true }
-                    }
-                },
+                onLogout = navigateToLogin,
                 onChangeLocation = {
                     navController.navigate(Routes.Location)
                 },
                 onRestaurantClick = { slug ->
-                    navController.navigate(Routes.restaurantDetail(slug))
+                    navController.navigate(Routes.menu(slug))
                 },
                 onViewProfile = {
                     navController.navigate(Routes.Profile)
@@ -175,10 +230,15 @@ fun NavGraph(
                     
                     if (slug != null) {
                         CartRepository.getInstance().setTable(tableNo)
+                        // If we have a table, we can potentially "Open Table" session here
+                        // For now just navigate to menu
                         navController.navigate(Routes.menu(slug)) {
                             popUpTo(Routes.Scanner) { inclusive = true }
                         }
                     }
+                },
+                onManualSelect = {
+                    navController.navigate(Routes.Home)
                 },
                 onBack = { navController.popBackStack() }
             )
@@ -187,13 +247,63 @@ fun NavGraph(
         composable(Routes.Profile) {
             ProfileScreen(
                 onEditProfile = { navController.navigate(Routes.EditProfile) },
-                onAddressesClick = { navController.navigate(Routes.SavedAddresses) },
                 onOrdersClick = { navController.navigate(Routes.Orders) },
-                onLogout = {
-                    navController.navigate(Routes.Login) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                },
+                onFavoritesClick = { navController.navigate(Routes.Favorites) },
+                onPayLaterClick = { navController.navigate(Routes.PayLater) },
+                onNotificationsClick = { navController.navigate(Routes.Notifications) },
+                onSettingsClick = { navController.navigate(Routes.Settings) },
+                onDeleteAccount = { navController.navigate(Routes.DeleteAccount) },
+                onLogout = navigateToLogin,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.Settings) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onLogout = navigateToLogin,
+                onDeleteAccount = { navController.navigate(Routes.DeleteAccount) }
+            )
+        }
+
+        composable(
+            route = Routes.LiveBill,
+            arguments = listOf(navArgument("sessionId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val sessionId = backStackEntry.arguments?.getInt("sessionId") ?: 0
+            LiveBillScreen(
+                sessionId = sessionId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.Favorites) {
+            FavoritesScreen(
+                onBack = { navController.popBackStack() },
+                onRestaurantClick = { slug: String -> navController.navigate(Routes.menu(slug)) }
+            )
+        }
+
+        composable(Routes.PayLater) {
+            PayLaterScreen(
+                onAccountClick = { accountId -> navController.navigate(Routes.payLaterDetail(accountId)) },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.PayLaterDetail,
+            arguments = listOf(navArgument("accountId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val accountId = backStackEntry.arguments?.getInt("accountId") ?: 0
+            PayLaterDetailScreen(
+                accountId = accountId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.Notifications) {
+            NotificationsScreen(
                 onBack = { navController.popBackStack() }
             )
         }
@@ -215,13 +325,12 @@ fun NavGraph(
             arguments = listOf(navArgument("slug") { type = NavType.StringType })
         ) { backStackEntry ->
             val slug = backStackEntry.arguments?.getString("slug") ?: ""
-            RestaurantDetailScreen(
-                slug = slug,
-                onBack = { navController.popBackStack() },
-                onViewMenu = { restaurantSlug ->
-                    navController.navigate(Routes.menu(restaurantSlug))
+            // Redirecting to Menu directly
+            LaunchedEffect(slug) {
+                navController.navigate(Routes.menu(slug)) {
+                    popUpTo(Routes.RestaurantDetail) { inclusive = true }
                 }
-            )
+            }
         }
 
         composable(
@@ -232,7 +341,9 @@ fun NavGraph(
             MenuScreen(
                 slug = slug,
                 onBack = { navController.popBackStack() },
-                onViewCart = { navController.navigate(Routes.Cart) }
+                onViewCart = { navController.navigate(Routes.Cart) },
+                onViewLiveBill = { sessionId -> navController.navigate(Routes.liveBill(sessionId)) },
+                onLogin = navigateToLogin
             )
         }
 

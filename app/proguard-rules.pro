@@ -25,3 +25,40 @@
 
 # Jetpack Compose / Material3
 -keep class androidx.compose.material3.** { *; }
+
+# Gson / Retrofit
+-keepattributes Signature, InnerClasses, EnclosingMethod
+-keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
+-keepattributes AnnotationDefault
+
+# Keep Data Models from being renamed or stripped
+-keep class com.tiffzy.app.data.model.** { *; }
+-keepclassmembers class com.tiffzy.app.data.model.** { <fields>; }
+
+# Google Sign-In
+-keep class com.google.android.gms.auth.api.signin.** { *; }
+-keep class com.google.android.gms.common.api.ApiException { *; }
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+-dontwarn com.google.android.gms.**
+
+# CameraX
+-keep class androidx.camera.core.** { *; }
+-keep class androidx.camera.camera2.** { *; }
+-keep class androidx.camera.lifecycle.** { *; }
+-keep class androidx.camera.view.** { *; }
+-dontwarn androidx.camera.**
+
+# ML Kit Barcode Scanning
+-keep class com.google.mlkit.vision.** { *; }
+-keep class com.google.android.gms.internal.mlkit_vision_barcode.** { *; }
+-dontwarn com.google.mlkit.vision.**
+
+# Socket.io
+-keep class io.socket.client.** { *; }
+-keep class io.socket.engineio.client.** { *; }
+-keep class io.socket.parser.** { *; }
+-keep class io.socket.thread.** { *; }
+-keep class io.socket.utf8.** { *; }
+-keep class okhttp3.** { *; }
+-dontwarn io.socket.**

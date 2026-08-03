@@ -57,4 +57,50 @@ class RestaurantRepository(private val apiService: ApiService) {
     suspend fun deleteAddress(id: Int) {
         apiService.deleteAddress(id)
     }
+
+    suspend fun getPayLaterAccounts(): PayLaterAccountsResponse {
+        return apiService.getPayLaterAccounts()
+    }
+
+    suspend fun getPayLaterDetails(accountId: Int): PayLaterDetailsResponse {
+        return apiService.getPayLaterDetails(accountId)
+    }
+
+    suspend fun checkPayLaterEligibility(slug: String): PayLaterEligibilityResponse {
+        return apiService.checkPayLaterEligibility(slug)
+    }
+
+    suspend fun repayPayLater(accountId: Int, amount: Double): CreatePaymentResponse {
+        return apiService.repayPayLater(accountId, PayLaterRepayRequest(amount))
+    }
+
+    suspend fun verifyPayLaterRepay(accountId: Int, request: VerifyPaymentRequest): SimpleResponse {
+        return apiService.verifyPayLaterRepay(accountId, request)
+    }
+
+    suspend fun getNotifications(): NotificationsResponse {
+        return apiService.getNotifications()
+    }
+
+    suspend fun markNotificationRead(id: Int): SimpleResponse {
+        return apiService.markNotificationRead(id)
+    }
+
+    suspend fun getLiveBill(sessionId: Int): TableSession {
+        return apiService.getLiveBill(sessionId)
+    }
+
+    suspend fun openTable(restaurantId: Int, tableNo: String): TableSession {
+        return apiService.openTable(mapOf(
+            "restaurantId" to restaurantId.toString(),
+            "tableNo" to tableNo
+        ))
+    }
+
+    suspend fun placeDineInOrder(sessionId: Int, items: List<OrderItemRequest>): SimpleResponse {
+        return apiService.placeDineInOrder(mapOf(
+            "sessionId" to sessionId,
+            "items" to items
+        ))
+    }
 }

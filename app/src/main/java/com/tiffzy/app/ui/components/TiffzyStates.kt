@@ -29,8 +29,11 @@ fun TiffzyLoadingIndicator(
 fun TiffzyErrorState(
     message: String,
     onRetry: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onLogin: (() -> Unit)? = null
 ) {
+    val isUnauthorized = message.contains("401") || message.contains("unauthorized", ignoreCase = true)
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -44,11 +47,22 @@ fun TiffzyErrorState(
             color = MaterialTheme.colorScheme.error,
             textAlign = TextAlign.Center
         )
+        
         Spacer(modifier = Modifier.height(Dimens.SpacingMedium))
-        TiffzySecondaryButton(
-            text = "Retry",
-            onClick = onRetry
-        )
+        
+        if (isUnauthorized && onLogin != null) {
+            TiffzyPrimaryButton(
+                text = "Login Again",
+                onClick = onLogin,
+                modifier = Modifier.width(200.dp),
+                fullWidth = false
+            )
+        } else {
+            TiffzySecondaryButton(
+                text = "Retry",
+                onClick = onRetry
+            )
+        }
     }
 }
 

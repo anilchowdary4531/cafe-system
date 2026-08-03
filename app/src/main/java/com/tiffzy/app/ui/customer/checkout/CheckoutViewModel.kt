@@ -30,43 +30,38 @@ class CheckoutViewModel(application: Application) : AndroidViewModel(application
     private val _uiState = MutableStateFlow<CheckoutUiState>(CheckoutUiState.Idle)
     val uiState: StateFlow<CheckoutUiState> = _uiState.asStateFlow()
 
-    private val _addresses = MutableStateFlow<List<Address>>(emptyList())
-    val addresses: StateFlow<List<Address>> = _addresses.asStateFlow()
-
-    private val _selectedAddress = MutableStateFlow<Address?>(null)
-    val selectedAddress: StateFlow<Address?> = _selectedAddress.asStateFlow()
-
     private val _customerName = MutableStateFlow("")
     val customerName: StateFlow<String> = _customerName.asStateFlow()
 
     private val _customerPhone = MutableStateFlow("")
     val customerPhone: StateFlow<String> = _customerPhone.asStateFlow()
 
-    var fulfillment = MutableStateFlow("delivery")
-    var paymentMethod = MutableStateFlow("UPI")
+    private val _isPayLaterEligible = MutableStateFlow(false)
+    val isPayLaterEligible: StateFlow<Boolean> = _isPayLaterEligible.asStateFlow()
+
+    var fulfillment = MutableStateFlow("dinein")
+    var paymentMethod = MutableStateFlow("CASH")
     var notes = MutableStateFlow("")
-    var manualAddress = MutableStateFlow("")
 
     init {
-        loadAddresses()
         loadCustomerInfo()
-        val restaurant = cartRepository.currentRestaurant.value
-        if (restaurant?.isActive == true) {
-            // Default fulfillment
-            // If we have a table number in context, it's dinein
-            // In a real app, we might get tableNo from a QR code scan.
-            // For now, let's assume delivery if no tableNo.
+        checkPayLaterEligibility()
+        // Set default fulfillment to dinein if a table is selected
+        if (cartRepository.selectedTable.value != null) {
+            fulfillment.value = "dinein"
+        } else {
+            fulfillment.value = "pickup"
         }
     }
 
-    fun loadAddresses() {
+    private fun checkPayLaterEligibility() {
         viewModelScope.launch {
+            val restaurant = cartRepository.currentRestaurant.value ?: return@launch
             try {
-                val response = restaurantRepository.getAddresses()
-                _addresses.value = response.addresses
-                _selectedAddress.value = response.addresses.find { it.isDefault } ?: response.addresses.firstOrNull()
+                val response = restaurantRepository.checkPayLaterEligibility(restaurant.slug)
+                _isPayLaterEligible.value = response.eligible
             } catch (e: Exception) {
-                // Not logged in or error
+                _isPayLaterEligible.value = false
             }
         }
     }
@@ -75,33 +70,6 @@ class CheckoutViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             _customerName.value = authDataStore.customerName.first() ?: ""
             _customerPhone.value = authDataStore.customerPhone.first() ?: ""
-        }
-    }
-
-    fun selectAddress(address: Address) {
-        _selectedAddress.value = address
-        manualAddress.value = "" // Clear manual if saved is selected
-    }
-
-    fun addAddress(label: String, line1: String, city: String, state: String, pincode: String) {
-        viewModelScope.launch {
-            _uiState.value = CheckoutUiState.Loading
-            try {
-                val request = CreateAddressRequest(
-                    label = label,
-                    line1 = line1,
-                    city = city,
-                    state = state,
-                    postalCode = pincode,
-                    isDefault = addresses.value.isEmpty()
-                )
-                val newAddress = restaurantRepository.createAddress(request)
-                loadAddresses()
-                _selectedAddress.value = newAddress
-                _uiState.value = CheckoutUiState.Idle
-            } catch (e: Exception) {
-                _uiState.value = CheckoutUiState.Error(e.message ?: "Failed to add address")
-            }
         }
     }
 
@@ -122,23 +90,15 @@ class CheckoutViewModel(application: Application) : AndroidViewModel(application
                 val customerName = authDataStore.customerName.first() ?: "Guest"
                 val phone = authDataStore.customerPhone.first() ?: ""
                 
-                val addressText = if (fulfillment.value == "delivery") {
-                    if (selectedAddress.value != null) {
-                        formatAddress(selectedAddress.value!!)
-                    } else {
-                        manualAddress.value
-                    }
-                } else null
-
                 val request = OrderRequest(
                     customerName = customerName,
                     phone = phone,
-                    email = null, // Can be added to DataStore if needed
-                    tableNumber = null, // Add to context if needed
+                    email = null,
+                    tableNumber = cartRepository.selectedTable.value,
                     fulfillment = fulfillment.value,
-                    deliveryAddress = addressText,
-                    deliveryLatitude = selectedAddress.value?.latitude,
-                    deliveryLongitude = selectedAddress.value?.longitude,
+                    deliveryAddress = null,
+                    deliveryLatitude = null,
+                    deliveryLongitude = null,
                     notes = notes.value,
                     items = cartItems.map { 
                         OrderItemRequest(it.menuItem.id, it.menuItem.name, it.menuItem.price, it.quantity)
@@ -147,43 +107,29 @@ class CheckoutViewModel(application: Application) : AndroidViewModel(application
 
                 val response = restaurantRepository.placeOrder(restaurant.slug, request)
                 
-                if (paymentMethod.value == "ONLINE") {
-                    initiateRazorpayPayment(response.order)
-                } else if (paymentMethod.value == "CASH") {
-                    // For cash, we might still want to call verifyPayment with status SUCCESS
-                    // matching React logic for "isUpiPayment" = false
-                    verifyOfflinePayment(response.order, "CASH")
-                } else if (paymentMethod.value == "UPI") {
-                    // This is for manual UPI, maybe we just show success for now as placeholder
+                // If it's dine-in (has table), we might also want to link it to a table session
+                val tableNo = cartRepository.selectedTable.value
+                if (tableNo != null) {
+                    try {
+                        val session = restaurantRepository.openTable(restaurant.id, tableNo)
+                        restaurantRepository.placeDineInOrder(
+                            session.id,
+                            cartItems.map { OrderItemRequest(it.menuItem.id, it.menuItem.name, it.menuItem.price, it.quantity) }
+                        )
+                    } catch (e: Exception) {
+                        // Table session failed, but main order was placed
+                    }
+                }
+                
+                if (paymentMethod.value == "CASH" || paymentMethod.value == "PAY_LATER") {
+                    verifyOfflinePayment(response.order, paymentMethod.value)
+                } else {
+                    // Default fallback
                     _uiState.value = CheckoutUiState.Success(response.order)
                     cartRepository.clearCart()
                 }
             } catch (e: Exception) {
                 _uiState.value = CheckoutUiState.Error(e.message ?: "Failed to place order")
-            }
-        }
-    }
-
-    private fun initiateRazorpayPayment(order: OrderDetails) {
-        viewModelScope.launch {
-            try {
-                val createRequest = CreatePaymentRequest(
-                    orderId = order.id,
-                    paymentMethod = "ONLINE",
-                    provider = "RAZORPAY"
-                )
-                val createResponse = restaurantRepository.createPayment(createRequest)
-                if (createResponse.razorpay != null) {
-                    _uiState.value = CheckoutUiState.RazorpayReady(
-                        createResponse.razorpay,
-                        createResponse.payment.id,
-                        order
-                    )
-                } else {
-                    _uiState.value = CheckoutUiState.Error("Razorpay not configured on server")
-                }
-            } catch (e: Exception) {
-                _uiState.value = CheckoutUiState.Error("Failed to initiate payment: ${e.message}")
             }
         }
     }
@@ -254,17 +200,5 @@ class CheckoutViewModel(application: Application) : AndroidViewModel(application
                 cartRepository.clearCart()
             }
         }
-    }
-
-    private fun formatAddress(address: Address): String {
-        return listOfNotNull(
-            address.label,
-            address.name,
-            address.line1,
-            address.line2,
-            address.city,
-            address.state,
-            address.postalCode
-        ).joinToString(", ")
     }
 }
