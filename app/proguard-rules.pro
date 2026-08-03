@@ -30,10 +30,32 @@
 -keepattributes Signature, InnerClasses, EnclosingMethod
 -keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
 -keepattributes AnnotationDefault
+-keep class retrofit2.** { *; }
+-keep class okhttp3.** { *; }
+-dontwarn retrofit2.**
+-dontwarn okhttp3.**
 
 # Keep Data Models from being renamed or stripped
 -keep class com.tiffzy.app.data.model.** { *; }
 -keepclassmembers class com.tiffzy.app.data.model.** { <fields>; }
+
+# DataStore & Preferences
+-keep class androidx.datastore.** { *; }
+-keep class androidx.preferences.** { *; }
+
+# GSON and TypeToken (Fix for Favorites crash)
+-keep class com.google.gson.reflect.TypeToken
+-keep class * extends com.google.gson.reflect.TypeToken
+
+# Coroutines
+-keep class kotlinx.coroutines.** { *; }
+
+# AndroidX Core & Lifecycle (Essential for startup)
+-keep class androidx.core.** { *; }
+-keep class androidx.lifecycle.** { *; }
+-keep class androidx.activity.** { *; }
+-dontwarn androidx.**
+
 
 # Google Sign-In
 -keep class com.google.android.gms.auth.api.signin.** { *; }

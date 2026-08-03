@@ -9,15 +9,13 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
@@ -48,16 +46,11 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     ) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        val dataStore = AuthDataStore(this)
-        
-        // Initial language application
-        val initialLang = runBlocking { dataStore.appLanguage.first() }
-        LanguageHelper.applyLanguage(this, initialLang)
-        var currentLang = initialLang
-        
         installSplashScreen()
         super.onCreate(savedInstanceState)
         instance = this
+        
+        val dataStore = AuthDataStore(this)
         
         askNotificationPermission()
         
@@ -65,7 +58,9 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
             val controller = rememberNavController()
             navController = controller
             
-            val languageCode by dataStore.appLanguage.collectAsState(initial = initialLang)
+            val languageCode by dataStore.appLanguage.collectAsState(initial = "en")
+            
+            var currentLang by remember { mutableStateOf(languageCode) }
             
             LaunchedEffect(languageCode) {
                 if (languageCode != currentLang) {

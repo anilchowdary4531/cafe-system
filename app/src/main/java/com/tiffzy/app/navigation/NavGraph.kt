@@ -105,7 +105,7 @@ fun NavGraph(
             SplashScreen(
                 viewModel = authViewModel,
                 onNavigateToHome = {
-                    navController.navigate(Routes.Scanner) {
+                    navController.navigate(Routes.Home) {
                         popUpTo(Routes.Splash) { inclusive = true }
                     }
                 },
@@ -135,7 +135,7 @@ fun NavGraph(
                     navController.navigate(Routes.DeleteAccount)
                 },
                 onAuthenticated = {
-                    navController.navigate(Routes.Scanner) {
+                    navController.navigate(Routes.Home) {
                         popUpTo(Routes.Login) { inclusive = true }
                     }
                 }
@@ -146,7 +146,7 @@ fun NavGraph(
             RegisterScreen(
                 viewModel = authViewModel,
                 onAuthenticated = {
-                    navController.navigate(Routes.Scanner) {
+                    navController.navigate(Routes.Home) {
                         popUpTo(Routes.Login) { inclusive = true }
                     }
                 },
@@ -173,7 +173,7 @@ fun NavGraph(
             OtpScreen(
                 viewModel = authViewModel,
                 onAuthenticated = {
-                    navController.navigate(Routes.Scanner) {
+                    navController.navigate(Routes.Home) {
                         popUpTo(Routes.Login) { inclusive = true }
                     }
                 },
