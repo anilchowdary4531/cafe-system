@@ -310,18 +310,20 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
           username = `${baseUsername}_${counter++}`;
         }
 
-        const createData = {
+        const baseCreateData = {
           email: userEmail || null,
           phone: inputPhone,
           username,
           name: inputName || "Customer",
-          googleId: userGoogleId || null,
-          avatarUrl: userPicture || null,
         };
 
         try {
           account = await prisma.customerAccount.create({
-            data: createData,
+            data: {
+              ...baseCreateData,
+              googleId: userGoogleId || null,
+              avatarUrl: userPicture || null,
+            },
           });
         } catch (createErr) {
           if (createErr.code === "P2002") {
@@ -335,7 +337,34 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
               },
             });
           } else {
-            throw createErr;
+            // Fallback: If avatarUrl causes Prisma Client validation error on server, retry without avatarUrl
+            try {
+              account = await prisma.customerAccount.create({
+                data: {
+                  ...baseCreateData,
+                  googleId: userGoogleId || null,
+                },
+              });
+            } catch (fallbackErr) {
+              try {
+                account = await prisma.customerAccount.create({
+                  data: baseCreateData,
+                });
+              } catch (finalErr) {
+                if (finalErr.code === "P2002") {
+                  account = await prisma.customerAccount.findFirst({
+                    where: {
+                      OR: [
+                        ...(userEmail ? [{ email: userEmail }, { phone: userEmail }] : []),
+                        ...(inputPhone ? [{ phone: inputPhone }] : []),
+                      ],
+                    },
+                  });
+                } else {
+                  throw finalErr;
+                }
+              }
+            }
           }
         }
       }

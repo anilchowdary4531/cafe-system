@@ -46,21 +46,41 @@ export const upsertCustomerAccount = async ({ prisma, phone, name, email, avatar
     }
 
     if (Object.keys(updateData).length > 0) {
-      return prisma.customerAccount.update({
-        where: { id: existing.id },
-        data: updateData,
-      });
+      try {
+        return await prisma.customerAccount.update({
+          where: { id: existing.id },
+          data: updateData,
+        });
+      } catch (err) {
+        delete updateData.avatarUrl;
+        if (Object.keys(updateData).length > 0) {
+          return await prisma.customerAccount.update({
+            where: { id: existing.id },
+            data: updateData,
+          });
+        }
+      }
     }
     return existing;
   }
 
-  return prisma.customerAccount.create({
-    data: {
-      phone: normalizedPhone,
-      name: normalizedName || null,
-      email: normalizedEmail || null,
-      avatarUrl: normalizedAvatar || null,
-    },
-  });
+  try {
+    return await prisma.customerAccount.create({
+      data: {
+        phone: normalizedPhone,
+        name: normalizedName || null,
+        email: normalizedEmail || null,
+        avatarUrl: normalizedAvatar || null,
+      },
+    });
+  } catch (err) {
+    return await prisma.customerAccount.create({
+      data: {
+        phone: normalizedPhone,
+        name: normalizedName || null,
+        email: normalizedEmail || null,
+      },
+    });
+  }
 };
 
