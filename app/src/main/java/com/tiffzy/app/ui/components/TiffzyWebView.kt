@@ -27,6 +27,25 @@ fun TiffzyWebViewScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var progress by remember { mutableIntStateOf(0) }
 
+    // JavaScript to hide "Back to Tiffzy" links
+    val hideElementsScript = """
+        (function() {
+            var links = document.getElementsByTagName('a');
+            for (var i = 0; i < links.length; i++) {
+                if (links[i].innerText.toLowerCase().includes('back to tiffzy')) {
+                    links[i].style.display = 'none';
+                }
+            }
+            // Also hide any headers/navs that might contain it if nested
+            var divs = document.getElementsByTagName('div');
+            for (var i = 0; i < divs.length; i++) {
+                 if (divs[i].innerText.trim().toLowerCase() === 'back to tiffzy') {
+                    divs[i].style.display = 'none';
+                 }
+            }
+        })();
+    """.trimIndent()
+
     Scaffold(
         topBar = {
             TiffzyTopBar(
@@ -57,6 +76,10 @@ fun TiffzyWebViewScreen(
                         webChromeClient = object : WebChromeClient() {
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                                 progress = newProgress
+                                if (newProgress > 80) {
+                                    // Inject script early if possible
+                                    view?.evaluateJavascript(hideElementsScript, null)
+                                }
                                 if (newProgress == 100) isLoading = false
                             }
                         }
@@ -71,6 +94,8 @@ fun TiffzyWebViewScreen(
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
                                 isLoading = false
+                                // Inject script when page is fully loaded
+                                view?.evaluateJavascript(hideElementsScript, null)
                             }
 
                             override fun onReceivedError(
