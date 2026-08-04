@@ -302,15 +302,19 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         }
 
         try {
+          const createData = {
+            email: userEmail || null,
+            phone: inputPhone,
+            username,
+            name: inputName || "Customer",
+          };
+
+          // Only add these if the schema supports them
+          if (userGoogleId) createData.googleId = userGoogleId;
+          if (userPicture) createData.avatarUrl = userPicture;
+
           account = await prisma.customerAccount.create({
-            data: {
-              email: userEmail || null,
-              phone: inputPhone,
-              username,
-              name: inputName || "Customer",
-              googleId: userGoogleId || null,
-              avatarUrl: userPicture || null,
-            },
+            data: createData,
           });
         } catch (createErr) {
           if (createErr.code === "P2002") {
