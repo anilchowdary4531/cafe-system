@@ -15,15 +15,22 @@ export const getCustomerAccountByPhone = async ({ prisma, phone }) => {
 };
 
 export const upsertCustomerAccount = async ({ prisma, phone, name, email, avatarUrl } = {}) => {
-  const normalizedPhone = normalizePhone(phone);
+  const rawPhone = String(phone || "").trim();
+  const isEmailInput = rawPhone.includes("@");
+  const normalizedPhone = isEmailInput ? rawPhone.toLowerCase() : normalizePhone(rawPhone);
   if (!normalizedPhone) throw new Error("phone_required");
 
   const normalizedName = String(name || "").trim();
-  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedEmail = String(email || "").trim().toLowerCase() || (isEmailInput ? normalizedPhone : "");
   const normalizedAvatar = avatarUrl !== undefined ? String(avatarUrl || "").trim() || null : undefined;
 
-  const existing = await prisma.customerAccount.findUnique({
-    where: { phone: normalizedPhone },
+  const existing = await prisma.customerAccount.findFirst({
+    where: {
+      OR: [
+        { phone: normalizedPhone },
+        ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
+      ],
+    },
   });
 
   if (existing) {

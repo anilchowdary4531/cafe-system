@@ -118,7 +118,7 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
       const token = app.jwt.sign(
         {
           type: "customer",
-          phone,
+          phone: account.phone || account.email || phone,
           customerAccountId: account.id,
         },
         { expiresIn: process.env.CUSTOMER_JWT_EXPIRES_IN || "30d" }
