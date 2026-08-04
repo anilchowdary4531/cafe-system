@@ -1,12 +1,10 @@
-# Add project specific ProGuard rules here.
-
 # Project Specific Rules
 -keep class com.tiffzy.app.** { *; }
 
 # Serialization and Networking Rules
 -keepattributes Signature, InnerClasses, EnclosingMethod, *Annotation*
 
-# GSON and Generic Types (CRITICAL for DataStore/Lists)
+# GSON and Generic Types
 -keep class com.google.gson.** { *; }
 -keep class com.google.gson.reflect.TypeToken
 -keep class * extends com.google.gson.reflect.TypeToken
@@ -17,7 +15,7 @@
 -dontwarn retrofit2.**
 -dontwarn okhttp3.**
 
-# DataStore & Preferences (Startup CRASH fix)
+# DataStore & Preferences
 -keep class androidx.datastore.** { *; }
 -keep class androidx.preferences.** { *; }
 -keep class com.google.protobuf.** { *; }
@@ -28,11 +26,35 @@
 -keep class androidx.lifecycle.** { *; }
 -dontwarn kotlinx.coroutines.**
 
-# CameraX & ML Kit (Scanner stability)
+# CameraX
 -keep class androidx.camera.** { *; }
--keep class com.google.mlkit.** { *; }
 -dontwarn androidx.camera.**
+
+# Firebase & ML Kit Component System (Fix for startup crash)
+-keep public class * implements com.google.firebase.components.ComponentRegistrar
+-keep public class * implements com.google.mlkit.common.internal.model.ModelRegistrar
+-keep class com.google.firebase.components.** { *; }
+-keep class com.google.mlkit.common.internal.** { *; }
+-keep class com.google.firebase.provider.FirebaseInitProvider
+-keep class com.google.mlkit.common.internal.MlKitInitProvider
+
+# Firebase
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.firebase.**
+-dontwarn com.google.android.gms.**
+
+# ML Kit
+-keep class com.google.mlkit.** { *; }
 -dontwarn com.google.mlkit.**
+
+# ODML (Needed for ML Kit)
+-keep class com.google.android.odml.** { *; }
+-dontwarn com.google.android.odml.**
+
+# DataTransport (Needed for Firebase/ML Kit)
+-keep class com.google.android.datatransport.** { *; }
+-dontwarn com.google.android.datatransport.**
 
 # Socket.io
 -keep class io.socket.** { *; }
@@ -43,12 +65,6 @@
 -dontwarn com.razorpay.**
 -keep class com.google.android.apps.nbu.paisa.** { *; }
 -dontwarn com.google.android.apps.nbu.paisa.**
-
-# Firebase
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
--dontwarn com.google.firebase.**
--dontwarn com.google.android.gms.**
 
 # Jetpack Compose
 -keep class androidx.compose.** { *; }

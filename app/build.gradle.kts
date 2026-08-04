@@ -90,6 +90,8 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.play.services.location)
     implementation(libs.play.services.auth)
+    implementation(libs.play.services.basement)
+    implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
     implementation(libs.razorpay)
     implementation(libs.mlkit.barcode.scanning)

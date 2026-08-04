@@ -39,6 +39,7 @@ fun HomeScreen(
     onRestaurantClick: (String) -> Unit,
     onViewProfile: () -> Unit,
     onScanClick: () -> Unit,
+    onNavigateToWeb: (String, String) -> Unit = { _, _ -> },
     viewModel: HomeViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel()
 ) {
@@ -64,6 +65,9 @@ fun HomeScreen(
                 actions = {
                     IconButton(onClick = onChangeLocation) {
                         Icon(Icons.Default.LocationOn, contentDescription = "Select Location")
+                    }
+                    IconButton(onClick = onScanClick) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan QR Code")
                     }
                     IconButton(onClick = onViewProfile) {
                         Icon(Icons.Default.AccountCircle, contentDescription = "Profile")
@@ -206,6 +210,18 @@ fun HomeScreen(
                                         restaurant = restaurant,
                                         onClick = { onRestaurantClick(restaurant.slug) },
                                         overrideImageRes = imageRes
+                                    )
+                                }
+                                
+                                item {
+                                    Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+                                    TiffzyFooter(
+                                        onAboutUsClick = { onNavigateToWeb("About Us", "https://tiffzy.com/about") },
+                                        onContactUsClick = { onNavigateToWeb("Contact Us", "https://tiffzy.com/contact") },
+                                        onHelpCenterClick = { onNavigateToWeb("Help Center", "https://tiffzy.com/help") },
+                                        onTermsClick = { onNavigateToWeb("Terms", "https://tiffzy.com/terms") },
+                                        onPrivacyClick = { onNavigateToWeb("Privacy", "https://tiffzy.com/privacy") },
+                                        onRefundPolicyClick = { onNavigateToWeb("Refund Policy", "https://tiffzy.com/refund") }
                                     )
                                 }
                             }

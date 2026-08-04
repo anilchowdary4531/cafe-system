@@ -71,6 +71,7 @@ object Routes {
     const val LiveBill = "live_bill/{sessionId}"
     const val Scanner = "scanner"
     const val DeleteAccount = "delete_account"
+    const val Web = "web?title={title}&url={url}"
     
     fun restaurantDetail(slug: String) = "restaurant/$slug"
     fun menu(slug: String) = "menu/$slug"
@@ -79,6 +80,7 @@ object Routes {
     fun orderTracking(orderId: Int) = "order_tracking/$orderId"
     fun payLaterDetail(accountId: Int) = "pay_later/$accountId"
     fun liveBill(sessionId: Int) = "live_bill/$sessionId"
+    fun web(title: String, url: String) = "web?title=${android.net.Uri.encode(title)}&url=${android.net.Uri.encode(url)}"
 }
 
 @Composable
@@ -211,6 +213,9 @@ fun NavGraph(
                 },
                 onScanClick = {
                     navController.navigate(Routes.Scanner)
+                },
+                onNavigateToWeb = { title, url ->
+                    navController.navigate(Routes.web(title, url))
                 }
             )
         }
@@ -254,7 +259,10 @@ fun NavGraph(
                 onSettingsClick = { navController.navigate(Routes.Settings) },
                 onDeleteAccount = { navController.navigate(Routes.DeleteAccount) },
                 onLogout = navigateToLogin,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onNavigateToWeb = { title, url ->
+                    navController.navigate(Routes.web(title, url))
+                }
             )
         }
 
@@ -439,6 +447,28 @@ fun NavGraph(
             val orderId = backStackEntry.arguments?.getInt("orderId") ?: 0
             OrderTrackingScreen(
                 orderId = orderId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.Web,
+            arguments = listOf(
+                navArgument("title") { 
+                    type = NavType.StringType 
+                    defaultValue = "Web Page"
+                },
+                navArgument("url") { 
+                    type = NavType.StringType 
+                    defaultValue = ""
+                }
+            )
+        ) { backStackEntry ->
+            val title = backStackEntry.arguments?.getString("title") ?: "Web Page"
+            val url = backStackEntry.arguments?.getString("url") ?: ""
+            com.tiffzy.app.ui.components.TiffzyWebViewScreen(
+                title = title,
+                url = url,
                 onBack = { navController.popBackStack() }
             )
         }

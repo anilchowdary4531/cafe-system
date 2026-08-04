@@ -46,6 +46,7 @@ fun ProfileScreen(
     onDeleteAccount: () -> Unit,
     onLogout: () -> Unit,
     onBack: () -> Unit,
+    onNavigateToWeb: (String, String) -> Unit = { _, _ -> },
     viewModel: ProfileViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel()
 ) {
@@ -106,6 +107,7 @@ fun ProfileScreen(
                     onLogout = { viewModel.logout(onLogout) },
                     onLanguageClick = { showLanguageSelector = true },
                     onDeleteAccount = onDeleteAccount,
+                    onNavigateToWeb = onNavigateToWeb,
                     currentLanguage = currentLanguage,
                     modifier = Modifier
                         .fillMaxSize()
@@ -132,6 +134,7 @@ fun ProfileContent(
     onLogout: () -> Unit,
     onLanguageClick: () -> Unit,
     onDeleteAccount: () -> Unit,
+    onNavigateToWeb: (String, String) -> Unit,
     currentLanguage: Language,
     modifier: Modifier = Modifier
 ) {
@@ -334,6 +337,19 @@ fun ProfileContent(
         ) {
             Text("Delete Account", style = MaterialTheme.typography.labelMedium)
         }
+
+        Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+        
+        // Footer Section
+        TiffzyFooter(
+            onAboutUsClick = { onNavigateToWeb("About Us", "https://tiffzy.com/about") },
+            onContactUsClick = { onNavigateToWeb("Contact Us", "https://tiffzy.com/contact") },
+            onHelpCenterClick = { onNavigateToWeb("Help Center", "https://tiffzy.com/help") },
+            onTermsClick = { onNavigateToWeb("Terms", "https://tiffzy.com/terms") },
+            onPrivacyClick = { onNavigateToWeb("Privacy", "https://tiffzy.com/privacy") },
+            onRefundPolicyClick = { onNavigateToWeb("Refund Policy", "https://tiffzy.com/refund") },
+            onDeleteAccountClick = onDeleteAccount
+        )
 
         Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
     }
