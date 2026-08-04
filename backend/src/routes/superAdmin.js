@@ -259,6 +259,23 @@ export default async function superAdminRoutes(app, deps) {
     }
   });
 
+  app.delete("/super-admin/customers/:id", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const customerId = Number(req.params.id);
+      if (!customerId) return reply.code(400).send({ message: "Invalid customer id" });
+
+      const existing = await prisma.customerAccount.findUnique({ where: { id: customerId } });
+      if (!existing) return reply.code(404).send({ message: "Customer account not found" });
+
+      await prisma.customerAccount.delete({ where: { id: customerId } });
+
+      return { message: "Customer account deleted successfully", id: customerId };
+    } catch (err) {
+      console.error("[/super-admin/customers/:id DELETE] Error:", err);
+      return reply.code(500).send({ message: "Failed to delete customer account" });
+    }
+  });
+
   app.post("/super-admin/restaurants", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
       const body = req.body || {};

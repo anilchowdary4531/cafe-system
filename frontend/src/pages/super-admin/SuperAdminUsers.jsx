@@ -13,11 +13,13 @@ import {
     Coins,
     ShieldCheck,
     Calendar,
-    Sparkles
+    Sparkles,
+    Trash2
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { cachedGet } from "../../utils/apiClient";
+import { api, cachedGet } from "../../utils/apiClient";
+import { showToast } from "../../utils/toast";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import tiffzyLogo from "../../assets/tiffzy-logo.png";
 
@@ -61,6 +63,32 @@ export default function SuperAdminUsers() {
     const [error, setError] = useState("");
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [activeMenuKey, setActiveMenuKey] = useState(isStaffTab ? "staff" : "users");
+
+    const [deleteModalCustomer, setDeleteModalCustomer] = useState(null);
+    const [deleting, setDeleting] = useState(false);
+
+    const confirmDeleteCustomer = async () => {
+        if (!deleteModalCustomer?.id) return;
+        try {
+            setDeleting(true);
+            await api.delete(`/super-admin/customers/${deleteModalCustomer.id}`);
+            setCustomers((prev) => prev.filter((c) => c.id !== deleteModalCustomer.id));
+            showToast({
+                title: "User Account Deleted",
+                message: `Account '${deleteModalCustomer.name}' has been permanently deleted.`,
+                variant: "success",
+            });
+            setDeleteModalCustomer(null);
+        } catch (err) {
+            showToast({
+                title: "Delete Failed",
+                message: err.response?.data?.message || "Failed to delete user account",
+                variant: "error",
+            });
+        } finally {
+            setDeleting(false);
+        }
+    };
 
     // Sync tab state when location pathname changes
     useEffect(() => {
@@ -424,7 +452,8 @@ export default function SuperAdminUsers() {
                                             <th className="px-4 py-3 font-bold">Phone Number</th>
                                             <th className="px-4 py-3 font-bold">Email Address</th>
                                             <th className="px-4 py-3 font-bold">Loyalty Balance</th>
-                                            <th className="px-4 py-3 font-bold text-right">Joined Date</th>
+                                            <th className="px-4 py-3 font-bold">Joined Date</th>
+                                            <th className="px-4 py-3 font-bold text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -455,8 +484,19 @@ export default function SuperAdminUsers() {
                                                         {c.rewardPoints || 0} pts
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 text-right theme-muted text-xs">
+                                                <td className="px-4 py-3 theme-muted text-xs">
                                                     {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "—"}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setDeleteModalCustomer(c)}
+                                                        className="inline-flex items-center gap-1.5 rounded-xl bg-rose-500/10 px-3 py-1.5 text-xs font-extrabold text-rose-500 hover:bg-rose-500/20 border border-rose-500/20 transition active:scale-95"
+                                                        title="Delete Customer Account"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                        <span>Delete</span>
+                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -471,6 +511,63 @@ export default function SuperAdminUsers() {
                     </section>
                 )}
             </main>
+
+            {/* DELETE CUSTOMER CONFIRMATION MODAL */}
+            {deleteModalCustomer && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+                    <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-black/10 dark:border-white/15 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500 font-bold shrink-0">
+                                <Trash2 size={24} />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Delete User Account</h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Permanent database action
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl bg-rose-500/5 dark:bg-rose-500/10 p-4 border border-rose-500/20 text-xs text-rose-600 dark:text-rose-400 space-y-1">
+                            <p className="font-bold text-sm">
+                                Delete "{deleteModalCustomer.name}"?
+                            </p>
+                            <p>
+                                Account details ({deleteModalCustomer.phone !== "Not set" ? deleteModalCustomer.phone : deleteModalCustomer.email}) will be permanently removed.
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setDeleteModalCustomer(null)}
+                                disabled={deleting}
+                                className="w-1/2 rounded-xl border border-gray-300 dark:border-slate-700 px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmDeleteCustomer}
+                                disabled={deleting}
+                                className="w-1/2 flex items-center justify-center gap-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 text-sm shadow-md transition disabled:opacity-60"
+                            >
+                                {deleting ? (
+                                    <>
+                                        <Sparkles size={16} className="animate-spin" />
+                                        <span>Deleting...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 size={16} />
+                                        <span>Delete Account</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
