@@ -254,27 +254,42 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
             ]
           }
         });
-
-        // 3. If found, link Google ID and update email/name/avatar
-        if (account) {
-          try {
-            account = await prisma.customerAccount.update({
-              where: { id: account.id },
-              data: {
-                googleId: userGoogleId || account.googleId || null,
-                email: userEmail || account.email || null,
-                name: account.name || userName || null,
-                avatarUrl: account.avatarUrl || userPicture || null,
-              },
-            });
-          } catch (updateErr) {
-            console.warn("[googleLogin] Update warning:", updateErr.message);
-          }
-        }
       }
 
-      // 4. If still not found, create new CustomerAccount
-      if (!account) {
+      const inputPhone = isValidPhone(body.phone) ? normalizePhone(body.phone) : null;
+      const inputName = userName || (body.name ? String(body.name).trim() : "");
+
+      // 3. If account does not exist or has no phone/name, and no valid inputPhone provided, prompt user for info
+      const hasValidAccountPhone = account && isValidPhone(account.phone);
+      const hasValidAccountName = account && account.name && account.name.trim() !== "Google User";
+
+      if ((!account || !hasValidAccountPhone || !hasValidAccountName) && !inputPhone) {
+        return reply.send({
+          requiresInfo: true,
+          googleId: userGoogleId || account?.googleId || null,
+          email: userEmail || account?.email || null,
+          name: inputName || account?.name || "",
+          picture: userPicture || account?.avatarUrl || null,
+        });
+      }
+
+      // 4. Update existing account or create new account with full name and phone number
+      if (account) {
+        try {
+          account = await prisma.customerAccount.update({
+            where: { id: account.id },
+            data: {
+              googleId: userGoogleId || account.googleId || null,
+              email: userEmail || account.email || null,
+              phone: inputPhone || account.phone,
+              name: (inputName && inputName !== "Google User") ? inputName : account.name,
+              avatarUrl: userPicture || account.avatarUrl || null,
+            },
+          });
+        } catch (updateErr) {
+          console.warn("[googleLogin] Update warning:", updateErr.message);
+        }
+      } else {
         const baseUsername = userEmail ? userEmail.split("@")[0].replace(/[^a-z0-9_]/gi, "") : `user_${Date.now()}`;
         let username = baseUsername;
         let counter = 1;
@@ -283,14 +298,13 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         }
 
         try {
-          const userPhone = isValidPhone(body.phone) ? normalizePhone(body.phone) : null;
           account = await prisma.customerAccount.create({
             data: {
               googleId: userGoogleId || null,
               email: userEmail || null,
-              phone: userPhone,
+              phone: inputPhone,
               username,
-              name: userName || "Google User",
+              name: inputName || "Customer",
               avatarUrl: userPicture || null,
             },
           });
@@ -301,6 +315,7 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
                 OR: [
                   ...(userGoogleId ? [{ googleId: userGoogleId }] : []),
                   ...(userEmail ? [{ email: userEmail }, { phone: userEmail }] : []),
+                  ...(inputPhone ? [{ phone: inputPhone }] : []),
                 ],
               },
             });
