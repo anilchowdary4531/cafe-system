@@ -397,6 +397,7 @@ fun NavGraph(
             val orderId = backStackEntry.arguments?.getString("orderId") ?: ""
             OrderSuccessScreen(
                 orderNo = orderNo,
+                orderId = orderId,
                 onHomeClick = {
                     navController.navigate(Routes.Home) {
                         popUpTo(Routes.Home) { inclusive = true }
