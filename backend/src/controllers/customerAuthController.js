@@ -276,15 +276,19 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
       // 4. Update existing account or create new account with full name and phone number
       if (account) {
         try {
+          const updateData = {
+            email: userEmail || account.email || null,
+            phone: inputPhone || account.phone,
+            name: (inputName && inputName !== "Google User") ? inputName : account.name,
+          };
+
+          // Only add these if the schema supports them
+          if (userGoogleId) updateData.googleId = userGoogleId;
+          if (userPicture) updateData.avatarUrl = userPicture;
+
           account = await prisma.customerAccount.update({
             where: { id: account.id },
-            data: {
-              googleId: userGoogleId || account.googleId || null,
-              email: userEmail || account.email || null,
-              phone: inputPhone || account.phone,
-              name: (inputName && inputName !== "Google User") ? inputName : account.name,
-              avatarUrl: userPicture || account.avatarUrl || null,
-            },
+            data: updateData,
           });
         } catch (updateErr) {
           console.warn("[googleLogin] Update warning:", updateErr.message);
@@ -300,11 +304,11 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         try {
           account = await prisma.customerAccount.create({
             data: {
-              googleId: userGoogleId || null,
               email: userEmail || null,
               phone: inputPhone,
               username,
               name: inputName || "Customer",
+              googleId: userGoogleId || null,
               avatarUrl: userPicture || null,
             },
           });
