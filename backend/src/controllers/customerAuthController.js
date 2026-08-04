@@ -282,14 +282,23 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
             name: (inputName && inputName !== "Google User") ? inputName : account.name,
           };
 
-          // Only add these if the schema supports them
-          if (userGoogleId) updateData.googleId = userGoogleId;
-          if (userPicture) updateData.avatarUrl = userPicture;
-
-          account = await prisma.customerAccount.update({
-            where: { id: account.id },
-            data: updateData,
-          });
+          // Try to update with Google fields if they exist in the schema
+          try {
+            await prisma.customerAccount.update({
+              where: { id: account.id },
+              data: {
+                ...updateData,
+                googleId: userGoogleId || account.googleId || null,
+                avatarUrl: userPicture || account.avatarUrl || null,
+              }
+            });
+          } catch (dbErr) {
+            // Fallback: If DB columns don't exist, update only basic info
+            account = await prisma.customerAccount.update({
+              where: { id: account.id },
+              data: updateData,
+            });
+          }
         } catch (updateErr) {
           console.warn("[googleLogin] Update warning:", updateErr.message);
         }
@@ -301,18 +310,16 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
           username = `${baseUsername}_${counter++}`;
         }
 
+        const createData = {
+          email: userEmail || null,
+          phone: inputPhone,
+          username,
+          name: inputName || "Customer",
+          googleId: userGoogleId || null,
+          avatarUrl: userPicture || null,
+        };
+
         try {
-          const createData = {
-            email: userEmail || null,
-            phone: inputPhone,
-            username,
-            name: inputName || "Customer",
-          };
-
-          // Only add these if the schema supports them
-          if (userGoogleId) createData.googleId = userGoogleId;
-          if (userPicture) createData.avatarUrl = userPicture;
-
           account = await prisma.customerAccount.create({
             data: createData,
           });
