@@ -65,7 +65,7 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
         return { title, subtitle, phone };
     }, [profile?.email, profile?.name, profile?.phone]);
     const profileExtras = useMemo(() => getCustomerProfileExtras(sidebarMeta.phone), [sidebarMeta.phone]);
-    const avatarDataUrl = String(profileExtras?.avatarDataUrl || "").trim();
+    const avatarDataUrl = String(profile?.avatarUrl || profileExtras?.avatarDataUrl || "").trim();
 
     const activeSection = String(section || "overview").toLowerCase();
     const isOverviewPage = activeSection === "overview";

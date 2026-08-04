@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { requireStaffJwt } from "../services/staffAuthService.js";
-import { getPhoneVariants } from "../services/phoneService.js";
+import { getPhoneVariants, isValidPhone } from "../services/phoneService.js";
 
 const slugify = (value) =>
   String(value || "")
@@ -237,8 +237,9 @@ export default async function superAdminRoutes(app, deps) {
             id: acc.id,
             name: acc.name || "Customer",
             username: acc.username || "Not set",
-            phone: acc.phone || "Not set",
+            phone: (acc.phone && isValidPhone(acc.phone)) ? acc.phone : "Not set",
             email: acc.email || "Not set",
+            avatarUrl: acc.avatarUrl || null,
             googleId: acc.googleId,
             rewardPoints: maxPoints,
             createdAt: acc.createdAt,

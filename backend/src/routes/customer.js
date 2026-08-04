@@ -1,4 +1,4 @@
-import { normalizePhone } from "../services/phoneService.js";
+import { normalizePhone, isValidPhone } from "../services/phoneService.js";
 import { buildReadableOrderNo } from "../services/orderService.js";
 import { requireCustomerPhoneFromJwt } from "../services/customerProfileService.js";
 import { buildCustomerOtpController } from "../controllers/customerOtpController.js";

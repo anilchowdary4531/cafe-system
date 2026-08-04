@@ -1,4 +1,4 @@
-import { normalizePhone, getPhoneVariants } from "../services/phoneService.js";
+import { normalizePhone, getPhoneVariants, isValidPhone } from "../services/phoneService.js";
 import { requireCustomerPhoneFromJwt, getCustomerAccountByPhone, upsertCustomerAccount } from "../services/customerProfileService.js";
 import { requestOtp, verifyOtp } from "../services/otpService.js";
 import { sendEmailOtp } from "../services/emailService.js";
@@ -47,7 +47,9 @@ export const buildCustomerProfileController = ({ prisma }) => {
       const body = req.body || {};
       const newName = String(body.name || "").trim();
       const newEmail = String(body.email || "").trim().toLowerCase();
-      const newPhone = normalizePhone(body.phone || phoneFromToken || "");
+      const newPhone = isValidPhone(body.phone) ? normalizePhone(body.phone) : null;
+      const rawAvatar = body.avatarUrl ?? body.avatarDataUrl ?? body.avatar;
+      const newAvatarUrl = rawAvatar !== undefined ? (String(rawAvatar || "").trim() || null) : undefined;
 
       const phoneVariants = getPhoneVariants(phoneFromToken);
       let account = await prisma.customerAccount.findFirst({
@@ -62,9 +64,10 @@ export const buildCustomerProfileController = ({ prisma }) => {
       if (!account) {
         account = await prisma.customerAccount.create({
           data: {
-            phone: newPhone || phoneFromToken,
+            phone: newPhone,
             name: newName || null,
             email: newEmail || null,
+            avatarUrl: newAvatarUrl !== undefined ? newAvatarUrl : null,
           },
         });
       } else {
@@ -73,7 +76,8 @@ export const buildCustomerProfileController = ({ prisma }) => {
           data: {
             name: newName || account.name || null,
             email: newEmail || account.email || null,
-            phone: newPhone || account.phone || null,
+            phone: newPhone || (isValidPhone(account.phone) ? account.phone : null),
+            ...(newAvatarUrl !== undefined ? { avatarUrl: newAvatarUrl } : {}),
           },
         });
       }

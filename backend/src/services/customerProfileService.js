@@ -14,12 +14,13 @@ export const getCustomerAccountByPhone = async ({ prisma, phone }) => {
   });
 };
 
-export const upsertCustomerAccount = async ({ prisma, phone, name, email } = {}) => {
+export const upsertCustomerAccount = async ({ prisma, phone, name, email, avatarUrl } = {}) => {
   const normalizedPhone = normalizePhone(phone);
   if (!normalizedPhone) throw new Error("phone_required");
 
   const normalizedName = String(name || "").trim();
   const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedAvatar = avatarUrl !== undefined ? String(avatarUrl || "").trim() || null : undefined;
 
   const existing = await prisma.customerAccount.findUnique({
     where: { phone: normalizedPhone },
@@ -32,6 +33,9 @@ export const upsertCustomerAccount = async ({ prisma, phone, name, email } = {})
     }
     if (normalizedEmail && normalizedEmail !== existing.email) {
       updateData.email = normalizedEmail;
+    }
+    if (normalizedAvatar !== undefined && normalizedAvatar !== existing.avatarUrl) {
+      updateData.avatarUrl = normalizedAvatar;
     }
 
     if (Object.keys(updateData).length > 0) {
@@ -48,6 +52,7 @@ export const upsertCustomerAccount = async ({ prisma, phone, name, email } = {})
       phone: normalizedPhone,
       name: normalizedName || null,
       email: normalizedEmail || null,
+      avatarUrl: normalizedAvatar || null,
     },
   });
 };

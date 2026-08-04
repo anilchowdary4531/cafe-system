@@ -31,6 +31,16 @@ const SUPER_ADMIN_MENU_ITEMS = [
     { key: "settings", label: "Settings", icon: Settings, to: "/super-admin/settings" },
 ];
 
+const formatPhone = (raw) => {
+    const s = String(raw || "").trim();
+    if (!s || s.includes("@") || s.startsWith("google_") || /[a-zA-Z]/.test(s)) {
+        return "Not set";
+    }
+    const digits = s.replace(/[^\d]/g, "");
+    if (digits.length < 7) return "Not set";
+    return s;
+};
+
 export default function SuperAdminUsers() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -344,7 +354,7 @@ export default function SuperAdminUsers() {
                                                                     </span>
                                                                 </td>
                                                                 <td className="px-3 py-2.5 font-bold">{item.name || "Not set"}</td>
-                                                                <td className="px-3 py-2.5">{item.phone || "Not set"}</td>
+                                                                <td className="px-3 py-2.5">{formatPhone(item.phone)}</td>
                                                                 <td className="px-3 py-2.5">{item.email || "Not set"}</td>
                                                                 <td className="px-3 py-2.5 text-right">
                                                                     <span className="text-xs font-semibold text-emerald-400">Active</span>
@@ -422,14 +432,22 @@ export default function SuperAdminUsers() {
                                             <tr key={c.id} className="border-t theme-border hover:bg-black/5 dark:hover:bg-white/5 transition">
                                                 <td className="px-4 py-3 font-bold">
                                                     <div className="flex items-center gap-2">
-                                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 font-black text-xs">
-                                                            {c.name ? c.name.charAt(0).toUpperCase() : "C"}
-                                                        </div>
+                                                        {c.avatarUrl ? (
+                                                            <img
+                                                                src={c.avatarUrl}
+                                                                alt={c.name || "User Avatar"}
+                                                                className="h-8 w-8 rounded-full object-cover border border-amber-500/30 shrink-0"
+                                                            />
+                                                        ) : (
+                                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 font-black text-xs shrink-0">
+                                                                {c.name ? c.name.charAt(0).toUpperCase() : "C"}
+                                                            </div>
+                                                        )}
                                                         <span>{c.name}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-amber-400 font-semibold">{c.username}</td>
-                                                <td className="px-4 py-3">{c.phone}</td>
+                                                <td className="px-4 py-3">{formatPhone(c.phone)}</td>
                                                 <td className="px-4 py-3">{c.email}</td>
                                                 <td className="px-4 py-3">
                                                     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-extrabold text-emerald-400 border border-emerald-500/20">

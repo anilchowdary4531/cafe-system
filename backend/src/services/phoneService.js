@@ -1,11 +1,15 @@
+export const isValidPhone = (raw) => {
+  const input = String(raw || "").trim();
+  if (!input) return false;
+  if (input.includes("@") || input.startsWith("google_")) return false;
+  if (/[a-zA-Z]/.test(input)) return false;
+  const digits = input.replace(/[^\d]/g, "");
+  return digits.length >= 7;
+};
+
 export const normalizePhone = (raw) => {
   const input = String(raw || "").trim();
-  if (!input) return "";
-
-  // If it's an email, don't normalize it like a phone number
-  if (input.includes("@")) {
-    return input.toLowerCase();
-  }
+  if (!isValidPhone(input)) return "";
 
   // Keep digits only
   let digits = input.replace(/[^\d]/g, "");
@@ -30,8 +34,7 @@ export const normalizePhone = (raw) => {
 
 export const getPhoneVariants = (raw) => {
   const input = String(raw || "").trim();
-  if (!input) return [];
-  if (input.includes("@")) return [input.toLowerCase()];
+  if (!isValidPhone(input)) return [];
 
   const digits = input.replace(/[^\d]/g, "");
   const set = new Set();

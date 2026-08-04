@@ -93,8 +93,8 @@ export default function EditProfileSection({ profile, loading, saving, error, up
 
     useEffect(() => {
         setNickname(String(extras.nickname || "").trim());
-        setAvatarDataUrl(String(extras.avatarDataUrl || "").trim());
-    }, [extras.avatarDataUrl, extras.nickname, phone]);
+        setAvatarDataUrl(String(profile?.avatarUrl || extras.avatarDataUrl || "").trim());
+    }, [extras.avatarDataUrl, extras.nickname, profile?.avatarUrl, phone]);
 
     const onPickAvatar = async (event) => {
         const file = event.target.files?.[0];
@@ -108,8 +108,10 @@ export default function EditProfileSection({ profile, loading, saving, error, up
             const rawDataUrl = await readFileAsDataUrl(file);
             const dataUrl = await compressAvatarDataUrl(rawDataUrl);
             setLocalError("");
-            setAvatarDataUrl(String(dataUrl || ""));
-            persistExtras({ avatarDataUrl: String(dataUrl || "") });
+            const nextAvatar = String(dataUrl || "");
+            setAvatarDataUrl(nextAvatar);
+            persistExtras({ avatarDataUrl: nextAvatar });
+            await updateProfile({ name, email, avatarUrl: nextAvatar });
         } catch {
             setLocalError("Could not read image. Please try another file.");
         } finally {
@@ -121,7 +123,7 @@ export default function EditProfileSection({ profile, loading, saving, error, up
         setLocalError("");
         setError("");
         try {
-            await updateProfile({ name, email });
+            await updateProfile({ name, email, avatarUrl: avatarDataUrl });
             if (phone) {
                 setCustomerProfileExtras(phone, { nickname, avatarDataUrl });
             }
@@ -170,9 +172,10 @@ export default function EditProfileSection({ profile, loading, saving, error, up
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => {
+                                    onClick={async () => {
                                         setAvatarDataUrl("");
                                         persistExtras({ avatarDataUrl: "" });
+                                        await updateProfile({ name, email, avatarUrl: "" });
                                     }}
                                     className="theme-soft-button inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold"
                                 >

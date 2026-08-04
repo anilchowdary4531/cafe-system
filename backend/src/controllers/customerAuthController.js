@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { normalizePhone, getPhoneVariants } from "../services/phoneService.js";
+import { normalizePhone, getPhoneVariants, isValidPhone } from "../services/phoneService.js";
 
 export const buildCustomerAuthController = ({ prisma, app }) => {
   const registerCustomer = async (req, reply) => {
@@ -16,9 +16,8 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
       const name = String(body.name || body.d || "").trim();
       const email = String(body.email || (String(body.phone || body.b || "").includes("@") ? (body.phone || body.b) : "") || "").trim().toLowerCase();
 
-      // Use email as fallback for phone if phone is missing
       const rawPhone = String(body.phone || body.b || body.identifier || "").trim();
-      const phone = normalizePhone(rawPhone || email);
+      const phone = isValidPhone(rawPhone) ? normalizePhone(rawPhone) : null;
 
       console.log("DEBUG [registerCustomer] values:", { username, passwordLength: password.length, name, email, rawPhone, phone });
 
@@ -34,7 +33,7 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         console.log("FAILED HERE -> password invalid/too short");
         return reply.code(400).send({ message: "Password must be at least 6 characters" });
       }
-      if (!phone) {
+      if (!phone && !email) {
         console.log("FAILED HERE -> phone/email missing");
         return reply.code(400).send({ message: "Identifier (Phone or Email) is required" });
       }
@@ -224,11 +223,12 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
     console.log("==================================");
     try {
       const body = req.body || {};
-      const { googleId, email, name, picture, credential, idToken } = body;
+      const { googleId, email, name, picture, photoUrl, avatarUrl, credential, idToken } = body;
 
       const userEmail = String(email || "").trim().toLowerCase();
       const userGoogleId = String(googleId || "").trim();
       const userName = String(name || "").trim();
+      const userPicture = String(picture || photoUrl || avatarUrl || "").trim() || null;
 
       if (!userEmail && !userGoogleId && !credential && !idToken) {
         return reply.code(400).send({ message: "Google credentials or payload are required" });
@@ -255,7 +255,7 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
           }
         });
 
-        // 3. If found, link Google ID and update email/name
+        // 3. If found, link Google ID and update email/name/avatar
         if (account) {
           try {
             account = await prisma.customerAccount.update({
@@ -264,6 +264,7 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
                 googleId: userGoogleId || account.googleId || null,
                 email: userEmail || account.email || null,
                 name: account.name || userName || null,
+                avatarUrl: account.avatarUrl || userPicture || null,
               },
             });
           } catch (updateErr) {
@@ -282,13 +283,15 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         }
 
         try {
+          const userPhone = isValidPhone(body.phone) ? normalizePhone(body.phone) : null;
           account = await prisma.customerAccount.create({
             data: {
               googleId: userGoogleId || null,
               email: userEmail || null,
-              phone: userEmail || `google_${userGoogleId || Date.now()}`,
+              phone: userPhone,
               username,
               name: userName || "Google User",
+              avatarUrl: userPicture || null,
             },
           });
         } catch (createErr) {

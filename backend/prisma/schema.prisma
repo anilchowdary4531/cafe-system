@@ -308,6 +308,7 @@ model CustomerAccount {
   googleId String? @unique @map("google_id")
   name  String?
   email String?
+  avatarUrl String? @map("avatar_url")
 
   addresses CustomerAddress[]
 
