@@ -216,12 +216,16 @@ fun HomeScreen(
                                 item {
                                     Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
                                     TiffzyFooter(
-                                        onAboutUsClick = { onNavigateToWeb("About Us", "https://tiffzy.com/about") },
-                                        onContactUsClick = { onNavigateToWeb("Contact Us", "https://tiffzy.com/contact") },
-                                        onHelpCenterClick = { onNavigateToWeb("Help Center", "https://tiffzy.com/help") },
+                                        onAboutUsClick = { onNavigateToWeb("About Us", "https://tiffzy.com/about-us") },
+                                        onContactUsClick = { onNavigateToWeb("Contact Us", "https://tiffzy.com/contact-us") },
+                                        onHelpCenterClick = { onNavigateToWeb("Help Center", "https://tiffzy.com/help-center") },
                                         onTermsClick = { onNavigateToWeb("Terms", "https://tiffzy.com/terms") },
                                         onPrivacyClick = { onNavigateToWeb("Privacy", "https://tiffzy.com/privacy") },
-                                        onRefundPolicyClick = { onNavigateToWeb("Refund Policy", "https://tiffzy.com/refund") }
+                                        onRefundPolicyClick = { onNavigateToWeb("Refund Policy", "https://tiffzy.com/refund-policy") },
+                                        onQrOrderingClick = { onNavigateToWeb("QR Ordering", "https://tiffzy.com/qr-ordering") },
+                                        onPosDashboardClick = { onNavigateToWeb("POS Dashboard", "https://tiffzy.com/pos-dashboard") },
+                                        onAnalyticsClick = { onNavigateToWeb("Analytics", "https://tiffzy.com/analytics") },
+                                        onInventoryClick = { onNavigateToWeb("Inventory", "https://tiffzy.com/inventory") }
                                     )
                                 }
                             }

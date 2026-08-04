@@ -22,7 +22,11 @@ fun TiffzyFooter(
     onTermsClick: () -> Unit = {},
     onPrivacyClick: () -> Unit = {},
     onRefundPolicyClick: () -> Unit = {},
-    onDeleteAccountClick: () -> Unit = {}
+    onDeleteAccountClick: () -> Unit = {},
+    onQrOrderingClick: () -> Unit = {},
+    onPosDashboardClick: () -> Unit = {},
+    onAnalyticsClick: () -> Unit = {},
+    onInventoryClick: () -> Unit = {}
 ) {
     // Colors adapted to MaterialTheme (Dark/Light support)
     val footerBackgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
@@ -56,10 +60,10 @@ fun TiffzyFooter(
             }
             Column(modifier = Modifier.weight(1f)) {
                 FooterHeader("Products", headerColor)
-                FooterLink("QR Ordering", textColor)
-                FooterLink("POS Dashboard", textColor)
-                FooterLink("Analytics", textColor)
-                FooterLink("Inventory", textColor)
+                FooterLink("QR Ordering", textColor, onQrOrderingClick)
+                FooterLink("POS Dashboard", textColor, onPosDashboardClick)
+                FooterLink("Analytics", textColor, onAnalyticsClick)
+                FooterLink("Inventory", textColor, onInventoryClick)
             }
         }
 
