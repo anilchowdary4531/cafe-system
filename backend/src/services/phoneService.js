@@ -8,6 +8,27 @@ export const isValidPhone = (raw) => {
   return digits.length >= 7;
 };
 
+export const isValidMobilePhone = (raw) => {
+  const input = String(raw || "").trim();
+  if (!input) return false;
+  if (input.includes("@") || input.startsWith("google_") || /[a-zA-Z]/.test(input)) {
+    return false;
+  }
+  const digits = input.replace(/[^\d]/g, "");
+  return digits.length >= 7;
+};
+
+export const isValidName = (raw) => {
+  const name = String(raw || "").trim();
+  if (!name) return false;
+  const lower = name.toLowerCase();
+  if (lower === "customer" || lower === "google user" || lower === "user" || lower === "not set") {
+    return false;
+  }
+  return name.length >= 2;
+};
+
+
 export const normalizePhone = (raw) => {
   const input = String(raw || "").trim();
   if (!input) return "";

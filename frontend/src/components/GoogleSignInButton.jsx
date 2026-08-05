@@ -50,6 +50,7 @@ export default function GoogleSignInButton({ onSuccessRedirect, className = "" }
         name: customer?.name || "",
         email: customer?.email || "",
         phone: customer?.phone || "",
+        avatarUrl: customer?.avatarUrl || null,
         token: res.data?.token || "",
         verified: true,
       });

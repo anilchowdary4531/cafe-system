@@ -35,6 +35,8 @@ export default function GoogleCompleteProfileModal({
             ...initialData,
             name: trimmedName,
             phone: cleanedPhone,
+            picture: initialData.picture || initialData.avatarUrl || null,
+            avatarUrl: initialData.picture || initialData.avatarUrl || null,
         });
     };
 

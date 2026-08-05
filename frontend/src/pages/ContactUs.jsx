@@ -67,7 +67,7 @@ export default function ContactUs() {
                                     <div>
                                         <p className="font-bold text-gray-900 dark:text-white">Legal Business Name</p>
                                         <p className="text-gray-600 dark:text-gray-300">SURVETRA SERVICES</p>
-                                        <p className="text-xs text-amber-600 dark:text-amber-400">Brand: Tiffzy</p>
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold">Brand: Tiffzy | GSTIN: 37FJMPS3S3117Q1ZB</p>
                                     </div>
                                 </div>
 
@@ -75,7 +75,7 @@ export default function ContactUs() {
                                     <Mail className="text-amber-500 shrink-0 mt-1" size={18} />
                                     <div>
                                         <p className="font-bold text-gray-900 dark:text-white">Customer Support Email</p>
-                                        <p className="text-gray-600 dark:text-gray-300">support@tiffzy.com</p>
+                                        <p className="text-gray-600 dark:text-gray-300">jekkaramesh@survetra.com</p>
                                     </div>
                                 </div>
 
@@ -83,7 +83,7 @@ export default function ContactUs() {
                                     <Phone className="text-amber-500 shrink-0 mt-1" size={18} />
                                     <div>
                                         <p className="font-bold text-gray-900 dark:text-white">Phone Number</p>
-                                        <p className="text-gray-600 dark:text-gray-300">+91 91779 39713</p>
+                                        <p className="text-gray-600 dark:text-gray-300">+91 91777 64632</p>
                                     </div>
                                 </div>
 

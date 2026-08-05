@@ -71,8 +71,9 @@ export default function RefundPolicy() {
                         <h3 className="font-bold text-sm text-gray-900 dark:text-white">Refund Support & Queries</h3>
                         <p>To request a refund or check the status of a pending refund, contact our support desk:</p>
                         <p><strong className="text-gray-900 dark:text-gray-200">Legal Entity:</strong> SURVETRA SERVICES (Tiffzy)</p>
-                        <p><strong className="text-gray-900 dark:text-gray-200">Refund Email:</strong> support@tiffzy.com</p>
-                        <p><strong className="text-gray-900 dark:text-gray-200">Support Phone:</strong> +91 91779 39713</p>
+                        <p><strong className="text-gray-900 dark:text-gray-200">GSTIN:</strong> 37FJMPS3S3117Q1ZB</p>
+                        <p><strong className="text-gray-900 dark:text-gray-200">Refund Email:</strong> jekkaramesh@survetra.com</p>
+                        <p><strong className="text-gray-900 dark:text-gray-200">Support Phone:</strong> +91 91777 64632</p>
                     </section>
                 </div>
             </main>

@@ -15,11 +15,11 @@ const faqs = [
     },
     {
         q: "How do I request a refund for an order?",
-        a: "If an order was debited but failed to prepare or fulfill, contact support@tiffzy.com or call +91 91779 39713 with your order ID. Approved refunds are credited to your original payment method within 5-7 business days.",
+        a: "If an order was debited but failed to prepare or fulfill, contact jekkaramesh@survetra.com or call +91 91777 64632 with your order ID. Approved refunds are credited to your original payment method within 5-7 business days.",
     },
     {
         q: "How do I request deletion of my account?",
-        a: "In compliance with Google Play Policy, you can request account deletion immediately via our Delete Account page (/delete-account) or by emailing support@tiffzy.com.",
+        a: "In compliance with Google Play Policy, you can request account deletion immediately via our Delete Account page (/delete-account) or by emailing jekkaramesh@survetra.com.",
     },
     {
         q: "Is payment information stored securely?",
@@ -91,14 +91,14 @@ export default function HelpCenter() {
                         <Mail className="text-amber-500" size={24} />
                         <h3 className="font-bold text-base text-gray-900 dark:text-white">Email Support</h3>
                         <p className="text-xs text-gray-600 dark:text-gray-400">Email our support team for order inquiries or partner support.</p>
-                        <p className="font-semibold text-xs text-amber-600 dark:text-amber-400">support@tiffzy.com</p>
+                        <p className="font-semibold text-xs text-amber-600 dark:text-amber-400">jekkaramesh@survetra.com</p>
                     </div>
 
                     <div className="rounded-3xl border border-[var(--app-border,rgba(0,0,0,0.1))] bg-white dark:bg-slate-900 p-6 space-y-3 shadow-sm">
                         <Phone className="text-amber-500" size={24} />
                         <h3 className="font-bold text-base text-gray-900 dark:text-white">Phone Support</h3>
                         <p className="text-xs text-gray-600 dark:text-gray-400">Call our desk Mon-Sat 9am-7pm IST for urgent assistance.</p>
-                        <p className="font-semibold text-xs text-amber-600 dark:text-amber-400">+91 91779 39713</p>
+                        <p className="font-semibold text-xs text-amber-600 dark:text-amber-400">+91 91777 64632</p>
                     </div>
 
                     <div className="rounded-3xl border border-[var(--app-border,rgba(0,0,0,0.1))] bg-white dark:bg-slate-900 p-6 space-y-3 shadow-sm">

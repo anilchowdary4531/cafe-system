@@ -89,9 +89,10 @@ export default function AboutUs() {
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
                             <p><strong className="text-gray-900 dark:text-gray-200">Legal Business Name:</strong> SURVETRA SERVICES</p>
+                            <p><strong className="text-gray-900 dark:text-gray-200">GSTIN:</strong> 37FJMPS3S3117Q1ZB</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Brand Name:</strong> Tiffzy</p>
-                            <p><strong className="text-gray-900 dark:text-gray-200">Official Email:</strong> support@tiffzy.com</p>
-                            <p><strong className="text-gray-900 dark:text-gray-200">Official Phone:</strong> +91 91779 39713</p>
+                            <p><strong className="text-gray-900 dark:text-gray-200">Official Email:</strong> jekkaramesh@survetra.com</p>
+                            <p><strong className="text-gray-900 dark:text-gray-200">Official Phone:</strong> +91 91777 64632</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Official Website:</strong> https://www.tiffzy.com</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Country:</strong> India</p>
                         </div>

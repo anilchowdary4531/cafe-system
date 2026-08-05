@@ -85,8 +85,9 @@ export default function Terms() {
                     <section className="rounded-3xl border border-[var(--app-border,rgba(0,0,0,0.1))] bg-white dark:bg-slate-900 p-6 space-y-2 text-xs">
                         <h3 className="font-bold text-sm text-gray-900 dark:text-white">Contact & Entity Details</h3>
                         <p><strong className="text-gray-900 dark:text-gray-200">Legal Entity:</strong> SURVETRA SERVICES</p>
+                        <p><strong className="text-gray-900 dark:text-gray-200">GSTIN:</strong> 37FJMPS3S3117Q1ZB</p>
                         <p><strong className="text-gray-900 dark:text-gray-200">Brand Name:</strong> Tiffzy</p>
-                        <p><strong className="text-gray-900 dark:text-gray-200">Email:</strong> support@tiffzy.com | Phone: +91 91779 39713</p>
+                        <p><strong className="text-gray-900 dark:text-gray-200">Email:</strong> jekkaramesh@survetra.com | Phone: +91 91777 64632</p>
                         <p><strong className="text-gray-900 dark:text-gray-200">Website:</strong> https://www.tiffzy.com</p>
                     </section>
                 </div>

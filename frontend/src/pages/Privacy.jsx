@@ -80,7 +80,7 @@ export default function Privacy() {
                         <div className="rounded-2xl bg-rose-500/10 p-4 border border-rose-500/20 text-rose-800 dark:text-rose-300 space-y-2">
                             <p className="font-bold text-sm">How to Request Account Deletion:</p>
                             <p className="text-xs">
-                                You can delete your account instantly through our web portal by visiting our dedicated <Link to="/delete-account" className="underline font-bold">Account Deletion Page</Link> or by sending an email request to <strong>support@tiffzy.com</strong>. Upon verification, your profile, authentication records, and personal addresses will be permanently removed within 7 business days.
+                                You can delete your account instantly through our web portal by visiting our dedicated <Link to="/delete-account" className="underline font-bold">Account Deletion Page</Link> or by sending an email request to <strong>jekkaramesh@survetra.com</strong>. Upon verification, your profile, authentication records, and personal addresses will be permanently removed within 7 business days.
                             </p>
                         </div>
                     </section>
@@ -104,9 +104,10 @@ export default function Privacy() {
                         <p>If you have any questions, privacy concerns, or data requests, please contact our Privacy Officer:</p>
                         <div className="text-xs space-y-1">
                             <p><strong className="text-gray-900 dark:text-gray-200">Legal Entity:</strong> SURVETRA SERVICES</p>
+                            <p><strong className="text-gray-900 dark:text-gray-200">GSTIN:</strong> 37FJMPS3S3117Q1ZB</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Brand:</strong> Tiffzy</p>
-                            <p><strong className="text-gray-900 dark:text-gray-200">Privacy Contact Email:</strong> support@tiffzy.com</p>
-                            <p><strong className="text-gray-900 dark:text-gray-200">Phone:</strong> +91 91779 39713</p>
+                            <p><strong className="text-gray-900 dark:text-gray-200">Privacy Contact Email:</strong> jekkaramesh@survetra.com</p>
+                            <p><strong className="text-gray-900 dark:text-gray-200">Phone:</strong> +91 91777 64632</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Official Website:</strong> https://www.tiffzy.com</p>
                         </div>
                     </section>

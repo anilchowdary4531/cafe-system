@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { normalizePhone, getPhoneVariants, isValidPhone } from "../services/phoneService.js";
+import { normalizePhone, getPhoneVariants, isValidPhone, isValidMobilePhone, isValidName } from "../services/phoneService.js";
 
 export const buildCustomerAuthController = ({ prisma, app }) => {
   const registerCustomer = async (req, reply) => {
@@ -256,34 +256,34 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         });
       }
 
-      const inputPhone = isValidPhone(body.phone) ? normalizePhone(body.phone) : null;
-      const inputName = userName || (body.name ? String(body.name).trim() : "");
+      const inputPhone = isValidMobilePhone(body.phone) ? normalizePhone(body.phone) : null;
+      const inputName = isValidName(userName) ? userName : (isValidName(body.name) ? String(body.name).trim() : "");
 
-      // 3. If account does not exist or has no phone/name, and no valid inputPhone provided, prompt user for info
-      const hasValidAccountPhone = account && isValidPhone(account.phone);
-      const hasValidAccountName = account && account.name && account.name.trim() !== "Google User";
+      // 3. If account does not exist or has no valid 10-digit mobile phone or name, and no valid inputPhone provided, prompt user for info
+      const hasValidAccountPhone = account && isValidMobilePhone(account.phone);
+      const hasValidAccountName = account && isValidName(account.name);
 
       if ((!account || !hasValidAccountPhone || !hasValidAccountName) && !inputPhone) {
         return reply.send({
           requiresInfo: true,
           googleId: userGoogleId || account?.googleId || null,
           email: userEmail || account?.email || null,
-          name: inputName || account?.name || "",
+          name: inputName || (isValidName(account?.name) ? account.name : ""),
           picture: userPicture || account?.avatarUrl || null,
         });
       }
 
-      // 4. Update existing account or create new account with full name and phone number
+      // 4. Update existing account or create new account with full name, phone number, and avatar
       if (account) {
         try {
           const basicData = {
             email: userEmail || account.email || null,
-            phone: inputPhone || account.phone,
-            name: (inputName && inputName !== "Google User") ? inputName : account.name,
+            phone: inputPhone || (isValidMobilePhone(account.phone) ? account.phone : null),
+            name: inputName || (isValidName(account.name) ? account.name : "Customer"),
           };
 
           try {
-            // Try updating everything
+            // Try updating everything including avatarUrl
             account = await prisma.customerAccount.update({
               where: { id: account.id },
               data: {

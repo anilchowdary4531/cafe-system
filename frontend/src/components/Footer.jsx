@@ -125,12 +125,13 @@ export default function Footer({
                     </div>
 
                     <div>
-                        <h3 className="mb-4 text-sm font-bold uppercase tracking-wider text-gray-900 dark:text-white">Developer Info</h3>
+                        <h3 className="mb-4 text-sm font-bold uppercase tracking-wider text-gray-900 dark:text-white">Developer & Merchant Info</h3>
                         <div className="space-y-2 text-xs text-gray-600 dark:text-gray-400">
                             <p><strong className="text-gray-900 dark:text-gray-200">Legal Entity:</strong> SURVETRA SERVICES</p>
+                            <p><strong className="text-gray-900 dark:text-gray-200">GSTIN:</strong> 37FJMPS3S3117Q1ZB</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Brand Name:</strong> Tiffzy</p>
-                            <p><strong className="text-gray-900 dark:text-gray-200">Email:</strong> support@tiffzy.com</p>
-                            <p><strong className="text-gray-900 dark:text-gray-200">Phone:</strong> +91 91779 39713</p>
+                            <p><strong className="text-gray-900 dark:text-gray-200">Email:</strong> jekkaramesh@survetra.com</p>
+                            <p><strong className="text-gray-900 dark:text-gray-200">Phone:</strong> +91 91777 64632</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Website:</strong> https://www.tiffzy.com</p>
                         </div>
                     </div>

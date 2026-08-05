@@ -33,7 +33,8 @@ export default function useCustomerProfile({ enabled = true } = {}) {
                     !prev ||
                     String(prev.phone || "") !== String(next.phone || "") ||
                     String(prev.name || "") !== String(next.name || "") ||
-                    String(prev.email || "") !== String(next.email || "");
+                    String(prev.email || "") !== String(next.email || "") ||
+                    String(prev.avatarUrl || "") !== String(next.avatarUrl || "");
                 if (changed) updateCustomer(next);
             }
             return next;

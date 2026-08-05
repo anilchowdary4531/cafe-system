@@ -68,8 +68,9 @@ export default function ShippingPolicy() {
                         <h3 className="font-bold text-sm text-gray-900 dark:text-white">Delivery Support</h3>
                         <p>If you experience delays or issues with order fulfillment, contact customer support:</p>
                         <p><strong className="text-gray-900 dark:text-gray-200">Legal Entity:</strong> SURVETRA SERVICES (Tiffzy)</p>
-                        <p><strong className="text-gray-900 dark:text-gray-200">Support Email:</strong> support@tiffzy.com</p>
-                        <p><strong className="text-gray-900 dark:text-gray-200">Phone:</strong> +91 91779 39713</p>
+                        <p><strong className="text-gray-900 dark:text-gray-200">GSTIN:</strong> 37FJMPS3S3117Q1ZB</p>
+                        <p><strong className="text-gray-900 dark:text-gray-200">Support Email:</strong> jekkaramesh@survetra.com</p>
+                        <p><strong className="text-gray-900 dark:text-gray-200">Phone:</strong> +91 91777 64632</p>
                     </section>
                 </div>
             </main>

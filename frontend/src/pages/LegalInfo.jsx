@@ -68,12 +68,12 @@ export default function LegalInfo() {
 
                             <div className="space-y-1">
                                 <span className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Support Email</span>
-                                <p className="font-semibold text-gray-800 dark:text-gray-200">support@tiffzy.com</p>
+                                <p className="font-semibold text-gray-800 dark:text-gray-200">jekkaramesh@survetra.com</p>
                             </div>
 
                             <div className="space-y-1">
                                 <span className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Customer Support Phone</span>
-                                <p className="font-semibold text-gray-800 dark:text-gray-200">+91 91779 39713</p>
+                                <p className="font-semibold text-gray-800 dark:text-gray-200">+91 91777 64632</p>
                             </div>
 
                             <div className="space-y-1 md:col-span-2">
@@ -87,7 +87,7 @@ export default function LegalInfo() {
 
                             <div className="space-y-1">
                                 <span className="text-xs uppercase tracking-wider text-gray-400 font-semibold">GSTIN (Tax ID)</span>
-                                <p className="font-mono font-bold text-gray-700 dark:text-gray-300">36XXXXX0000X1Z5 (Provided upon invoice)</p>
+                                <p className="font-mono font-bold text-amber-600 dark:text-amber-400">37FJMPS3S3117Q1ZB</p>
                             </div>
 
                             <div className="space-y-1">
