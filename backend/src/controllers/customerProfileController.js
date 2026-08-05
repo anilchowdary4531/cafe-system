@@ -10,7 +10,24 @@ export const buildCustomerProfileController = ({ prisma }) => {
       const phone = await requireCustomerPhoneFromJwt(req);
       if (!phone) return reply.code(401).send({ message: "Unauthorized" });
 
-      const account = await getCustomerAccountByPhone({ prisma, phone });
+      let account = await getCustomerAccountByPhone({ prisma, phone });
+
+      // Fallback search if findUnique failed (handles phone variant mismatches)
+      if (!account) {
+        const normalized = normalizePhone(phone);
+        const variants = getPhoneVariants(phone);
+        account = await prisma.customerAccount.findFirst({
+          where: {
+            OR: [
+              { phone: normalized },
+              { email: normalized },
+              { phone: { in: variants } },
+              { username: normalized }
+            ]
+          }
+        });
+      }
+
       if (!account) return reply.code(404).send({ message: "Customer not found" });
 
       const slug = req.query.slug || "";

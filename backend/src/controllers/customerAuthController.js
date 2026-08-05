@@ -276,27 +276,27 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
       // 4. Update existing account or create new account with full name and phone number
       if (account) {
         try {
-          const updateData = {
+          const basicData = {
             email: userEmail || account.email || null,
             phone: inputPhone || account.phone,
             name: (inputName && inputName !== "Google User") ? inputName : account.name,
           };
 
-          // Try to update with Google fields if they exist in the schema
           try {
-            await prisma.customerAccount.update({
+            // Try updating everything
+            account = await prisma.customerAccount.update({
               where: { id: account.id },
               data: {
-                ...updateData,
+                ...basicData,
                 googleId: userGoogleId || account.googleId || null,
                 avatarUrl: userPicture || account.avatarUrl || null,
               }
             });
           } catch (dbErr) {
-            // Fallback: If DB columns don't exist, update only basic info
+            // If it fails, the database structure is old. Update only basic info.
             account = await prisma.customerAccount.update({
               where: { id: account.id },
-              data: updateData,
+              data: basicData
             });
           }
         } catch (updateErr) {
@@ -310,7 +310,7 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
           username = `${baseUsername}_${counter++}`;
         }
 
-        const baseCreateData = {
+        const basicCreateData = {
           email: userEmail || null,
           phone: inputPhone,
           username,
@@ -318,9 +318,10 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
         };
 
         try {
+          // Try full create
           account = await prisma.customerAccount.create({
             data: {
-              ...baseCreateData,
+              ...basicCreateData,
               googleId: userGoogleId || null,
               avatarUrl: userPicture || null,
             },
@@ -337,21 +338,13 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
               },
             });
           } else {
-            // Fallback: If avatarUrl causes Prisma Client validation error on server, retry without avatarUrl
+            // Database is likely old. Create with basic info.
             try {
               account = await prisma.customerAccount.create({
-                data: {
-                  ...baseCreateData,
-                  googleId: userGoogleId || null,
-                },
+                data: basicCreateData
               });
             } catch (fallbackErr) {
-              try {
-                account = await prisma.customerAccount.create({
-                  data: baseCreateData,
-                });
-              } catch (finalErr) {
-                if (finalErr.code === "P2002") {
+               if (fallbackErr.code === "P2002") {
                   account = await prisma.customerAccount.findFirst({
                     where: {
                       OR: [
@@ -360,10 +353,9 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
                       ],
                     },
                   });
-                } else {
-                  throw finalErr;
-                }
-              }
+               } else {
+                 throw fallbackErr;
+               }
             }
           }
         }

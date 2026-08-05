@@ -1,7 +1,8 @@
 export const isValidPhone = (raw) => {
   const input = String(raw || "").trim();
   if (!input) return false;
-  if (input.includes("@") || input.startsWith("google_")) return false;
+  // Emails are "valid" identifiers, but not valid "physical phone numbers"
+  if (input.includes("@") || input.startsWith("google_")) return true;
   if (/[a-zA-Z]/.test(input)) return false;
   const digits = input.replace(/[^\d]/g, "");
   return digits.length >= 7;
@@ -9,10 +10,16 @@ export const isValidPhone = (raw) => {
 
 export const normalizePhone = (raw) => {
   const input = String(raw || "").trim();
-  if (!isValidPhone(input)) return "";
+  if (!input) return "";
+
+  // If it's an email or special identifier, don't try to strip digits
+  if (input.includes("@") || input.startsWith("google_")) {
+    return input.toLowerCase();
+  }
 
   // Keep digits only
   let digits = input.replace(/[^\d]/g, "");
+  if (!digits) return "";
 
   // Fix double 91 prefix (e.g. 919177764632 -> 9177764632)
   if (digits.length === 12 && digits.startsWith("9191")) {
