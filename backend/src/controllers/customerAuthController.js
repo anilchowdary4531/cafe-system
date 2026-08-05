@@ -270,6 +270,13 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
           email: userEmail || account?.email || null,
           name: inputName || (isValidName(account?.name) ? account.name : ""),
           picture: userPicture || account?.avatarUrl || null,
+          customer: {
+            id: account?.id || null,
+            name: inputName || (isValidName(account?.name) ? account.name : "Customer"),
+            email: userEmail || account?.email || "",
+            phone: account?.phone || "",
+            avatarUrl: userPicture || account?.avatarUrl || null,
+          },
         });
       }
 
