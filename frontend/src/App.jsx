@@ -9,9 +9,11 @@ import Landing from "./pages/Landing";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import RefundPolicy from "./pages/RefundPolicy";
+import ShippingPolicy from "./pages/ShippingPolicy";
 import ContactUs from "./pages/ContactUs";
 import AboutUs from "./pages/AboutUs";
 import HelpCenter from "./pages/HelpCenter";
+import LegalInfo from "./pages/LegalInfo";
 import Pricing from "./pages/Pricing";
 import QROrdering from "./pages/QROrdering";
 import POSDashboardPage from "./pages/POSDashboardPage";
@@ -79,16 +81,28 @@ export default function App() {
                     <Routes>
 
                     {/* ================================= */}
-                    {/* PUBLIC CUSTOMER ROUTES */}
+                    {/* PUBLIC CUSTOMER & LEGAL ROUTES */}
                     {/* ================================= */}
 
                     <Route path="/" element={<Landing />} />
                     <Route path="/terms" element={<Terms />} />
+                    <Route path="/terms-and-conditions" element={<Terms />} />
                     <Route path="/privacy" element={<Privacy />} />
+                    <Route path="/privacy-policy" element={<Privacy />} />
                     <Route path="/refund-policy" element={<RefundPolicy />} />
+                    <Route path="/cancellation-policy" element={<RefundPolicy />} />
+                    <Route path="/shipping-policy" element={<ShippingPolicy />} />
+                    <Route path="/delivery-policy" element={<ShippingPolicy />} />
                     <Route path="/contact-us" element={<ContactUs />} />
+                    <Route path="/contact" element={<ContactUs />} />
                     <Route path="/about-us" element={<AboutUs />} />
+                    <Route path="/about" element={<AboutUs />} />
                     <Route path="/help-center" element={<HelpCenter />} />
+                    <Route path="/support" element={<HelpCenter />} />
+                    <Route path="/legal" element={<LegalInfo />} />
+                    <Route path="/legal-information" element={<LegalInfo />} />
+                    <Route path="/business-disclosure" element={<LegalInfo />} />
+                    <Route path="/delete-account" element={<DeleteAccount />} />
                     <Route path="/pricing" element={<Pricing />} />
                     <Route path="/qr-ordering" element={<QROrdering />} />
                     <Route path="/pos-dashboard" element={<POSDashboardPage />} />
