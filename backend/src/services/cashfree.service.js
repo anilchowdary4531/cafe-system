@@ -82,3 +82,62 @@ export const createCashfreePaymentSession = async ({
     throw new Error(errorMsg);
   }
 };
+
+/**
+ * Directly query Cashfree PG API to verify payment status of an order
+ */
+export const verifyCashfreeOrderSession = async ({ orderId }) => {
+  const cashfree = getCashfreeInstance();
+  const formattedOrderId = String(orderId || "").trim();
+
+  if (!formattedOrderId) {
+    throw new Error("orderId is required for Cashfree verification");
+  }
+
+  try {
+    // 1. Fetch Order Details from Cashfree
+    const orderResponse = await cashfree.PGFetchOrder(CASHFREE_API_VERSION, formattedOrderId);
+    const orderData = orderResponse?.data || orderResponse;
+
+    const orderStatus = String(orderData?.order_status || "UNKNOWN").toUpperCase();
+    const orderAmount = Number(orderData?.order_amount || 0);
+    const cfOrderId = orderData?.cf_order_id || null;
+
+    let paymentId = null;
+    let paymentMethod = null;
+    let txMsg = null;
+
+    // 2. Optionally fetch payment transactions for this order
+    try {
+      const paymentsResponse = await cashfree.PGOrderFetchPayments(CASHFREE_API_VERSION, formattedOrderId);
+      const payments = paymentsResponse?.data || paymentsResponse;
+      if (Array.isArray(payments) && payments.length > 0) {
+        const latestPayment = payments[0];
+        paymentId = latestPayment?.cf_payment_id ? String(latestPayment.cf_payment_id) : null;
+        paymentMethod = latestPayment?.payment_group || latestPayment?.payment_method || null;
+        txMsg = latestPayment?.payment_message || null;
+      }
+    } catch (payErr) {
+      console.warn("[CashfreeService] Warning fetching payments for order:", payErr.message);
+    }
+
+    const isPaid = orderStatus === "PAID" || orderStatus === "SUCCESS";
+
+    return {
+      verified: true,
+      isPaid,
+      orderStatus, // PAID, ACTIVE, EXPIRED, FAILED, CANCELLED
+      orderAmount,
+      orderId: formattedOrderId,
+      cfOrderId,
+      paymentId,
+      paymentMethod,
+      txMsg: txMsg || (isPaid ? "Payment Verified Successfully" : `Order status: ${orderStatus}`),
+    };
+  } catch (err) {
+    const errorMsg = err?.response?.data?.message || err?.message || "Failed to verify order with Cashfree";
+    console.error("[CashfreeService] Error verifying order:", errorMsg);
+    throw new Error(errorMsg);
+  }
+};
+
