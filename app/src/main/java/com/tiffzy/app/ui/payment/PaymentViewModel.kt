@@ -102,32 +102,56 @@ class PaymentViewModel(
         paymentId: String? = null,
         message: String? = null
     ) {
+        // Never trust client callback alone: Always verify payment directly with Cashfree backend
+        verifyPaymentWithBackend(
+            orderId = orderId,
+            fallbackStatus = resultStatus,
+            message = message
+        )
+    }
+
+    fun verifyPaymentWithBackend(
+        orderId: String,
+        fallbackStatus: PaymentResultStatus = PaymentResultStatus.LOADING,
+        message: String? = null
+    ) {
         _uiState.update {
             it.copy(
-                status = resultStatus,
-                errorMessage = if (resultStatus == PaymentResultStatus.FAILED) message else null,
-                txMsg = message
+                status = PaymentResultStatus.LOADING,
+                txMsg = "Verifying payment with Cashfree..."
             )
         }
 
-        // Send payment status update to backend asynchronously
         viewModelScope.launch {
-            val statusString = when (resultStatus) {
-                PaymentResultStatus.SUCCESS -> "SUCCESS"
-                PaymentResultStatus.FAILED -> "FAILED"
-                PaymentResultStatus.CANCELLED -> "CANCELLED"
-                PaymentResultStatus.PENDING -> "PENDING"
-                else -> "UNKNOWN"
+            val verifyRequest = CashfreeVerifyOrderRequest(orderId = orderId)
+            val result = paymentRepository.verifyCashfreeOrder(verifyRequest)
+
+            result.onSuccess { response ->
+                val finalStatus = when (response.status) {
+                    "SUCCESS" -> PaymentResultStatus.SUCCESS
+                    "FAILED" -> PaymentResultStatus.FAILED
+                    "CANCELLED" -> PaymentResultStatus.CANCELLED
+                    "PENDING" -> PaymentResultStatus.PENDING
+                    else -> if (response.verified) PaymentResultStatus.SUCCESS else fallbackStatus
+                }
+
+                _uiState.update {
+                    it.copy(
+                        status = finalStatus,
+                        errorMessage = if (!response.verified && finalStatus == PaymentResultStatus.FAILED) response.message else null,
+                        txMsg = response.message ?: if (response.verified) "Payment Verified Successfully" else "Verification completed"
+                    )
+                }
+            }.onFailure { exception ->
+                // Fallback to client callback status if network fails
+                _uiState.update {
+                    it.copy(
+                        status = fallbackStatus,
+                        errorMessage = exception.message ?: message ?: "Verification failed",
+                        txMsg = message
+                    )
+                }
             }
-
-            val statusRequest = PaymentStatusRequest(
-                orderId = orderId,
-                paymentId = paymentId,
-                status = statusString,
-                txMsg = message
-            )
-
-            paymentRepository.sendPaymentStatus(statusRequest)
         }
     }
 

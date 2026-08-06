@@ -112,4 +112,7 @@ interface ApiService {
 
     @POST("payments/status")
     suspend fun sendPaymentStatus(@Body request: PaymentStatusRequest): PaymentStatusResponse
+
+    @POST("api/payments/verify")
+    suspend fun verifyCashfreeOrder(@Body request: CashfreeVerifyOrderRequest): CashfreeVerifyOrderResponse
 }

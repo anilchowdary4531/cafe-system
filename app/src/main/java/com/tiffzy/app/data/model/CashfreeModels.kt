@@ -31,6 +31,19 @@ data class PaymentStatusResponse(
     val message: String? = null
 )
 
+data class CashfreeVerifyOrderRequest(
+    val orderId: String
+)
+
+data class CashfreeVerifyOrderResponse(
+    val verified: Boolean = false,
+    val status: String = "PENDING",
+    val message: String? = null,
+    val orderId: String? = null,
+    val amount: Double? = null,
+    val invoiceUrl: String? = null
+)
+
 enum class PaymentResultStatus {
     IDLE,
     LOADING,
