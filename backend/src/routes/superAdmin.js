@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { requireStaffJwt } from "../services/staffAuthService.js";
 import { getPhoneVariants, isValidPhone } from "../services/phoneService.js";
+import { createCashfreeVendor } from "../services/vendor.service.js";
 
 const slugify = (value) =>
   String(value || "")
@@ -394,7 +395,19 @@ export default async function superAdminRoutes(app, deps) {
         data: { isActive },
       });
 
-      return { message: isActive ? "Restaurant activated" : "Restaurant disabled", restaurant };
+      // Automatically create Cashfree Easy Split Vendor when restaurant is activated/approved
+      if (isActive) {
+        createCashfreeVendor({
+          restaurantId: restaurant.id,
+          name: restaurant.name || restaurant.legalName || "Tiffzy Vendor",
+          email: restaurant.email,
+          phone: restaurant.phone,
+          upi: restaurant.upiId,
+          maxRetries: 3,
+        }).catch((vErr) => console.warn("[SuperAdmin] Automatic Cashfree vendor creation warning:", vErr.message));
+      }
+
+      return { message: isActive ? "Restaurant activated and Cashfree vendor onboarding initiated" : "Restaurant disabled", restaurant };
     } catch (err) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to update restaurant status" });
