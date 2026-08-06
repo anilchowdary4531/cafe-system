@@ -9,10 +9,12 @@ import {
 } from "../services/staffSessionService.js";
 import { resolveMenuPricing } from "../services/menuPricingService.js";
 import { buildPayLaterController } from "../controllers/payLaterController.js";
+import { buildSettlementController } from "../controllers/settlementController.js";
 
 export default async function ownerRoutes(app, deps) {
   const { prisma, buildQrTargetUrl, FRONTEND_URL, STAFF_ACCESS_MODULES, STAFF_ALLOWED_ROLES, normalizeAccess, normalizeDbPermissions, serializeAccess, realtime } = deps;
   const uploadController = buildUploadController();
+  const settlementController = buildSettlementController({ prisma });
   const STAFF_LOGIN_LINK_EXPIRES_IN = process.env.STAFF_LOGIN_LINK_EXPIRES_IN || "30d";
   const LEGACY_ORDER_NO_PATTERN = /^ORD-\d{12,}$/i;
   const toDisplayOrderNo = (order, restaurant) => {
@@ -884,6 +886,12 @@ export default async function ownerRoutes(app, deps) {
       return reply.code(500).send({ message: "Failed to fetch finance analytics" });
     }
   });
+
+  // SETTLEMENT DASHBOARD ENDPOINTS
+  app.get("/owner/:restaurantId/settlements/summary", settlementController.getSummary);
+  app.get("/owner/:restaurantId/settlements/orders", settlementController.getOrders);
+  app.get("/owner/:restaurantId/settlements/export/csv", settlementController.exportCsv);
+  app.get("/owner/:restaurantId/settlements/export/pdf", settlementController.exportPdf);
 
   app.get("/owner/:restaurantId/settings", async (req, reply) => {
     try {

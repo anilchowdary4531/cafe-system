@@ -28,6 +28,7 @@ import {
     YAxis,
 } from "recharts";
 import { API } from "../../config";
+import SettlementDashboard from "../owner/SettlementDashboard";
 
 const RANGE_OPTIONS = ["24h", "7d", "30d"];
 const PAYMENT_BUCKET_ORDER = ["Digital", "Cash", "Online", "Due"];
@@ -200,6 +201,7 @@ const buildPaymentTrendData = (invoices, range) => {
 };
 
 export default function OwnerFinance() {
+    const [activeTab, setActiveTab] = useState("overview"); // overview | settlement
     const [range, setRange] = useState("7d");
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -454,6 +456,34 @@ export default function OwnerFinance() {
 
     return (
         <section className="space-y-5">
+            {/* Top Navigation Tabs */}
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+                <button
+                    onClick={() => setActiveTab("overview")}
+                    className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all ${
+                        activeTab === "overview"
+                            ? "bg-amber-500 text-slate-950 shadow-md font-bold"
+                            : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                    }`}
+                >
+                    Finance Overview
+                </button>
+                <button
+                    onClick={() => setActiveTab("settlement")}
+                    className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all ${
+                        activeTab === "settlement"
+                            ? "bg-amber-500 text-slate-950 shadow-md font-bold"
+                            : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                    }`}
+                >
+                    Settlement Dashboard
+                </button>
+            </div>
+
+            {activeTab === "settlement" ? (
+                <SettlementDashboard />
+            ) : (
+                <>
             <article className="theme-card rounded-3xl p-5 sm:p-6">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div>
@@ -907,6 +937,8 @@ export default function OwnerFinance() {
                     </article>
                 </div>
             )}
+        </>
+      )}
         </section>
     );
 }
