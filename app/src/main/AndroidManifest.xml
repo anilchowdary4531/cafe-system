@@ -41,6 +41,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.payment.PaymentActivity"
+            android:exported="false"
+            android:label="Cashfree Payment"
+            android:theme="@style/Theme.TiffzyApp" />
+
         <service
             android:name=".service.TiffzyMessagingService"
             android:exported="false">

@@ -34,8 +34,8 @@ android {
         minSdk = 24
         targetSdk = 36
 
-        versionCode = 9
-        versionName = "1.0.8"
+        versionCode = 10
+        versionName = "1.0.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -107,6 +107,7 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.coil.compose)
     implementation(libs.socketio)
+    implementation(libs.cashfree)
 
     // Firebase AI temporarily disabled.
     // We will enable this later after Firebase configuration.

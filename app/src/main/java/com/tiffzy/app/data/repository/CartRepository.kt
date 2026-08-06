@@ -22,6 +22,8 @@ class CartRepository {
         _selectedTable.value = tableNo
     }
 
+    fun getTable(): String? = _selectedTable.value
+
     fun addToCart(item: MenuItem, restaurant: Restaurant) {
         // Rule: If adding from a different restaurant, clear the cart first
         if (_currentRestaurant.value != null && _currentRestaurant.value?.id != restaurant.id) {

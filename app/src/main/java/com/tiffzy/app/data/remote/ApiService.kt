@@ -106,4 +106,10 @@ interface ApiService {
 
     @POST("customer/order")
     suspend fun placeDineInOrder(@Body body: Map<String, Any>): SimpleResponse
+
+    @POST("api/payments/create-order")
+    suspend fun createCashfreeOrder(@Body request: CashfreeCreateOrderRequest): CashfreeCreateOrderResponse
+
+    @POST("payments/status")
+    suspend fun sendPaymentStatus(@Body request: PaymentStatusRequest): PaymentStatusResponse
 }
