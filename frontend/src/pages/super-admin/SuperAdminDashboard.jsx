@@ -45,6 +45,7 @@ const shortName = (value) => {
 
 const SUPER_ADMIN_MENU_ITEMS = [
     { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, to: "/super-admin" },
+    { key: "settlements", label: "Settlement Dashboard", icon: BarChart3, to: "/super-admin/settlements" },
     { key: "profile", label: "Profile", icon: UserRound, to: "/super-admin#profile-section" },
     { key: "staff", label: "Staff", icon: UserCheck, to: "/super-admin/staff" },
     { key: "users", label: "Users / Customers", icon: Users, to: "/super-admin/users" },

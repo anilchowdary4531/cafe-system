@@ -62,6 +62,7 @@ import SuperAdminDashboard from "./pages/super-admin/SuperAdminDashboard";
 import SuperAdminCreateRestaurant from "./pages/super-admin/SuperAdminCreateRestaurant";
 import SuperAdminUsers from "./pages/super-admin/SuperAdminUsers";
 import SuperAdminSettings from "./pages/super-admin/SuperAdminSettings";
+import SuperAdminSettlements from "./pages/super-admin/SuperAdminSettlements";
 import NewOrder from "./pages/admin/NewOrder.jsx";
 import PaymentSuccess from "./pages/admin/PaymentSuccess.jsx";
 import Kitchen from "./pages/Kitchen.jsx";
@@ -400,6 +401,14 @@ export default function App() {
                         element={
                             <ProtectedRoute role="SUPER_ADMIN">
                                 <SuperAdminSettings />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/super-admin/settlements"
+                        element={
+                            <ProtectedRoute role="SUPER_ADMIN">
+                                <SuperAdminSettlements />
                             </ProtectedRoute>
                         }
                     />

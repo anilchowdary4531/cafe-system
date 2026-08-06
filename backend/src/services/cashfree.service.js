@@ -1,7 +1,35 @@
 import crypto from "node:crypto";
-import { getCashfreeInstance, CASHFREE_API_VERSION } from "../config/cashfree.config.js";
+import { getCashfreeInstance, CASHFREE_API_VERSION, initCashfree } from "../config/cashfree.config.js";
 
 const round2 = (num) => Math.round(Number(num || 0) * 100) / 100;
+
+// Production Telemetry & Monitoring Metrics
+const paymentMetrics = {
+  ordersCreated: 0,
+  paymentsVerified: 0,
+  paymentsFailed: 0,
+  webhooksReceived: 0,
+  webhooksVerified: 0,
+  startTime: new Date().toISOString(),
+};
+
+export const incrementMetric = (metricName) => {
+  if (paymentMetrics[metricName] !== undefined) {
+    paymentMetrics[metricName]++;
+  }
+};
+
+export const getPaymentMetrics = () => {
+  const config = initCashfree();
+  return {
+    ...paymentMetrics,
+    uptimeSeconds: Math.floor((Date.now() - new Date(paymentMetrics.startTime).getTime()) / 1000),
+    cashfreeEnv: config.env,
+    isProduction: config.isProduction,
+    isConfigured: config.isConfigured,
+    clientIdMasked: config.clientIdMasked,
+  };
+};
 
 /**
  * Service to interact with Cashfree Payment Gateway SDK
@@ -110,6 +138,8 @@ export const createCashfreePaymentSession = async ({
     if (!data?.payment_session_id) {
       throw new Error(data?.message || "Cashfree did not return a valid payment_session_id");
     }
+
+    incrementMetric("ordersCreated");
 
     return {
       payment_session_id: data.payment_session_id,

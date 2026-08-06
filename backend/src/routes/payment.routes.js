@@ -15,4 +15,8 @@ export default async function paymentRoutes(app, deps = {}) {
   // Webhook Endpoints: POST /api/payments/webhook, /payments/webhook
   app.post("/api/payments/webhook", paymentController.handleWebhook);
   app.post("/payments/webhook", paymentController.handleWebhook);
+
+  // Health Check & Monitoring Endpoints: GET /api/payments/health, /payments/health
+  app.get("/api/payments/health", paymentController.getHealthCheck);
+  app.get("/payments/health", paymentController.getHealthCheck);
 }

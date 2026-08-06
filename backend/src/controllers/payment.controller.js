@@ -1,5 +1,5 @@
 import { validateCreateOrderPayload } from "../middleware/paymentValidation.js";
-import { createCashfreePaymentSession, verifyCashfreeOrderSession, verifyCashfreeWebhookSignature } from "../services/cashfree.service.js";
+import { createCashfreePaymentSession, verifyCashfreeOrderSession, verifyCashfreeWebhookSignature, getPaymentMetrics } from "../services/cashfree.service.js";
 
 export const buildPaymentController = ({ prisma }) => {
   const createOrder = async (req, reply) => {
@@ -348,10 +348,51 @@ export const buildPaymentController = ({ prisma }) => {
     }
   };
 
+  const getHealthCheck = async (req, reply) => {
+    try {
+      const metrics = getPaymentMetrics();
+      let dbConnected = false;
+
+      if (prisma) {
+        try {
+          await prisma.$queryRaw`SELECT 1`;
+          dbConnected = true;
+        } catch (dbErr) {
+          dbConnected = false;
+        }
+      }
+
+      return reply.code(200).send({
+        status: metrics.isConfigured ? "HEALTHY" : "MISCONFIGURED",
+        timestamp: new Date().toISOString(),
+        cashfreeEnv: metrics.cashfreeEnv,
+        isProduction: metrics.isProduction,
+        isConfigured: metrics.isConfigured,
+        clientIdMasked: metrics.clientIdMasked,
+        dbConnected,
+        metrics: {
+          ordersCreated: metrics.ordersCreated,
+          paymentsVerified: metrics.paymentsVerified,
+          paymentsFailed: metrics.paymentsFailed,
+          webhooksReceived: metrics.webhooksReceived,
+          webhooksVerified: metrics.webhooksVerified,
+          uptimeSeconds: metrics.uptimeSeconds,
+        },
+      });
+    } catch (err) {
+      console.error("[PaymentController] HealthCheck Error:", err);
+      return reply.code(500).send({
+        status: "UNHEALTHY",
+        message: err.message,
+      });
+    }
+  };
+
   return {
     createOrder,
     verifyOrder,
     handleWebhook,
+    getHealthCheck,
   };
 };
 

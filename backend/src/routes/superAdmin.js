@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { requireStaffJwt } from "../services/staffAuthService.js";
 import { getPhoneVariants, isValidPhone } from "../services/phoneService.js";
 import { createCashfreeVendor } from "../services/vendor.service.js";
+import { buildAdminSettlementController } from "../controllers/adminSettlementController.js";
 
 const slugify = (value) =>
   String(value || "")
@@ -16,6 +17,7 @@ const fullOwnerAccess = (modules) => modules.reduce((acc, key) => ({ ...acc, [ke
 
 export default async function superAdminRoutes(app, deps) {
   const { prisma, STAFF_ACCESS_MODULES } = deps;
+  const adminSettlementController = buildAdminSettlementController({ prisma });
 
   const requireSuperAdmin = async (req, reply) => {
     const actor = await requireStaffJwt(req, reply, { prisma, allowedRoles: ["SUPER_ADMIN"] });
@@ -413,4 +415,10 @@ export default async function superAdminRoutes(app, deps) {
       return reply.code(500).send({ message: "Failed to update restaurant status" });
     }
   });
+
+  // ADMIN SETTLEMENT DASHBOARD ENDPOINTS
+  app.get("/super-admin/settlements/summary", { preHandler: requireSuperAdmin }, adminSettlementController.getSummary);
+  app.get("/super-admin/settlements/payment-logs", { preHandler: requireSuperAdmin }, adminSettlementController.getPaymentLogs);
+  app.get("/super-admin/settlements/webhook-logs", { preHandler: requireSuperAdmin }, adminSettlementController.getWebhookLogs);
+  app.get("/super-admin/settlements/vendors", { preHandler: requireSuperAdmin }, adminSettlementController.getVendorDetails);
 }
