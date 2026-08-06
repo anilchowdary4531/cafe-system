@@ -1,5 +1,5 @@
 import { validateCreateOrderPayload } from "../middleware/paymentValidation.js";
-import { createCashfreePaymentSession } from "../services/cashfree.service.js";
+import { createCashfreePaymentSession, verifyCashfreeOrderSession, verifyCashfreeWebhookSignature } from "../services/cashfree.service.js";
 
 export const buildPaymentController = ({ prisma }) => {
   const createOrder = async (req, reply) => {
@@ -205,9 +205,128 @@ export const buildPaymentController = ({ prisma }) => {
     }
   };
 
+  const handleWebhook = async (req, reply) => {
+    try {
+      const signature = String(req.headers["x-webhook-signature"] || req.headers["x-cashfree-signature"] || "").trim();
+      const timestamp = String(req.headers["x-webhook-timestamp"] || req.headers["x-cashfree-timestamp"] || "").trim();
+      const rawBody = typeof req.rawBody === "string" ? req.rawBody : JSON.stringify(req.body || {});
+
+      // 1. Verify Webhook Signature (if headers present)
+      if (signature && timestamp) {
+        const isValidSignature = verifyCashfreeWebhookSignature({ signature, rawBody, timestamp });
+        if (!isValidSignature && process.env.NODE_ENV === "production") {
+          console.warn("[PaymentController] Webhook signature verification failed for signature:", signature);
+          return reply.code(400).send({ status: "ERROR", message: "Invalid webhook signature" });
+        }
+      }
+
+      const body = req.body || {};
+      const eventType = String(body.type || body.event || "").toUpperCase();
+      const eventData = body.data || body;
+      const orderDetails = eventData.order || {};
+      const paymentDetails = eventData.payment || {};
+      const refundDetails = eventData.refund || {};
+      const orderId = String(orderDetails.order_id || eventData.order_id || "").trim();
+
+      // 2. Log every webhook event cleanly
+      console.log("[Cashfree Webhook Received]", {
+        timestamp: new Date().toISOString(),
+        eventType,
+        orderId,
+        paymentStatus: paymentDetails.payment_status,
+        refundStatus: refundDetails.refund_status,
+      });
+
+      if (!orderId) {
+        // Return 200 OK even if orderId is missing in raw ping
+        return reply.code(200).send({ status: "OK", message: "Webhook ping received" });
+      }
+
+      // 3. Look up order in Prisma DB
+      let existingOrder = null;
+      if (prisma) {
+        try {
+          const numericId = Number(orderId);
+          if (!Number.isNaN(numericId)) {
+            existingOrder = await prisma.order.findUnique({ where: { id: numericId } });
+          }
+          if (!existingOrder) {
+            existingOrder = await prisma.order.findFirst({
+              where: {
+                OR: [{ orderNo: orderId }, { invoiceNo: orderId }],
+              },
+            });
+          }
+        } catch (dbErr) {
+          console.warn("[PaymentController] Webhook DB order lookup error:", dbErr.message);
+        }
+      }
+
+      // 4. Event Processing with Idempotency (Prevent Duplicate Processing)
+      if (eventType === "PAYMENT_SUCCESS" || eventType === "PAYMENT.SUCCESS") {
+        if (existingOrder && (existingOrder.paymentStatus === "PAID" || existingOrder.status === "PAID" || existingOrder.status === "COMPLETED")) {
+          console.log(`[PaymentController] Webhook: Order ${orderId} already marked PAID. Ignoring duplicate.`);
+          return reply.code(200).send({ status: "OK", message: "Duplicate webhook ignored" });
+        }
+
+        if (existingOrder && prisma) {
+          await prisma.order.update({
+            where: { id: existingOrder.id },
+            data: {
+              paymentStatus: "PAID",
+              status: "CONFIRMED",
+              paymentMethod: paymentDetails.payment_group || "CASHFREE",
+            },
+          });
+        }
+      } else if (eventType === "PAYMENT_FAILED" || eventType === "PAYMENT.FAILED") {
+        if (existingOrder && (existingOrder.paymentStatus === "PAID" || existingOrder.status === "PAID")) {
+          console.log(`[PaymentController] Webhook: Order ${orderId} is already PAID. Ignoring payment failure webhook.`);
+          return reply.code(200).send({ status: "OK", message: "Webhook ignored for paid order" });
+        }
+
+        if (existingOrder && prisma) {
+          await prisma.order.update({
+            where: { id: existingOrder.id },
+            data: { paymentStatus: "FAILED" },
+          });
+        }
+      } else if (eventType === "REFUND_SUCCESS" || eventType === "REFUND.SUCCESS") {
+        if (existingOrder && prisma) {
+          await prisma.order.update({
+            where: { id: existingOrder.id },
+            data: {
+              paymentStatus: "REFUNDED",
+              status: "CANCELLED",
+            },
+          });
+        }
+      } else if (eventType === "REFUND_FAILED" || eventType === "REFUND.FAILED") {
+        console.warn(`[PaymentController] Webhook: Refund failed for order ${orderId}:`, refundDetails.refund_note || "Refund error");
+      }
+
+      // 5. Always Return HTTP 200 OK to Cashfree
+      return reply.code(200).send({
+        status: "OK",
+        message: "Webhook event processed successfully",
+        orderId,
+        event: eventType,
+      });
+    } catch (err) {
+      console.error("[PaymentController] Webhook Error:", err);
+      // Always return HTTP 200 OK so Cashfree does not retry indefinitely on unexpected internal errors
+      return reply.code(200).send({
+        status: "OK",
+        message: "Webhook received with internal warning",
+      });
+    }
+  };
+
   return {
     createOrder,
     verifyOrder,
+    handleWebhook,
   };
 };
+
 

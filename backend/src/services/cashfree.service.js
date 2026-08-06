@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { getCashfreeInstance, CASHFREE_API_VERSION } from "../config/cashfree.config.js";
 
 /**
@@ -140,4 +141,42 @@ export const verifyCashfreeOrderSession = async ({ orderId }) => {
     throw new Error(errorMsg);
   }
 };
+
+/**
+ * Verify Cashfree Webhook Signature
+ */
+export const verifyCashfreeWebhookSignature = ({ signature, rawBody, timestamp }) => {
+  if (!signature || !rawBody || !timestamp) {
+    return false;
+  }
+
+  try {
+    const cashfree = getCashfreeInstance();
+    // 1. Try Cashfree SDK verification method if supported
+    if (typeof cashfree.PGVerifyWebhookSignature === "function") {
+      try {
+        const isVerified = cashfree.PGVerifyWebhookSignature(signature, rawBody, timestamp);
+        if (isVerified) return true;
+      } catch (sdkErr) {
+        // Fallback to crypto calculation
+      }
+    }
+
+    // 2. Compute HMAC SHA-256 fallback verification
+    const secret = String(process.env.CASHFREE_CLIENT_SECRET || "").trim();
+    if (!secret) return false;
+
+    const dataToSign = `${timestamp}${rawBody}`;
+    const expectedSignature = crypto
+      .createHmac("sha256", secret)
+      .update(dataToSign)
+      .digest("base64");
+
+    return signature === expectedSignature;
+  } catch (err) {
+    console.error("[CashfreeService] Webhook signature verification error:", err.message);
+    return false;
+  }
+};
+
 
