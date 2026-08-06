@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import { getCashfreeInstance, CASHFREE_API_VERSION } from "../config/cashfree.config.js";
 
+const round2 = (num) => Math.round(Number(num || 0) * 100) / 100;
+
 /**
  * Service to interact with Cashfree Payment Gateway SDK
  */
@@ -12,6 +14,9 @@ export const createCashfreePaymentSession = async ({
   customerName,
   customerEmail,
   returnUrl,
+  vendorId,
+  commissionType = "PERCENTAGE",
+  commissionValue = 10,
 }) => {
   const cashfree = getCashfreeInstance();
 
@@ -48,8 +53,23 @@ export const createCashfreePaymentSession = async ({
 
   const defaultReturnUrl = returnUrl || `${process.env.FRONTEND_URL || "https://www.tiffzy.com"}/payment-status?order_id={order_id}`;
 
+  // Cashfree Easy Split Settlement Calculation
+  // Business logic: e.g. Customer pays ₹500, Tiffzy receives ₹50, Restaurant receives ₹450
+  const normalizedCommType = String(commissionType || "PERCENTAGE").toUpperCase();
+  const commVal = Number(commissionValue !== undefined && commissionValue !== null ? commissionValue : 10);
+
+  let tiffzyCommission = 0;
+  if (normalizedCommType === "FIXED") {
+    tiffzyCommission = round2(Math.min(numericAmount, commVal));
+  } else {
+    // Default: PERCENTAGE commission (e.g. 10%)
+    tiffzyCommission = round2(numericAmount * (commVal / 100));
+  }
+
+  const restaurantShare = round2(Math.max(0, numericAmount - tiffzyCommission));
+
   const orderPayload = {
-    order_amount: Math.round(numericAmount * 100) / 100, // Format to 2 decimal places
+    order_amount: round2(numericAmount), // Format to 2 decimal places
     order_currency: "INR",
     order_id: formattedOrderId,
     customer_details: {
@@ -62,6 +82,26 @@ export const createCashfreePaymentSession = async ({
       return_url: defaultReturnUrl,
     },
   };
+
+  // Configure Cashfree Easy Split if vendorId is provided
+  const cleanVendorId = vendorId ? String(vendorId).trim() : null;
+  if (cleanVendorId) {
+    orderPayload.order_splits = [
+      {
+        vendor_id: cleanVendorId,
+        amount: restaurantShare,
+      },
+    ];
+
+    console.log(`[CashfreeService] Configured Easy Split for Order ${formattedOrderId}:`, {
+      totalAmount: numericAmount,
+      restaurantShare,
+      tiffzyCommission,
+      vendorId: cleanVendorId,
+      commissionType: normalizedCommType,
+      commissionValue: commVal,
+    });
+  }
 
   try {
     const response = await cashfree.PGCreateOrder(CASHFREE_API_VERSION, orderPayload);
@@ -76,6 +116,14 @@ export const createCashfreePaymentSession = async ({
       order_id: data.order_id || formattedOrderId,
       cf_order_id: data.cf_order_id || null,
       order_status: data.order_status || "ACTIVE",
+      settlement: {
+        totalAmount: round2(numericAmount),
+        tiffzyCommission: round2(tiffzyCommission),
+        restaurantShare: round2(restaurantShare),
+        commissionType: normalizedCommType,
+        commissionValue: commVal,
+        vendorId: cleanVendorId,
+      },
     };
   } catch (err) {
     const errorMsg = err?.response?.data?.message || err?.message || "Cashfree PG order creation failed";

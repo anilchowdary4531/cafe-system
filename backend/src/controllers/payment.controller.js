@@ -64,7 +64,29 @@ export const buildPaymentController = ({ prisma }) => {
         }
       }
 
-      // Generate Cashfree payment session
+      // Resolve restaurant vendor and commission settings if restaurantId is provided
+      let resolvedVendorId = body.vendorId || body.vendor_id || null;
+      let commissionType = body.commissionType || body.commission_type || process.env.COMMISSION_TYPE || "PERCENTAGE";
+      let commissionValue = body.commissionValue !== undefined ? body.commissionValue : (process.env.COMMISSION_VALUE !== undefined ? Number(process.env.COMMISSION_VALUE) : 10);
+
+      if (restaurantId && prisma && !resolvedVendorId) {
+        try {
+          const numericRestId = Number(restaurantId);
+          let dbRest = null;
+          if (!Number.isNaN(numericRestId)) {
+            dbRest = await prisma.restaurant.findUnique({
+              where: { id: numericRestId },
+            });
+          }
+          if (dbRest) {
+            resolvedVendorId = `vendor_rest_${dbRest.id}`;
+          }
+        } catch (rErr) {
+          console.warn("[PaymentController] Restaurant lookup warning:", rErr.message);
+        }
+      }
+
+      // Generate Cashfree payment session with Easy Split
       const result = await createCashfreePaymentSession({
         orderId,
         amount,
@@ -74,6 +96,9 @@ export const buildPaymentController = ({ prisma }) => {
         customerEmail: resolvedEmail,
         restaurantId,
         returnUrl,
+        vendorId: resolvedVendorId,
+        commissionType,
+        commissionValue,
       });
 
       return reply.code(200).send({
@@ -81,6 +106,7 @@ export const buildPaymentController = ({ prisma }) => {
         order_id: result.order_id,
         cf_order_id: result.cf_order_id,
         order_status: result.order_status,
+        settlement: result.settlement,
       });
     } catch (err) {
       console.error("[PaymentController] createOrder Error:", err);
