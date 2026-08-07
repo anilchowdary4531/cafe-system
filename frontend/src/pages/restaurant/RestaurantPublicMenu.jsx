@@ -59,7 +59,6 @@ export default function RestaurantPublicMenu() {
             name: data.restaurant.name || null,
             slug: data.restaurant.slug || slug || null,
             logo: data.restaurant.logo || data.restaurant.logoUrl || null,
-            upiId: data.restaurant.upiId || null,
             tableNo: null,
         });
     }, [data?.restaurant, setRestaurantContext, slug]);

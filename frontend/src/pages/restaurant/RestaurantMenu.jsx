@@ -243,7 +243,6 @@ export default function RestaurantMenu() {
             name: data.restaurant.name || null,
             slug: data.restaurant.slug || slug || null,
             logo: data.restaurant.logo || data.restaurant.logoUrl || restaurantContext?.logo || null,
-            upiId: data.restaurant.upiId || null,
             tableNo: tableNo || null,
         });
     }, [data?.restaurant, restaurantContext?.logo, setRestaurantContext, slug, tableNo]);

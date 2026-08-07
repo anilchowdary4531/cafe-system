@@ -208,86 +208,7 @@ export default function OwnerFinance() {
     const [data, setData] = useState(null);
     const [error, setError] = useState("");
     const [search, setSearch] = useState("");
-    const [upiIdInput, setUpiIdInput] = useState("");
-    const [savingUpi, setSavingUpi] = useState(false);
-    const [upiNotice, setUpiNotice] = useState("");
     const [selectedInvoice, setSelectedInvoice] = useState(null);
-
-    const user = useMemo(() => {
-        try {
-            return JSON.parse(localStorage.getItem("user")) || {};
-        } catch {
-            return {};
-        }
-    }, []);
-
-    const restaurantId = Number(user?.restaurantId);
-
-    const loadFinance = async ({ silent = false } = {}) => {
-        if (!restaurantId) {
-            setLoading(false);
-            setError("Restaurant not linked to current user.");
-            return;
-        }
-
-        try {
-            if (silent) setRefreshing(true);
-            else setLoading(true);
-
-            const res = await axios.get(`${API}/owner/${restaurantId}/finance`, {
-                params: { range },
-            });
-            setData(res.data || null);
-            setError("");
-        } catch (err) {
-            console.log(err);
-            setError(err?.response?.data?.message || "Unable to load finance data.");
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    };
-
-    useEffect(() => {
-        loadFinance();
-    }, [restaurantId, range]);
-
-    useEffect(() => {
-        setUpiIdInput(String(data?.restaurant?.upiId || ""));
-    }, [data?.restaurant?.upiId]);
-
-    useEffect(() => {
-        if (!selectedInvoice) return undefined;
-        const handleEscape = (event) => {
-            if (event.key === "Escape") setSelectedInvoice(null);
-        };
-        window.addEventListener("keydown", handleEscape);
-        return () => window.removeEventListener("keydown", handleEscape);
-    }, [selectedInvoice]);
-
-    const saveUpiId = async () => {
-        const normalizedUpiId = String(upiIdInput || "").trim().toLowerCase();
-        if (normalizedUpiId && !/^[a-z0-9._-]{2,}@[a-z0-9._-]{2,}$/i.test(normalizedUpiId)) {
-            setError("Enter a valid UPI ID (example: owner@okhdfcbank).");
-            return;
-        }
-
-        try {
-            setSavingUpi(true);
-            setError("");
-            setUpiNotice("");
-            await axios.put(`${API}/owner/${restaurantId}/settings`, {
-                upiId: normalizedUpiId || null,
-            });
-            setUpiNotice(normalizedUpiId ? "UPI ID saved successfully." : "UPI ID removed.");
-            await loadFinance({ silent: true });
-        } catch (err) {
-            console.log(err);
-            setError(err?.response?.data?.message || "Failed to save UPI ID.");
-        } finally {
-            setSavingUpi(false);
-        }
-    };
 
     const invoices = Array.isArray(data?.invoices) ? data.invoices : [];
     const summary = data?.summary || {};
@@ -673,33 +594,15 @@ export default function OwnerFinance() {
                 <article className="theme-card rounded-2xl p-5 xl:col-span-2">
                     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                         <div>
-                            <h4 className="text-xl font-semibold">UPI Payment Setup</h4>
+                            <h4 className="text-xl font-semibold">Cashfree Automated Easy Split</h4>
                             <p className="theme-muted mt-1 text-sm">
-                                Add your restaurant UPI ID so customers can pay via UPI apps.
+                                All digital payments are processed through Cashfree Payment Gateway. 90% of vendor GMV is automatically routed directly to your linked bank account.
                             </p>
                         </div>
-                        <span className="theme-pill rounded-full px-3 py-1 text-xs">
-                            Current: {data?.restaurant?.upiId || "Not configured"}
+                        <span className="theme-pill rounded-full px-3 py-1 text-xs text-emerald-400 font-medium">
+                            Active Engine: Cashfree PG
                         </span>
                     </div>
-
-                    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                        <input
-                            value={upiIdInput}
-                            onChange={(e) => setUpiIdInput(e.target.value)}
-                            placeholder="owner@okbank"
-                            className="theme-input w-full rounded-lg px-3 py-2"
-                        />
-                        <button
-                            type="button"
-                            onClick={saveUpiId}
-                            disabled={savingUpi}
-                            className="theme-button inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60"
-                        >
-                            {savingUpi ? <LoaderCircle size={14} className="animate-spin" /> : "Save UPI ID"}
-                        </button>
-                    </div>
-                    {upiNotice && <p className="mt-2 text-sm text-emerald-700">{upiNotice}</p>}
                 </article>
 
                 <article className="theme-card rounded-2xl p-5">

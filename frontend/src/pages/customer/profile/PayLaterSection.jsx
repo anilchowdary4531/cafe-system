@@ -209,7 +209,7 @@ export default function PayLaterSection() {
                         <strong className="block theme-text text-sm font-semibold flex items-center gap-1.5 text-amber-500">
                             <CreditCard size={16} /> 3. Instant Online Repayment
                         </strong>
-                        <p>Repay anytime using UPI, Google Pay, PhonePe, Paytm, or debit/credit cards.</p>
+                        <p>Repay anytime securely via Cashfree Payment Gateway (Cards, UPI, Net Banking, Wallets).</p>
                     </div>
                 </div>
             </div>
