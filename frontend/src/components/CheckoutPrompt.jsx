@@ -542,17 +542,28 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
 
                 const sessionId = cashfreeRes?.data?.payment_session_id || cashfreeRes?.data?.paymentSessionId;
 
-                if (sessionId && typeof window.Cashfree === "function") {
+                if (!sessionId) {
+                    throw new Error(cashfreeRes?.data?.message || "Cashfree payment session could not be created. Please verify Cashfree API credentials.");
+                }
+
+                if (typeof window.Cashfree === "function") {
                     const cashfree = window.Cashfree({ mode: "sandbox" });
                     cashfree.checkout({
                         paymentSessionId: sessionId,
                         redirectTarget: "_modal",
                     }).then(async (cfResult) => {
                         if (cfResult?.error) {
-                            setError(cfResult.error.message || "Payment cancelled or failed.");
+                            setError(cfResult.error.message || "Payment cancelled or failed. Please try again.");
                             setSubmitting(false);
                             return;
                         }
+
+                        if (cfResult?.redirect) {
+                            // User redirected to bank/UPI page
+                            return;
+                        }
+
+                        // Verify completion with backend
                         await api.post(
                             "/payments/verify",
                             { orderId, status: "SUCCESS", paymentMode: "ONLINE", paymentSessionId: sessionId },
@@ -569,46 +580,25 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                             )}`,
                             { replace: true }
                         );
-                    }).catch(async () => {
-                        await api.post("/payments/verify", { orderId, status: "SUCCESS", paymentMode: "ONLINE" }, getCustomerAuthConfig());
-                        clearCart();
-                        onClose();
-                        navigate(`/orders/thank-you?slug=${encodeURIComponent(slug)}&orderNo=${encodeURIComponent(orderNo)}&orderId=${encodeURIComponent(String(orderId))}&amount=${encodeURIComponent(String(toInr(orderTotal)))}&fulfillment=${encodeURIComponent(isOnlineOrder ? selectedFulfillment : "dinein")}`, { replace: true });
+                    }).catch((sdkErr) => {
+                        console.error("Cashfree SDK Checkout Error:", sdkErr);
+                        setError("Unable to open Cashfree Payment window. Please disable popup blocker or try again.");
+                        setSubmitting(false);
                     });
                     return;
                 }
 
-                // Direct verification fallback if Cashfree SDK script is pending
-                await api.post(
-                    "/payments/verify",
-                    { orderId, status: "SUCCESS", paymentMode: "ONLINE", paymentSessionId: sessionId || null },
-                    getCustomerAuthConfig()
-                );
-
-                clearCart();
-                onClose();
-                navigate(
-                    `/orders/thank-you?slug=${encodeURIComponent(slug)}&orderNo=${encodeURIComponent(orderNo)}&orderId=${encodeURIComponent(
-                        String(orderId)
-                    )}&amount=${encodeURIComponent(String(toInr(orderTotal)))}&fulfillment=${encodeURIComponent(
-                        isOnlineOrder ? selectedFulfillment : "dinein"
-                    )}`,
-                    { replace: true }
-                );
+                setError("Cashfree Payment SDK loading. Please refresh and try again.");
+                setSubmitting(false);
                 return;
             } catch (pgErr) {
-                console.log("Cashfree PG order session created:", pgErr?.message || pgErr);
-                await api.post("/payments/verify", { orderId, status: "SUCCESS", paymentMode: "ONLINE" }, getCustomerAuthConfig());
-                clearCart();
-                onClose();
-                navigate(
-                    `/orders/thank-you?slug=${encodeURIComponent(slug)}&orderNo=${encodeURIComponent(orderNo)}&orderId=${encodeURIComponent(
-                        String(orderId)
-                    )}&amount=${encodeURIComponent(String(toInr(orderTotal)))}&fulfillment=${encodeURIComponent(
-                        isOnlineOrder ? selectedFulfillment : "dinein"
-                    )}`,
-                    { replace: true }
+                console.error("Cashfree PG Order Creation Error:", pgErr?.response?.data || pgErr);
+                setError(
+                    pgErr?.response?.data?.message ||
+                    pgErr?.message ||
+                    "Cashfree Gateway Unavailable. Please check API credentials or try Cash on Pickup."
                 );
+                setSubmitting(false);
                 return;
             }
 
