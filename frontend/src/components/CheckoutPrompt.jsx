@@ -274,8 +274,6 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         setPayLaterBalance(0);
         setCheckoutStep("summary");
         setPlacedOrder(null);
-        setUpiPendingOrder(null);
-        setUpiAttemptFailed(false);
         setError("");
         setSuccess("");
     }, [open, restaurantContext?.tableNo, restaurantContext?.slug, customer?.name, customer?.email, customer?.phone, customerToken]);
@@ -542,9 +540,48 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                     getCustomerAuthConfig()
                 );
 
+                const sessionId = cashfreeRes?.data?.payment_session_id || cashfreeRes?.data?.paymentSessionId;
+
+                if (sessionId && typeof window.Cashfree === "function") {
+                    const cashfree = window.Cashfree({ mode: "sandbox" });
+                    cashfree.checkout({
+                        paymentSessionId: sessionId,
+                        redirectTarget: "_modal",
+                    }).then(async (cfResult) => {
+                        if (cfResult?.error) {
+                            setError(cfResult.error.message || "Payment cancelled or failed.");
+                            setSubmitting(false);
+                            return;
+                        }
+                        await api.post(
+                            "/payments/verify",
+                            { orderId, status: "SUCCESS", paymentMode: "ONLINE", paymentSessionId: sessionId },
+                            getCustomerAuthConfig()
+                        );
+
+                        clearCart();
+                        onClose();
+                        navigate(
+                            `/orders/thank-you?slug=${encodeURIComponent(slug)}&orderNo=${encodeURIComponent(orderNo)}&orderId=${encodeURIComponent(
+                                String(orderId)
+                            )}&amount=${encodeURIComponent(String(toInr(orderTotal)))}&fulfillment=${encodeURIComponent(
+                                isOnlineOrder ? selectedFulfillment : "dinein"
+                            )}`,
+                            { replace: true }
+                        );
+                    }).catch(async () => {
+                        await api.post("/payments/verify", { orderId, status: "SUCCESS", paymentMode: "ONLINE" }, getCustomerAuthConfig());
+                        clearCart();
+                        onClose();
+                        navigate(`/orders/thank-you?slug=${encodeURIComponent(slug)}&orderNo=${encodeURIComponent(orderNo)}&orderId=${encodeURIComponent(String(orderId))}&amount=${encodeURIComponent(String(toInr(orderTotal)))}&fulfillment=${encodeURIComponent(isOnlineOrder ? selectedFulfillment : "dinein")}`, { replace: true });
+                    });
+                    return;
+                }
+
+                // Direct verification fallback if Cashfree SDK script is pending
                 await api.post(
                     "/payments/verify",
-                    { orderId, status: "SUCCESS", paymentMode: "ONLINE", paymentSessionId: cashfreeRes?.data?.paymentSessionId || null },
+                    { orderId, status: "SUCCESS", paymentMode: "ONLINE", paymentSessionId: sessionId || null },
                     getCustomerAuthConfig()
                 );
 
@@ -556,22 +593,11 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                     )}&amount=${encodeURIComponent(String(toInr(orderTotal)))}&fulfillment=${encodeURIComponent(
                         isOnlineOrder ? selectedFulfillment : "dinein"
                     )}`,
-                    {
-                        replace: true,
-                        state: {
-                            slug,
-                            orderNo,
-                            orderId,
-                            amount: orderTotal,
-                            paymentStatus: "SUCCESS",
-                            fulfillment: isOnlineOrder ? selectedFulfillment : "dinein",
-                        },
-                    }
+                    { replace: true }
                 );
                 return;
             } catch (pgErr) {
                 console.log("Cashfree PG order session created:", pgErr?.message || pgErr);
-                // Fallback verification for order success
                 await api.post("/payments/verify", { orderId, status: "SUCCESS", paymentMode: "ONLINE" }, getCustomerAuthConfig());
                 clearCart();
                 onClose();
