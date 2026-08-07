@@ -9,6 +9,8 @@ import {
     CreditCard,
     Globe,
     IndianRupee,
+    Landmark,
+    Building2,
     LoaderCircle,
     ReceiptText,
     RefreshCcw,
@@ -209,6 +211,16 @@ export default function OwnerFinance() {
     const [error, setError] = useState("");
     const [search, setSearch] = useState("");
     const [selectedInvoice, setSelectedInvoice] = useState(null);
+
+    // Settlement Payout Account States (UPI & Bank Details)
+    const [upiIdInput, setUpiIdInput] = useState("");
+    const [bankAccountNumberInput, setBankAccountNumberInput] = useState("");
+    const [bankIfscCodeInput, setBankIfscCodeInput] = useState("");
+    const [bankAccountNameInput, setBankAccountNameInput] = useState("");
+    const [bankNameInput, setBankNameInput] = useState("");
+    const [savingPayoutAccount, setSavingPayoutAccount] = useState(false);
+    const [payoutNotice, setPayoutNotice] = useState("");
+
     const user = useMemo(() => {
         try {
             return JSON.parse(localStorage.getItem("user")) || {};
@@ -249,6 +261,15 @@ export default function OwnerFinance() {
     }, [restaurantId, range]);
 
     useEffect(() => {
+        if (!data?.restaurant) return;
+        setUpiIdInput(String(data.restaurant.upiId || ""));
+        setBankAccountNumberInput(String(data.restaurant.bankAccountNumber || ""));
+        setBankIfscCodeInput(String(data.restaurant.bankIfscCode || ""));
+        setBankAccountNameInput(String(data.restaurant.bankAccountName || ""));
+        setBankNameInput(String(data.restaurant.bankName || ""));
+    }, [data?.restaurant]);
+
+    useEffect(() => {
         if (!selectedInvoice) return undefined;
         const handleEscape = (event) => {
             if (event.key === "Escape") setSelectedInvoice(null);
@@ -256,6 +277,31 @@ export default function OwnerFinance() {
         window.addEventListener("keydown", handleEscape);
         return () => window.removeEventListener("keydown", handleEscape);
     }, [selectedInvoice]);
+
+    const savePayoutAccount = async (e) => {
+        if (e) e.preventDefault();
+        try {
+            setSavingPayoutAccount(true);
+            setError("");
+            setPayoutNotice("");
+
+            await axios.put(`${API}/owner/${restaurantId}/settings`, {
+                upiId: upiIdInput.trim() || null,
+                bankAccountNumber: bankAccountNumberInput.trim() || null,
+                bankIfscCode: bankIfscCodeInput.trim().toUpperCase() || null,
+                bankAccountName: bankAccountNameInput.trim() || null,
+                bankName: bankNameInput.trim() || null,
+            });
+
+            setPayoutNotice("Payout bank and UPI details saved successfully!");
+            await loadFinance({ silent: true });
+        } catch (err) {
+            console.log(err);
+            setError(err?.response?.data?.message || "Failed to save payout account details.");
+        } finally {
+            setSavingPayoutAccount(false);
+        }
+    };
 
     const invoices = Array.isArray(data?.invoices) ? data.invoices : [];
     const summary = data?.summary || {};
@@ -639,17 +685,105 @@ export default function OwnerFinance() {
 
             <div className="grid gap-4 xl:grid-cols-3">
                 <article className="theme-card rounded-2xl p-5 xl:col-span-2">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                         <div>
-                            <h4 className="text-xl font-semibold">Cashfree Automated Easy Split</h4>
+                            <h4 className="text-xl font-semibold flex items-center gap-2">
+                                <Landmark size={20} className="text-amber-500" />
+                                Settlement Payout Account (UPI & Bank Details)
+                            </h4>
                             <p className="theme-muted mt-1 text-sm">
-                                All digital payments are processed through Cashfree Payment Gateway. 90% of vendor GMV is automatically routed directly to your linked bank account.
+                                Enter your UPI ID and Bank Account details to receive automated Cashfree Easy Split payouts.
                             </p>
                         </div>
-                        <span className="theme-pill rounded-full px-3 py-1 text-xs text-emerald-400 font-medium">
-                            Active Engine: Cashfree PG
+                        <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                            upiIdInput || bankAccountNumberInput ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                        }`}>
+                            {upiIdInput || bankAccountNumberInput ? "Active Payout Target" : "Pending Setup"}
                         </span>
                     </div>
+
+                    <form onSubmit={savePayoutAccount} className="mt-4 space-y-3.5">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                                <label className="block text-xs font-semibold theme-muted uppercase tracking-wider mb-1">
+                                    UPI ID / VPA
+                                </label>
+                                <input
+                                    type="text"
+                                    value={upiIdInput}
+                                    onChange={(e) => setUpiIdInput(e.target.value)}
+                                    placeholder="e.g. cafeking@okicici"
+                                    className="theme-input w-full rounded-xl px-3 py-2 text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold theme-muted uppercase tracking-wider mb-1">
+                                    Bank Account Number
+                                </label>
+                                <input
+                                    type="text"
+                                    value={bankAccountNumberInput}
+                                    onChange={(e) => setBankAccountNumberInput(e.target.value)}
+                                    placeholder="e.g. 987654321012"
+                                    className="theme-input w-full rounded-xl px-3 py-2 text-sm"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            <div>
+                                <label className="block text-xs font-semibold theme-muted uppercase tracking-wider mb-1">
+                                    IFSC Code
+                                </label>
+                                <input
+                                    type="text"
+                                    value={bankIfscCodeInput}
+                                    onChange={(e) => setBankIfscCodeInput(e.target.value.toUpperCase())}
+                                    placeholder="e.g. HDFC0001234"
+                                    className="theme-input w-full rounded-xl px-3 py-2 text-sm uppercase"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold theme-muted uppercase tracking-wider mb-1">
+                                    Account Holder Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={bankAccountNameInput}
+                                    onChange={(e) => setBankAccountNameInput(e.target.value)}
+                                    placeholder="e.g. Cafe King Pvt Ltd"
+                                    className="theme-input w-full rounded-xl px-3 py-2 text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold theme-muted uppercase tracking-wider mb-1">
+                                    Bank Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={bankNameInput}
+                                    onChange={(e) => setBankNameInput(e.target.value)}
+                                    placeholder="e.g. HDFC Bank"
+                                    className="theme-input w-full rounded-xl px-3 py-2 text-sm"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between pt-2">
+                            {payoutNotice ? (
+                                <p className="text-xs font-semibold text-emerald-400">{payoutNotice}</p>
+                            ) : (
+                                <p className="theme-muted text-xs">90% of vendor GMV is auto-routed to these details via Cashfree Easy Split.</p>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={savingPayoutAccount}
+                                className="theme-button inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                            >
+                                {savingPayoutAccount ? <LoaderCircle size={14} className="animate-spin" /> : "Save Settlement Details"}
+                            </button>
+                        </div>
+                    </form>
                 </article>
 
                 <article className="theme-card rounded-2xl p-5">

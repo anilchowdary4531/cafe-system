@@ -25,6 +25,12 @@ model Restaurant {
   phone String?
   upiId String? @map("upi_id")
 
+  // BANK & SETTLEMENT PAYOUT DETAILS
+  bankAccountNumber String? @map("bank_account_number")
+  bankIfscCode      String? @map("bank_ifsc_code")
+  bankAccountName   String? @map("bank_account_name")
+  bankName          String? @map("bank_name")
+
   // ADDRESS
   addressLine1 String? @map("address_line1")
   city         String?

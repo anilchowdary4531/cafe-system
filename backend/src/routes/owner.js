@@ -777,7 +777,7 @@ export default async function ownerRoutes(app, deps) {
       const now = new Date();
       const fromDate = new Date(now.getTime() - (range === "24h" ? 1 : range === "7d" ? 7 : 30) * 24 * 60 * 60 * 1000);
       const [restaurant, orders, tables, menuItems, expenses] = await Promise.all([
-        prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { id: true, name: true, slug: true, invoicePrefix: true, upiId: true } }),
+        prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { id: true, name: true, slug: true, invoicePrefix: true, upiId: true, bankAccountNumber: true, bankIfscCode: true, bankAccountName: true, bankName: true } }),
         prisma.order.findMany({ where: { restaurantId, createdAt: { gte: fromDate } }, include: { items: true }, orderBy: { createdAt: "desc" } }),
         prisma.diningTable.findMany({ where: { restaurantId }, select: { id: true, isActive: true } }),
         prisma.menuItem.findMany({ where: { restaurantId }, select: { id: true, isAvailable: true } }),
@@ -901,6 +901,7 @@ export default async function ownerRoutes(app, deps) {
         where: { id: restaurantId },
         select: {
           id: true, name: true, legalName: true, slug: true, ownerName: true, email: true, phone: true, upiId: true,
+          bankAccountNumber: true, bankIfscCode: true, bankAccountName: true, bankName: true,
           addressLine1: true, city: true, state: true, country: true, pincode: true, gstNumber: true, logoUrl: true,
           bannerUrl: true, brandColor: true, faviconUrl: true,
           timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
@@ -923,6 +924,7 @@ export default async function ownerRoutes(app, deps) {
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
       const updates = {
         name: body.name, legalName: body.legalName, ownerName: body.ownerName, email: body.email, phone: body.phone, upiId: body.upiId,
+        bankAccountNumber: body.bankAccountNumber, bankIfscCode: body.bankIfscCode, bankAccountName: body.bankAccountName, bankName: body.bankName,
         addressLine1: body.addressLine1, city: body.city, state: body.state, country: body.country, pincode: body.pincode,
         gstNumber: body.gstNumber, logoUrl: body.logo, bannerUrl: body.bannerUrl, brandColor: body.brandColor, faviconUrl: body.faviconUrl,
         timezone: body.timezone, currency: body.currency, taxEnabled: body.taxEnabled,
