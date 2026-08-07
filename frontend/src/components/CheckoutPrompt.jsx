@@ -967,7 +967,12 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                     <div className={payLaterEligible ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
                                         <button
                                             type="button"
-                                            onClick={() => setPaymentMethod("UPI")}
+                                            onClick={() => {
+                                                setPaymentMethod("UPI");
+                                                if (selectedPaymentMethod === "UPI") {
+                                                    handleSubmit();
+                                                }
+                                            }}
                                             className={[
                                                 "checkout-paper-option group relative flex min-h-[64px] items-center justify-between gap-2 overflow-hidden rounded-[18px] border px-3 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-primary)] hover:-translate-y-0.5",
                                                 selectedPaymentMethod === "UPI" ? "ring-1 ring-[color:var(--app-primary)]" : "",
