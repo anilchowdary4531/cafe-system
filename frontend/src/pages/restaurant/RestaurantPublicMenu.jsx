@@ -30,8 +30,8 @@ export default function RestaurantPublicMenu() {
     const searchFromUrl = String(searchParams.get("search") || "").trim();
 
     const { data, loading } = useCachedGet(`/r/${slug}/menu`, {
-        ttlMs: 2 * 60_000,
-        staleMs: 30 * 60_000,
+        ttlMs: 5_000,
+        staleMs: 15_000,
         scope: `restaurant:${slug}`,
     });
     const restaurant = data?.restaurant || null;
