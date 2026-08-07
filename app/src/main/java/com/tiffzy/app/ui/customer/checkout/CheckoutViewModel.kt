@@ -1,203 +1,135 @@
 package com.tiffzy.app.ui.customer.checkout
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.tiffzy.app.data.local.AuthDataStore
 import com.tiffzy.app.data.model.*
-import com.tiffzy.app.data.remote.RetrofitClient
-import com.tiffzy.app.data.repository.CartRepository
-import com.tiffzy.app.data.repository.RestaurantRepository
+import com.tiffzy.app.data.repository.CheckoutRepository
+import com.tiffzy.app.ui.customer.cart.CartViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-sealed class CheckoutUiState {
-    object Idle : CheckoutUiState()
-    object Loading : CheckoutUiState()
-    data class Success(val orderDetails: OrderDetails) : CheckoutUiState()
-    data class RazorpayReady(val razorpayData: RazorpayOrderData, val paymentId: Int, val orderDetails: OrderDetails) : CheckoutUiState()
-    data class Error(val message: String) : CheckoutUiState()
-}
+data class CheckoutUiState(
+    val isLoading: Boolean = false,
+    val addresses: List<Address> = emptyList(),
+    val selectedAddress: Address? = null,
+    val walletAccounts: List<PayLaterAccount> = emptyList(),
+    val useWallet: Boolean = false,
+    val deliveryInstructions: String = "",
+    val restaurant: Restaurant? = null,
+    val checkoutPreview: CheckoutPreviewResponse? = null,
+    val orderSuccess: OrderResponse? = null,
+    val error: String? = null
+)
 
-class CheckoutViewModel(application: Application) : AndroidViewModel(application) {
-    private val restaurantRepository = RestaurantRepository(RetrofitClient.apiService)
-    private val cartRepository = CartRepository.getInstance()
-    private val authDataStore = AuthDataStore(application)
+class CheckoutViewModel(
+    private val repository: CheckoutRepository,
+    private val cartViewModel: CartViewModel
+) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<CheckoutUiState>(CheckoutUiState.Idle)
+    private val _uiState = MutableStateFlow(CheckoutUiState())
     val uiState: StateFlow<CheckoutUiState> = _uiState.asStateFlow()
 
-    private val _customerName = MutableStateFlow("")
-    val customerName: StateFlow<String> = _customerName.asStateFlow()
+    fun getCartState() = cartViewModel.uiState
 
-    private val _customerPhone = MutableStateFlow("")
-    val customerPhone: StateFlow<String> = _customerPhone.asStateFlow()
-
-    private val _isPayLaterEligible = MutableStateFlow(false)
-    val isPayLaterEligible: StateFlow<Boolean> = _isPayLaterEligible.asStateFlow()
-
-    var fulfillment = MutableStateFlow("dinein")
-    var paymentMethod = MutableStateFlow("CASH")
-    var notes = MutableStateFlow("")
-
-    init {
-        loadCustomerInfo()
-        checkPayLaterEligibility()
-        // Set default fulfillment to dinein if a table is selected
-        if (cartRepository.selectedTable.value != null) {
-            fulfillment.value = "dinein"
-        } else {
-            fulfillment.value = "pickup"
-        }
-    }
-
-    private fun checkPayLaterEligibility() {
+    fun loadCheckoutData(restaurantSlug: String) {
         viewModelScope.launch {
-            val restaurant = cartRepository.currentRestaurant.value ?: return@launch
+            _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                val response = restaurantRepository.checkPayLaterEligibility(restaurant.slug)
-                _isPayLaterEligible.value = response.eligible
+                val addresses = repository.getAddresses()
+                val wallet = repository.getWalletAccounts()
+                val restaurant = repository.getRestaurant(restaurantSlug)
+                
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    addresses = addresses,
+                    selectedAddress = addresses.find { it.isDefault } ?: addresses.firstOrNull(),
+                    walletAccounts = wallet,
+                    restaurant = restaurant
+                )
+                calculateBill()
             } catch (e: Exception) {
-                _isPayLaterEligible.value = false
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
     }
 
-    private fun loadCustomerInfo() {
-        viewModelScope.launch {
-            _customerName.value = authDataStore.customerName.first() ?: ""
-            _customerPhone.value = authDataStore.customerPhone.first() ?: ""
-        }
+    fun selectAddress(address: Address) {
+        _uiState.value = _uiState.value.copy(selectedAddress = address)
+        calculateBill()
     }
 
-    fun placeOrder() {
-        val restaurant = cartRepository.currentRestaurant.value ?: return
-        val cartItems = cartRepository.cartItems.value
-        if (cartItems.isEmpty()) return
+    fun toggleWallet(use: Boolean) {
+        _uiState.value = _uiState.value.copy(useWallet = use)
+        calculateBill()
+    }
+
+    fun setInstructions(text: String) {
+        _uiState.value = _uiState.value.copy(deliveryInstructions = text)
+    }
+
+    private fun calculateBill() {
+        val cartState = cartViewModel.uiState.value
+        val restaurant = _uiState.value.restaurant ?: return
+
+        val subtotal = cartState.subtotal
+        val taxAmount = cartState.tax
+        
+        // Mocking packing charges and delivery fee for now as they are not in schema
+        val packingCharges = if (subtotal > 0) 20.0 else 0.0
+        val deliveryFee = if (subtotal > 0 && subtotal < 500) 40.0 else 0.0
+        
+        val walletApplied = if (_uiState.value.useWallet) {
+            val account = _uiState.value.walletAccounts.find { it.restaurantId == restaurant.id }
+            account?.pendingBalance ?: 0.0
+        } else 0.0
+
+        val total = subtotal + taxAmount + packingCharges + deliveryFee - walletApplied
+
+        _uiState.value = _uiState.value.copy(
+            checkoutPreview = CheckoutPreviewResponse(
+                subtotal = subtotal,
+                taxAmount = taxAmount,
+                gstAmount = taxAmount,
+                packingCharges = packingCharges,
+                deliveryFee = deliveryFee,
+                couponDiscount = 0.0,
+                walletApplied = walletApplied,
+                total = total,
+                savings = 0.0,
+                taxes = listOf(TaxDetail("GST", taxAmount, restaurant.taxPercent)),
+                availableCoupons = emptyList()
+            )
+        )
+    }
+
+    fun placeOrder(customerName: String, phone: String, email: String?) {
+        val state = _uiState.value
+        val restaurant = state.restaurant ?: return
+        val cartState = cartViewModel.uiState.value
+        val items = cartState.items
 
         viewModelScope.launch {
-            _uiState.value = CheckoutUiState.Loading
+            _uiState.value = state.copy(isLoading = true)
             try {
-                val token = authDataStore.authToken.first()
-                if (token == null) {
-                    _uiState.value = CheckoutUiState.Error("Please login to place an order")
-                    return@launch
-                }
-
-                val customerName = authDataStore.customerName.first() ?: "Guest"
-                val phone = authDataStore.customerPhone.first() ?: ""
-                
                 val request = OrderRequest(
                     customerName = customerName,
                     phone = phone,
-                    email = null,
-                    tableNumber = cartRepository.selectedTable.value,
-                    fulfillment = fulfillment.value,
-                    deliveryAddress = null,
-                    deliveryLatitude = null,
-                    deliveryLongitude = null,
-                    notes = notes.value,
-                    items = cartItems.map { 
-                        OrderItemRequest(it.menuItem.id, it.menuItem.name, it.menuItem.price, it.quantity)
-                    }
+                    email = email,
+                    tableNumber = cartViewModel.cartRepository.getTable(),
+                    fulfillment = if (cartViewModel.cartRepository.getTable() != null) "dinein" else "delivery",
+                    deliveryAddress = state.selectedAddress?.let { "${it.label}: ${it.line1}, ${it.line2 ?: ""}, ${it.city}" },
+                    deliveryLatitude = state.selectedAddress?.latitude,
+                    deliveryLongitude = state.selectedAddress?.longitude,
+                    notes = state.deliveryInstructions,
+                    items = items.map { OrderItemRequest(it.menuItem.id, it.menuItem.name, it.menuItem.price, it.quantity) }
                 )
-
-                val response = restaurantRepository.placeOrder(restaurant.slug, request)
-                
-                // If it's dine-in (has table), we might also want to link it to a table session
-                val tableNo = cartRepository.selectedTable.value
-                if (tableNo != null) {
-                    try {
-                        val session = restaurantRepository.openTable(restaurant.id, tableNo)
-                        restaurantRepository.placeDineInOrder(
-                            session.id,
-                            cartItems.map { OrderItemRequest(it.menuItem.id, it.menuItem.name, it.menuItem.price, it.quantity) }
-                        )
-                    } catch (e: Exception) {
-                        // Table session failed, but main order was placed
-                    }
-                }
-                
-                if (paymentMethod.value == "CASH" || paymentMethod.value == "PAY_LATER") {
-                    verifyOfflinePayment(response.order, paymentMethod.value)
-                } else {
-                    // Default fallback
-                    _uiState.value = CheckoutUiState.Success(response.order)
-                    cartRepository.clearCart()
-                }
+                val response = repository.placeOrder(restaurant.slug, request)
+                _uiState.value = _uiState.value.copy(isLoading = false, orderSuccess = response)
+                cartViewModel.clearCart()
             } catch (e: Exception) {
-                _uiState.value = CheckoutUiState.Error(e.message ?: "Failed to place order")
-            }
-        }
-    }
-
-    fun onRazorpaySuccess(
-        razorpayPaymentId: String,
-        razorpayOrderId: String,
-        razorpaySignature: String,
-        paymentId: Int,
-        order: OrderDetails
-    ) {
-        viewModelScope.launch {
-            _uiState.value = CheckoutUiState.Loading
-            try {
-                val verifyRequest = VerifyPaymentRequest(
-                    paymentId = paymentId,
-                    razorpayOrderId = razorpayOrderId,
-                    razorpayPaymentId = razorpayPaymentId,
-                    razorpaySignature = razorpaySignature
-                )
-                val verifyResponse = restaurantRepository.verifyPayment(verifyRequest)
-                if (verifyResponse.verified) {
-                    _uiState.value = CheckoutUiState.Success(order)
-                    cartRepository.clearCart()
-                } else {
-                    _uiState.value = CheckoutUiState.Error("Payment verification failed. Please contact support with Payment ID: $razorpayPaymentId")
-                }
-            } catch (e: Exception) {
-                _uiState.value = CheckoutUiState.Error("Verification failed: ${e.message}. Your payment was successful. If your order is not confirmed, please contact us.")
-            }
-        }
-    }
-
-    fun onRazorpayFailure(code: Int, message: String) {
-        val errorMessage = when (code) {
-            2 -> "Payment cancelled by user" // Checkout.PAYMENT_CANCELED
-            0 -> "Network error. Please check your internet connection." // Checkout.NETWORK_ERROR
-            else -> "Payment failed: $message"
-        }
-        
-        if (code == 2) {
-            _uiState.value = CheckoutUiState.Idle
-        } else {
-            _uiState.value = CheckoutUiState.Error(errorMessage)
-        }
-    }
-
-    fun onRazorpayFailure(message: String) {
-        onRazorpayFailure(-1, message)
-    }
-
-    private fun verifyOfflinePayment(order: OrderDetails, method: String) {
-        viewModelScope.launch {
-            try {
-                // Matching React: api.post("/payments/verify", { orderId, status: "SUCCESS", paymentMode: "CASH" })
-                val verifyRequest = VerifyPaymentRequest(
-                    orderId = order.id,
-                    status = "SUCCESS",
-                    paymentMode = method
-                )
-                restaurantRepository.verifyPayment(verifyRequest)
-                _uiState.value = CheckoutUiState.Success(order)
-                cartRepository.clearCart()
-            } catch (e: Exception) {
-                // Even if verification fails, order was placed. 
-                // But for consistency let's show success if the order creation succeeded.
-                _uiState.value = CheckoutUiState.Success(order)
-                cartRepository.clearCart()
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
     }

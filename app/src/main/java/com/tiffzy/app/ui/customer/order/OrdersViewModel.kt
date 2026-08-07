@@ -88,23 +88,22 @@ class OrdersViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun startPollingOrder(orderId: Int) {
-        pollingJob?.cancel()
-        pollingJob = viewModelScope.launch {
-            while (true) {
-                delay(10000) // Poll every 10 seconds
-                fetchOrderDetail(orderId)
-                
-                // If status is terminal, stop polling
-                val currentState = _orderDetailState.value
-                if (currentState is OrderDetailUiState.Success) {
-                    val status = currentState.order.status.uppercase()
-                    if (status == "DELIVERED" || status == "CANCELLED" || status == "PICKED_UP") {
-                        break
+    fun startRealtimeOrderTracking(orderId: Int) {
+        viewModelScope.launch {
+            com.tiffzy.app.service.SocketManager.connect()
+            com.tiffzy.app.service.SocketManager.joinOrderRoom(orderId)
+            com.tiffzy.app.service.SocketManager.listenOrderStatusUpdates { updatedOrderId, newStatus ->
+                if (updatedOrderId == orderId || updatedOrderId == 0) {
+                    viewModelScope.launch {
+                        fetchOrderDetail(orderId)
                     }
                 }
             }
         }
+    }
+
+    fun startPollingOrder(orderId: Int) {
+        startRealtimeOrderTracking(orderId)
     }
 
     fun reorder(order: OrderDetails) {

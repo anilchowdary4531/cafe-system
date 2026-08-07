@@ -24,6 +24,7 @@ sealed class AuthUiState {
     object OtpSent : AuthUiState()
     object Authenticated : AuthUiState()
     object AccountDeleted : AuthUiState()
+    data class RequiresProfileCompletion(val partialInfo: VerifyOtpResponse) : AuthUiState()
     data class Error(val message: String) : AuthUiState()
 }
 
@@ -48,6 +49,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     val notificationsEnabled = authDataStore.notificationsEnabled
 
     private var timerJob: Job? = null
+
+    val authToken = repository.getAuthTokenFlow()
 
     init {
         viewModelScope.launch {
@@ -78,6 +81,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     // Login & Register fields
     var username: String = ""
     var password: String = ""
+
+    // Temporary storage for profile completion
+    var pendingProfileInfo: VerifyOtpResponse? = null
 
     private fun handleError(e: Exception, defaultMessage: String) {
         val message = if (e is HttpException) {
@@ -128,24 +134,42 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loginWithGoogle(idToken: String, email: String?, name: String?, googleId: String?, picture: String?) {
-        android.util.Log.d("GOOGLE_AUTH", "AuthViewModel.loginWithGoogle() called with email: $email")
+    fun loginWithGoogle(idToken: String, email: String?, name: String?, googleId: String?, picture: String?, phone: String? = null) {
+        android.util.Log.d("GOOGLE_AUTH", "AuthViewModel.loginWithGoogle() called with email: $email, phone: $phone")
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             try {
                 android.util.Log.d("GOOGLE_AUTH", "Executing repository.googleLogin")
-                repository.googleLogin(
+                val response = repository.googleLogin(
                     GoogleLoginRequest(
                         googleId = googleId,
                         email = email,
                         name = name,
                         picture = picture,
-                        idToken = idToken
+                        idToken = idToken,
+                        phone = phone
                     )
                 )
-                android.util.Log.d("GOOGLE_AUTH", "repository.googleLogin success")
-                _uiState.value = AuthUiState.Authenticated
-                registerFcm()
+                android.util.Log.d("GOOGLE_AUTH", "repository.googleLogin success. requiresInfo=${response.requiresInfo}")
+                
+                if (response.requiresInfo == true) {
+                    _uiState.value = AuthUiState.RequiresProfileCompletion(response)
+                } else {
+                    _uiState.value = AuthUiState.Authenticated
+                    // Initial local save for picture to ensure it shows in Profile
+                    picture?.let { pic ->
+                        viewModelScope.launch {
+                            authDataStore.saveAvatarUrl(pic)
+                            // Also save to ProfileExtras so ProfileViewModel finds it
+                            val userPhone = response.customer?.phone ?: email ?: ""
+                            if (userPhone.isNotEmpty()) {
+                                val extrasStore = com.tiffzy.app.data.local.ProfileExtrasDataStore(getApplication())
+                                extrasStore.saveProfileExtras(userPhone, null, pic)
+                            }
+                        }
+                    }
+                    registerFcm()
+                }
             } catch (e: Exception) {
                 android.util.Log.e("GOOGLE_AUTH", "Backend Google Login Failed", e)
                 handleError(e, "Google login failed")
@@ -198,13 +222,17 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             try {
-                repository.verifyOtp(currentEmail, otp, name)
-                _uiState.value = AuthUiState.Authenticated
+                val response = repository.verifyOtp(currentEmail, otp, name)
                 
-                // Register FCM Token after successful login
-                registerFcm()
+                if (response.requiresInfo == true) {
+                    _uiState.value = AuthUiState.RequiresProfileCompletion(response)
+                } else {
+                    _uiState.value = AuthUiState.Authenticated
+                    // Register FCM Token after successful login
+                    registerFcm()
+                }
             } catch (e: Exception) {
-                _uiState.value = AuthUiState.Error(e.message ?: "Invalid OTP")
+                handleError(e, "Invalid OTP")
             }
         }
     }

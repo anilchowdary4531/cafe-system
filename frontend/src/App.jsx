@@ -17,6 +17,8 @@ import QROrdering from "./pages/QROrdering";
 import POSDashboardPage from "./pages/POSDashboardPage";
 import ProductAnalytics from "./pages/ProductAnalytics";
 import InventoryPage from "./pages/InventoryPage";
+import ShippingPolicy from "./pages/ShippingPolicy";
+import LegalDisclosure from "./pages/LegalDisclosure";
 
 import Cart from "./pages/Cart";
 import Login from "./pages/Login";
@@ -93,6 +95,8 @@ export default function App() {
                     <Route path="/pos-dashboard" element={<POSDashboardPage />} />
                     <Route path="/analytics" element={<ProductAnalytics />} />
                     <Route path="/inventory" element={<InventoryPage />} />
+                    <Route path="/shipping-policy" element={<ShippingPolicy />} />
+                    <Route path="/legal-disclosure" element={<LegalDisclosure />} />
 
                     <Route
                         path="/cart"

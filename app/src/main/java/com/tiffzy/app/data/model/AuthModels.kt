@@ -23,9 +23,14 @@ data class VerifyOtpRequest(
 )
 
 data class VerifyOtpResponse(
-    @SerializedName("message") val message: String,
-    @SerializedName("token") val token: String,
-    @SerializedName("customer") val customer: Customer
+    @SerializedName("message") val message: String?,
+    @SerializedName("token") val token: String?,
+    @SerializedName("customer") val customer: Customer?,
+    @SerializedName("requiresInfo") val requiresInfo: Boolean? = false,
+    @SerializedName("googleId") val googleId: String? = null,
+    @SerializedName("email") val email: String? = null,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("picture") val picture: String? = null
 )
 
 data class Customer(
@@ -34,7 +39,8 @@ data class Customer(
     @SerializedName("phone") val phone: String,
     @SerializedName("name") val name: String?,
     @SerializedName("email") val email: String?,
-    @SerializedName("rewardPoints") val rewardPoints: Int? = 0
+    @SerializedName("rewardPoints") val rewardPoints: Int? = 0,
+    @SerializedName("avatarUrl") val avatarUrl: String? = null
 )
 
 data class CustomerRegisterRequest(
@@ -55,7 +61,8 @@ data class GoogleLoginRequest(
     @SerializedName("email") val email: String? = null,
     @SerializedName("name") val name: String? = null,
     @SerializedName("picture") val picture: String? = null,
-    @SerializedName("idToken") val idToken: String? = null
+    @SerializedName("idToken") val idToken: String? = null,
+    @SerializedName("phone") val phone: String? = null
 )
 
 data class CustomerProfileResponse(

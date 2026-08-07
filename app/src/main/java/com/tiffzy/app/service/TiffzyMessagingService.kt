@@ -47,27 +47,28 @@ class TiffzyMessagingService : FirebaseMessagingService() {
         super.onMessageReceived(remoteMessage)
         Log.d(TAG, "From: ${remoteMessage.from}")
 
-        // Support actual order events only
-        val isOrderEvent = remoteMessage.data.containsKey("orderId") || 
-                          remoteMessage.data["type"]?.contains("ORDER", ignoreCase = true) == true ||
-                          remoteMessage.notification?.title?.contains("Order", ignoreCase = true) == true
-        
-        if (!isOrderEvent) {
-            Log.d(TAG, "Skipping non-order notification")
-            return
-        }
+        val data = remoteMessage.data
+        val notification = remoteMessage.notification
 
-        // Check if message contains a notification payload.
-        remoteMessage.notification?.let {
-            val orderId = remoteMessage.data["orderId"]?.toIntOrNull() ?: 0
-            NotificationHelper.sendOrderNotification(this, it.title ?: "Order Update", it.body ?: "", orderId)
-        } ?: run {
-            // Check if message contains a data payload.
-            if (remoteMessage.data.isNotEmpty()) {
-                val title = remoteMessage.data["title"] ?: "Order Update"
-                val message = remoteMessage.data["body"] ?: remoteMessage.data["message"] ?: "Your order has been updated"
-                val orderId = remoteMessage.data["orderId"]?.toIntOrNull() ?: 0
-                NotificationHelper.sendOrderNotification(this, title, message, orderId)
+        val title = notification?.title ?: data["title"] ?: "Tiffzy Notification"
+        val body = notification?.body ?: data["body"] ?: data["message"] ?: "You have a new update"
+        val type = data["type"] ?: "GENERAL"
+        val orderId = data["orderId"]?.toIntOrNull() ?: 0
+
+        Log.d(TAG, "Received FCM Notification: Type=$type, Title=$title, Body=$body, OrderId=$orderId")
+
+        when (type.uppercase()) {
+            "ORDER_CONFIRMED", "PREPARING", "READY", "OUT_FOR_DELIVERY", "DELIVERED" -> {
+                NotificationHelper.sendOrderNotification(this, title, body, orderId)
+            }
+            "NEW_ORDER", "PAYMENT_SUCCESS", "REFUND", "SETTLEMENT" -> {
+                NotificationHelper.sendOrderNotification(this, "🔔 Restaurant Alert: $title", body, orderId)
+            }
+            "RESTAURANT_REGISTRATION", "PAYMENT_FAILURE" -> {
+                NotificationHelper.sendOrderNotification(this, "⚠️ Admin Alert: $title", body, orderId)
+            }
+            else -> {
+                NotificationHelper.sendOrderNotification(this, title, body, orderId)
             }
         }
     }

@@ -115,4 +115,73 @@ interface ApiService {
 
     @POST("api/payments/verify")
     suspend fun verifyCashfreeOrder(@Body request: CashfreeVerifyOrderRequest): CashfreeVerifyOrderResponse
+
+    @GET("api/payments/status/{orderId}")
+    suspend fun getPaymentStatus(@Path("orderId") orderId: String): CashfreeVerifyOrderResponse
+
+    @GET("api/restaurant/settlements")
+    suspend fun getRestaurantSettlements(
+        @Query("restaurantId") restaurantId: Int? = null,
+        @Query("range") range: String = "daily"
+    ): SettlementSummaryResponse
+
+    @GET("api/restaurant/payments")
+    suspend fun getRestaurantPayments(
+        @Query("restaurantId") restaurantId: Int? = null,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 10,
+        @Query("range") range: String = "daily"
+    ): SettlementOrdersResponse
+
+    @POST("api/orders/{orderId}/status")
+    suspend fun updateOrderStatus(
+        @Path("orderId") orderId: Int,
+        @Body body: Map<String, String>
+    ): SimpleResponse
+
+    @GET("api/restaurant/orders")
+    suspend fun getKitchenOrders(
+        @Query("restaurantId") restaurantId: Int? = null,
+        @Query("status") status: String? = null
+    ): List<OrderDetails>
+
+    @GET("api/restaurant/inventory")
+    suspend fun getInventory(
+        @Query("restaurantId") restaurantId: Int? = null
+    ): InventoryResponse
+
+    @POST("api/restaurant/inventory/adjust")
+    suspend fun adjustInventory(
+        @Body request: InventoryAdjustmentRequest
+    ): SimpleResponse
+
+    @POST("api/restaurant/menu")
+    suspend fun createMenuItem(@Body request: MenuItemRequest): MenuItem
+
+    @PUT("api/restaurant/menu/{id}")
+    suspend fun updateMenuItem(@Path("id") id: Int, @Body request: MenuItemRequest): MenuItem
+
+    @DELETE("api/restaurant/menu/{id}")
+    suspend fun deleteMenuItem(@Path("id") id: Int): SimpleResponse
+
+    @PATCH("api/restaurant/menu/{id}/availability")
+    suspend fun toggleItemAvailability(@Path("id") id: Int, @Body body: Map<String, Boolean>): SimpleResponse
+
+    @POST("api/coupons/validate")
+    suspend fun validateCoupon(@Body request: ValidateCouponRequest): ValidateCouponResponse
+
+    @POST("api/coupons/create")
+    suspend fun createCoupon(@Body request: CreateCouponRequest): SimpleResponse
+
+    @GET("api/coupons")
+    suspend fun getCoupons(): CouponListResponse
+
+    @POST("api/delivery/assign")
+    suspend fun assignDeliveryPartner(@Body request: AssignDeliveryPartnerRequest): SimpleResponse
+
+    @POST("api/delivery/status")
+    suspend fun updateDeliveryStatus(@Body request: UpdateDeliveryStatusRequest): SimpleResponse
+
+    @GET("api/delivery/partners")
+    suspend fun getDeliveryPartners(): DeliveryPartnersResponse
 }

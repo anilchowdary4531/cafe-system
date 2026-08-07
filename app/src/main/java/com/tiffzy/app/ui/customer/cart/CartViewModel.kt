@@ -20,7 +20,7 @@ data class CartUiState(
 )
 
 class CartViewModel(
-    private val cartRepository: CartRepository = CartRepository.getInstance()
+    val cartRepository: CartRepository = CartRepository.getInstance()
 ) : ViewModel() {
 
     val uiState: StateFlow<CartUiState> = combine(

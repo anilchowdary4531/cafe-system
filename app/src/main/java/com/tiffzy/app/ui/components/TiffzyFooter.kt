@@ -23,10 +23,12 @@ fun TiffzyFooter(
     onPrivacyClick: () -> Unit = {},
     onRefundPolicyClick: () -> Unit = {},
     onDeleteAccountClick: () -> Unit = {},
+    onShippingPolicyClick: () -> Unit = {},
     onQrOrderingClick: () -> Unit = {},
     onPosDashboardClick: () -> Unit = {},
     onAnalyticsClick: () -> Unit = {},
-    onInventoryClick: () -> Unit = {}
+    onInventoryClick: () -> Unit = {},
+    onLegalDisclosureClick: () -> Unit = {}
 ) {
     // Colors adapted to MaterialTheme (Dark/Light support)
     val footerBackgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
@@ -49,6 +51,29 @@ fun TiffzyFooter(
             modifier = Modifier.fillMaxWidth(0.8f)
         )
 
+        Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+        
+        // Legal Entity Notice Card (Added for Google Play Compliance)
+        Surface(
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+            shape = RoundedCornerShape(12.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Legal Entity Notice",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Tiffzy is owned & operated by SURVETRA SERVICES.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = textColor
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
 
         // Grid-like layout for sections
@@ -57,6 +82,7 @@ fun TiffzyFooter(
                 FooterHeader("Company", headerColor)
                 FooterLink("About Us", textColor, onAboutUsClick)
                 FooterLink("Contact Us", textColor, onContactUsClick)
+                FooterLink("Legal & Business Info", headerColor, onLegalDisclosureClick)
             }
             Column(modifier = Modifier.weight(1f)) {
                 FooterHeader("Products", headerColor)
@@ -76,6 +102,7 @@ fun TiffzyFooter(
                 FooterLink("Terms", textColor, onTermsClick)
                 FooterLink("Privacy", textColor, onPrivacyClick)
                 FooterLink("Refund Policy", textColor, onRefundPolicyClick)
+                FooterLink("Shipping Policy", textColor, onShippingPolicyClick)
                 FooterLink("Delete Account", textColor, onDeleteAccountClick)
             }
             Column(modifier = Modifier.weight(1f)) {
@@ -100,9 +127,14 @@ fun TiffzyFooter(
         Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
 
         Text(
-            text = "© 2026 Tiffzy Technologies Pvt Ltd. All rights reserved.",
+            text = "© 2026 SURVETRA SERVICES. All rights reserved.",
             style = MaterialTheme.typography.labelSmall,
             color = textColor.copy(alpha = 0.7f)
+        )
+        Text(
+            text = "Tiffzy is owned and operated by SURVETRA SERVICES.",
+            style = MaterialTheme.typography.labelSmall,
+            color = textColor.copy(alpha = 0.5f)
         )
     }
 }

@@ -55,21 +55,30 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             _uiState.value = ProfileUiState.Loading
             try {
                 val response = repository.getProfile()
-                _uiState.value = ProfileUiState.Success(response.customer)
+                val customer = response.customer
+                _uiState.value = ProfileUiState.Success(customer)
                 
-                // Sync with local store
-                authDataStore.saveCustomerInfo(response.customer.name, response.customer.phone)
+                // Sync with local store including avatar
+                authDataStore.saveCustomerInfo(customer.name, customer.phone, customer.avatarUrl)
                 
                 // Load local extras
-                _nickname.value = profileExtrasDataStore.getNickname(response.customer.phone).first()
-                _avatar.value = profileExtrasDataStore.getAvatar(response.customer.phone).first()
+                _nickname.value = profileExtrasDataStore.getNickname(customer.phone).first()
+                
+                // Use backend avatarUrl if present, otherwise fallback to local ProfileExtras
+                _avatar.value = customer.avatarUrl ?: profileExtrasDataStore.getAvatar(customer.phone).first()
 
                 // Fetch last order
-                val ordersResponse = repository.getCustomerOrders(response.customer.phone)
+                val ordersResponse = repository.getCustomerOrders(customer.phone)
                 val allOrders = ordersResponse.groups.flatMap { it.orders }
                 _lastOrder.value = allOrders.maxByOrNull { it.createdAt }
             } catch (e: Exception) {
-                _uiState.value = ProfileUiState.Error(e.message ?: "Failed to load profile")
+                if (e is retrofit2.HttpException && e.code() == 404) {
+                    // Account missing in backend but app has token - session is invalid
+                    logout { }
+                    _uiState.value = ProfileUiState.Error("Session expired. Please login again.")
+                } else {
+                    _uiState.value = ProfileUiState.Error(e.message ?: "Failed to load profile")
+                }
             }
         }
     }
@@ -79,13 +88,14 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             _uiState.value = ProfileUiState.Loading
             try {
                 val response = repository.updateProfile(name, email)
-                _uiState.value = ProfileUiState.Success(response.customer)
-                authDataStore.saveCustomerInfo(response.customer.name, response.customer.phone)
+                val customer = response.customer
+                _uiState.value = ProfileUiState.Success(customer)
+                authDataStore.saveCustomerInfo(customer.name, customer.phone, customer.avatarUrl)
                 
                 // Save local extras
-                profileExtrasDataStore.saveProfileExtras(response.customer.phone, newNickname, newAvatar)
+                profileExtrasDataStore.saveProfileExtras(customer.phone, newNickname, newAvatar)
                 _nickname.value = newNickname
-                _avatar.value = newAvatar
+                _avatar.value = customer.avatarUrl ?: newAvatar
             } catch (e: Exception) {
                 _uiState.value = ProfileUiState.Error(e.message ?: "Failed to update profile")
             }

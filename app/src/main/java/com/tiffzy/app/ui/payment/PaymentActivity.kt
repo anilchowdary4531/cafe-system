@@ -341,52 +341,19 @@ fun PaymentScreen(
                     }
                 }
 
-                PaymentResultStatus.FAILED -> {
-                    StatusBanner(
-                        icon = Icons.Default.Error,
-                        iconTint = Color(0xFFF44336),
-                        title = "Payment Failed",
-                        subtitle = uiState.errorMessage ?: "The transaction could not be completed.",
-                        backgroundColor = Color(0xFFFFEBEE)
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = onBackClick,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text(text = "Cancel")
+                PaymentResultStatus.FAILED, PaymentResultStatus.CANCELLED -> {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    PaymentFailureScreen(
+                        errorMessage = uiState.errorMessage ?: if (uiState.status == PaymentResultStatus.CANCELLED) "Payment transaction was cancelled" else null,
+                        orderId = uiState.orderId,
+                        amount = uiState.amount,
+                        onRetryClick = onRetryClick,
+                        onChooseOtherPaymentClick = onBackClick,
+                        onGoBackClick = onBackClick,
+                        onSupportClick = {
+                            Toast.makeText(context, "Support requested. Contacting Tiffzy Helpdesk...", Toast.LENGTH_LONG).show()
                         }
-                        Button(
-                            onClick = onRetryClick,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text(text = "Retry")
-                        }
-                    }
-                }
-
-                PaymentResultStatus.CANCELLED -> {
-                    StatusBanner(
-                        icon = Icons.Default.Info,
-                        iconTint = Color(0xFFFF9800),
-                        title = "Payment Cancelled",
-                        subtitle = "You cancelled the Cashfree payment transaction.",
-                        backgroundColor = Color(0xFFFFF3E0)
                     )
-
-                    Button(
-                        onClick = onRetryClick,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(text = "Try Payment Again")
-                    }
                 }
 
                 PaymentResultStatus.PENDING -> {

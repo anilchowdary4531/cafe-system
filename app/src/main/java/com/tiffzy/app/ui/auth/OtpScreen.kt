@@ -19,6 +19,7 @@ import com.tiffzy.app.ui.theme.Dimens
 fun OtpScreen(
     viewModel: AuthViewModel,
     onAuthenticated: () -> Unit,
+    onNavigateToCompleteProfile: () -> Unit,
     onBack: () -> Unit
 ) {
     var otp by remember { mutableStateOf("") }
@@ -29,6 +30,9 @@ fun OtpScreen(
     LaunchedEffect(uiState) {
         if (uiState is AuthUiState.Authenticated) {
             onAuthenticated()
+        } else if (uiState is AuthUiState.RequiresProfileCompletion) {
+            viewModel.pendingProfileInfo = (uiState as AuthUiState.RequiresProfileCompletion).partialInfo
+            onNavigateToCompleteProfile()
         }
     }
 

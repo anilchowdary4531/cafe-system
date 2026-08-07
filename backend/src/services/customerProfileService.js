@@ -15,8 +15,13 @@ export const getCustomerAccountByPhone = async ({ prisma, phone }) => {
 };
 
 export const upsertCustomerAccount = async ({ prisma, phone, name, email } = {}) => {
-  const normalizedPhone = normalizePhone(phone);
-  if (!normalizedPhone) throw new Error("phone_required");
+  // If it's an email, use it directly. Otherwise normalize it.
+  const normalizedPhone = (phone && phone.includes("@")) ? phone.toLowerCase() : normalizePhone(phone);
+
+  if (!normalizedPhone) {
+    console.error("[upsertCustomerAccount] Missing identifier. Received:", { phone, email });
+    throw new Error("phone_required");
+  }
 
   const normalizedName = String(name || "").trim();
   const normalizedEmail = String(email || "").trim().toLowerCase();

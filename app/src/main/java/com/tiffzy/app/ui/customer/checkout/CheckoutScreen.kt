@@ -1,20 +1,11 @@
 package com.tiffzy.app.ui.customer.checkout
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,90 +13,35 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.tiffzy.app.MainActivity
-import com.tiffzy.app.data.model.Address
-import com.tiffzy.app.data.repository.CartRepository
+import com.tiffzy.app.data.model.*
 import com.tiffzy.app.ui.components.*
 import com.tiffzy.app.ui.theme.Dimens
-import org.json.JSONObject
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CheckoutScreen(
-    onOrderSuccess: (String, String) -> Unit,
+    restaurantSlug: String,
     onBack: () -> Unit,
-    viewModel: CheckoutViewModel = viewModel()
+    onOrderSuccess: (OrderDetails) -> Unit,
+    viewModel: CheckoutViewModel,
+    authViewModel: com.tiffzy.app.ui.auth.AuthViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val fulfillment by viewModel.fulfillment.collectAsState()
-    val paymentMethod by viewModel.paymentMethod.collectAsState()
-    val isPayLaterEligible by viewModel.isPayLaterEligible.collectAsState()
-    val customerName by viewModel.customerName.collectAsState()
-    val customerPhone by viewModel.customerPhone.collectAsState()
-    
-    val cartItems by CartRepository.getInstance().cartItems.collectAsState()
-    val restaurant by CartRepository.getInstance().currentRestaurant.collectAsState()
+    val cartState by viewModel.getCartState().collectAsState()
+    val scrollState = rememberScrollState()
 
-    val context = LocalContext.current
-    val activity = context as? MainActivity
-
-    if (uiState is CheckoutUiState.Success) {
-        val order = (uiState as CheckoutUiState.Success).orderDetails
-        LaunchedEffect(Unit) {
-            onOrderSuccess(order.orderNo, order.id.toString())
-        }
+    LaunchedEffect(restaurantSlug) {
+        viewModel.loadCheckoutData(restaurantSlug)
     }
 
-    LaunchedEffect(uiState) {
-        if (uiState is CheckoutUiState.RazorpayReady) {
-            val readyState = uiState as CheckoutUiState.RazorpayReady
-            val checkout = com.razorpay.Checkout()
-            checkout.setKeyID(readyState.razorpayData.keyId)
-
-            MainActivity.onPaymentSuccess = { paymentId, data ->
-                viewModel.onRazorpaySuccess(
-                    paymentId,
-                    data.orderId ?: readyState.razorpayData.orderId,
-                    data.signature ?: "",
-                    readyState.paymentId,
-                    readyState.orderDetails
-                )
-            }
-
-            MainActivity.onPaymentError = { code, response, _ ->
-                viewModel.onRazorpayFailure(code, response ?: "Payment cancelled")
-            }
-
-            try {
-                val options = JSONObject()
-                options.put("name", "Tiffzy")
-                options.put("description", "Order #${readyState.orderDetails.orderNo}")
-                options.put("order_id", readyState.razorpayData.orderId)
-                options.put("amount", readyState.razorpayData.amount)
-                options.put("currency", readyState.razorpayData.currency)
-
-                val prefill = JSONObject()
-                prefill.put("name", customerName)
-                prefill.put("contact", customerPhone)
-                options.put("prefill", prefill)
-
-                // Premium coloring for Razorpay UI
-                val theme = JSONObject()
-                theme.put("color", "#F5B94E") // Tiffzy Gold
-                options.put("theme", theme)
-
-                checkout.open(activity, options)
-            } catch (e: Exception) {
-                viewModel.onRazorpayFailure(e.message ?: "Error opening Razorpay")
-            }
+    LaunchedEffect(uiState.orderSuccess) {
+        uiState.orderSuccess?.let { 
+            onOrderSuccess(it.order) 
         }
     }
 
@@ -113,339 +49,428 @@ fun CheckoutScreen(
         topBar = {
             TiffzyTopBar(
                 title = "Checkout",
-                subtitle = restaurant?.name ?: "Confirm Order",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
+        },
+        bottomBar = {
+            if (uiState.checkoutPreview != null) {
+                CheckoutBottomBar(
+                    total = uiState.checkoutPreview!!.total,
+                    isLoading = uiState.isLoading,
+                    onPlaceOrder = {
+                        viewModel.placeOrder(
+                            customerName = authViewModel.name ?: "Customer",
+                            phone = authViewModel.phone,
+                            email = authViewModel.email
+                        )
+                    }
+                )
+            }
         }
-    ) { innerPadding ->
-        if (uiState is CheckoutUiState.Loading) {
-            TiffzyLoadingIndicator()
-        } else {
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
+                    .padding(Dimens.PaddingMedium)
             ) {
-                // 1. Order Summary
-                SectionHeader("Order Summary", Icons.Default.ShoppingBag)
-                Card(
-                    modifier = Modifier.padding(horizontal = Dimens.PaddingLarge),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = MaterialTheme.shapes.large
-                ) {
-                    Column(modifier = Modifier.padding(Dimens.PaddingMedium)) {
-                        cartItems.forEach { item ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
+                // Restaurant Info Banner
+                uiState.restaurant?.let { rest ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = Dimens.PaddingMedium),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(Dimens.PaddingMedium),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Storefront,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.width(Dimens.SpacingMedium))
+                            Column {
                                 Text(
-                                    text = "${item.quantity}x ${item.menuItem.name}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.weight(1f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    text = rest.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Text(
-                                    text = "₹${String.format(Locale.getDefault(), "%.2f", item.menuItem.price * item.quantity)}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold
+                                    text = "${cartState.items.sumOf { it.quantity }} items in cart",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                                 )
                             }
                         }
                     }
                 }
 
+                // 1. Delivery Address Section
+                SectionHeader("Delivery Address", Icons.Default.LocationOn)
+                AddressSelector(
+                    addresses = uiState.addresses,
+                    selectedAddress = uiState.selectedAddress,
+                    onSelect = { viewModel.selectAddress(it) }
+                )
+                
                 Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
-                // 2. Fulfillment
-                val tableNo = CartRepository.getInstance().selectedTable.collectAsState().value
-                SectionHeader("Fulfillment", Icons.Default.LocationOn)
-                Row(
-                    modifier = Modifier.padding(horizontal = Dimens.PaddingLarge),
-                    horizontalArrangement = Arrangement.spacedBy(Dimens.SpacingMedium)
-                ) {
-                    if (tableNo != null) {
-                        FulfillmentChip(
-                            label = "Dine-in (Table $tableNo)",
-                            selected = fulfillment == "dinein",
-                            modifier = Modifier.weight(1f)
-                        ) { viewModel.fulfillment.value = "dinein" }
-                    }
-                    FulfillmentChip(
-                        label = "Self-Pickup",
-                        selected = fulfillment == "pickup",
-                        modifier = Modifier.weight(1f)
-                    ) { viewModel.fulfillment.value = "pickup" }
-                }
-
+                // 2. Order Summary Section
+                SectionHeader("Items Summary", Icons.Default.Receipt)
+                OrderSummaryList(cartItems = cartState.items)
+                
                 Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
-
-                // 4. Payment Method
-                SectionHeader("Payment Method", Icons.Default.Payments)
-                Column(
-                    modifier = Modifier.padding(horizontal = Dimens.PaddingLarge),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (isPayLaterEligible) {
-                        PaymentOptionItem(
-                            title = "Tiffzy Pay Later",
-                            subtitle = "Digital Khata - Pay monthly",
-                            selected = paymentMethod == "PAY_LATER",
-                            onClick = { viewModel.paymentMethod.value = "PAY_LATER" },
-                            icon = Icons.Default.CheckCircle,
-                            iconTint = Color(0xFFF59E0B)
-                        )
-                    }
-                    PaymentOptionItem(
-                        title = "Counter Payment",
-                        subtitle = "Pay at the restaurant",
-                        selected = paymentMethod == "CASH",
-                        onClick = { viewModel.paymentMethod.value = "CASH" }
+                
+                // 3. Delivery Instructions
+                SectionHeader("Delivery Instructions", Icons.Default.EditNote)
+                OutlinedTextField(
+                    value = uiState.deliveryInstructions,
+                    onValueChange = { viewModel.setInstructions(it) },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("e.g. Leave at door, call on arrival...") },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                     )
-                }
+                )
 
                 Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
-                // 5. Billing Details
-                SectionHeader("Billing Details", null)
-                val subtotal = cartItems.sumOf { it.menuItem.price * it.quantity }
-                val tax = if (restaurant?.taxEnabled == true) (subtotal * restaurant!!.taxPercent) / 100.0 else 0.0
-                val total = subtotal + tax
+                // 4. Coupon Section
+                SectionHeader("Offers & Coupons", Icons.Default.ConfirmationNumber)
+                CouponSection(
+                    appliedCoupon = null,
+                    onApply = { /* Apply Coupon */ }
+                )
 
-                Card(
-                    modifier = Modifier.padding(horizontal = Dimens.PaddingLarge),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                ) {
-                    Column(modifier = Modifier.padding(Dimens.PaddingMedium)) {
-                        BillingRowItem("Item Total", subtotal)
-                        if (tax > 0) {
-                            BillingRowItem("Taxes & Charges", tax)
-                        }
-                        HorizontalDivider(modifier = Modifier.padding(vertical = Dimens.PaddingSmall), color = MaterialTheme.colorScheme.outlineVariant)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(text = "Total Amount", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
-                            Text(
-                                text = "₹${String.format(Locale.getDefault(), "%.2f", total)}",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Black,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
+                Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
-                Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+                // 5. Payment Method Selector (Cashfree PG)
+                SectionHeader("Payment Method", Icons.Default.Payment)
+                PaymentMethodSelectorCard(
+                    selectedMethod = "CASHFREE",
+                    onSelectMethod = { /* Selected Method */ }
+                )
 
-                if (uiState is CheckoutUiState.Error) {
-                    Text(
-                        text = (uiState as CheckoutUiState.Error).message,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = Dimens.PaddingLarge),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Spacer(modifier = Modifier.height(Dimens.SpacingSmall))
-                }
+                Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
-                Box(modifier = Modifier.padding(horizontal = Dimens.PaddingLarge)) {
-                    TiffzyPrimaryButton(
-                        text = "Confirm & Place Order",
-                        onClick = { viewModel.placeOrder() }
-                    )
+                // Wallet / Pay Later Option (If Available)
+                WalletSelector(
+                    useWallet = uiState.useWallet,
+                    onToggle = { viewModel.toggleWallet(it) },
+                    balance = uiState.walletAccounts.find { it.restaurantId == uiState.restaurant?.id }?.pendingBalance ?: 0.0
+                )
+
+                Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
+
+                // 6. Detailed Bill Breakdown
+                if (uiState.checkoutPreview != null) {
+                    SectionHeader("Bill Breakdown", Icons.Default.RequestQuote)
+                    BillDetailsCard(preview = uiState.checkoutPreview!!)
                 }
                 
-                Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+                Spacer(modifier = Modifier.height(90.dp)) // Padding for fixed bottom bar
+            }
+
+            if (uiState.isLoading) {
+                TiffzyLoadingIndicator()
             }
         }
     }
 }
 
 @Composable
-fun SectionHeader(title: String, icon: ImageVector?) {
+fun SectionHeader(title: String, icon: ImageVector) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = Dimens.PaddingLarge, vertical = Dimens.PaddingSmall),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(bottom = Dimens.PaddingSmall)
     ) {
-        if (icon != null) {
-            Icon(icon, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.width(Dimens.SpacingSmall))
-        }
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(Dimens.SpacingSmall))
         Text(
             text = title.uppercase(),
-            style = MaterialTheme.typography.labelLarge,
-            letterSpacing = 2.sp,
+            style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 1.sp
         )
     }
 }
 
 @Composable
-fun BillingRowItem(label: String, amount: Double) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(text = label, style = MaterialTheme.typography.bodySmall)
-        Text(text = "₹${String.format(Locale.getDefault(), "%.2f", amount)}", style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-@Composable
-fun PaymentOptionItem(
-    title: String,
-    subtitle: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    icon: ImageVector? = null,
-    iconTint: Color = MaterialTheme.colorScheme.primary
+fun AddressSelector(
+    addresses: List<Address>,
+    selectedAddress: Address?,
+    onSelect: (Address) -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .border(
-                1.dp,
-                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                MaterialTheme.shapes.medium
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(Dimens.PaddingMedium),
-            verticalAlignment = Alignment.CenterVertically
+    if (addresses.isEmpty()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
         ) {
-            RadioButton(selected = selected, onClick = onClick)
-            Spacer(modifier = Modifier.width(Dimens.SpacingSmall))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (icon != null) {
-                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
+            Text(
+                text = "No addresses found. Add one in Profile.",
+                modifier = Modifier.padding(Dimens.PaddingMedium),
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    } else {
+        addresses.forEach { address ->
+            val isSelected = address.id == selectedAddress?.id
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .clickable { onSelect(address) },
+                border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.05f) 
+                                    else MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(Dimens.PaddingMedium),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(selected = isSelected, onClick = { onSelect(address) })
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = address.label, fontWeight = FontWeight.Bold)
+                        Text(text = "${address.line1}, ${address.city}", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun AddressItem(address: Address, selected: Boolean, onClick: () -> Unit) {
+fun CouponSection(appliedCoupon: String?, onApply: (String) -> Unit) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .border(
-                1.dp,
-                if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                MaterialTheme.shapes.medium
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface
-        )
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(Dimens.PaddingSmall),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.LocalOffer, null, tint = Color(0xFFEAB308))
+            Spacer(modifier = Modifier.width(Dimens.SpacingSmall))
+            Text(text = "Apply Coupon", modifier = Modifier.weight(1f))
+            TextButton(onClick = { /* Open Coupon Dialog */ }) {
+                Text("VIEW ALL")
+            }
+        }
+    }
+}
+
+@Composable
+fun PaymentMethodSelectorCard(selectedMethod: String, onSelectMethod: (String) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Row(
             modifier = Modifier.padding(Dimens.PaddingMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            RadioButton(
+                selected = true,
+                onClick = { onSelectMethod("CASHFREE") }
+            )
+            Spacer(modifier = Modifier.width(Dimens.SpacingSmall))
             Icon(
-                imageVector = Icons.Default.LocationOn,
+                Icons.Default.CreditCard,
                 contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
             )
             Spacer(modifier = Modifier.width(Dimens.SpacingMedium))
             Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Cashfree Payment Gateway",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.colorScheme.let { MaterialTheme.typography.titleSmall }
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        color = Color(0xFF10B981),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "SECURE",
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
                 Text(
-                    text = address.label,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "${address.line1}, ${address.city}",
+                    text = "UPI (GPay, PhonePe, Paytm), Cards & Netbanking",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Selected",
-                    tint = MaterialTheme.colorScheme.primary
-                )
+        }
+    }
+}
+
+@Composable
+fun WalletSelector(useWallet: Boolean, onToggle: (Boolean) -> Unit, balance: Double) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(Dimens.PaddingMedium),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.AccountBalanceWallet, null, tint = Color(0xFF10B981))
+            Spacer(modifier = Modifier.width(Dimens.SpacingSmall))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Tiffzy Credit / Wallet", fontWeight = FontWeight.Bold)
+                Text(text = "Available: Rs $balance", style = MaterialTheme.typography.bodySmall)
+            }
+            Switch(checked = useWallet, onCheckedChange = onToggle)
+        }
+    }
+}
+
+@Composable
+fun BillDetailsCard(preview: CheckoutPreviewResponse) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(Dimens.PaddingMedium)) {
+            BillRow("Subtotal", preview.subtotal)
+            BillRow("GST & Restaurant Taxes", preview.taxAmount)
+            BillRow("Delivery Fee", preview.deliveryFee)
+            BillRow("Packing Charges", preview.packingCharges)
+            
+            if (preview.couponDiscount > 0) {
+                BillRow("Coupon Discount", -preview.couponDiscount, color = Color(0xFF10B981))
+            }
+            
+            if (preview.walletApplied > 0) {
+                BillRow("Wallet Applied", -preview.walletApplied, color = Color(0xFF10B981))
+            }
+            
+            HorizontalDivider(modifier = Modifier.padding(vertical = Dimens.PaddingSmall))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = "Grand Total", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                Text(text = "₹${preview.total.toInt()}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
             }
         }
     }
 }
 
 @Composable
-fun AddAddressDialog(onDismiss: () -> Unit, onConfirm: (String, String, String, String, String) -> Unit) {
-    var label by remember { mutableStateOf("Home") }
-    var line1 by remember { mutableStateOf("") }
-    var city by remember { mutableStateOf("") }
-    var state by remember { mutableStateOf("") }
-    var pin by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add New Address") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                TiffzyTextField(value = label, onValueChange = { label = it }, label = "Label (e.g. Home, Office)")
-                TiffzyTextField(value = line1, onValueChange = { line1 = it }, label = "Address Line 1")
-                TiffzyTextField(value = city, onValueChange = { city = it }, label = "City")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TiffzyTextField(value = state, onValueChange = { state = it }, label = "State", modifier = Modifier.weight(1f))
-                    TiffzyTextField(value = pin, onValueChange = { pin = it }, label = "Pincode", modifier = Modifier.weight(1f))
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(label, line1, city, state, pin) }) {
-                Text("Add")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
+fun BillRow(label: String, amount: Double, color: Color = MaterialTheme.colorScheme.onSurface) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = if (amount < 0) "-₹${Math.abs(amount).toInt()}" else "₹${amount.toInt()}", 
+            style = MaterialTheme.typography.bodyMedium, 
+            color = color,
+            fontWeight = if (amount < 0) FontWeight.Bold else FontWeight.Normal
+        )
+    }
 }
 
 @Composable
-fun FulfillmentChip(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun CheckoutBottomBar(total: Double, isLoading: Boolean, onPlaceOrder: () -> Unit) {
     Surface(
-        modifier = modifier
-            .clickable { onClick() }
-            .border(
-                1.dp,
-                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                CircleShape
-            )
-            .clip(CircleShape),
-        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+        modifier = Modifier.fillMaxWidth(),
+        shadowElevation = 8.dp,
+        color = MaterialTheme.colorScheme.surface
     ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.labelLarge,
-            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center
-        )
+        Row(
+            modifier = Modifier
+                .padding(Dimens.PaddingMedium)
+                .navigationBarsPadding(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "₹${total.toInt()}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                Text(text = "VIEW DETAILED BILL", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            }
+            
+            Button(
+                onClick = onPlaceOrder,
+                modifier = Modifier
+                    .weight(1.5f)
+                    .height(Dimens.ButtonHeight),
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                } else {
+                    Text(text = "PLACE ORDER", fontWeight = FontWeight.Black)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun OrderSummaryList(cartItems: List<CartItem>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(Dimens.PaddingMedium)) {
+            cartItems.forEach { item ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${item.quantity}x",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.width(32.dp)
+                    )
+                    Text(
+                        text = item.menuItem.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "₹${(item.menuItem.price * item.quantity).toInt()}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
     }
 }

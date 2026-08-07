@@ -4,6 +4,7 @@ import com.tiffzy.app.data.local.AuthDataStore
 import com.tiffzy.app.data.model.*
 import com.tiffzy.app.data.remote.ApiService
 import com.tiffzy.app.data.remote.RetrofitClient
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 
 class AuthRepository(
@@ -55,7 +56,13 @@ class AuthRepository(
 
     private suspend fun handleCustomerAuth(response: VerifyOtpResponse) {
         saveAuthToken(response.token)
-        authDataStore.saveCustomerInfo(response.customer.name, response.customer.phone)
+        // Ensure customer object is not null before accessing its properties
+        val customer = response.customer ?: return
+        authDataStore.saveCustomerInfo(
+            customer.name ?: "Guest",
+            customer.phone,
+            customer.avatarUrl // Sync avatar from backend
+        )
     }
 
     suspend fun login(email: String, password: String): LoginResponse {
@@ -65,15 +72,21 @@ class AuthRepository(
         return response
     }
 
-    suspend fun saveAuthToken(token: String) {
-        authDataStore.saveAuthToken(token)
-        RetrofitClient.setToken(token)
+    suspend fun saveAuthToken(token: String?) {
+        if (token != null) {
+            authDataStore.saveAuthToken(token)
+            RetrofitClient.setToken(token)
+        }
     }
 
     suspend fun getAuthToken(): String? {
         val token = authDataStore.authToken.first()
         RetrofitClient.setToken(token)
         return token
+    }
+
+    fun getAuthTokenFlow(): Flow<String?> {
+        return authDataStore.authToken
     }
 
     suspend fun getAccountType(): String? {

@@ -103,4 +103,68 @@ class RestaurantRepository(private val apiService: ApiService) {
             "items" to items
         ))
     }
+
+    suspend fun updateOrderStatus(orderId: Int, status: String): SimpleResponse {
+        return apiService.updateOrderStatus(orderId, mapOf("status" to status))
+    }
+
+    suspend fun getKitchenOrders(restaurantId: Int? = null, status: String? = null): List<OrderDetails> {
+        return try {
+            apiService.getKitchenOrders(restaurantId, status)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun getInventory(restaurantId: Int? = null): InventoryResponse {
+        return try {
+            apiService.getInventory(restaurantId)
+        } catch (e: Exception) {
+            InventoryResponse()
+        }
+    }
+
+    suspend fun adjustInventory(request: InventoryAdjustmentRequest): SimpleResponse {
+        return apiService.adjustInventory(request)
+    }
+
+    suspend fun createMenuItem(request: MenuItemRequest): Result<MenuItem> {
+        return runCatching { apiService.createMenuItem(request) }
+    }
+
+    suspend fun updateMenuItem(id: Int, request: MenuItemRequest): Result<MenuItem> {
+        return runCatching { apiService.updateMenuItem(id, request) }
+    }
+
+    suspend fun deleteMenuItem(id: Int): Result<SimpleResponse> {
+        return runCatching { apiService.deleteMenuItem(id) }
+    }
+
+    suspend fun toggleItemAvailability(id: Int, isAvailable: Boolean): Result<SimpleResponse> {
+        return runCatching { apiService.toggleItemAvailability(id, mapOf("isAvailable" to isAvailable)) }
+    }
+
+    suspend fun validateCoupon(request: ValidateCouponRequest): Result<ValidateCouponResponse> {
+        return runCatching { apiService.validateCoupon(request) }
+    }
+
+    suspend fun createCoupon(request: CreateCouponRequest): Result<SimpleResponse> {
+        return runCatching { apiService.createCoupon(request) }
+    }
+
+    suspend fun getCoupons(): Result<CouponListResponse> {
+        return runCatching { apiService.getCoupons() }
+    }
+
+    suspend fun assignDeliveryPartner(request: AssignDeliveryPartnerRequest): Result<SimpleResponse> {
+        return runCatching { apiService.assignDeliveryPartner(request) }
+    }
+
+    suspend fun updateDeliveryStatus(request: UpdateDeliveryStatusRequest): Result<SimpleResponse> {
+        return runCatching { apiService.updateDeliveryStatus(request) }
+    }
+
+    suspend fun getDeliveryPartners(): Result<DeliveryPartnersResponse> {
+        return runCatching { apiService.getDeliveryPartners() }
+    }
 }

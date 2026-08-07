@@ -123,8 +123,9 @@ class PaymentViewModel(
         }
 
         viewModelScope.launch {
-            val verifyRequest = CashfreeVerifyOrderRequest(orderId = orderId)
-            val result = paymentRepository.verifyCashfreeOrder(verifyRequest)
+            val result = paymentRepository.getPaymentStatus(orderId)
+                .mapCatching { it }
+                .recoverCatching { paymentRepository.verifyCashfreeOrder(CashfreeVerifyOrderRequest(orderId = orderId)).getOrThrow() }
 
             result.onSuccess { response ->
                 val finalStatus = when (response.status) {

@@ -71,6 +71,7 @@ object Routes {
     const val LiveBill = "live_bill/{sessionId}"
     const val Scanner = "scanner"
     const val DeleteAccount = "delete_account"
+    const val CompleteProfile = "complete_profile"
     const val Web = "web?title={title}&url={url}"
     
     fun restaurantDetail(slug: String) = "restaurant/$slug"
@@ -136,6 +137,9 @@ fun NavGraph(
                 onNavigateToDeleteAccount = {
                     navController.navigate(Routes.DeleteAccount)
                 },
+                onNavigateToCompleteProfile = {
+                    navController.navigate(Routes.CompleteProfile)
+                },
                 onAuthenticated = {
                     navController.navigate(Routes.Home) {
                         popUpTo(Routes.Login) { inclusive = true }
@@ -179,11 +183,37 @@ fun NavGraph(
                         popUpTo(Routes.Login) { inclusive = true }
                     }
                 },
+                onNavigateToCompleteProfile = {
+                    navController.navigate(Routes.CompleteProfile)
+                },
                 onBack = {
                     authViewModel.resetState()
                     navController.popBackStack()
                 }
             )
+        }
+
+        composable(Routes.CompleteProfile) {
+            val info = authViewModel.pendingProfileInfo
+            if (info != null) {
+                com.tiffzy.app.ui.auth.CompleteProfileScreen(
+                    viewModel = authViewModel,
+                    partialInfo = info,
+                    onAuthenticated = {
+                        navController.navigate(Routes.Home) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onBack = {
+                        authViewModel.resetState()
+                        navController.popBackStack()
+                    }
+                )
+            } else {
+                LaunchedEffect(Unit) {
+                    navController.popBackStack()
+                }
+            }
         }
 
         composable(Routes.Location) {
@@ -375,14 +405,26 @@ fun NavGraph(
         }
 
         composable(Routes.Checkout) {
+            val cartViewModel: com.tiffzy.app.ui.customer.cart.CartViewModel = viewModel()
+            val restaurantSlug = cartViewModel.uiState.collectAsState().value.restaurant?.slug ?: ""
+            val checkoutViewModel: com.tiffzy.app.ui.customer.checkout.CheckoutViewModel = viewModel(
+                factory = com.tiffzy.app.ui.customer.checkout.CheckoutViewModelFactory(
+                    com.tiffzy.app.data.repository.CheckoutRepository(com.tiffzy.app.data.remote.RetrofitClient.apiService),
+                    cartViewModel
+                )
+            )
+
             CheckoutScreen(
+                restaurantSlug = restaurantSlug,
                 onBack = { navController.popBackStack() },
-                onOrderSuccess = { orderNo, orderId ->
-                    navController.navigate(Routes.orderSuccess(orderNo, orderId)) {
+                onOrderSuccess = { order ->
+                    navController.navigate(Routes.orderSuccess(order.orderNo, order.id.toString())) {
                         popUpTo(Routes.Checkout) { inclusive = true }
                         popUpTo(Routes.Cart) { inclusive = true }
                     }
-                }
+                },
+                viewModel = checkoutViewModel,
+                authViewModel = authViewModel
             )
         }
 
@@ -467,9 +509,14 @@ fun NavGraph(
         ) { backStackEntry ->
             val title = backStackEntry.arguments?.getString("title") ?: "Web Page"
             val url = backStackEntry.arguments?.getString("url") ?: ""
+            
+            // Get token from ViewModel
+            val tokenState by authViewModel.authToken.collectAsState(initial = null)
+
             com.tiffzy.app.ui.components.TiffzyWebViewScreen(
                 title = title,
                 url = url,
+                token = tokenState,
                 onBack = { navController.popBackStack() }
             )
         }

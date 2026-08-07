@@ -28,4 +28,22 @@ class PaymentRepository(private val apiService: ApiService = RetrofitClient.apiS
             apiService.verifyCashfreeOrder(request)
         }
     }
+
+    suspend fun getPaymentStatus(orderId: String): Result<CashfreeVerifyOrderResponse> {
+        return runCatching {
+            apiService.getPaymentStatus(orderId)
+        }
+    }
+
+    suspend fun getRestaurantSettlements(restaurantId: Int? = null, range: String = "daily"): Result<com.tiffzy.app.data.model.SettlementSummaryResponse> {
+        return runCatching {
+            apiService.getRestaurantSettlements(restaurantId, range)
+        }
+    }
+
+    suspend fun getRestaurantPayments(restaurantId: Int? = null, page: Int = 1, limit: Int = 10, range: String = "daily"): Result<com.tiffzy.app.data.model.SettlementOrdersResponse> {
+        return runCatching {
+            apiService.getRestaurantPayments(restaurantId, page, limit, range)
+        }
+    }
 }

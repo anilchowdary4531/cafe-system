@@ -21,27 +21,39 @@ import com.tiffzy.app.ui.theme.Dimens
 fun TiffzyWebViewScreen(
     title: String,
     url: String,
+    token: String? = null, // Accept the auth token
     onBack: () -> Unit
 ) {
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var progress by remember { mutableIntStateOf(0) }
 
-    // JavaScript to hide "Back to Tiffzy" links
-    val hideElementsScript = """
+    // JavaScript to sync authentication and hide "Back to Tiffzy" links
+    val script = """
         (function() {
-            var links = document.getElementsByTagName('a');
-            for (var i = 0; i < links.length; i++) {
-                if (links[i].innerText.toLowerCase().includes('back to tiffzy')) {
-                    links[i].style.display = 'none';
+            var token = '${token ?: ""}';
+            if (token !== '') {
+                if (localStorage.getItem('customerToken') !== token) {
+                    localStorage.setItem('customerToken', token);
+                    localStorage.setItem('android_injected', 'true');
+                    window.location.reload(); 
                 }
             }
-            // Also hide any headers/navs that might contain it if nested
-            var divs = document.getElementsByTagName('div');
-            for (var i = 0; i < divs.length; i++) {
-                 if (divs[i].innerText.trim().toLowerCase() === 'back to tiffzy') {
-                    divs[i].style.display = 'none';
-                 }
+
+            // Hide common UI elements that don't belong in App WebView
+            var selectors = ['header', 'nav', '.navbar', '.theme-navbar', '.back-to-tiffzy'];
+            selectors.forEach(function(s) {
+                var elements = document.querySelectorAll(s);
+                elements.forEach(function(el) { el.style.display = 'none'; });
+            });
+            
+            // Hide "Login" links/buttons specifically
+            var links = document.getElementsByTagName('a');
+            for (var i = 0; i < links.length; i++) {
+                var text = links[i].innerText.toLowerCase();
+                if (text.includes('back to tiffzy') || text === 'login' || text === 'sign in') {
+                    links[i].style.display = 'none';
+                }
             }
         })();
     """.trimIndent()
@@ -76,9 +88,8 @@ fun TiffzyWebViewScreen(
                         webChromeClient = object : WebChromeClient() {
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                                 progress = newProgress
-                                if (newProgress > 80) {
-                                    // Inject script early if possible
-                                    view?.evaluateJavascript(hideElementsScript, null)
+                                if (newProgress > 10) {
+                                    view?.evaluateJavascript(script, null)
                                 }
                                 if (newProgress == 100) isLoading = false
                             }
@@ -89,13 +100,14 @@ fun TiffzyWebViewScreen(
                                 super.onPageStarted(view, url, favicon)
                                 isLoading = true
                                 errorMessage = null
+                                view?.evaluateJavascript(script, null)
                             }
 
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
                                 isLoading = false
-                                // Inject script when page is fully loaded
-                                view?.evaluateJavascript(hideElementsScript, null)
+                                // Ensure script runs when fully loaded
+                                view?.evaluateJavascript(script, null)
                             }
 
                             override fun onReceivedError(

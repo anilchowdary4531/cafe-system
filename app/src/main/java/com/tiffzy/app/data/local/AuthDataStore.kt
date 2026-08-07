@@ -20,6 +20,7 @@ class AuthDataStore(context: Context) {
         private val AUTH_TOKEN = stringPreferencesKey("auth_token")
         private val CUSTOMER_NAME = stringPreferencesKey("customer_name")
         private val CUSTOMER_PHONE = stringPreferencesKey("customer_phone")
+        private val CUSTOMER_AVATAR = stringPreferencesKey("customer_avatar")
         private val USER_ROLE = stringPreferencesKey("user_role")
         private val ACCOUNT_TYPE = stringPreferencesKey("account_type") // "customer" or "staff"
         private val RESTAURANT_ID = stringPreferencesKey("restaurant_id")
@@ -69,6 +70,10 @@ class AuthDataStore(context: Context) {
         preferences[CUSTOMER_PHONE]
     }
 
+    val customerAvatar: Flow<String?> = appContext.dataStore.data.map { preferences ->
+        preferences[CUSTOMER_AVATAR]
+    }
+
     suspend fun saveAuthToken(token: String) {
         appContext.dataStore.edit { preferences ->
             preferences[AUTH_TOKEN] = token
@@ -83,11 +88,22 @@ class AuthDataStore(context: Context) {
         }
     }
 
-    suspend fun saveCustomerInfo(name: String?, phone: String) {
+    suspend fun saveCustomerInfo(name: String?, phone: String, avatarUrl: String? = null) {
         appContext.dataStore.edit { preferences ->
             name?.let { preferences[CUSTOMER_NAME] = it }
             preferences[CUSTOMER_PHONE] = phone
+            avatarUrl?.let { preferences[CUSTOMER_AVATAR] = it }
             preferences[ACCOUNT_TYPE] = "customer"
+        }
+    }
+
+    suspend fun saveAvatarUrl(url: String?) {
+        appContext.dataStore.edit { preferences ->
+            if (url != null) {
+                preferences[CUSTOMER_AVATAR] = url
+            } else {
+                preferences.remove(CUSTOMER_AVATAR)
+            }
         }
     }
 

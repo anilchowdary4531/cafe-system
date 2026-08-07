@@ -30,6 +30,7 @@ fun LoginScreen(
     onOtpSent: () -> Unit,
     onNavigateToRegister: () -> Unit,
     onNavigateToDeleteAccount: () -> Unit,
+    onNavigateToCompleteProfile: () -> Unit,
     onAuthenticated: () -> Unit,
     onStaffLoggedIn: () -> Unit = {} // Kept for signature compatibility
 ) {
@@ -100,6 +101,9 @@ fun LoginScreen(
             onOtpSent()
         } else if (uiState is AuthUiState.Authenticated) {
             onAuthenticated()
+        } else if (uiState is AuthUiState.RequiresProfileCompletion) {
+            viewModel.pendingProfileInfo = (uiState as AuthUiState.RequiresProfileCompletion).partialInfo
+            onNavigateToCompleteProfile()
         }
     }
 

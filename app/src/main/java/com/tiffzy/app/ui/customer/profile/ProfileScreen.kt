@@ -352,6 +352,8 @@ fun ProfileContent(
             onPosDashboardClick = { onNavigateToWeb("POS Dashboard", "https://tiffzy.com/pos-dashboard") },
             onAnalyticsClick = { onNavigateToWeb("Analytics", "https://tiffzy.com/analytics") },
             onInventoryClick = { onNavigateToWeb("Inventory", "https://tiffzy.com/inventory") },
+            onShippingPolicyClick = { onNavigateToWeb("Shipping Policy", "https://tiffzy.com/shipping-policy") },
+            onLegalDisclosureClick = { onNavigateToWeb("Legal Disclosure", "https://tiffzy.com/legal-disclosure") },
             onDeleteAccountClick = onDeleteAccount
         )
 

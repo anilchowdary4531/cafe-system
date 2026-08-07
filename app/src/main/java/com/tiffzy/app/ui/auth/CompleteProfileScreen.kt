@@ -33,6 +33,7 @@ fun CompleteProfileScreen(
     var name by remember { mutableStateOf(partialInfo.name ?: "") }
     var phone by remember { mutableStateOf("") }
     val email = partialInfo.email ?: ""
+    val picture = partialInfo.picture
     
     val uiState by viewModel.uiState.collectAsState()
 
@@ -73,9 +74,9 @@ fun CompleteProfileScreen(
             Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
             // Profile Picture
-            if (!partialInfo.picture.isNullOrEmpty()) {
+            if (!picture.isNullOrEmpty()) {
                 AsyncImage(
-                    model = partialInfo.picture,
+                    model = picture,
                     contentDescription = "Profile Picture",
                     modifier = Modifier
                         .size(100.dp)
@@ -131,7 +132,8 @@ fun CompleteProfileScreen(
                                 email = email,
                                 name = name,
                                 googleId = partialInfo.googleId,
-                                picture = partialInfo.picture
+                                picture = picture,
+                                phone = phone
                             )
                         }
                     }
