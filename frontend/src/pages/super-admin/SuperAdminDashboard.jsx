@@ -12,6 +12,11 @@ import {
     Users,
     UserCheck,
     X,
+    Receipt,
+    DollarSign,
+    RotateCcw,
+    Tag,
+    Download,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
