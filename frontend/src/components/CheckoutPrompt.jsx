@@ -27,17 +27,24 @@ const normalizeFulfillment = (value) => {
     return "delivery";
 };
 
-const getPaymentMethodTitle = (value, fulfillment = "delivery") => {
-    const m = normalizePaymentMethod(value);
-    if (m === "CASH") {
-        return fulfillment === "pickup"
-            ? "Cash on Pickup"
-            : fulfillment === "dinein"
-                ? "Cash on Table"
-            : "Cash on Delivery";
-    }
-    if (m === "PAY_LATER") return "Pay Later";
-    return "UPI";
+const loadCashfreeSdk = () => {
+    return new Promise((resolve) => {
+        if (typeof window.Cashfree === "function") {
+            resolve(window.Cashfree);
+            return;
+        }
+        const existingScript = document.getElementById("cashfree-js-sdk");
+        if (existingScript) {
+            existingScript.addEventListener("load", () => resolve(window.Cashfree));
+            return;
+        }
+        const script = document.createElement("script");
+        script.id = "cashfree-js-sdk";
+        script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
+        script.onload = () => resolve(window.Cashfree);
+        script.onerror = () => resolve(null);
+        document.head.appendChild(script);
+    });
 };
 
 const getPaymentMethodSubtitle = (value, fulfillment = "delivery") => {
@@ -546,11 +553,13 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                     throw new Error(cashfreeRes?.data?.message || "Cashfree payment session could not be created. Please verify Cashfree API credentials.");
                 }
 
-                if (typeof window.Cashfree === "function") {
-                    const cashfree = window.Cashfree({ mode: "sandbox" });
+                const CashfreeSdk = await loadCashfreeSdk();
+                if (CashfreeSdk) {
+                    const mode = (import.meta.env.VITE_CASHFREE_ENV || "").toUpperCase() === "PRODUCTION" ? "production" : "sandbox";
+                    const cashfree = CashfreeSdk({ mode });
+
                     cashfree.checkout({
                         paymentSessionId: sessionId,
-                        redirectTarget: "_modal",
                     }).then(async (cfResult) => {
                         if (cfResult?.error) {
                             setError(cfResult.error.message || "Payment cancelled or failed. Please try again.");
@@ -559,11 +568,9 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                         }
 
                         if (cfResult?.redirect) {
-                            // User redirected to bank/UPI page
                             return;
                         }
 
-                        // Verify completion with backend
                         await api.post(
                             "/payments/verify",
                             { orderId, status: "SUCCESS", paymentMode: "ONLINE", paymentSessionId: sessionId },
@@ -582,13 +589,13 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                         );
                     }).catch((sdkErr) => {
                         console.error("Cashfree SDK Checkout Error:", sdkErr);
-                        setError("Unable to open Cashfree Payment window. Please disable popup blocker or try again.");
+                        setError("Unable to open Cashfree Payment window. Please try again.");
                         setSubmitting(false);
                     });
                     return;
                 }
 
-                setError("Cashfree Payment SDK loading. Please refresh and try again.");
+                setError("Cashfree Payment SDK could not be loaded. Please refresh and try again.");
                 setSubmitting(false);
                 return;
             } catch (pgErr) {
