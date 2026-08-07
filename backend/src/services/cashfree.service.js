@@ -257,4 +257,56 @@ export const verifyCashfreeWebhookSignature = ({ signature, rawBody, timestamp }
   }
 };
 
+/**
+ * Initiate Refund via Cashfree PG API
+ */
+export const createCashfreeRefund = async ({ orderId, refundAmount, refundId, refundNote }) => {
+  const cashfree = getCashfreeInstance();
+  const formattedOrderId = String(orderId || "").trim();
+  const numericRefundAmount = Number(refundAmount);
+
+  if (!formattedOrderId) {
+    throw new Error("orderId is required to initiate refund");
+  }
+
+  if (Number.isNaN(numericRefundAmount) || numericRefundAmount <= 0) {
+    throw new Error("refundAmount must be a valid positive number");
+  }
+
+  const formattedRefundId = String(refundId || `ref_${formattedOrderId}_${Date.now()}`).trim();
+  const formattedNote = String(refundNote || "Customer requested refund").trim();
+
+  const refundPayload = {
+    refund_amount: round2(numericRefundAmount),
+    refund_id: formattedRefundId,
+    refund_note: formattedNote,
+    refund_speed: "STANDARD",
+  };
+
+  try {
+    const response = await cashfree.PGOrderCreateRefund(CASHFREE_API_VERSION, formattedOrderId, refundPayload);
+    const data = response?.data || response;
+
+    console.log(`[CashfreeService] Refund initiated successfully for Order ${formattedOrderId}:`, {
+      refundId: data?.refund_id || formattedRefundId,
+      refundAmount: numericRefundAmount,
+      status: data?.refund_status || "SUCCESS",
+    });
+
+    return {
+      success: true,
+      refundId: data?.refund_id || formattedRefundId,
+      orderId: formattedOrderId,
+      refundAmount: round2(numericRefundAmount),
+      refundStatus: data?.refund_status || "SUCCESS",
+      data,
+    };
+  } catch (err) {
+    const errorMsg = err?.response?.data?.message || err?.message || "Cashfree refund creation failed";
+    console.error("[CashfreeService] Error creating refund:", errorMsg, err?.response?.data || err);
+    throw new Error(errorMsg);
+  }
+};
+
+
 

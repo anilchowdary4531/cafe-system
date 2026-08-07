@@ -48,7 +48,7 @@ const customerFromToken = (token) => {
 };
 
 export function useAuth() {
-    return useContext(AuthContext);
+    return useContext(AuthContext) || {};
 }
 
 export default function AuthProvider({ children }) {

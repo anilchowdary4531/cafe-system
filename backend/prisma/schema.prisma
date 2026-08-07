@@ -311,6 +311,7 @@ model CustomerAccount {
   avatarUrl String? @map("avatar_url")
 
   addresses CustomerAddress[]
+  payments  Payment[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -492,28 +493,29 @@ model Branch {
 model Payment {
   id Int @id @default(autoincrement())
 
-  orderId Int   @map("order_id")
-  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  cashfreeOrderId  String? @map("cashfree_order_id")
+  paymentSessionId String? @map("payment_session_id")
 
-  restaurantId Int        @map("restaurant_id")
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customerId   Int?             @map("customer_id")
+  customer     CustomerAccount? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
-  // Amount in smallest currency subunit (e.g., paise)
-  amountSubunit Int    @map("amount_subunit")
-  currency      String @default("INR")
+  restaurantId Int?             @map("restaurant_id")
+  restaurant   Restaurant?      @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
 
-  // CASH / CARD / UPI / ONLINE
-  method String
+  orderId      Int?             @map("order_id")
+  order        Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
-  // PENDING / PAID / FAILED / REFUNDED / PARTIAL
-  status String @default("PENDING")
+  amount        Float   @default(0)
+  amountSubunit Int?    @map("amount_subunit")
+  currency      String  @default("INR")
 
-  // RAZORPAY / STRIPE / OFFLINE
-  provider String? @map("provider")
+  status        String  @default("PENDING")
+  transactionId String? @map("transaction_id")
+  paymentMethod String? @map("payment_method")
+  method        String?
+  provider      String? @default("CASHFREE")
 
-  // External ids
   providerOrderId  String? @map("provider_order_id")
-  transactionId    String? @map("transaction_id")
   providerMetadata Json?   @map("provider_metadata")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -521,6 +523,8 @@ model Payment {
 
   @@index([restaurantId, createdAt])
   @@index([orderId])
+  @@index([cashfreeOrderId])
+  @@index([paymentSessionId])
   @@map("payments")
 }
 

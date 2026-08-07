@@ -10,5 +10,9 @@ export default function Landing() {
         return <Navigate to={`/m/${encodeURIComponent(slug)}/${encodeURIComponent(table)}`} replace />;
     }
 
-    return <RestaurantChooser />;
+    return (
+        <div id="tiffzy-landing-root">
+            <RestaurantChooser />
+        </div>
+    );
 }

@@ -44,14 +44,17 @@ const shortName = (value) => {
 };
 
 const SUPER_ADMIN_MENU_ITEMS = [
-    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, to: "/super-admin" },
-    { key: "settlements", label: "Settlement Dashboard", icon: BarChart3, to: "/super-admin/settlements" },
-    { key: "profile", label: "Profile", icon: UserRound, to: "/super-admin#profile-section" },
-    { key: "staff", label: "Staff", icon: UserCheck, to: "/super-admin/staff" },
-    { key: "users", label: "Users / Customers", icon: Users, to: "/super-admin/users" },
-    { key: "restaurants", label: "Restaurants", icon: Building2, to: "/super-admin#restaurants-section" },
-    { key: "create-restaurant", label: "Create Restaurant", icon: Store, to: "/super-admin/create-restaurant" },
-    { key: "settings", label: "Settings", icon: Settings, to: "/super-admin/settings" },
+    { key: "dashboard", label: "Dashboard Overview", icon: LayoutDashboard, to: "/super-admin" },
+    { key: "restaurants", label: "Restaurant Management", icon: Building2, to: "/super-admin#restaurants-section" },
+    { key: "users", label: "Customer Management", icon: Users, to: "/super-admin/users" },
+    { key: "orders", label: "Orders Ledger", icon: Receipt, to: "/super-admin/settlements" },
+    { key: "revenue", label: "Revenue & Commission", icon: DollarSign, to: "/super-admin/settlements" },
+    { key: "settlements", label: "Cashfree Easy Split", icon: BarChart3, to: "/super-admin/settlements" },
+    { key: "refunds", label: "Refunds Ledger", icon: RotateCcw, to: "/super-admin/settlements" },
+    { key: "coupons", label: "Coupons & Offers", icon: Tag, to: "/super-admin/settings" },
+    { key: "reports", label: "Reports & Analytics", icon: Download, to: "/super-admin/settlements" },
+    { key: "staff", label: "Staff Management", icon: UserCheck, to: "/super-admin/staff" },
+    { key: "settings", label: "System Settings", icon: Settings, to: "/super-admin/settings" },
 ];
 
 const HASH_TO_MENU_KEY = {

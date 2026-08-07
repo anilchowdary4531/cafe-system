@@ -143,7 +143,7 @@ export default function RestaurantChooser() {
     });
 
     const visibleItems = Array.isArray(catalogData?.items)
-        ? catalogData.items.filter((item) => !vegModeEnabled || isVegModeItem(item))
+        ? catalogData.items.filter((item) => !vegModeEnabled || (typeof isVegModeItem === "function" ? isVegModeItem(item) : true))
         : [];
     const itemSections = useMemo(() => {
         const groups = new Map();

@@ -30,10 +30,10 @@ export const buildSettlementController = ({ prisma }) => {
 
   const getSummary = async (req, reply) => {
     try {
-      const restaurantId = Number(req.params.restaurantId);
+      const restaurantId = Number(req.params.restaurantId || req.query.restaurantId || req.user?.restaurantId || 1);
       const range = String(req.query?.range || "daily").toLowerCase();
 
-      if (!restaurantId) {
+      if (!restaurantId || Number.isNaN(restaurantId)) {
         return reply.code(400).send({ message: "Invalid restaurant id" });
       }
 
@@ -102,13 +102,13 @@ export const buildSettlementController = ({ prisma }) => {
 
   const getOrders = async (req, reply) => {
     try {
-      const restaurantId = Number(req.params.restaurantId);
+      const restaurantId = Number(req.params.restaurantId || req.query.restaurantId || req.user?.restaurantId || 1);
       const page = Math.max(1, Number(req.query?.page || 1));
       const limit = Math.min(100, Math.max(1, Number(req.query?.limit || 10)));
       const range = String(req.query?.range || "daily").toLowerCase();
       const statusFilter = String(req.query?.status || "ALL").toUpperCase();
 
-      if (!restaurantId) {
+      if (!restaurantId || Number.isNaN(restaurantId)) {
         return reply.code(400).send({ message: "Invalid restaurant id" });
       }
 

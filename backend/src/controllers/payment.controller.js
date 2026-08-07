@@ -1,5 +1,5 @@
 import { validateCreateOrderPayload } from "../middleware/paymentValidation.js";
-import { createCashfreePaymentSession, verifyCashfreeOrderSession, verifyCashfreeWebhookSignature, getPaymentMetrics } from "../services/cashfree.service.js";
+import { createCashfreePaymentSession, verifyCashfreeOrderSession, verifyCashfreeWebhookSignature, getPaymentMetrics, createCashfreeRefund } from "../services/cashfree.service.js";
 
 export const buildPaymentController = ({ prisma }) => {
   const createOrder = async (req, reply) => {
@@ -101,8 +101,32 @@ export const buildPaymentController = ({ prisma }) => {
         commissionValue,
       });
 
+      // Store Payment record in Prisma DB
+      if (prisma) {
+        try {
+          const numRestId = Number(restaurantId);
+          const numCustId = Number(customerId);
+          const numOrderId = Number(orderId);
+          await prisma.payment.create({
+            data: {
+              cashfreeOrderId: String(result.cf_order_id || result.order_id || ""),
+              paymentSessionId: String(result.payment_session_id || ""),
+              amount: Number(amount || 0),
+              status: "PENDING",
+              provider: "CASHFREE",
+              ...(numRestId && !Number.isNaN(numRestId) ? { restaurantId: numRestId } : {}),
+              ...(numCustId && !Number.isNaN(numCustId) ? { customerId: numCustId } : {}),
+              ...(numOrderId && !Number.isNaN(numOrderId) ? { orderId: numOrderId } : {}),
+            },
+          });
+        } catch (payDbErr) {
+          console.warn("[PaymentController] Payment record creation notice:", payDbErr.message);
+        }
+      }
+
       return reply.code(200).send({
         payment_session_id: result.payment_session_id,
+        cashfree_order_id: result.cf_order_id || result.order_id,
         order_id: result.order_id,
         cf_order_id: result.cf_order_id,
         order_status: result.order_status,
@@ -120,7 +144,7 @@ export const buildPaymentController = ({ prisma }) => {
   const verifyOrder = async (req, reply) => {
     try {
       const body = req.body || {};
-      const orderId = String(body.orderId || body.order_id || "").trim();
+      const orderId = String(req.params?.orderId || body.orderId || body.order_id || "").trim();
 
       if (!orderId) {
         return reply.code(400).send({
@@ -182,8 +206,21 @@ export const buildPaymentController = ({ prisma }) => {
                 paymentMethod: cfResult.paymentMethod || "CASHFREE",
               },
             });
+            await prisma.payment.updateMany({
+              where: {
+                OR: [
+                  { cashfreeOrderId: String(cfResult.cfOrderId || orderId) },
+                  { orderId: existingOrder.id },
+                ],
+              },
+              data: {
+                status: "PAID",
+                paymentMethod: cfResult.paymentMethod || "CASHFREE",
+                transactionId: cfResult.paymentId || null,
+              },
+            });
           } catch (updateErr) {
-            console.error("[PaymentController] Order DB update error:", updateErr.message);
+            console.error("[PaymentController] Order/Payment DB update error:", updateErr.message);
           }
         }
 
@@ -388,11 +425,116 @@ export const buildPaymentController = ({ prisma }) => {
     }
   };
 
+  const initiateRefund = async (req, reply) => {
+    try {
+      const body = req.body || {};
+      const orderId = String(body.orderId || body.order_id || "").trim();
+      const refundAmount = Number(body.refundAmount || body.amount);
+      const refundNote = String(body.refundNote || body.reason || "Customer refund").trim();
+
+      if (!orderId) {
+        return reply.code(400).send({
+          success: false,
+          message: "orderId is required to initiate refund",
+        });
+      }
+
+      if (Number.isNaN(refundAmount) || refundAmount <= 0) {
+        return reply.code(400).send({
+          success: false,
+          message: "refundAmount must be a valid positive number",
+        });
+      }
+
+      // 1. Prisma DB Order Lookup & Anti-Duplicate Refund Check
+      let existingOrder = null;
+      if (prisma) {
+        try {
+          const numericId = Number(orderId);
+          if (!Number.isNaN(numericId)) {
+            existingOrder = await prisma.order.findUnique({ where: { id: numericId } });
+          }
+          if (!existingOrder) {
+            existingOrder = await prisma.order.findFirst({
+              where: { OR: [{ orderNo: orderId }, { invoiceNo: orderId }] },
+            });
+          }
+        } catch (dbErr) {
+          console.warn("[PaymentController] Refund DB lookup warning:", dbErr.message);
+        }
+      }
+
+      if (existingOrder && existingOrder.paymentStatus === "REFUNDED") {
+        return reply.code(400).send({
+          success: false,
+          message: "Order has already been fully refunded",
+          orderId,
+        });
+      }
+
+      // Determine Full vs Partial Refund
+      const orderTotal = Number(existingOrder?.total || existingOrder?.amount || refundAmount);
+      const isFullRefund = refundAmount >= orderTotal;
+      const refundType = isFullRefund ? "FULL" : "PARTIAL";
+
+      // 2. Call Cashfree PG Refund API
+      const refundResult = await createCashfreeRefund({
+        orderId,
+        refundAmount,
+        refundNote,
+      });
+
+      // 3. Update Database Order & Payment Records
+      if (existingOrder && prisma) {
+        try {
+          await prisma.order.update({
+            where: { id: existingOrder.id },
+            data: {
+              paymentStatus: isFullRefund ? "REFUNDED" : "PARTIALLY_REFUNDED",
+              status: isFullRefund ? "CANCELLED" : existingOrder.status,
+            },
+          });
+
+          await prisma.payment.create({
+            data: {
+              cashfreeOrderId: String(refundResult.orderId),
+              amount: Number(refundAmount),
+              status: "REFUNDED",
+              provider: "CASHFREE",
+              transactionId: String(refundResult.refundId),
+              orderId: existingOrder.id,
+              restaurantId: existingOrder.restaurantId || null,
+            },
+          });
+        } catch (updateErr) {
+          console.error("[PaymentController] Refund DB update warning:", updateErr.message);
+        }
+      }
+
+      return reply.code(200).send({
+        success: true,
+        message: `${refundType} refund initiated successfully`,
+        refundId: refundResult.refundId,
+        refundAmount: refundResult.refundAmount,
+        refundType,
+        orderId,
+        status: refundResult.refundStatus || "SUCCESS",
+      });
+    } catch (err) {
+      console.error("[PaymentController] initiateRefund Error:", err);
+      return reply.code(500).send({
+        success: false,
+        message: err.message || "Failed to initiate Cashfree refund",
+      });
+    }
+  };
+
   return {
     createOrder,
     verifyOrder,
     handleWebhook,
     getHealthCheck,
+    initiateRefund,
   };
 };
 
