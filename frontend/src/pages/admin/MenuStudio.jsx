@@ -4,6 +4,7 @@ import { MoreVertical } from "lucide-react";
 import { API } from "../../config";
 import { uploadToS3Presigned } from "../../utils/s3Upload";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
+import { invalidateGetCache } from "../../utils/apiClient";
 
 const emptyForm = {
     name: "",
@@ -208,6 +209,8 @@ export default function MenuStudio() {
                 await axios.post(`${API}/owner/${restaurantId}/menu`, payload);
             }
 
+            invalidateGetCache({ urlStartsWith: "/catalog" });
+            invalidateGetCache({ urlStartsWith: "/restaurants" });
             await loadMenu();
             resetForm({ close: true });
         } catch (err) {
@@ -235,6 +238,8 @@ export default function MenuStudio() {
     const handleDelete = async (id) => {
         try {
             await axios.delete(`${API}/owner/${restaurantId}/menu/${id}`);
+            invalidateGetCache({ urlStartsWith: "/catalog" });
+            invalidateGetCache({ urlStartsWith: "/restaurants" });
             setItems((prev) => prev.filter((item) => item.id !== id));
             if (editingId === id) resetForm();
         } catch (err) {
@@ -257,6 +262,9 @@ export default function MenuStudio() {
                 discountPercent: item.discountPercent ?? 0,
                 isAvailable,
             });
+
+            invalidateGetCache({ urlStartsWith: "/catalog" });
+            invalidateGetCache({ urlStartsWith: "/restaurants" });
 
             setItems((prev) =>
                 prev.map((menuItem) =>

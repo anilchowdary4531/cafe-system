@@ -177,8 +177,8 @@ export default async function publicRoutes(app, deps) {
                 },
               },
             },
-            orderBy: [{ isFeatured: "desc" }, { orderCount: "desc" }, { rating: "desc" }, { name: "asc" }],
-            take: itemLimit * 4,
+            orderBy: [{ isFeatured: "desc" }, { id: "desc" }, { name: "asc" }],
+            take: 200,
           }),
           prisma.menuItem.count({
             where: {
@@ -189,7 +189,6 @@ export default async function publicRoutes(app, deps) {
 
         const items = rawItems
           .filter((item) => item?.restaurant?.isActive !== false)
-          .slice(0, itemLimit)
           .map(mapItem);
 
         return {
