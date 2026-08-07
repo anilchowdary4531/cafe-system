@@ -56,7 +56,7 @@ const getPaymentMethodTitle = (value, fulfillment = "delivery") => {
             : "Cash on Delivery";
     }
     if (m === "PAY_LATER") return "Pay Later";
-    return "UPI";
+    return "Online Pay (UPI / Cards / NetBanking)";
 };
 
 const getPaymentMethodSubtitle = (value, fulfillment = "delivery") => {
@@ -69,7 +69,7 @@ const getPaymentMethodSubtitle = (value, fulfillment = "delivery") => {
             : "Pay when your order arrives";
     }
     if (m === "PAY_LATER") return "Charge to Khata Credit";
-    return "Pay with any UPI app";
+    return "UPI, Cards, Net Banking & Wallets";
 };
 
 const getPaymentFooterHint = (value, isOnlineOrder = false, fulfillment = "delivery") => {
