@@ -46,6 +46,18 @@ const loadCashfreeSdk = () => {
         document.head.appendChild(script);
     });
 };
+const getPaymentMethodTitle = (value, fulfillment = "delivery") => {
+    const m = normalizePaymentMethod(value);
+    if (m === "CASH") {
+        return fulfillment === "pickup"
+            ? "Cash on Pickup"
+            : fulfillment === "dinein"
+                ? "Cash on Table"
+            : "Cash on Delivery";
+    }
+    if (m === "PAY_LATER") return "Pay Later";
+    return "UPI";
+};
 
 const getPaymentMethodSubtitle = (value, fulfillment = "delivery") => {
     const m = normalizePaymentMethod(value);
