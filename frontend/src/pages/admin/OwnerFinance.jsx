@@ -209,6 +209,53 @@ export default function OwnerFinance() {
     const [error, setError] = useState("");
     const [search, setSearch] = useState("");
     const [selectedInvoice, setSelectedInvoice] = useState(null);
+    const user = useMemo(() => {
+        try {
+            return JSON.parse(localStorage.getItem("user")) || {};
+        } catch {
+            return {};
+        }
+    }, []);
+
+    const restaurantId = Number(user?.restaurantId || 1);
+
+    const loadFinance = async ({ silent = false } = {}) => {
+        if (!restaurantId) {
+            setLoading(false);
+            setError("Restaurant not linked to current user.");
+            return;
+        }
+
+        try {
+            if (silent) setRefreshing(true);
+            else setLoading(true);
+
+            const res = await axios.get(`${API}/owner/${restaurantId}/finance`, {
+                params: { range },
+            });
+            setData(res.data || null);
+            setError("");
+        } catch (err) {
+            console.log(err);
+            setError(err?.response?.data?.message || "Unable to load finance data.");
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
+        loadFinance();
+    }, [restaurantId, range]);
+
+    useEffect(() => {
+        if (!selectedInvoice) return undefined;
+        const handleEscape = (event) => {
+            if (event.key === "Escape") setSelectedInvoice(null);
+        };
+        window.addEventListener("keydown", handleEscape);
+        return () => window.removeEventListener("keydown", handleEscape);
+    }, [selectedInvoice]);
 
     const invoices = Array.isArray(data?.invoices) ? data.invoices : [];
     const summary = data?.summary || {};
