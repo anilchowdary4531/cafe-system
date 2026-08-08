@@ -9,8 +9,10 @@ export default async function paymentRoutes(app, deps = {}) {
   const settlementController = buildSettlementController({ prisma });
   const adminSettlementController = buildAdminSettlementController({ prisma });
 
-  // Endpoint: POST /api/payments/create-order
+  // Endpoint: POST /api/payments/create-order & aliases
   app.post("/api/payments/create-order", paymentController.createOrder);
+  app.post("/payments/create-order", paymentController.createOrder);
+  app.post("/r/:slug/payments/create-order", paymentController.createOrder);
 
   // Verification Endpoints: GET /api/payments/status/:orderId, POST /api/payments/verify, /api/payments/status
   app.get("/api/payments/status/:orderId", paymentController.verifyOrder);
