@@ -198,6 +198,34 @@ export const createCashfreePaymentSession = async ({
 };
 
 /**
+ * Helper to sanitize failure reasons into safe, user-friendly messages without leaking secrets
+ */
+export const sanitizeFailureReason = (rawMsg, rawStatus, rawCode) => {
+  const msg = String(rawMsg || "").toLowerCase();
+  const status = String(rawStatus || "").toUpperCase();
+
+  if (status === "USER_DROPPED" || msg.includes("user dropped") || msg.includes("cancelled by user") || msg.includes("user_dropped")) {
+    return "User cancelled payment";
+  }
+  if (status === "EXPIRED" || msg.includes("expired")) {
+    return "Payment session expired";
+  }
+  if (msg.includes("declined") || msg.includes("bank") || msg.includes("issuer")) {
+    return "Bank declined the transaction";
+  }
+  if (msg.includes("insufficient") || msg.includes("balance") || msg.includes("funds")) {
+    return "Insufficient funds in bank account";
+  }
+  if (msg.includes("otp") || msg.includes("auth") || msg.includes("pin")) {
+    return "Authentication / OTP verification failed";
+  }
+  if (rawMsg && typeof rawMsg === "string" && rawMsg.length < 80 && !rawMsg.includes("http") && !rawMsg.includes("Key")) {
+    return rawMsg.trim();
+  }
+  return "Payment could not be completed. Please try again.";
+};
+
+/**
  * Directly query Cashfree PG API to verify payment status of an order
  */
 export const verifyCashfreeOrderSession = async ({ orderId }) => {
@@ -240,6 +268,8 @@ export const verifyCashfreeOrderSession = async ({ orderId }) => {
     let paymentId = null;
     let paymentMethod = null;
     let txMsg = null;
+    let paymentStatus = null;
+    let paymentCode = null;
 
     // Fetch payment transactions for this order
     try {
@@ -260,28 +290,67 @@ export const verifyCashfreeOrderSession = async ({ orderId }) => {
         paymentId = latestPayment?.cf_payment_id ? String(latestPayment.cf_payment_id) : null;
         paymentMethod = latestPayment?.payment_group || latestPayment?.payment_method || null;
         txMsg = latestPayment?.payment_message || null;
+        paymentStatus = String(latestPayment?.payment_status || "").toUpperCase();
+        paymentCode = latestPayment?.payment_completion_code || null;
       }
     } catch (payErr) {
       console.warn("[CashfreeService] Warning fetching payments for order:", payErr.message);
     }
 
-    const isPaid = orderStatus === "PAID" || orderStatus === "SUCCESS";
+    // Determine normalized status strictly from Cashfree response
+    let normalizedStatus = "UNKNOWN";
+    const isPaid = orderStatus === "PAID" || orderStatus === "SUCCESS" || paymentStatus === "SUCCESS";
+
+    if (isPaid) {
+      normalizedStatus = "SUCCESS";
+    } else if (orderStatus === "USER_DROPPED" || paymentStatus === "USER_DROPPED" || paymentStatus === "CANCELLED") {
+      normalizedStatus = "CANCELLED";
+    } else if (orderStatus === "FAILED" || orderStatus === "EXPIRED" || orderStatus === "TERMINATED" || paymentStatus === "FAILED") {
+      normalizedStatus = "FAILED";
+    } else if (orderStatus === "ACTIVE" || orderStatus === "INITIALIZED" || paymentStatus === "PENDING") {
+      normalizedStatus = "PENDING";
+    }
+
+    const failureReason = normalizedStatus !== "SUCCESS"
+      ? sanitizeFailureReason(txMsg, paymentStatus || orderStatus, paymentCode)
+      : null;
+
+    console.log(`[CashfreeService] Server-side Cashfree verification for Order ${formattedOrderId}:`, {
+      orderStatus,
+      paymentStatus,
+      normalizedStatus,
+      orderAmount,
+      isPaid,
+      failureReason,
+    });
 
     return {
       verified: true,
       isPaid,
-      orderStatus, // PAID, ACTIVE, EXPIRED, FAILED, CANCELLED
+      normalizedStatus, // SUCCESS | PENDING | FAILED | CANCELLED | UNKNOWN
+      orderStatus,
+      paymentStatus,
       orderAmount,
       orderId: formattedOrderId,
       cfOrderId,
       paymentId,
       paymentMethod,
-      txMsg: txMsg || (isPaid ? "Payment Verified Successfully" : `Order status: ${orderStatus}`),
+      failureReason,
+      txMsg: txMsg || (isPaid ? "Payment Verified Successfully" : failureReason || `Order status: ${orderStatus}`),
     };
   } catch (err) {
     const errorMsg = err?.response?.data?.message || err?.message || "Failed to verify order with Cashfree";
     console.error("[CashfreeService] Error verifying order:", errorMsg);
-    throw new Error(errorMsg);
+    return {
+      verified: false,
+      isPaid: false,
+      normalizedStatus: "UNKNOWN",
+      orderStatus: "UNKNOWN",
+      orderAmount: 0,
+      orderId: formattedOrderId,
+      failureReason: "Payment status could not be verified due to a network or server error",
+      txMsg: errorMsg,
+    };
   }
 };
 

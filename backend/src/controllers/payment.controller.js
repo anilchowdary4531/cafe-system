@@ -143,15 +143,20 @@ export const buildPaymentController = ({ prisma }) => {
 
   const verifyOrder = async (req, reply) => {
     try {
+      const query = req.query || {};
       const body = req.body || {};
-      const orderId = String(req.params?.orderId || body.orderId || body.order_id || "").trim();
+      const orderId = String(req.params?.orderId || query.order_id || query.orderId || body.orderId || body.order_id || "").trim();
 
       if (!orderId) {
         return reply.code(400).send({
-          success: false,
-          message: "orderId is required for verification",
+          verified: false,
+          status: "UNKNOWN",
+          message: "orderId parameter is required for payment verification",
+          reason: "Missing order ID in request",
         });
       }
+
+      console.log(`[PaymentController] Payment verification requested for Order ID: ${orderId}`);
 
       // 1. Idempotency Check: Look up existing Order in Prisma DB
       let existingOrder = null;
@@ -161,6 +166,7 @@ export const buildPaymentController = ({ prisma }) => {
           if (!Number.isNaN(numericId)) {
             existingOrder = await prisma.order.findUnique({
               where: { id: numericId },
+              include: { restaurant: { select: { slug: true } } },
             });
           }
 
@@ -172,6 +178,7 @@ export const buildPaymentController = ({ prisma }) => {
                   { invoiceNo: orderId },
                 ],
               },
+              include: { restaurant: { select: { slug: true } } },
             });
           }
         } catch (dbErr) {
@@ -179,28 +186,83 @@ export const buildPaymentController = ({ prisma }) => {
         }
       }
 
-      // If already verified & paid in DB, return immediately (Anti-Duplicate / Idempotent)
+      // If already verified & paid in DB, return verified SUCCESS immediately (Idempotent guard)
       if (existingOrder && (existingOrder.paymentStatus === "PAID" || existingOrder.status === "PAID" || existingOrder.status === "COMPLETED")) {
         return reply.code(200).send({
           verified: true,
           status: "SUCCESS",
+          paymentStatus: "PAID",
           message: "Order is already verified and paid",
           orderId: orderId,
           orderNo: existingOrder.orderNo || orderId,
-          amount: existingOrder.total || existingOrder.amount,
-          paymentMethod: existingOrder.paymentMethod || "ONLINE",
+          amount: Number(existingOrder.total || existingOrder.amount || 0),
+          paymentMethod: existingOrder.paymentMode || "ONLINE",
           fulfillment: existingOrder.fulfillment || "pickup",
+          slug: existingOrder.restaurant?.slug || "",
           invoiceUrl: existingOrder.invoiceS3Url || `/invoice/${existingOrder.id}`,
         });
       }
 
-      // 2. Direct Verification with Cashfree API (Never trust client callback alone)
+      // 2. Direct Server-Side Verification with Cashfree API (NEVER trust client payload or query params!)
       const cfResult = await verifyCashfreeOrderSession({ orderId });
 
-      const isSuccess = cfResult.isPaid || String(body.status || "").toUpperCase() === "SUCCESS" || String(body.status || "").toUpperCase() === "PAID";
+      // If Cashfree verification failed due to network/server error
+      if (!cfResult.verified) {
+        if (existingOrder && prisma) {
+          try {
+            await prisma.order.update({
+              where: { id: existingOrder.id },
+              data: { paymentStatus: "UNKNOWN" },
+            });
+          } catch {}
+        }
+        return reply.code(200).send({
+          verified: false,
+          status: "UNKNOWN",
+          paymentStatus: "UNKNOWN",
+          message: "Payment status could not be verified right now",
+          reason: cfResult.failureReason || "Payment status could not be verified due to a network or server error",
+          orderId,
+          orderNo: existingOrder?.orderNo || orderId,
+          amount: existingOrder?.total || 0,
+        });
+      }
 
-      if (isSuccess) {
-        // Update Order in database to PAID & CONFIRMED
+      // 3. Amount Verification (Phase 11): Compare Cashfree returned orderAmount against DB Tiffzy order total
+      if (existingOrder && cfResult.orderAmount > 0) {
+        const expectedTotal = Number(existingOrder.total || 0);
+        const actualAmount = Number(cfResult.orderAmount || 0);
+        const amountDiff = Math.abs(expectedTotal - actualAmount);
+
+        if (amountDiff > 0.05) {
+          console.error(`[PaymentController] SECURITY ALERT: Amount mismatch for Order ${orderId}! Expected: ₹${expectedTotal}, Cashfree returned: ₹${actualAmount}`);
+          
+          if (prisma) {
+            try {
+              await prisma.order.update({
+                where: { id: existingOrder.id },
+                data: { paymentStatus: "UNKNOWN" },
+              });
+            } catch {}
+          }
+
+          return reply.code(200).send({
+            verified: false,
+            status: "UNKNOWN",
+            paymentStatus: "UNKNOWN",
+            message: "Payment amount mismatch detected",
+            reason: "Payment amount mismatch detected. Please contact support.",
+            orderId,
+            orderNo: existingOrder?.orderNo || orderId,
+            amount: expectedTotal,
+          });
+        }
+      }
+
+      // 4. Update Database Order & Payment status strictly based on verified Cashfree result
+      const normalizedStatus = cfResult.normalizedStatus || "UNKNOWN";
+
+      if (normalizedStatus === "SUCCESS" && cfResult.isPaid) {
         if (existingOrder && prisma) {
           try {
             await prisma.order.update({
@@ -208,7 +270,7 @@ export const buildPaymentController = ({ prisma }) => {
               data: {
                 paymentStatus: "PAID",
                 status: "CONFIRMED",
-                paymentMode: body.paymentMode || cfResult.paymentMethod || existingOrder.paymentMode || "ONLINE",
+                paymentMode: cfResult.paymentMethod || existingOrder.paymentMode || "ONLINE",
               },
             });
             await prisma.payment.updateMany({
@@ -220,7 +282,7 @@ export const buildPaymentController = ({ prisma }) => {
               },
               data: {
                 status: "PAID",
-                paymentMethod: cfResult.paymentMethod || body.paymentMode || "CASHFREE",
+                paymentMethod: cfResult.paymentMethod || "CASHFREE",
                 transactionId: cfResult.paymentId || null,
               },
             });
@@ -232,46 +294,115 @@ export const buildPaymentController = ({ prisma }) => {
         return reply.code(200).send({
           verified: true,
           status: "SUCCESS",
+          paymentStatus: "PAID",
           message: cfResult.txMsg || "Payment verified successfully",
           orderId: orderId,
           orderNo: existingOrder?.orderNo || orderId,
           amount: cfResult.orderAmount || existingOrder?.total || 0,
           paymentMethod: cfResult.paymentMethod || existingOrder?.paymentMode || "ONLINE",
           fulfillment: existingOrder?.fulfillment || "pickup",
+          slug: existingOrder?.restaurant?.slug || "",
           invoiceUrl: existingOrder ? `/invoice/${existingOrder.id}` : null,
         });
-      } else if (cfResult.orderStatus === "FAILED" || cfResult.orderStatus === "CANCELLED" || cfResult.orderStatus === "EXPIRED") {
+      }
+
+      if (normalizedStatus === "CANCELLED") {
+        if (existingOrder && prisma) {
+          try {
+            await prisma.order.update({
+              where: { id: existingOrder.id },
+              data: { paymentStatus: "CANCELLED" },
+            });
+          } catch {}
+        }
+
+        return reply.code(200).send({
+          verified: false,
+          status: "CANCELLED",
+          paymentStatus: "CANCELLED",
+          message: "Payment was cancelled",
+          reason: cfResult.failureReason || "User cancelled payment",
+          orderId,
+          orderNo: existingOrder?.orderNo || orderId,
+          amount: existingOrder?.total || cfResult.orderAmount || 0,
+          paymentMethod: cfResult.paymentMethod || "ONLINE",
+          fulfillment: existingOrder?.fulfillment || "pickup",
+          slug: existingOrder?.restaurant?.slug || "",
+        });
+      }
+
+      if (normalizedStatus === "FAILED") {
         if (existingOrder && prisma) {
           try {
             await prisma.order.update({
               where: { id: existingOrder.id },
               data: { paymentStatus: "FAILED" },
             });
-          } catch (e) {
-            // Ignore failure update error
-          }
+          } catch {}
         }
 
         return reply.code(200).send({
           verified: false,
-          status: cfResult.orderStatus === "CANCELLED" ? "CANCELLED" : "FAILED",
-          message: cfResult.txMsg || `Payment ${cfResult.orderStatus.toLowerCase()}`,
-          orderId: orderId,
+          status: "FAILED",
+          paymentStatus: "FAILED",
+          message: "Payment failed",
+          reason: cfResult.failureReason || "Payment could not be completed",
+          orderId,
+          orderNo: existingOrder?.orderNo || orderId,
+          amount: existingOrder?.total || cfResult.orderAmount || 0,
+          paymentMethod: cfResult.paymentMethod || "ONLINE",
+          fulfillment: existingOrder?.fulfillment || "pickup",
+          slug: existingOrder?.restaurant?.slug || "",
         });
-      } else {
+      }
+
+      if (normalizedStatus === "PENDING") {
+        if (existingOrder && prisma) {
+          try {
+            await prisma.order.update({
+              where: { id: existingOrder.id },
+              data: { paymentStatus: "PENDING" },
+            });
+          } catch {}
+        }
+
         return reply.code(200).send({
           verified: false,
           status: "PENDING",
-          message: cfResult.txMsg || "Payment is pending verification",
-          orderId: orderId,
+          paymentStatus: "PENDING",
+          message: "Payment confirmation is pending from gateway",
+          reason: "We are waiting for confirmation from Cashfree",
+          orderId,
+          orderNo: existingOrder?.orderNo || orderId,
+          amount: existingOrder?.total || cfResult.orderAmount || 0,
+          paymentMethod: cfResult.paymentMethod || "ONLINE",
+          fulfillment: existingOrder?.fulfillment || "pickup",
+          slug: existingOrder?.restaurant?.slug || "",
         });
       }
+
+      // Default UNKNOWN fallback
+      return reply.code(200).send({
+        verified: false,
+        status: "UNKNOWN",
+        paymentStatus: "UNKNOWN",
+        message: "Payment status could not be verified",
+        reason: cfResult.failureReason || "Payment status could not be verified",
+        orderId,
+        orderNo: existingOrder?.orderNo || orderId,
+        amount: existingOrder?.total || cfResult.orderAmount || 0,
+        paymentMethod: cfResult.paymentMethod || "ONLINE",
+        fulfillment: existingOrder?.fulfillment || "pickup",
+        slug: existingOrder?.restaurant?.slug || "",
+      });
     } catch (err) {
       console.error("[PaymentController] verifyOrder Error:", err);
-      return reply.code(500).send({
+      return reply.code(200).send({
         verified: false,
-        status: "FAILED",
-        message: err.message || "Payment verification failed",
+        status: "UNKNOWN",
+        paymentStatus: "UNKNOWN",
+        message: "Payment status could not be verified",
+        reason: "Payment status could not be verified due to a server error",
       });
     }
   };

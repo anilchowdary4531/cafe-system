@@ -14,14 +14,18 @@ export default async function paymentRoutes(app, deps = {}) {
   app.post("/payments/create-order", paymentController.createOrder);
   app.post("/r/:slug/payments/create-order", paymentController.createOrder);
 
-  // Verification Endpoints: GET /api/payments/status/:orderId, POST /api/payments/verify, /api/payments/status
+  // Verification Endpoints: GET /api/payments/cashfree/status/:orderId, GET /api/payments/status/:orderId, POST /api/payments/verify
+  app.get("/api/payments/cashfree/status/:orderId", paymentController.verifyOrder);
+  app.get("/payments/cashfree/status/:orderId", paymentController.verifyOrder);
   app.get("/api/payments/status/:orderId", paymentController.verifyOrder);
   app.get("/payments/status/:orderId", paymentController.verifyOrder);
   app.post("/api/payments/verify", paymentController.verifyOrder);
   app.post("/api/payments/status", paymentController.verifyOrder);
   app.post("/payments/status", paymentController.verifyOrder);
 
-  // Webhook Endpoints: POST /api/payments/webhook, /payments/webhook
+  // Webhook Endpoints: POST /api/payments/cashfree/webhook, /api/payments/webhook
+  app.post("/api/payments/cashfree/webhook", paymentController.handleWebhook);
+  app.post("/payments/cashfree/webhook", paymentController.handleWebhook);
   app.post("/api/payments/webhook", paymentController.handleWebhook);
   app.post("/payments/webhook", paymentController.handleWebhook);
 

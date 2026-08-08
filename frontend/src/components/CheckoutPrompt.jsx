@@ -597,21 +597,21 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                             return;
                         }
 
-                        await api.post(
-                            "/payments/verify",
-                            { orderId, status: "SUCCESS", paymentMode: "ONLINE", paymentSessionId: sessionId },
-                            getCustomerAuthConfig()
-                        );
+                        // Query backend server-side verification after Cashfree modal interaction
+                        const verifyRes = await api.get(`/api/payments/cashfree/status/${orderId}`, getCustomerAuthConfig());
+                        const verifiedData = verifyRes?.data || {};
 
                         clearCart();
                         onClose();
+
+                        const verifiedStatus = verifiedData.status || "UNKNOWN";
+                        const queryStatus = verifiedStatus === "SUCCESS" ? "SUCCESS" : verifiedStatus;
+
                         navigate(
                             `/orders/thank-you?slug=${encodeURIComponent(slug)}&orderNo=${encodeURIComponent(orderNo)}&orderId=${encodeURIComponent(
                                 String(orderId)
-                            )}&amount=${encodeURIComponent(String(toInr(orderTotal)))}&fulfillment=${encodeURIComponent(
-                                isOnlineOrder ? selectedFulfillment : "dinein"
-                            )}`,
-                            { replace: true }
+                            )}&paymentStatus=${encodeURIComponent(queryStatus)}`,
+                            { replace: true, state: verifiedData }
                         );
                     }).catch((sdkErr) => {
                         console.error("Cashfree SDK Checkout Error:", sdkErr);
