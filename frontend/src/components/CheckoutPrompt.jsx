@@ -1,6 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Banknote, MapPin, Plus, QrCode, ShieldCheck, X, IndianRupee } from "lucide-react";
+import {
+    AlertCircle,
+    ArrowLeft,
+    Banknote,
+    CheckCircle2,
+    CreditCard,
+    IndianRupee,
+    Landmark,
+    LoaderCircle,
+    MapPin,
+    Plus,
+    QrCode,
+    RefreshCw,
+    ShieldCheck,
+    Wallet,
+    X,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import useCachedGet from "../hooks/useCachedGet";
@@ -55,21 +71,21 @@ const getPaymentMethodTitle = (value, fulfillment = "delivery") => {
                 ? "Cash on Table"
             : "Cash on Delivery";
     }
-    if (m === "PAY_LATER") return "Pay Later";
-    return "Online Pay (UPI / Cards / NetBanking)";
+    if (m === "PAY_LATER") return "Khata Pay Later";
+    return "Pay Online (Recommended)";
 };
 
 const getPaymentMethodSubtitle = (value, fulfillment = "delivery") => {
     const m = normalizePaymentMethod(value);
     if (m === "CASH") {
         return fulfillment === "pickup"
-            ? "Pay when you collect your order"
+            ? "Pay cash when you collect your order"
             : fulfillment === "dinein"
-                ? "Pay when your order is served"
-            : "Pay when your order arrives";
+                ? "Pay cash when your order is served"
+            : "Pay cash when your order arrives";
     }
     if (m === "PAY_LATER") return "Charge to Khata Credit";
-    return "UPI, Cards, Net Banking & Wallets";
+    return "Secure by Cashfree • UPI, Cards, Net Banking & Wallets";
 };
 
 const getPaymentFooterHint = (value, isOnlineOrder = false, fulfillment = "delivery") => {
@@ -175,14 +191,12 @@ const getCheckoutActionLabel = ({
         : "Order";
 
     if (method === "UPI") {
-        if (placedOrder?.id) return "Open UPI Apps";
-        if (customerToken) return isOnlineOrder ? `Place ${orderMode} Order & Continue` : "Place Order & Continue";
-        if (!isOnlineOrder) return "Place Table Order & Continue";
+        if (placedOrder?.id) return "Open Cashfree Gateway";
+        if (customerToken) return `Pay Rs ${toInr(payableAmount)} Online (Cashfree)`;
+        if (!isOnlineOrder) return `Pay Rs ${toInr(payableAmount)} via Cashfree`;
         return otpStep === "otp"
-            ? `Verify & Pay Rs ${toInr(payableAmount)}`
-            : isOnlineOrder
-                ? `Send OTP to Place ${orderMode} Order`
-                : "Send OTP to Place Order";
+            ? `Verify & Pay Rs ${toInr(payableAmount)} via Cashfree`
+            : `Send OTP & Pay Rs ${toInr(payableAmount)} Online`;
     }
 
     if (method === "PAY_LATER") {
@@ -953,150 +967,108 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                     </div>
                                 )}
 
-                                <div className="order-1 space-y-3">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div>
-                                            <h3 className="mt-1 text-base font-semibold sm:text-lg">Pick one</h3>
+                                <div className="order-1 space-y-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <h3 className="text-base font-bold sm:text-lg">Select Payment Method</h3>
+                                                <p className="theme-muted text-xs">Choose how you would like to pay for this order.</p>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400">
+                                                <ShieldCheck size={14} />
+                                                <span>Encrypted 256-bit</span>
+                                            </div>
                                         </div>
-                                        <p className="theme-muted hidden items-center gap-2 text-[11px] sm:inline-flex sm:text-xs">
-                                            <ShieldCheck size={13} className="theme-accent-text sm:size-3.5" />
-                                            Secure payment
-                                        </p>
-                                    </div>
 
-                                    <div className={payLaterEligible ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setPaymentMethod("UPI");
-                                                if (selectedPaymentMethod === "UPI") {
-                                                    handleSubmit();
-                                                }
-                                            }}
-                                            className={[
-                                                "checkout-paper-option group relative flex min-h-[64px] items-center justify-between gap-2 overflow-hidden rounded-[18px] border px-3 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-primary)] hover:-translate-y-0.5",
-                                                selectedPaymentMethod === "UPI" ? "ring-1 ring-[color:var(--app-primary)]" : "",
-                                            ].join(" ")}
-                                            aria-pressed={selectedPaymentMethod === "UPI"}
-                                            style={getPaymentTileStyle("UPI", selectedPaymentMethod === "UPI")}
-                                        >
-                                            <div className="flex min-w-0 items-center gap-2">
-                                                <div
-                                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border"
-                                                    style={{
-                                                        borderColor: "color-mix(in srgb, var(--app-primary) 26%, var(--app-border) 74%)",
-                                                        background: "color-mix(in srgb, var(--app-primary) 11%, transparent)",
-                                                        color: "var(--app-primary)",
-                                                    }}
-                                                >
-                                                    <QrCode size={16} />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-[13px] font-semibold leading-tight tracking-tight sm:text-sm">{getPaymentMethodTitle("UPI")}</p>
-                                                    <p className="theme-muted mt-0.5 hidden text-[9px] leading-tight sm:block sm:text-[10px]">
-                                                        {getPaymentMethodSubtitle("UPI")}
-                                                     </p>
-                                                </div>
-                                            </div>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => setPaymentMethod("CASH")}
-                                            className={[
-                                                "checkout-paper-option group relative flex min-h-[72px] items-center justify-between gap-2 overflow-hidden rounded-[20px] border px-3 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] hover:-translate-y-0.5",
-                                                selectedPaymentMethod === "CASH" ? "ring-1 ring-[color:var(--app-accent)]" : "",
-                                            ].join(" ")}
-                                            aria-pressed={selectedPaymentMethod === "CASH"}
-                                            style={getPaymentTileStyle("CASH", selectedPaymentMethod === "CASH")}
-                                        >
-                                            <div className="flex min-w-0 items-center gap-2">
-                                                <div
-                                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border"
-                                                    style={{
-                                                        borderColor: "color-mix(in srgb, var(--app-accent) 30%, var(--app-border) 70%)",
-                                                        background: "color-mix(in srgb, var(--app-accent) 12%, transparent)",
-                                                        color: "var(--app-accent)",
-                                                    }}
-                                                >
-                                                    <Banknote size={16} />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-[13px] font-semibold leading-tight tracking-tight sm:text-sm">
-                                                        {getPaymentMethodTitle("CASH", selectedFulfillment)}
-                                                    </p>
-                                                <p className="theme-muted mt-0.5 hidden text-[9px] leading-tight sm:block sm:text-[10px]">
-                                                    {getPaymentMethodSubtitle("CASH", selectedFulfillment)}
-                                                </p>
-                                                </div>
-                                            </div>
-                                            <span
-                                                className="shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.18em] sm:text-[10px]"
-                                                style={getPaymentBadgeStyle("CASH", selectedPaymentMethod === "CASH")}
-                                            >
-                                                COD
-                                            </span>
-                                        </button>
-
-                                        {payLaterEligible && (
+                                        <div className="grid gap-3 sm:grid-cols-2">
                                             <button
                                                 type="button"
-                                                onClick={() => setPaymentMethod("PAY_LATER")}
-                                                className={[
-                                                    "checkout-paper-option group relative flex min-h-[72px] items-center justify-between gap-2 overflow-hidden rounded-[20px] border px-3 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 hover:-translate-y-0.5",
-                                                    selectedPaymentMethod === "PAY_LATER" ? "ring-1 ring-emerald-500" : "",
-                                                ].join(" ")}
-                                                aria-pressed={selectedPaymentMethod === "PAY_LATER"}
-                                                style={getPaymentTileStyle("PAY_LATER", selectedPaymentMethod === "PAY_LATER")}
+                                                onClick={() => setPaymentMethod("UPI")}
+                                                className={`group relative flex flex-col justify-between gap-3 rounded-2xl border p-4 text-left transition-all duration-200 ${
+                                                    selectedPaymentMethod === "UPI"
+                                                        ? "border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-500/5"
+                                                        : "border-white/10 hover:border-white/20 bg-white/5"
+                                                }`}
                                             >
-                                                <div className="flex min-w-0 items-center gap-2">
-                                                    <div
-                                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border"
-                                                        style={{
-                                                            borderColor: "color-mix(in srgb, #10B981 30%, var(--app-border) 70%)",
-                                                            background: "color-mix(in srgb, #10B981 12%, transparent)",
-                                                            color: "#10B981",
-                                                        }}
-                                                    >
-                                                        <IndianRupee size={16} />
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                                                            selectedPaymentMethod === "UPI" ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400" : "border-white/10 bg-white/5 text-amber-400"
+                                                        }`}>
+                                                            <CreditCard size={20} />
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-bold sm:text-base">Pay Online</span>
+                                                                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
+                                                                    Recommended
+                                                                </span>
+                                                            </div>
+                                                            <p className="theme-muted text-xs mt-0.5">Secure by Cashfree</p>
+                                                        </div>
                                                     </div>
-                                                    <div className="min-w-0">
-                                                        <p className="text-[13px] font-semibold leading-tight tracking-tight sm:text-sm">
-                                                            {getPaymentMethodTitle("PAY_LATER")}
-                                                        </p>
-                                                    <p className="theme-muted mt-0.5 hidden text-[9px] leading-tight sm:block sm:text-[10px]">
-                                                        {getPaymentMethodSubtitle("PAY_LATER")}
-                                                    </p>
+                                                    <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                        selectedPaymentMethod === "UPI" ? "border-emerald-500 bg-emerald-500 text-black" : "border-white/30"
+                                                    }`}>
+                                                        {selectedPaymentMethod === "UPI" && <CheckCircle2 size={14} className="fill-current text-white" />}
                                                     </div>
                                                 </div>
-                                                <span
-                                                    className="shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.18em] sm:text-[10px]"
-                                                    style={getPaymentBadgeStyle("PAY_LATER", selectedPaymentMethod === "PAY_LATER")}
-                                                >
-                                                    KHATA
-                                                </span>
+
+                                                <div className="mt-1 flex flex-wrap items-center gap-1.5 pt-2 border-t border-white/10">
+                                                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-bold text-emerald-300">UPI</span>
+                                                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold">Cards</span>
+                                                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold">Net Banking</span>
+                                                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold">Wallets</span>
+                                                </div>
                                             </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setPaymentMethod("CASH")}
+                                                className={`group relative flex flex-col justify-between gap-3 rounded-2xl border p-4 text-left transition-all duration-200 ${
+                                                    selectedPaymentMethod === "CASH"
+                                                        ? "border-amber-500 bg-amber-500/5 ring-2 ring-amber-500/40 shadow-lg shadow-amber-500/5"
+                                                        : "border-white/10 hover:border-white/20 bg-white/5"
+                                                }`}
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                                                            selectedPaymentMethod === "CASH" ? "border-amber-500/40 bg-amber-500/15 text-amber-400" : "border-white/10 bg-white/5 text-amber-400"
+                                                        }`}>
+                                                            <Banknote size={20} />
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-sm font-bold sm:text-base">{getPaymentMethodTitle("CASH", selectedFulfillment)}</span>
+                                                            <p className="theme-muted text-xs mt-0.5">{getPaymentMethodSubtitle("CASH", selectedFulfillment)}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                        selectedPaymentMethod === "CASH" ? "border-amber-500 bg-amber-500 text-black" : "border-white/30"
+                                                    }`}>
+                                                        {selectedPaymentMethod === "CASH" && <CheckCircle2 size={14} className="fill-current text-white" />}
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-1 flex items-center justify-between pt-2 border-t border-white/10">
+                                                    <span className="theme-muted text-[11px]">Pay when receiving order</span>
+                                                    <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-extrabold text-amber-400">
+                                                        COD
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        </div>
+
+                                        {selectedPaymentMethod === "UPI" && (
+                                            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300 flex items-center gap-2.5">
+                                                <ShieldCheck size={18} className="shrink-0 text-emerald-400" />
+                                                <span>
+                                                    You will be redirected to Cashfree Secure Checkout modal to complete payment via UPI, Cards, or Net Banking.
+                                                </span>
+                                            </div>
                                         )}
                                     </div>
 
-                                    {paymentMethod === "UPI" && (
-                                        <div className="space-y-2">
-                                            <div className="checkout-paper-flat py-2" style={getPaymentInfoStyle()}>
-                                                <p className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[color:var(--app-primary)] sm:text-xs">
-                                                    Cashfree Payment Gateway
-                                                </p>
-                                                <p className="mt-1 text-[13px] font-semibold tracking-tight text-emerald-400 sm:text-sm">
-                                                    Unified Digital Payment Engine (UPI, Cards, Net Banking, Wallets)
-                                                </p>
-                                                <p className="theme-muted mt-1 text-[11px] leading-relaxed sm:text-xs">
-                                                    Securely processes digital payments instantly via Cashfree Checkout SDK.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="order-3 space-y-3">
+                                    <div className="order-3 space-y-3">
                                     <div className="grid gap-3 md:grid-cols-2">
                                         {!customerToken && (
                                             <div>

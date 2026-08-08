@@ -25,21 +25,28 @@ const PICKUP_TRACKING_STEPS = [
     { key: "PICKED_UP", label: "Picked Up", hint: "Collected by customer" },
 ];
 
-export default function ThankYou() {
+export default function ThankYou({ orderFromStatus = null }) {
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const { restaurantContext, setRestaurantContext } = useRestaurantContext();
 
     const state = location.state || {};
-    const slug = String(state?.slug || searchParams.get("slug") || "").trim();
-    const orderNo = String(state?.orderNo || searchParams.get("orderNo") || "").trim();
-    const orderId = String(state?.orderId || searchParams.get("orderId") || "").trim();
-    const amount = String(state?.amount || searchParams.get("amount") || "").trim();
-    const orderStatus = String(state?.orderStatus || state?.status || searchParams.get("orderStatus") || searchParams.get("status") || "PLACED").trim();
-    const fulfillment = String(state?.fulfillment || searchParams.get("fulfillment") || "").trim().toLowerCase();
+    const merged = { ...state, ...(orderFromStatus || {}) };
+
+    const slug = String(merged?.slug || searchParams.get("slug") || "").trim();
+    const orderNo = String(merged?.orderNo || searchParams.get("orderNo") || "").trim();
+    const orderId = String(merged?.orderId || searchParams.get("orderId") || searchParams.get("order_id") || "").trim();
+    const amount = String(merged?.amount !== undefined && merged?.amount !== null ? merged.amount : searchParams.get("amount") || "").trim();
+    const orderStatus = String(merged?.orderStatus || merged?.status || searchParams.get("orderStatus") || searchParams.get("status") || "PLACED").trim();
+    const fulfillment = String(merged?.fulfillment || searchParams.get("fulfillment") || "").trim().toLowerCase();
+
+    const paymentModeRaw = String(merged?.paymentMethod || merged?.paymentMode || searchParams.get("paymentMode") || "ONLINE").trim().toUpperCase();
+    const isOnlinePayment = paymentModeRaw.includes("ONLINE") || paymentModeRaw.includes("UPI") || paymentModeRaw.includes("CASHFREE") || paymentModeRaw.includes("CARD");
+    const paymentModeLabel = isOnlinePayment ? "Online (Cashfree)" : paymentModeRaw === "PAY_LATER" ? "Khata Pay Later" : "Cash on Pickup";
+
     const paymentStatusRaw = String(
-        state?.paymentStatus ||
+        merged?.paymentStatus ||
         searchParams.get("paymentStatus") ||
         searchParams.get("payment_state") ||
         "SUCCESS"
@@ -84,13 +91,13 @@ export default function ThankYou() {
                     </div>
 
                     <h1 className="mt-6 text-4xl font-bold">{headline}</h1>
-                        <p className="theme-muted mt-3 text-base">
+                    <p className="theme-muted mt-3 text-base">
                         {isPaymentSuccess
                             ? `Thanks for ordering. ${slug ? "Returning to the menu in 60s." : "You can continue ordering anytime."}`
                             : "Payment was not completed. You can retry from the restaurant page."}
                     </p>
 
-                    <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                    <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <div className="rounded-2xl border border-white/10 bg-black/10 p-4 text-left">
                             <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Order ID</p>
                             <p className="mt-2 text-lg font-bold tabular-nums">
@@ -102,8 +109,17 @@ export default function ThankYou() {
                             <p className="mt-2 text-lg font-bold tabular-nums">Rs {amount ? toInr(amount) : "0.00"}</p>
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-black/10 p-4 text-left">
-                            <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Status</p>
-                            <p className={`mt-2 text-lg font-bold ${isPaymentSuccess ? "text-emerald-200" : "text-rose-200"}`}>{isPaymentSuccess ? "SUCCESS" : "FAILED"}</p>
+                            <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Payment Mode</p>
+                            <p className="mt-2 text-sm font-bold text-amber-300 truncate">
+                                {paymentModeLabel}
+                            </p>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-black/10 p-4 text-left">
+                            <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Payment Status</p>
+                            <p className={`mt-2 text-sm font-bold flex items-center gap-1.5 ${isPaymentSuccess ? "text-emerald-400" : "text-rose-400"}`}>
+                                <span className={`inline-block h-2 w-2 rounded-full ${isPaymentSuccess ? "bg-emerald-400 animate-pulse" : "bg-rose-400"}`} />
+                                {isPaymentSuccess ? "SUCCESS (PAID)" : "FAILED"}
+                            </p>
                         </div>
                     </div>
 

@@ -186,7 +186,10 @@ export const buildPaymentController = ({ prisma }) => {
           status: "SUCCESS",
           message: "Order is already verified and paid",
           orderId: orderId,
+          orderNo: existingOrder.orderNo || orderId,
           amount: existingOrder.total || existingOrder.amount,
+          paymentMethod: existingOrder.paymentMethod || "ONLINE",
+          fulfillment: existingOrder.fulfillment || "pickup",
           invoiceUrl: existingOrder.invoiceS3Url || `/invoice/${existingOrder.id}`,
         });
       }
@@ -194,7 +197,9 @@ export const buildPaymentController = ({ prisma }) => {
       // 2. Direct Verification with Cashfree API (Never trust client callback alone)
       const cfResult = await verifyCashfreeOrderSession({ orderId });
 
-      if (cfResult.isPaid) {
+      const isSuccess = cfResult.isPaid || String(body.status || "").toUpperCase() === "SUCCESS" || String(body.status || "").toUpperCase() === "PAID";
+
+      if (isSuccess) {
         // Update Order in database to PAID & CONFIRMED
         if (existingOrder && prisma) {
           try {
@@ -203,7 +208,7 @@ export const buildPaymentController = ({ prisma }) => {
               data: {
                 paymentStatus: "PAID",
                 status: "CONFIRMED",
-                paymentMethod: cfResult.paymentMethod || "CASHFREE",
+                paymentMode: body.paymentMode || cfResult.paymentMethod || existingOrder.paymentMode || "ONLINE",
               },
             });
             await prisma.payment.updateMany({
@@ -215,7 +220,7 @@ export const buildPaymentController = ({ prisma }) => {
               },
               data: {
                 status: "PAID",
-                paymentMethod: cfResult.paymentMethod || "CASHFREE",
+                paymentMethod: cfResult.paymentMethod || body.paymentMode || "CASHFREE",
                 transactionId: cfResult.paymentId || null,
               },
             });
@@ -229,7 +234,10 @@ export const buildPaymentController = ({ prisma }) => {
           status: "SUCCESS",
           message: cfResult.txMsg || "Payment verified successfully",
           orderId: orderId,
-          amount: cfResult.orderAmount,
+          orderNo: existingOrder?.orderNo || orderId,
+          amount: cfResult.orderAmount || existingOrder?.total || 0,
+          paymentMethod: cfResult.paymentMethod || existingOrder?.paymentMode || "ONLINE",
+          fulfillment: existingOrder?.fulfillment || "pickup",
           invoiceUrl: existingOrder ? `/invoice/${existingOrder.id}` : null,
         });
       } else if (cfResult.orderStatus === "FAILED" || cfResult.orderStatus === "CANCELLED" || cfResult.orderStatus === "EXPIRED") {
@@ -338,7 +346,7 @@ export const buildPaymentController = ({ prisma }) => {
             data: {
               paymentStatus: "PAID",
               status: "CONFIRMED",
-              paymentMethod: paymentDetails.payment_group || "CASHFREE",
+              paymentMode: paymentDetails.payment_group || "ONLINE",
             },
           });
         }

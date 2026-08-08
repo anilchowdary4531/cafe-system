@@ -131,9 +131,44 @@ export const createCashfreePaymentSession = async ({
     });
   }
 
+  const baseUrl = process.env.CASHFREE_ENV === "PRODUCTION"
+    ? "https://api.cashfree.com/pg"
+    : "https://sandbox.cashfree.com/pg";
+
+  const headers = {
+    "x-api-version": CASHFREE_API_VERSION,
+    "x-client-id": process.env.CASHFREE_CLIENT_ID || "",
+    "x-client-secret": process.env.CASHFREE_CLIENT_SECRET || "",
+    "Content-Type": "application/json",
+  };
+
   try {
-    const response = await cashfree.PGCreateOrder(CASHFREE_API_VERSION, orderPayload);
-    const data = response?.data || response;
+    let data;
+    try {
+      const response = await cashfree.PGCreateOrder(CASHFREE_API_VERSION, orderPayload);
+      data = response?.data || response;
+    } catch (sdkErr) {
+      console.warn("[CashfreeService] SDK call warning, falling back to REST HTTP call...", sdkErr.message);
+      let httpRes = await fetch(`${baseUrl}/orders`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(orderPayload),
+      });
+      data = await httpRes.json();
+
+      // If vendor is not registered in Cashfree Easy Split, retry without order_splits
+      if (!data?.payment_session_id && data?.message && String(data.message).toLowerCase().includes("vendor")) {
+        console.warn("[CashfreeService] Vendor not found on Cashfree. Retrying without order_splits...");
+        const fallbackPayload = { ...orderPayload };
+        delete fallbackPayload.order_splits;
+        const retryRes = await fetch(`${baseUrl}/orders`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(fallbackPayload),
+        });
+        data = await retryRes.json();
+      }
+    }
 
     if (!data?.payment_session_id) {
       throw new Error(data?.message || "Cashfree did not return a valid payment_session_id");
@@ -173,10 +208,30 @@ export const verifyCashfreeOrderSession = async ({ orderId }) => {
     throw new Error("orderId is required for Cashfree verification");
   }
 
+  const baseUrl = process.env.CASHFREE_ENV === "PRODUCTION"
+    ? "https://api.cashfree.com/pg"
+    : "https://sandbox.cashfree.com/pg";
+
+  const headers = {
+    "x-api-version": CASHFREE_API_VERSION,
+    "x-client-id": process.env.CASHFREE_CLIENT_ID || "",
+    "x-client-secret": process.env.CASHFREE_CLIENT_SECRET || "",
+    "Content-Type": "application/json",
+  };
+
   try {
-    // 1. Fetch Order Details from Cashfree
-    const orderResponse = await cashfree.PGFetchOrder(CASHFREE_API_VERSION, formattedOrderId);
-    const orderData = orderResponse?.data || orderResponse;
+    let orderData;
+    try {
+      const orderResponse = await cashfree.PGFetchOrder(CASHFREE_API_VERSION, formattedOrderId);
+      orderData = orderResponse?.data || orderResponse;
+    } catch (sdkErr) {
+      console.warn("[CashfreeService] SDK PGFetchOrder warning, falling back to direct REST fetch...", sdkErr.message);
+      const httpRes = await fetch(`${baseUrl}/orders/${encodeURIComponent(formattedOrderId)}`, {
+        method: "GET",
+        headers,
+      });
+      orderData = await httpRes.json();
+    }
 
     const orderStatus = String(orderData?.order_status || "UNKNOWN").toUpperCase();
     const orderAmount = Number(orderData?.order_amount || 0);
@@ -186,10 +241,20 @@ export const verifyCashfreeOrderSession = async ({ orderId }) => {
     let paymentMethod = null;
     let txMsg = null;
 
-    // 2. Optionally fetch payment transactions for this order
+    // Fetch payment transactions for this order
     try {
-      const paymentsResponse = await cashfree.PGOrderFetchPayments(CASHFREE_API_VERSION, formattedOrderId);
-      const payments = paymentsResponse?.data || paymentsResponse;
+      let payments;
+      try {
+        const paymentsResponse = await cashfree.PGOrderFetchPayments(CASHFREE_API_VERSION, formattedOrderId);
+        payments = paymentsResponse?.data || paymentsResponse;
+      } catch {
+        const httpRes = await fetch(`${baseUrl}/orders/${encodeURIComponent(formattedOrderId)}/payments`, {
+          method: "GET",
+          headers,
+        });
+        payments = await httpRes.json();
+      }
+
       if (Array.isArray(payments) && payments.length > 0) {
         const latestPayment = payments[0];
         paymentId = latestPayment?.cf_payment_id ? String(latestPayment.cf_payment_id) : null;

@@ -25,6 +25,7 @@ import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import DeleteAccount from "./pages/DeleteAccount";
 import ThankYou from "./pages/ThankYou";
+import PaymentStatus from "./pages/PaymentStatus";
 
 // ============================
 // ADMIN PAGES
@@ -273,6 +274,28 @@ export default function App() {
                             <>
                                 <Navbar />
                                 <ThankYou />
+                                <Footer />
+                            </>
+                        }
+                    />
+
+                    <Route
+                        path="/payment-status"
+                        element={
+                            <>
+                                <Navbar />
+                                <PaymentStatus />
+                                <Footer />
+                            </>
+                        }
+                    />
+
+                    <Route
+                        path="/payment-success"
+                        element={
+                            <>
+                                <Navbar />
+                                <PaymentStatus />
                                 <Footer />
                             </>
                         }
