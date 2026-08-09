@@ -32,11 +32,11 @@ export default function PaymentStatus() {
                 } catch {}
             }
 
-            // Limited polling for PENDING status (max 3 attempts with 2.5s delay)
-            if (data.status === "PENDING" && pollAttempt < 3) {
+            // Limited polling for PENDING status (max 5 attempts with 3s delay = 15s total)
+            if (data.status === "PENDING" && pollAttempt < 5) {
                 setTimeout(() => {
                     fetchVerifiedStatus(pollAttempt + 1);
-                }, 2500);
+                }, 3000);
                 return;
             }
         } catch (err) {

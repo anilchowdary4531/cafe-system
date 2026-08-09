@@ -101,24 +101,30 @@ export const buildPaymentController = ({ prisma }) => {
         commissionValue,
       });
 
-      // Store Payment record in Prisma DB
+      // Store Payment record in Prisma DB with schema-aligned fields
       if (prisma) {
         try {
-          const numRestId = Number(restaurantId);
-          const numCustId = Number(customerId);
+          const numRestId = Number(restaurantId || body.restaurantId || 1);
           const numOrderId = Number(orderId);
-          await prisma.payment.create({
-            data: {
-              cashfreeOrderId: String(result.cf_order_id || result.order_id || ""),
-              paymentSessionId: String(result.payment_session_id || ""),
-              amount: Number(amount || 0),
-              status: "PENDING",
-              provider: "CASHFREE",
-              ...(numRestId && !Number.isNaN(numRestId) ? { restaurantId: numRestId } : {}),
-              ...(numCustId && !Number.isNaN(numCustId) ? { customerId: numCustId } : {}),
-              ...(numOrderId && !Number.isNaN(numOrderId) ? { orderId: numOrderId } : {}),
-            },
-          });
+          const amountSubunit = Math.round(Number(amount || 0) * 100);
+
+          if (numOrderId && !Number.isNaN(numOrderId)) {
+            await prisma.payment.create({
+              data: {
+                orderId: numOrderId,
+                restaurantId: numRestId && !Number.isNaN(numRestId) ? numRestId : 1,
+                amountSubunit,
+                currency: "INR",
+                method: "ONLINE",
+                status: "PENDING",
+                provider: "CASHFREE",
+                providerOrderId: String(result.cf_order_id || result.order_id || ""),
+                providerMetadata: {
+                  paymentSessionId: String(result.payment_session_id || ""),
+                },
+              },
+            });
+          }
         } catch (payDbErr) {
           console.warn("[PaymentController] Payment record creation notice:", payDbErr.message);
         }
@@ -276,13 +282,13 @@ export const buildPaymentController = ({ prisma }) => {
             await prisma.payment.updateMany({
               where: {
                 OR: [
-                  { cashfreeOrderId: String(cfResult.cfOrderId || orderId) },
+                  { providerOrderId: String(cfResult.cfOrderId || orderId) },
                   { orderId: existingOrder.id },
                 ],
               },
               data: {
                 status: "PAID",
-                paymentMethod: cfResult.paymentMethod || "CASHFREE",
+                method: cfResult.paymentMethod || "CASHFREE",
                 transactionId: cfResult.paymentId || null,
               },
             });
@@ -480,6 +486,19 @@ export const buildPaymentController = ({ prisma }) => {
               paymentMode: paymentDetails.payment_group || "ONLINE",
             },
           });
+          await prisma.payment.updateMany({
+            where: {
+              OR: [
+                { providerOrderId: String(orderDetails.order_id || orderId) },
+                { orderId: existingOrder.id },
+              ],
+            },
+            data: {
+              status: "PAID",
+              method: paymentDetails.payment_group || "CASHFREE",
+              transactionId: paymentDetails.cf_payment_id ? String(paymentDetails.cf_payment_id) : null,
+            },
+          }).catch((pErr) => console.warn("[PaymentController] Webhook Payment DB update notice:", pErr.message));
         }
       } else if (eventType === "PAYMENT_FAILED" || eventType === "PAYMENT.FAILED") {
         if (existingOrder && (existingOrder.paymentStatus === "PAID" || existingOrder.status === "PAID")) {
@@ -636,13 +655,15 @@ export const buildPaymentController = ({ prisma }) => {
 
           await prisma.payment.create({
             data: {
-              cashfreeOrderId: String(refundResult.orderId),
-              amount: Number(refundAmount),
+              orderId: existingOrder.id,
+              restaurantId: Number(existingOrder.restaurantId || 1),
+              amountSubunit: Math.round(Number(refundAmount || 0) * 100),
+              currency: "INR",
+              method: "REFUND",
               status: "REFUNDED",
               provider: "CASHFREE",
+              providerOrderId: String(refundResult.orderId),
               transactionId: String(refundResult.refundId),
-              orderId: existingOrder.id,
-              restaurantId: existingOrder.restaurantId || null,
             },
           });
         } catch (updateErr) {

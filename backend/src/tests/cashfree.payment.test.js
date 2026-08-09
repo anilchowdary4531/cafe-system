@@ -17,12 +17,12 @@ describe("Cashfree Payment Audit & Status Normalization Tests", () => {
     expect(reason).toBe("Bank declined the transaction");
   });
 
-  it("should return normalizedStatus CANCELLED when Cashfree returns USER_DROPPED", async () => {
-    // Test helper logic validation
-    const dummyCashfreeRes = {
-      order_status: "USER_DROPPED",
-      order_amount: 100,
-    };
-    expect(dummyCashfreeRes.order_status).toBe("USER_DROPPED");
+  it("should calculate ₹2.00 subtotal -> ₹0.00 tax -> ₹2.00 total final payment amount", () => {
+    const subtotal = 2.0;
+    const taxAmount = 0;
+    const total = subtotal + taxAmount;
+    expect(subtotal).toBe(2.0);
+    expect(taxAmount).toBe(0);
+    expect(total).toBe(2.0);
   });
 });

@@ -131,14 +131,15 @@ export const createCashfreePaymentSession = async ({
     });
   }
 
-  const baseUrl = process.env.CASHFREE_ENV === "PRODUCTION"
+  const cfConfig = initCashfree();
+  const baseUrl = cfConfig.isProduction
     ? "https://api.cashfree.com/pg"
     : "https://sandbox.cashfree.com/pg";
 
   const headers = {
     "x-api-version": CASHFREE_API_VERSION,
-    "x-client-id": process.env.CASHFREE_CLIENT_ID || "",
-    "x-client-secret": process.env.CASHFREE_CLIENT_SECRET || "",
+    "x-client-id": cfConfig.clientId,
+    "x-client-secret": cfConfig.clientSecret,
     "Content-Type": "application/json",
   };
 
@@ -236,14 +237,15 @@ export const verifyCashfreeOrderSession = async ({ orderId }) => {
     throw new Error("orderId is required for Cashfree verification");
   }
 
-  const baseUrl = process.env.CASHFREE_ENV === "PRODUCTION"
+  const cfConfig = initCashfree();
+  const baseUrl = cfConfig.isProduction
     ? "https://api.cashfree.com/pg"
     : "https://sandbox.cashfree.com/pg";
 
   const headers = {
     "x-api-version": CASHFREE_API_VERSION,
-    "x-client-id": process.env.CASHFREE_CLIENT_ID || "",
-    "x-client-secret": process.env.CASHFREE_CLIENT_SECRET || "",
+    "x-client-id": cfConfig.clientId,
+    "x-client-secret": cfConfig.clientSecret,
     "Content-Type": "application/json",
   };
 

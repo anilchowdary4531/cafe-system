@@ -14,8 +14,8 @@ export default async function (fastify) {
             0
         );
 
-        const taxAmount = +(subtotal * 0.05).toFixed(2);
-        const total = subtotal + taxAmount;
+        const taxAmount = 0;
+        const total = subtotal;
 
         const count = await prisma.order.count({
             where: { restaurantId },

@@ -19,7 +19,7 @@ export const initCashfree = () => {
   const clientId = String(process.env.CASHFREE_CLIENT_ID || "").trim();
   const clientSecret = String(process.env.CASHFREE_CLIENT_SECRET || "").trim();
 
-  const isProduction = env === "PRODUCTION";
+  const isProduction = env === "PRODUCTION" || env === "PROD" || env === "LIVE";
 
   Cashfree.XClientId = clientId;
   Cashfree.XClientSecret = clientSecret;
@@ -34,6 +34,8 @@ export const initCashfree = () => {
   return {
     env,
     isProduction,
+    clientId,
+    clientSecret,
     clientIdMasked: maskSecret(clientId),
     clientSecretMasked: maskSecret(clientSecret),
     isConfigured,
