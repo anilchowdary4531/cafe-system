@@ -322,11 +322,9 @@ export default async function customerRoutes(app, deps) {
       }
 
       const subtotal = normalizedItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
-      const taxAmount = restaurant.taxEnabled ? (subtotal * restaurant.defaultTaxPercent) / 100 : 0;
-      const serviceChargeAmount = restaurant.serviceChargeEnabled
-        ? (subtotal * restaurant.serviceChargePercent) / 100
-        : 0;
-      const total = subtotal + taxAmount + serviceChargeAmount;
+      const taxAmount = 0;
+      const serviceChargeAmount = 0;
+      const total = subtotal;
 
       const invoiceSequence = Number(restaurant.nextInvoiceNumber || 1001);
       const orderNo = buildReadableOrderNo({

@@ -98,16 +98,9 @@ export async function placeCustomerOrder(req, reply) {
 
     // 💰 CALCULATIONS
     const subtotal = normalized.reduce((a, b) => a + b.total, 0);
-
-    const taxAmount = restaurant.taxEnabled
-        ? (subtotal * restaurant.defaultTaxPercent) / 100
-        : 0;
-
-    const serviceChargeAmount = restaurant.serviceChargeEnabled
-        ? (subtotal * restaurant.serviceChargePercent) / 100
-        : 0;
-
-    const total = subtotal + taxAmount + serviceChargeAmount;
+    const taxAmount = 0;
+    const serviceChargeAmount = 0;
+    const total = subtotal;
 
     // 💾 CREATE ORDER
     const order = await prisma.order.create({
