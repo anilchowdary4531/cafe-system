@@ -288,21 +288,20 @@ export default async function customerRoutes(app, deps) {
           const itemName = String(rawItem.name || rawItem.itemName || "").trim().toLowerCase();
 
           let dbItem = availableById.get(itemId) || availableByName.get(itemName);
-          if (!dbItem && availableMenuItems.length > 0) {
-            dbItem = availableMenuItems[0];
-          }
+          const rawPrice = Number(rawItem.price);
+          const hasValidRawPrice = rawItem.price !== undefined && rawItem.price !== null && !Number.isNaN(rawPrice) && rawPrice >= 0;
 
-          if (!dbItem) {
+          if (!dbItem && !hasValidRawPrice) {
             return reply.code(400).send({
               message: "One or more items are unavailable",
             });
           }
 
           const qty = Math.max(1, Number(rawItem.qty || 1));
-          const price = Number(dbItem.price);
+          const price = hasValidRawPrice ? rawPrice : Number(dbItem.price);
           normalizedItems.push({
-            menuItemId: dbItem.id,
-            itemName: dbItem.name,
+            menuItemId: dbItem?.id || null,
+            itemName: dbItem?.name || String(rawItem.name || rawItem.itemName || "Item").trim(),
             qty,
             price,
             total: price * qty,

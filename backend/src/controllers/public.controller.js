@@ -77,17 +77,19 @@ export async function placeCustomerOrder(req, reply) {
     // 🧠 NORMALIZE ITEMS
     const normalized = items.map((raw) => {
         const db = map.get(Number(raw.id));
+        const rawPrice = Number(raw.price);
+        const hasValidRawPrice = raw.price !== undefined && raw.price !== null && !Number.isNaN(rawPrice) && rawPrice >= 0;
 
-        if (!db) {
+        if (!db && !hasValidRawPrice) {
             throw new Error(`Invalid item ID: ${raw.id}`);
         }
 
         const qty = Number(raw.qty || 1);
-        const price = Number(db.price);
+        const price = hasValidRawPrice ? rawPrice : Number(db.price);
 
         return {
-            menuItemId: db.id,
-            itemName: db.name,
+            menuItemId: db?.id || null,
+            itemName: db?.name || String(raw.name || raw.itemName || "Item").trim(),
             qty,
             price,
             total: qty * price,
