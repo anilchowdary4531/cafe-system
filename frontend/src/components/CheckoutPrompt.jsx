@@ -581,7 +581,9 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
 
                 const CashfreeSdk = await loadCashfreeSdk();
                 if (CashfreeSdk) {
-                    const mode = (import.meta.env.VITE_CASHFREE_ENV || "").toUpperCase() === "PRODUCTION" ? "production" : "sandbox";
+                    const envSetting = (import.meta.env.VITE_CASHFREE_ENV || "").toUpperCase();
+                    const isProdHostname = typeof window !== "undefined" && (window.location.hostname.includes("tiffzy.com"));
+                    const mode = envSetting === "PRODUCTION" || (isProdHostname && envSetting !== "TEST") ? "production" : "sandbox";
                     const cashfree = CashfreeSdk({ mode });
 
                     cashfree.checkout({
