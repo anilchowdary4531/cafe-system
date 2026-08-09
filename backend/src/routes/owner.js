@@ -764,7 +764,7 @@ export default async function ownerRoutes(app, deps) {
     }
   });
 
-  app.get("/owner/:restaurantId/finance", async (req, reply) => {
+  const getFinanceAnalyticsHandler = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const range = String(req.query?.range || "7d").toLowerCase();
@@ -776,14 +776,65 @@ export default async function ownerRoutes(app, deps) {
 
       const now = new Date();
       const fromDate = new Date(now.getTime() - (range === "24h" ? 1 : range === "7d" ? 7 : 30) * 24 * 60 * 60 * 1000);
-      const [restaurant, orders, tables, menuItems, expenses] = await Promise.all([
-        prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { id: true, name: true, slug: true, invoicePrefix: true, upiId: true, bankAccountNumber: true, bankIfscCode: true, bankAccountName: true, bankName: true } }),
-        prisma.order.findMany({ where: { restaurantId, createdAt: { gte: fromDate } }, include: { items: true }, orderBy: { createdAt: "desc" } }),
-        prisma.diningTable.findMany({ where: { restaurantId }, select: { id: true, isActive: true } }),
-        prisma.menuItem.findMany({ where: { restaurantId }, select: { id: true, isAvailable: true } }),
-        prisma.expense.findMany({ where: { restaurantId, spentAt: { gte: fromDate } }, orderBy: { spentAt: "desc" } }),
-      ]);
+
+      // Safe restaurant fetch with fallback for optional bank/UPI columns
+      let restaurant = null;
+      try {
+        restaurant = await prisma.restaurant.findUnique({
+          where: { id: restaurantId },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            invoicePrefix: true,
+            upiId: true,
+            bankAccountNumber: true,
+            bankIfscCode: true,
+            bankAccountName: true,
+            bankName: true,
+          },
+        });
+      } catch (restErr) {
+        console.warn("[OwnerFinance] Detailed restaurant select failed, trying basic select:", restErr.message);
+        restaurant = await prisma.restaurant.findUnique({
+          where: { id: restaurantId },
+          select: { id: true, name: true, slug: true, invoicePrefix: true },
+        }).catch(() => null);
+      }
+
       if (!restaurant) return reply.code(404).send({ message: "Restaurant not found" });
+
+      const [orders, tables, menuItems, expenses] = await Promise.all([
+        prisma.order.findMany({
+          where: { restaurantId, createdAt: { gte: fromDate } },
+          include: { items: true },
+          orderBy: { createdAt: "desc" },
+        }).catch((err) => {
+          console.error("[OwnerFinance] Order query error:", err.message);
+          return [];
+        }),
+        prisma.diningTable.findMany({
+          where: { restaurantId },
+          select: { id: true, isActive: true },
+        }).catch((err) => {
+          console.warn("[OwnerFinance] DiningTable query warning:", err.message);
+          return [];
+        }),
+        prisma.menuItem.findMany({
+          where: { restaurantId },
+          select: { id: true, isAvailable: true },
+        }).catch((err) => {
+          console.warn("[OwnerFinance] MenuItem query warning:", err.message);
+          return [];
+        }),
+        prisma.expense.findMany({
+          where: { restaurantId, spentAt: { gte: fromDate } },
+          orderBy: { spentAt: "desc" },
+        }).catch((err) => {
+          console.warn("[OwnerFinance] Expense query warning:", err.message);
+          return [];
+        }),
+      ]);
 
       let grossSales = 0;
       let netSales = 0;
@@ -796,7 +847,7 @@ export default async function ownerRoutes(app, deps) {
       const paymentSplit = {};
       const statusMix = {};
 
-      const invoices = orders.map((order) => {
+      const invoices = (Array.isArray(orders) ? orders : []).map((order) => {
         const total = Number(order.total || 0);
         const discount = Number(order.discountAmount || 0);
         const taxAmount = Number(order.taxAmount || 0);
@@ -846,7 +897,7 @@ export default async function ownerRoutes(app, deps) {
         };
       });
 
-      const expenseTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+      const expenseTotal = (Array.isArray(expenses) ? expenses : []).reduce((sum, expense) => sum + Number(expense?.amount || 0), 0);
       const operatingProfit = netSales - expenseTotal;
       const collectionEfficiency = grossSales > 0 ? (paidAmount / grossSales) * 100 : 0;
       const marginPct = netSales > 0 ? (operatingProfit / netSales) * 100 : 0;
@@ -878,20 +929,27 @@ export default async function ownerRoutes(app, deps) {
         },
         paymentSplit: Object.entries(paymentSplit).map(([mode, amount]) => ({ mode, amount })).sort((a, b) => b.amount - a.amount),
         statusMix: Object.entries(statusMix).map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count),
-        expenses,
+        expenses: Array.isArray(expenses) ? expenses : [],
         invoices,
       };
     } catch (err) {
-      console.log(err);
+      console.error("[OwnerFinance] Error fetching finance analytics:", err);
       return reply.code(500).send({ message: "Failed to fetch finance analytics" });
     }
-  });
+  };
+
+  app.get("/owner/:restaurantId/finance", getFinanceAnalyticsHandler);
+  app.get("/api/owner/:restaurantId/finance", getFinanceAnalyticsHandler);
 
   // SETTLEMENT DASHBOARD ENDPOINTS
   app.get("/owner/:restaurantId/settlements/summary", settlementController.getSummary);
+  app.get("/api/owner/:restaurantId/settlements/summary", settlementController.getSummary);
   app.get("/owner/:restaurantId/settlements/orders", settlementController.getOrders);
+  app.get("/api/owner/:restaurantId/settlements/orders", settlementController.getOrders);
   app.get("/owner/:restaurantId/settlements/export/csv", settlementController.exportCsv);
+  app.get("/api/owner/:restaurantId/settlements/export/csv", settlementController.exportCsv);
   app.get("/owner/:restaurantId/settlements/export/pdf", settlementController.exportPdf);
+  app.get("/api/owner/:restaurantId/settlements/export/pdf", settlementController.exportPdf);
 
   app.get("/owner/:restaurantId/settings", async (req, reply) => {
     try {
