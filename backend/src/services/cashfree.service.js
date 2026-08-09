@@ -46,6 +46,7 @@ export const createCashfreePaymentSession = async ({
   commissionType = "PERCENTAGE",
   commissionValue = 10,
 }) => {
+  const cfConfig = initCashfree();
   const cashfree = getCashfreeInstance();
 
   const formattedOrderId = String(orderId).trim();
@@ -79,7 +80,11 @@ export const createCashfreePaymentSession = async ({
     ? customerName.trim()
     : "Tiffzy Customer";
 
-  const defaultReturnUrl = returnUrl || `${process.env.FRONTEND_URL || "https://www.tiffzy.com"}/payment-status?order_id={order_id}`;
+  let rawReturnUrl = returnUrl || `${process.env.FRONTEND_URL || "https://www.tiffzy.com"}/payment-status?order_id={order_id}`;
+  if (cfConfig.isProduction && rawReturnUrl.startsWith("http://")) {
+    rawReturnUrl = rawReturnUrl.replace(/^http:\/\//, "https://");
+  }
+  const defaultReturnUrl = rawReturnUrl;
 
   // Cashfree Easy Split Settlement Calculation
   // Business logic: e.g. Customer pays ₹500, Tiffzy receives ₹50, Restaurant receives ₹450
@@ -131,7 +136,6 @@ export const createCashfreePaymentSession = async ({
     });
   }
 
-  const cfConfig = initCashfree();
   const baseUrl = cfConfig.isProduction
     ? "https://api.cashfree.com/pg"
     : "https://sandbox.cashfree.com/pg";
