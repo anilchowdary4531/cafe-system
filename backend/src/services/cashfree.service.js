@@ -190,6 +190,8 @@ export const createCashfreePaymentSession = async ({
       order_id: data.order_id || formattedOrderId,
       cf_order_id: data.cf_order_id || null,
       order_status: data.order_status || "ACTIVE",
+      cf_env: cfConfig.env,
+      is_production: cfConfig.isProduction,
       settlement: {
         totalAmount: round2(numericAmount),
         tiffzyCommission: round2(tiffzyCommission),

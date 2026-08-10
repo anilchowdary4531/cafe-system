@@ -36,7 +36,8 @@ export const buildPaymentController = ({ prisma }) => {
           const numericId = Number(customerId);
           let dbAccount = null;
 
-          if (!Number.isNaN(numericId)) {
+          // Only attempt findUnique if it's a valid small integer ID (to avoid Prisma out-of-range errors)
+          if (!Number.isNaN(numericId) && Number.isInteger(numericId) && numericId > 0 && numericId < 2147483647) {
             dbAccount = await prisma.customerAccount.findUnique({
               where: { id: numericId },
             });
@@ -140,12 +141,22 @@ export const buildPaymentController = ({ prisma }) => {
         cf_order_id: result.cf_order_id,
         order_status: result.order_status,
         settlement: result.settlement,
+        cf_env: result.cf_env,
+        is_production: result.is_production,
       });
     } catch (err) {
       console.error("[PaymentController] createOrder Error:", err);
-      return reply.code(500).send({
+
+      const message = err.message || "Failed to create Cashfree payment order session";
+
+      // If it's a Cashfree or Validation error, return 400. Otherwise 500.
+      const isValidationError = message.toLowerCase().includes("required") ||
+                              message.toLowerCase().includes("invalid") ||
+                              message.toLowerCase().includes("already exists");
+
+      return reply.code(isValidationError ? 400 : 500).send({
         success: false,
-        message: err.message || "Failed to create Cashfree payment order session",
+        message: message,
       });
     }
   };
