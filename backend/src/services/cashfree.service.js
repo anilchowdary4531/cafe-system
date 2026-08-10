@@ -45,6 +45,7 @@ export const createCashfreePaymentSession = async ({
   vendorId,
   commissionType = "PERCENTAGE",
   commissionValue = 10,
+  orderNote = "Have good food!",
 }) => {
   const cfConfig = initCashfree();
   const cashfree = getCashfreeInstance();
@@ -86,6 +87,8 @@ export const createCashfreePaymentSession = async ({
   }
   const defaultReturnUrl = rawReturnUrl;
 
+  const cleanOrderNote = String(orderNote || "Have good food!").trim();
+
   // Cashfree Easy Split Settlement Calculation
   // Business logic: e.g. Customer pays ₹500, Tiffzy receives ₹50, Restaurant receives ₹450
   const normalizedCommType = String(commissionType || "PERCENTAGE").toUpperCase();
@@ -105,6 +108,7 @@ export const createCashfreePaymentSession = async ({
     order_amount: round2(numericAmount), // Format to 2 decimal places
     order_currency: "INR",
     order_id: formattedOrderId,
+    order_note: cleanOrderNote || "Have good food!",
     customer_details: {
       customer_id: cleanCustomerId,
       customer_phone: cleanPhone,

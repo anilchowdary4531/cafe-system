@@ -87,6 +87,8 @@ export const buildPaymentController = ({ prisma }) => {
       }
 
       // Generate Cashfree payment session with Easy Split
+      const orderNote = body.orderNote || body.note || body.notes || "Have good food!";
+
       const result = await createCashfreePaymentSession({
         orderId,
         amount,
@@ -99,6 +101,7 @@ export const buildPaymentController = ({ prisma }) => {
         vendorId: resolvedVendorId,
         commissionType,
         commissionValue,
+        orderNote,
       });
 
       // Store Payment record in Prisma DB with schema-aligned fields
