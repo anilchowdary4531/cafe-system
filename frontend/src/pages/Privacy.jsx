@@ -21,7 +21,7 @@ export default function Privacy() {
                         Privacy Policy
                     </h1>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Effective Date: August 5, 2026 | Last Updated: August 5, 2026
+                        Effective Date: August 9, 2026 | Last Updated: August 9, 2026
                     </p>
                 </div>
 
@@ -60,7 +60,17 @@ export default function Privacy() {
                     </section>
 
                     <section className="space-y-3">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">3. Third-Party Service Disclosures</h2>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">3. Use of Location Services</h2>
+                        <p>The Tiffzy Restaurant app requires access to your location (<strong>ACCESS_FINE_LOCATION</strong>) while the app is in use. This data is used solely to:</p>
+                        <ul className="list-disc pl-6 space-y-2">
+                            <li>Display a list of restaurants currently serving your area.</li>
+                            <li>Help users set precise delivery markers for food orders.</li>
+                            <li><strong>Notice:</strong> We do not track your location in the background or sell your movement data to third parties.</li>
+                        </ul>
+                    </section>
+
+                    <section className="space-y-3">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">4. Third-Party Service Disclosures</h2>
                         <p>We do NOT sell, rent, or trade your personal data. We share minimal necessary data only with trusted infrastructure providers:</p>
                         <ul className="list-disc pl-6 space-y-2">
                             <li><strong>Google Sign-In / OAuth 2.0:</strong> For secure single sign-on authentication.</li>
@@ -104,6 +114,7 @@ export default function Privacy() {
                         <p>If you have any questions, privacy concerns, or data requests, please contact our Privacy Officer:</p>
                         <div className="text-xs space-y-1">
                             <p><strong className="text-gray-900 dark:text-gray-200">Legal Entity:</strong> SURVETRA SERVICES</p>
+                            <p><strong className="text-gray-900 dark:text-gray-200">Registered Address:</strong> 13/640, Sasthri Nagar, Tadipatri, Andhra Pradesh, India</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">GSTIN:</strong> 37FJMPS3S3117Q1ZB</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Brand:</strong> Tiffzy</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Privacy Contact Email:</strong> jekkaramesh@survetra.com</p>

@@ -96,3 +96,65 @@ export const deleteCustomerAddress = async ({ prisma, customerAccountId, id }) =
 
   return { ok: true };
 };
+
+export const updateCustomerAddress = async ({ prisma, customerAccountId, id, input }) => {
+  const addressId = Number(id || 0);
+  if (!addressId) return { ok: false, status: 400, payload: { message: "Invalid address id" } };
+
+  const patch = input && typeof input === "object" ? input : {};
+  const normalizeNumber = (value) => {
+    if (value === "" || value === null || value === undefined) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const existing = await prisma.customerAddress.findFirst({
+    where: { id: addressId, customerAccountId },
+  });
+  if (!existing) return { ok: false, status: 404, payload: { message: "Address not found" } };
+
+  const label = patch.label !== undefined ? (String(patch.label || "Home").trim() || "Home") : existing.label;
+  const name = patch.name !== undefined ? (patch.name ? String(patch.name).trim() : null) : existing.name;
+  const phone = patch.phone !== undefined ? (patch.phone ? String(patch.phone).trim() : null) : existing.phone;
+  const line1 = patch.line1 !== undefined ? String(patch.line1 || "").trim() : existing.line1;
+  const line2 = patch.line2 !== undefined ? (patch.line2 ? String(patch.line2).trim() : null) : existing.line2;
+  const city = patch.city !== undefined ? (patch.city ? String(patch.city).trim() : null) : existing.city;
+  const state = patch.mandal !== undefined ? String(patch.mandal).trim() : patch.state !== undefined ? String(patch.state).trim() : existing.state;
+  const postalCode = patch.postalCode !== undefined ? (patch.postalCode ? String(patch.postalCode).trim() : null) : existing.postalCode;
+  const latitude = patch.latitude !== undefined || patch.lat !== undefined ? normalizeNumber(patch.latitude ?? patch.lat) : existing.latitude;
+  const longitude = patch.longitude !== undefined || patch.lng !== undefined ? normalizeNumber(patch.longitude ?? patch.lng) : existing.longitude;
+  const notes = patch.notes !== undefined ? (patch.notes ? String(patch.notes).trim() : null) : existing.notes;
+  const isDefault = patch.isDefault !== undefined ? Boolean(patch.isDefault) : existing.isDefault;
+
+  if (patch.line1 !== undefined && !line1) {
+    return { ok: false, status: 400, payload: { message: "Address line1 is required" } };
+  }
+
+  // Ensure single default if being set to default.
+  if (isDefault && !existing.isDefault) {
+    await prisma.customerAddress.updateMany({
+      where: { customerAccountId },
+      data: { isDefault: false },
+    });
+  }
+
+  const address = await prisma.customerAddress.update({
+    where: { id: addressId },
+    data: {
+      label,
+      name,
+      phone,
+      line1,
+      line2,
+      city,
+      state,
+      postalCode,
+      latitude,
+      longitude,
+      notes,
+      isDefault,
+    },
+  });
+
+  return { ok: true, address };
+};

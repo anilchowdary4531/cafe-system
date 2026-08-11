@@ -102,8 +102,8 @@ export default function ContactUs() {
                                         <p className="font-bold text-gray-900 dark:text-white">Registered Address</p>
                                         <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-xs sm:text-sm">
                                             SURVETRA SERVICES<br />
-                                            Main Road, Customer Desk,<br />
-                                            Andhra Pradesh / Telangana, India - 500001
+                                            13/640, Sasthri Nagar,<br />
+                                            Tadipatri, Andhra Pradesh, India
                                         </p>
                                     </div>
                                 </div>

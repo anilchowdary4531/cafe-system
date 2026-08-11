@@ -100,25 +100,41 @@ export const buildCustomerProfileController = ({ prisma }) => {
       }
 
       // Sync matching Customer records in restaurant tables
-      const allPhoneVariants = getPhoneVariants(account.phone || newPhone || phoneFromToken);
-      await prisma.customer.updateMany({
-        where: {
-          OR: [
-            ...(allPhoneVariants.length > 0 ? [{ phone: { in: allPhoneVariants } }] : []),
-            ...(account.email ? [{ email: account.email.toLowerCase() }] : []),
-          ],
-        },
-        data: {
-          name: newName || account.name || undefined,
-          phone: account.phone || newPhone || undefined,
-          email: account.email || newEmail || undefined,
-        },
-      });
+      const targetPhone = account.phone || newPhone || phoneFromToken;
+      const allPhoneVariants = getPhoneVariants(targetPhone);
+
+      try {
+        await prisma.customer.updateMany({
+          where: {
+            OR: [
+              ...(allPhoneVariants.length > 0 ? [{ phone: { in: allPhoneVariants } }] : []),
+              ...(account.email ? [{ email: account.email.toLowerCase() }] : []),
+            ],
+          },
+          data: {
+            name: newName || account.name || undefined,
+            // Only update phone if it's different to avoid unique constraint triggers
+            ...(targetPhone ? { phone: targetPhone } : {}),
+            email: account.email || newEmail || undefined,
+          },
+        });
+      } catch (syncErr) {
+        console.warn("[putProfile] Customer sync warning:", syncErr.message);
+        // Don't fail the whole profile update if restaurant-specific sync fails
+      }
 
       return { message: "Profile updated successfully", customer: account };
     } catch (err) {
       console.error("[putProfile] Error:", err);
-      return reply.code(500).send({ message: "Failed to update profile" });
+      const message = err.message || "Failed to update profile";
+      // Handle unique constraint violations
+      if (err.code === "P2002") {
+        return reply.code(400).send({
+          message: "Could not update profile because some information (phone or email) is already used by another account.",
+          detail: err.meta?.target
+        });
+      }
+      return reply.code(500).send({ message });
     }
   };
 

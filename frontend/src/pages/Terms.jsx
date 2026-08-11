@@ -21,7 +21,7 @@ export default function Terms() {
                         Terms & Conditions
                     </h1>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Effective Date: August 5, 2026 | Last Updated: August 5, 2026
+                        Effective Date: August 9, 2026 | Last Updated: August 9, 2026
                     </p>
                 </div>
 
@@ -85,6 +85,7 @@ export default function Terms() {
                     <section className="rounded-3xl border border-[var(--app-border,rgba(0,0,0,0.1))] bg-white dark:bg-slate-900 p-6 space-y-2 text-xs">
                         <h3 className="font-bold text-sm text-gray-900 dark:text-white">Contact & Entity Details</h3>
                         <p><strong className="text-gray-900 dark:text-gray-200">Legal Entity:</strong> SURVETRA SERVICES</p>
+                        <p><strong className="text-gray-900 dark:text-gray-200">Registered Address:</strong> 13/640, Sasthri Nagar, Tadipatri, Andhra Pradesh, India</p>
                         <p><strong className="text-gray-900 dark:text-gray-200">GSTIN:</strong> 37FJMPS3S3117Q1ZB</p>
                         <p><strong className="text-gray-900 dark:text-gray-200">Brand Name:</strong> Tiffzy</p>
                         <p><strong className="text-gray-900 dark:text-gray-200">Email:</strong> jekkaramesh@survetra.com | Phone: +91 91777 64632</p>

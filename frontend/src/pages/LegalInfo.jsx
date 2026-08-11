@@ -80,8 +80,8 @@ export default function LegalInfo() {
                                 <span className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Registered Office & Contact Address</span>
                                 <p className="font-semibold text-gray-800 dark:text-gray-200 leading-relaxed">
                                     SURVETRA SERVICES<br />
-                                    Main Road, Near Bus Station, Customer Support Desk,<br />
-                                    Andhra Pradesh / Telangana, India - 500001
+                                    13/640, Sasthri Nagar,<br />
+                                    Tadipatri, Andhra Pradesh, India
                                 </p>
                             </div>
 

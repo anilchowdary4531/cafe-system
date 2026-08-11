@@ -297,7 +297,7 @@ export default function DeleteAccount() {
                     )}
 
                     <div className="pt-2 text-xs theme-muted border-t border-[var(--app-border)]">
-                        Support Contact: <strong>rameshnanda@tiffzy.com</strong> • Phone: <strong>+91 9177764632</strong> • Website: <strong>https://tiffzy.com</strong>
+                        Support Contact: <strong>jekkaramesh@survetra.com</strong> • Phone: <strong>+91 91777 64632</strong> • Website: <strong>https://tiffzy.com</strong>
                     </div>
                 </div>
 

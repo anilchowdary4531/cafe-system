@@ -179,6 +179,7 @@ export default async function customerRoutes(app, deps) {
 
   app.get("/customer/address", addressController.getAddresses);
   app.post("/customer/address", addressController.postAddress);
+  app.put("/customer/address/:id", addressController.putAddress);
   app.delete("/customer/address/:id", addressController.deleteAddress);
 
   app.post("/customer/fcm-token", async (req, reply) => {
