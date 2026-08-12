@@ -123,10 +123,17 @@ export const buildPayLaterController = ({ prisma }) => {
 
   const repay = async (req, reply) => {
     try {
-      const accountId = Number(req.params.accountId);
+      let accountId = Number(req.params.accountId);
       const { amount } = req.body || {};
       const phone = await requireCustomerPhoneFromJwt(req);
       if (!phone) return reply.code(401).send({ message: "Authentication required" });
+
+      if (!accountId) {
+        // Find first account for this customer if none specified (for wallet recharge)
+        const accounts = await payLaterService.getCustomerPayLaterAccounts({ prisma, phone });
+        if (!accounts.length) return reply.code(404).send({ message: "No wallet account found" });
+        accountId = accounts[0].accountId;
+      }
 
       const actor = { type: "customer", phone };
       const repayment = await payLaterService.createPayLaterRepayment({ prisma, accountId, amount, actor });
@@ -138,9 +145,20 @@ export const buildPayLaterController = ({ prisma }) => {
 
   const verifyRepay = async (req, reply) => {
     try {
-      const accountId = Number(req.params.accountId);
+      let accountId = Number(req.params.accountId);
       const phone = await requireCustomerPhoneFromJwt(req);
       if (!phone) return reply.code(401).send({ message: "Authentication required" });
+
+      if (!accountId) {
+        // If it's a wallet verify, the razorpay order id is in the body, we can find the transaction and account from there
+        const body = req.body || {};
+        const rzpOrderId = String(body.razorpayOrderId || body.razorpay_order_id || "");
+        const pendingTx = await prisma.payLaterTransaction.findFirst({
+          where: { paymentReference: rzpOrderId, status: "PENDING" }
+        });
+        if (!pendingTx) return reply.code(404).send({ message: "Transaction not found" });
+        accountId = pendingTx.accountId;
+      }
 
       const actor = { type: "customer", phone };
       const result = await payLaterService.verifyPayLaterRepayment({ prisma, accountId, input: req.body, actor });
@@ -205,6 +223,39 @@ export const buildPayLaterController = ({ prisma }) => {
     }
   };
 
+  const getWalletHistory = async (req, reply) => {
+    try {
+      const phone = await requireCustomerPhoneFromJwt(req);
+      if (!phone) return reply.code(401).send({ message: "Authentication required" });
+
+      const accounts = await payLaterService.getCustomerPayLaterAccounts({ prisma, phone });
+      if (!accounts.length) {
+        return { balance: 0, transactions: [] };
+      }
+
+      // Aggregate all accounts for this phone
+      const totalBalance = accounts.reduce((sum, acc) => sum + (acc.totalPaid - acc.totalBorrowed), 0);
+
+      const accountIds = accounts.map(a => a.accountId);
+      const transactions = await prisma.payLaterTransaction.findMany({
+        where: { accountId: { in: accountIds }, status: "SUCCESS" },
+        orderBy: { createdAt: "desc" }
+      });
+
+      const mappedTransactions = transactions.map(t => ({
+        id: t.id,
+        amount: t.amount,
+        type: (t.type.includes("REPAYMENT") || t.type.includes("CASHBACK")) ? "credit" : "debit",
+        description: t.description || t.type.replace(/_/g, " "),
+        createdAt: t.createdAt
+      }));
+
+      return { balance: totalBalance, transactions: mappedTransactions };
+    } catch (err) {
+      return mapError(err, reply);
+    }
+  };
+
   return {
     getCustomers,
     addCustomer,
@@ -218,5 +269,6 @@ export const buildPayLaterController = ({ prisma }) => {
     sendReminder,
     getNotifications,
     readNotification,
+    getWalletHistory,
   };
 };

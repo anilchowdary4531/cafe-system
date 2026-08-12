@@ -492,6 +492,9 @@ export default async function customerRoutes(app, deps) {
   app.get("/customer/pay-later/accounts/:accountId/details", payLaterController.getDetails);
   app.post("/customer/pay-later/accounts/:accountId/repay", payLaterController.repay);
   app.post("/customer/pay-later/accounts/:accountId/repay/verify", payLaterController.verifyRepay);
+  app.get("/customer/wallet/history", payLaterController.getWalletHistory);
+  app.post("/customer/wallet/recharge", payLaterController.repay); // Alias for now
+  app.post("/customer/wallet/verify", payLaterController.verifyRepay); // Alias for now
   app.get("/customer/notifications", payLaterController.getNotifications);
   app.post("/customer/notifications/:notificationId/read", payLaterController.readNotification);
 }

@@ -48,7 +48,14 @@ export const buildCustomerProfileController = ({ prisma }) => {
         rewardPoints = scopedSum._sum?.rewardPoints || 0;
       }
 
-      return { customer: { ...account, rewardPoints } };
+      // Calculate wallet balance (total repayments - total credits/orders)
+      const payLaterAccounts = await prisma.payLaterAccount.findMany({
+        where: { customer: { phone: account.phone } },
+        select: { totalBorrowed: true, totalPaid: true }
+      });
+      const walletBalance = payLaterAccounts.reduce((sum, acc) => sum + (acc.totalPaid - acc.totalBorrowed), 0);
+
+      return { customer: { ...account, rewardPoints, walletBalance } };
     } catch (err) {
       // eslint-disable-next-line no-console
       console.log(err);
