@@ -70,7 +70,7 @@ export const buildPayLaterController = ({ prisma }) => {
 
   const getEligibility = async (req, reply) => {
     try {
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Authentication required" });
 
       const { slug } = req.query || {};
@@ -85,7 +85,7 @@ export const buildPayLaterController = ({ prisma }) => {
 
   const getAccounts = async (req, reply) => {
     try {
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       const customerAccountId = req.user?.customerAccountId;
       if (!phone && !customerAccountId) return reply.code(401).send({ message: "Authentication required" });
 
@@ -104,7 +104,7 @@ export const buildPayLaterController = ({ prisma }) => {
       if (req.staffActor) {
         actor = req.staffActor;
       } else {
-        const phone = await requireCustomerPhoneFromJwt(req);
+        const phone = await requireCustomerPhoneFromJwt(req, prisma);
         if (phone) {
           actor = { type: "customer", phone };
         }
@@ -125,7 +125,7 @@ export const buildPayLaterController = ({ prisma }) => {
     try {
       let accountId = Number(req.params.accountId);
       const { amount } = req.body || {};
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Authentication required" });
 
       if (!accountId) {
@@ -146,7 +146,7 @@ export const buildPayLaterController = ({ prisma }) => {
   const verifyRepay = async (req, reply) => {
     try {
       let accountId = Number(req.params.accountId);
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Authentication required" });
 
       if (!accountId) {
@@ -200,7 +200,7 @@ export const buildPayLaterController = ({ prisma }) => {
 
   const getNotifications = async (req, reply) => {
     try {
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Authentication required" });
 
       const notifications = await payLaterService.getCustomerNotifications({ prisma, phone });
@@ -213,7 +213,7 @@ export const buildPayLaterController = ({ prisma }) => {
   const readNotification = async (req, reply) => {
     try {
       const notificationId = Number(req.params.notificationId);
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Authentication required" });
 
       const notification = await payLaterService.markNotificationRead({ prisma, notificationId, phone });
@@ -225,7 +225,7 @@ export const buildPayLaterController = ({ prisma }) => {
 
   const getWalletHistory = async (req, reply) => {
     try {
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Authentication required" });
 
       const accounts = await payLaterService.getCustomerPayLaterAccounts({ prisma, phone });

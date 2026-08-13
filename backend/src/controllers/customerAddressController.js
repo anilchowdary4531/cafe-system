@@ -4,7 +4,7 @@ import { createCustomerAddress, deleteCustomerAddress, listCustomerAddresses, up
 export const buildCustomerAddressController = ({ prisma }) => {
   const getAddresses = async (req, reply) => {
     try {
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Unauthorized" });
 
       const account = await getCustomerAccountByPhone({ prisma, phone });
@@ -21,7 +21,7 @@ export const buildCustomerAddressController = ({ prisma }) => {
 
   const postAddress = async (req, reply) => {
     try {
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Unauthorized" });
 
       const account = await getCustomerAccountByPhone({ prisma, phone });
@@ -40,7 +40,7 @@ export const buildCustomerAddressController = ({ prisma }) => {
 
   const deleteAddress = async (req, reply) => {
     try {
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Unauthorized" });
 
       const account = await getCustomerAccountByPhone({ prisma, phone });
@@ -59,7 +59,7 @@ export const buildCustomerAddressController = ({ prisma }) => {
 
   const putAddress = async (req, reply) => {
     try {
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Unauthorized" });
 
       const account = await getCustomerAccountByPhone({ prisma, phone });

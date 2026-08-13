@@ -1,10 +1,28 @@
 import { normalizePhone } from "./phoneService.js";
 
-export const requireCustomerPhoneFromJwt = async (req) => {
+export const requireCustomerPhoneFromJwt = async (req, prisma) => {
   if (!req.headers?.authorization) return "";
-  await req.jwtVerify();
-  if (String(req.user?.type || "") !== "customer") return "";
-  return normalizePhone(req.user?.phone || "");
+  try {
+    await req.jwtVerify();
+  } catch (err) {
+    return "";
+  }
+
+  // 1. Direct phone in token (Customer login or recently updated Staff login)
+  const phone = normalizePhone(req.user?.phone || "");
+  if (phone) return phone;
+
+  // 2. If it's a staff member without phone in token, try looking it up in DB
+  const userId = Number(req.user?.id || 0);
+  if (prisma && userId && String(req.user?.type || "") !== "customer") {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { phone: true }
+    });
+    if (user?.phone) return normalizePhone(user.phone);
+  }
+
+  return "";
 };
 
 export const getCustomerAccountByPhone = async ({ prisma, phone }) => {

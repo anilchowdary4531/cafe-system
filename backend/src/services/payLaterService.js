@@ -684,7 +684,7 @@ export const getCustomerNotifications = async ({ prisma, phone }) => {
   const normPhone = normalizePhone(phone);
   if (!normPhone) return [];
 
-  return prisma.customerNotification.findMany({
+  const dbNotifications = await prisma.customerNotification.findMany({
     where: {
       customer: { phone: normPhone },
     },
@@ -695,6 +695,20 @@ export const getCustomerNotifications = async ({ prisma, phone }) => {
     },
     orderBy: { createdAt: "desc" },
   });
+
+  // Map to the format expected by the Android app
+  return dbNotifications.map((n) => ({
+    id: n.id,
+    title: n.title,
+    body: n.message,
+    type: "promotion", // Default type since it's not in DB yet
+    isRead: n.read,
+    createdAt: n.createdAt,
+    metadata: {
+      restaurantId: String(n.restaurantId),
+      restaurantName: n.restaurant?.name || "",
+    },
+  }));
 };
 
 export const markNotificationRead = async ({ prisma, notificationId, phone }) => {

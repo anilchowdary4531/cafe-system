@@ -7,7 +7,7 @@ import { sendSmsOtp } from "../services/smsService.js";
 export const buildCustomerProfileController = ({ prisma }) => {
   const getProfile = async (req, reply) => {
     try {
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Unauthorized" });
 
       let account = await getCustomerAccountByPhone({ prisma, phone });
@@ -65,7 +65,7 @@ export const buildCustomerProfileController = ({ prisma }) => {
 
   const putProfile = async (req, reply) => {
     try {
-      const phoneFromToken = await requireCustomerPhoneFromJwt(req);
+      const phoneFromToken = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phoneFromToken) return reply.code(401).send({ message: "Unauthorized" });
 
       const body = req.body || {};
@@ -147,7 +147,7 @@ export const buildCustomerProfileController = ({ prisma }) => {
 
   const requestDeleteOtp = async (req, reply) => {
     try {
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Unauthorized" });
 
       const account = await getCustomerAccountByPhone({ prisma, phone });
@@ -182,7 +182,7 @@ export const buildCustomerProfileController = ({ prisma }) => {
 
   const deleteAccount = async (req, reply) => {
     try {
-      const phone = await requireCustomerPhoneFromJwt(req);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Unauthorized" });
 
       const body = req.body || {};

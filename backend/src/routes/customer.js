@@ -66,7 +66,7 @@ export default async function customerRoutes(app, deps) {
     try {
       let tokenPhone = "";
       try {
-        tokenPhone = await requireCustomerPhoneFromJwt(req);
+        tokenPhone = await requireCustomerPhoneFromJwt(req, prisma);
       } catch {
         tokenPhone = "";
       }
@@ -193,7 +193,7 @@ export default async function customerRoutes(app, deps) {
 
       let tokenPhone = "";
       try {
-        tokenPhone = await requireCustomerPhoneFromJwt(req);
+        tokenPhone = await requireCustomerPhoneFromJwt(req, prisma);
       } catch {
         tokenPhone = "";
       }
@@ -496,5 +496,23 @@ export default async function customerRoutes(app, deps) {
   app.post("/customer/wallet/recharge", payLaterController.repay); // Alias for now
   app.post("/customer/wallet/verify", payLaterController.verifyRepay); // Alias for now
   app.get("/customer/notifications", payLaterController.getNotifications);
-  app.post("/customer/notifications/:notificationId/read", payLaterController.readNotification);
+  app.patch("/customer/notifications/:notificationId/read", payLaterController.readNotification);
+  app.delete("/customer/notifications/:notificationId", async (req, reply) => {
+    try {
+      const notificationId = Number(req.params.notificationId);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
+      if (!phone) return reply.code(401).send({ message: "Authentication required" });
+
+      await prisma.customerNotification.deleteMany({
+        where: {
+          id: notificationId,
+          customer: { phone },
+        },
+      });
+      return { message: "Notification deleted" };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to delete notification" });
+    }
+  });
 }
