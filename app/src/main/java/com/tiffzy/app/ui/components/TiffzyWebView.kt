@@ -31,29 +31,33 @@ fun TiffzyWebViewScreen(
     // JavaScript to sync authentication and hide "Back to Tiffzy" links
     val script = """
         (function() {
-            var token = '${token ?: ""}';
-            if (token !== '') {
-                if (localStorage.getItem('customerToken') !== token) {
-                    localStorage.setItem('customerToken', token);
-                    localStorage.setItem('android_injected', 'true');
-                    window.location.reload(); 
+            try {
+                var token = '${token ?: ""}';
+                if (token !== '') {
+                    if (localStorage.getItem('customerToken') !== token) {
+                        localStorage.setItem('customerToken', token);
+                        localStorage.setItem('android_injected', 'true');
+                        // window.location.reload(); 
+                    }
                 }
-            }
 
-            // Hide common UI elements that don't belong in App WebView
-            var selectors = ['header', 'nav', '.navbar', '.theme-navbar', '.back-to-tiffzy'];
-            selectors.forEach(function(s) {
-                var elements = document.querySelectorAll(s);
-                elements.forEach(function(el) { el.style.display = 'none'; });
-            });
-            
-            // Hide "Login" links/buttons specifically
-            var links = document.getElementsByTagName('a');
-            for (var i = 0; i < links.length; i++) {
-                var text = links[i].innerText.toLowerCase();
-                if (text.includes('back to tiffzy') || text === 'login' || text === 'sign in') {
-                    links[i].style.display = 'none';
+                // Hide common UI elements that don't belong in App WebView
+                var selectors = ['header', 'nav', '.navbar', '.theme-navbar', '.back-to-tiffzy'];
+                selectors.forEach(function(s) {
+                    var elements = document.querySelectorAll(s);
+                    elements.forEach(function(el) { el.style.display = 'none'; });
+                });
+                
+                // Hide "Login" links/buttons specifically
+                var links = document.getElementsByTagName('a');
+                for (var i = 0; i < links.length; i++) {
+                    var text = links[i].innerText.toLowerCase();
+                    if (text.includes('back to tiffzy') || text === 'login' || text === 'sign in') {
+                        links[i].style.display = 'none';
+                    }
                 }
+            } catch (e) {
+                console.error('JS Injection Error:', e);
             }
         })();
     """.trimIndent()
@@ -96,10 +100,27 @@ fun TiffzyWebViewScreen(
                         }
 
                         webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                val newUrl = request?.url?.toString() ?: return false
+                                // Handle mailto, tel, etc.
+                                if (newUrl.startsWith("mailto:") || newUrl.startsWith("tel:") || newUrl.startsWith("whatsapp:")) {
+                                    try {
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, request.url)
+                                        view?.context?.startActivity(intent)
+                                        return true
+                                    } catch (e: Exception) {
+                                        return false
+                                    }
+                                }
+                                return false // Allow WebView to load the URL
+                            }
+
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 super.onPageStarted(view, url, favicon)
+                                android.util.Log.d("WEBVIEW_DEBUG", "Loading URL: ${url ?: "null"}")
                                 isLoading = true
                                 errorMessage = null
+                                // For SPA, we inject script on start to set token before first render
                                 view?.evaluateJavascript(script, null)
                             }
 

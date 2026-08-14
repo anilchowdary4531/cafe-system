@@ -58,6 +58,22 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 _appLanguage.value = code
             }
         }
+        viewModelScope.launch {
+            authDataStore.customerPhone.collect { p ->
+                if (p != null) phone = p
+            }
+        }
+        viewModelScope.launch {
+            authDataStore.customerName.collect { n ->
+                if (n != null) name = n
+            }
+        }
+        viewModelScope.launch {
+            authDataStore.authToken.collect { token ->
+                // Basic way to get email if needed, but DataStore doesn't store it yet.
+                // For now, phone and name are enough for the order.
+            }
+        }
     }
 
     fun updateSettings(remember: Boolean? = null, autoDetect: Boolean? = null, notify: Boolean? = null) {

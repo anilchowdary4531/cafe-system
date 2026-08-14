@@ -72,6 +72,18 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
             val controller = rememberNavController()
             navController = controller
             
+            // Handle initial intent if it contains payment success
+            LaunchedEffect(intent) {
+                if (intent.getBooleanExtra("payment_success", false)) {
+                    val orderId = intent.getStringExtra("order_id") ?: ""
+                    if (orderId.isNotEmpty()) {
+                        controller.navigate("order_success/PENDING/$orderId") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                }
+            }
+            
             // Re-fetch language code to handle dynamic changes (e.g. from Settings)
             val languageCode by dataStore.appLanguage.collectAsState(initial = "en")
             
@@ -92,7 +104,21 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        
+        // Handle deep links
         navController?.handleDeepLink(intent)
+        
+        // Handle Cashfree payment success
+        if (intent.getBooleanExtra("payment_success", false)) {
+            val orderId = intent.getStringExtra("order_id") ?: ""
+            if (orderId.isNotEmpty()) {
+                // Navigate to order success screen. 
+                // We might not have the orderNo here, but Success screen can handle it.
+                navController?.navigate("order_success/PENDING/$orderId") {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+        }
     }
 
     private fun askNotificationPermission() {

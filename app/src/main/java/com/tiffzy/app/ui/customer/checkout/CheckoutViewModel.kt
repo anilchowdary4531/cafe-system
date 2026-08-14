@@ -19,6 +19,7 @@ data class CheckoutUiState(
     val deliveryInstructions: String = "",
     val restaurant: Restaurant? = null,
     val checkoutPreview: CheckoutPreviewResponse? = null,
+    val selectedPaymentMethod: String = "CASHFREE",
     val orderSuccess: OrderResponse? = null,
     val error: String? = null
 )
@@ -60,6 +61,10 @@ class CheckoutViewModel(
         calculateBill()
     }
 
+    fun selectPaymentMethod(method: String) {
+        _uiState.value = _uiState.value.copy(selectedPaymentMethod = method)
+    }
+
     fun toggleWallet(use: Boolean) {
         _uiState.value = _uiState.value.copy(useWallet = use)
         calculateBill()
@@ -74,18 +79,16 @@ class CheckoutViewModel(
         val restaurant = _uiState.value.restaurant ?: return
 
         val subtotal = cartState.subtotal
-        val taxAmount = cartState.tax
-        
-        // Mocking packing charges and delivery fee for now as they are not in schema
-        val packingCharges = if (subtotal > 0) 20.0 else 0.0
-        val deliveryFee = if (subtotal > 0 && subtotal < 500) 40.0 else 0.0
+        val taxAmount = 0.0 // Set taxes to 0
+        val packingCharges = 0.0 // Set packing charges to 0
+        val deliveryFee = 0.0 // Set delivery fee to 0
         
         val walletApplied = if (_uiState.value.useWallet) {
             val account = _uiState.value.walletAccounts.find { it.restaurantId == restaurant.id }
             account?.pendingBalance ?: 0.0
         } else 0.0
 
-        val total = subtotal + taxAmount + packingCharges + deliveryFee - walletApplied
+        val total = subtotal - walletApplied
 
         _uiState.value = _uiState.value.copy(
             checkoutPreview = CheckoutPreviewResponse(
@@ -98,10 +101,14 @@ class CheckoutViewModel(
                 walletApplied = walletApplied,
                 total = total,
                 savings = 0.0,
-                taxes = listOf(TaxDetail("GST", taxAmount, restaurant.taxPercent)),
+                taxes = emptyList(),
                 availableCoupons = emptyList()
             )
         )
+    }
+
+    fun resetOrderState() {
+        _uiState.value = _uiState.value.copy(orderSuccess = null, error = null)
     }
 
     fun placeOrder(customerName: String, phone: String, email: String?) {
@@ -110,15 +117,31 @@ class CheckoutViewModel(
         val cartState = cartViewModel.uiState.value
         val items = cartState.items
 
+        if (items.isEmpty()) {
+            _uiState.value = state.copy(error = "Cart is empty")
+            return
+        }
+
+        val isDineIn = cartViewModel.cartRepository.getTable() != null
+        if (!isDineIn && state.selectedAddress == null) {
+            _uiState.value = state.copy(error = "Please select a delivery address")
+            return
+        }
+
+        if (phone.isBlank()) {
+            _uiState.value = state.copy(error = "Phone number is required")
+            return
+        }
+
         viewModelScope.launch {
-            _uiState.value = state.copy(isLoading = true)
+            _uiState.value = state.copy(isLoading = true, error = null)
             try {
                 val request = OrderRequest(
                     customerName = customerName,
                     phone = phone,
                     email = email,
                     tableNumber = cartViewModel.cartRepository.getTable(),
-                    fulfillment = if (cartViewModel.cartRepository.getTable() != null) "dinein" else "delivery",
+                    fulfillment = if (isDineIn) "dinein" else "delivery",
                     deliveryAddress = state.selectedAddress?.let { "${it.label}: ${it.line1}, ${it.line2 ?: ""}, ${it.city}" },
                     deliveryLatitude = state.selectedAddress?.latitude,
                     deliveryLongitude = state.selectedAddress?.longitude,
@@ -126,10 +149,39 @@ class CheckoutViewModel(
                     items = items.map { OrderItemRequest(it.menuItem.id, it.menuItem.name, it.menuItem.price, it.quantity) }
                 )
                 val response = repository.placeOrder(restaurant.slug, request)
+                
+                // Handle payment verification for CASH or full PAY_LATER orders
+                val order = response.order
+                val finalPaymentMethod = if (state.checkoutPreview?.total == 0.0 && state.useWallet) "PAY_LATER" else state.selectedPaymentMethod
+                
+                if (finalPaymentMethod == "CASH" || finalPaymentMethod == "PAY_LATER") {
+                    try {
+                        repository.verifyPayment(
+                            VerifyPaymentRequest(
+                                orderId = order.id,
+                                status = "SUCCESS",
+                                paymentMode = finalPaymentMethod
+                            )
+                        )
+                    } catch (e: Exception) {
+                        // Log verification failure but don't stop the flow
+                        e.printStackTrace()
+                    }
+                    // For CASH/Wallet success, we clear cart immediately as we are navigating to success screen
+                    cartViewModel.clearCart()
+                }
+
                 _uiState.value = _uiState.value.copy(isLoading = false, orderSuccess = response)
-                cartViewModel.clearCart()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
+                val errorMsg = if (e is retrofit2.HttpException) {
+                    try {
+                        val body = e.response()?.errorBody()?.string()
+                        if (body?.contains("message") == true) {
+                            com.google.gson.Gson().fromJson(body, Map::class.java)["message"] as String
+                        } else body ?: e.message()
+                    } catch (ex: Exception) { e.message() }
+                } else e.message
+                _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg ?: "Order failed")
             }
         }
     }

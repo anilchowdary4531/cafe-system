@@ -47,6 +47,15 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val _lastOrder = MutableStateFlow<OrderDetails?>(null)
     val lastOrder: StateFlow<OrderDetails?> = _lastOrder.asStateFlow()
 
+    private val _totalSpend = MutableStateFlow(0.0)
+    val totalSpend: StateFlow<Double> = _totalSpend.asStateFlow()
+
+    private val _totalOrders = MutableStateFlow(0)
+    val totalOrders: StateFlow<Int> = _totalOrders.asStateFlow()
+
+    private val _activeOrders = MutableStateFlow(0)
+    val activeOrders: StateFlow<Int> = _activeOrders.asStateFlow()
+
     private val _addressState = MutableStateFlow<AddressUiState>(AddressUiState.Idle)
     val addressState: StateFlow<AddressUiState> = _addressState.asStateFlow()
 
@@ -67,10 +76,14 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 // Use backend avatarUrl if present, otherwise fallback to local ProfileExtras
                 _avatar.value = customer.avatarUrl ?: profileExtrasDataStore.getAvatar(customer.phone).first()
 
-                // Fetch last order
+                // Fetch last order and stats
                 val ordersResponse = repository.getCustomerOrders(customer.phone)
                 val allOrders = ordersResponse.groups.flatMap { it.orders }
                 _lastOrder.value = allOrders.maxByOrNull { it.createdAt }
+                
+                _totalOrders.value = ordersResponse.groups.sumOf { it.stats.totalOrders }
+                _totalSpend.value = ordersResponse.groups.sumOf { it.stats.totalSpend }
+                _activeOrders.value = ordersResponse.groups.sumOf { it.stats.activeOrders }
             } catch (e: Exception) {
                 if (e is retrofit2.HttpException && e.code() == 404) {
                     // Account missing in backend but app has token - session is invalid
@@ -97,7 +110,15 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 _nickname.value = newNickname
                 _avatar.value = customer.avatarUrl ?: newAvatar
             } catch (e: Exception) {
-                _uiState.value = ProfileUiState.Error(e.message ?: "Failed to update profile")
+                val errorMsg = if (e is retrofit2.HttpException) {
+                    try {
+                        val body = e.response()?.errorBody()?.string()
+                        if (body?.contains("message") == true) {
+                            com.google.gson.Gson().fromJson(body, Map::class.java)["message"] as String
+                        } else body ?: e.message()
+                    } catch (ex: Exception) { e.message() }
+                } else e.message
+                _uiState.value = ProfileUiState.Error(errorMsg ?: "Failed to update profile")
             }
         }
     }
@@ -132,6 +153,18 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 loadAddresses()
             } catch (e: Exception) {
                 _addressState.value = AddressUiState.Error(e.message ?: "Failed to add address")
+            }
+        }
+    }
+
+    fun updateAddress(id: Int, request: CreateAddressRequest) {
+        viewModelScope.launch {
+            _addressState.value = AddressUiState.Loading
+            try {
+                repository.updateAddress(id, request)
+                loadAddresses()
+            } catch (e: Exception) {
+                _addressState.value = AddressUiState.Error(e.message ?: "Failed to update address")
             }
         }
     }

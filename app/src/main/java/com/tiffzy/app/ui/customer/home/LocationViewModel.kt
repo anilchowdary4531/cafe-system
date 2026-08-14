@@ -36,8 +36,17 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
     private val _addresses = MutableStateFlow<List<Address>>(emptyList())
     val addresses: StateFlow<List<Address>> = _addresses.asStateFlow()
 
+    private val _lastSelectedLocation = MutableStateFlow<LocationState.Success?>(null)
+    val lastSelectedLocation: StateFlow<LocationState.Success?> = _lastSelectedLocation.asStateFlow()
+
     fun selectLocation(latitude: Double, longitude: Double, name: String = "Selected Location") {
-        _locationState.value = LocationState.Success(latitude, longitude, name)
+        val success = LocationState.Success(latitude, longitude, name)
+        _lastSelectedLocation.value = success
+        _locationState.value = success
+    }
+
+    fun resetState() {
+        _locationState.value = LocationState.Idle
     }
 
     fun fetchCurrentLocation() {
@@ -56,7 +65,9 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
             try {
                 val location = locationHelper.getCurrentLocation()
                 if (location != null) {
-                    _locationState.value = LocationState.Success(location.latitude, location.longitude)
+                    val success = LocationState.Success(location.latitude, location.longitude)
+                    _lastSelectedLocation.value = success
+                    _locationState.value = success
                 } else {
                     _locationState.value = LocationState.Error("Unable to retrieve location")
                 }

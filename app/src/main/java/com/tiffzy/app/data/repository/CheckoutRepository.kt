@@ -20,4 +20,8 @@ class CheckoutRepository(private val apiService: ApiService) {
     suspend fun getRestaurant(slug: String): Restaurant? {
         return apiService.getRestaurants().find { it.slug == slug }
     }
+
+    suspend fun verifyPayment(request: VerifyPaymentRequest): VerifyPaymentResponse {
+        return apiService.verifyPayment(request)
+    }
 }

@@ -54,6 +54,10 @@ class RestaurantRepository(private val apiService: ApiService) {
         return apiService.createAddress(request)
     }
 
+    suspend fun updateAddress(id: Int, request: CreateAddressRequest): Address {
+        return apiService.updateAddress(id, request)
+    }
+
     suspend fun deleteAddress(id: Int) {
         apiService.deleteAddress(id)
     }

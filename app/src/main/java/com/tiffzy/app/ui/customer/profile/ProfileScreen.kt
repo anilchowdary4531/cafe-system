@@ -54,6 +54,9 @@ fun ProfileScreen(
     val nickname by viewModel.nickname.collectAsState()
     val avatar by viewModel.avatar.collectAsState()
     val lastOrder by viewModel.lastOrder.collectAsState()
+    val totalOrders by viewModel.totalOrders.collectAsState()
+    val totalSpend by viewModel.totalSpend.collectAsState()
+    val activeOrders by viewModel.activeOrders.collectAsState()
     
     var showLanguageSelector by remember { mutableStateOf(false) }
     val currentLanguageCode by authViewModel.appLanguage.collectAsState()
@@ -98,6 +101,9 @@ fun ProfileScreen(
                     nickname = nickname,
                     avatarUrl = avatar,
                     lastOrder = lastOrder,
+                    totalOrders = totalOrders,
+                    totalSpend = totalSpend,
+                    activeOrders = activeOrders,
                     onEditProfile = onEditProfile,
                     onOrdersClick = onOrdersClick,
                     onFavoritesClick = onFavoritesClick,
@@ -125,6 +131,9 @@ fun ProfileContent(
     nickname: String?,
     avatarUrl: String?,
     lastOrder: OrderDetails?,
+    totalOrders: Int,
+    totalSpend: Double,
+    activeOrders: Int,
     onEditProfile: () -> Unit,
     onOrdersClick: () -> Unit,
     onFavoritesClick: () -> Unit,
@@ -141,9 +150,19 @@ fun ProfileContent(
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = Dimens.PaddingLarge)
+            .padding(horizontal = 4.dp) // ~98% width
     ) {
         Spacer(modifier = Modifier.height(Dimens.PaddingLarge))
+
+        Text(
+            text = "Logged in as ${customer.phone}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 12.dp)
+        )
+        
+        Spacer(modifier = Modifier.height(12.dp))
 
         // 1. Unified Identity Card
         ProfileHeaderCard(
@@ -152,6 +171,40 @@ fun ProfileContent(
             avatarUrl = avatarUrl, 
             onEditClick = onEditProfile
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Web-style Quick Stats Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val stats = listOf(
+                "Orders" to "$totalOrders",
+                "Spend" to "₹${totalSpend.toInt()}",
+                "Avg" to "₹${if (totalOrders > 0) (totalSpend / totalOrders).toInt() else 0}",
+                "Active" to "$activeOrders"
+            )
+            
+            stats.forEach { (label, value) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "$label: ",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
 
@@ -227,17 +280,17 @@ fun ProfileContent(
             )
             ModernRewardCard(
                 modifier = Modifier.weight(1f),
-                icon = Icons.Default.Star,
-                label = "Points",
-                value = "${customer.rewardPoints ?: 0}",
+                icon = Icons.Default.BarChart,
+                label = "Spend",
+                value = "₹${totalSpend.toInt()}",
                 color = Color(0xFF10B981) // Emerald
             )
             ModernRewardCard(
                 modifier = Modifier.weight(1f),
-                icon = Icons.Default.CardGiftcard,
-                label = "Offers",
-                value = "0",
-                color = Color(0xFF8B5CF6) // Violet
+                icon = Icons.Default.ShoppingBag,
+                label = "Orders",
+                value = "$totalOrders",
+                color = Color(0xFF3B82F6) // Blue
             )
         }
 
@@ -342,18 +395,18 @@ fun ProfileContent(
         
         // Footer Section
         TiffzyFooter(
-            onAboutUsClick = { onNavigateToWeb("About Us", "https://tiffzy.com/about-us") },
-            onContactUsClick = { onNavigateToWeb("Contact Us", "https://tiffzy.com/contact-us") },
-            onHelpCenterClick = { onNavigateToWeb("Help Center", "https://tiffzy.com/help-center") },
-            onTermsClick = { onNavigateToWeb("Terms", "https://tiffzy.com/terms") },
-            onPrivacyClick = { onNavigateToWeb("Privacy", "https://tiffzy.com/privacy") },
-            onRefundPolicyClick = { onNavigateToWeb("Refund Policy", "https://tiffzy.com/refund-policy") },
-            onQrOrderingClick = { onNavigateToWeb("QR Ordering", "https://tiffzy.com/qr-ordering") },
-            onPosDashboardClick = { onNavigateToWeb("POS Dashboard", "https://tiffzy.com/pos-dashboard") },
-            onAnalyticsClick = { onNavigateToWeb("Analytics", "https://tiffzy.com/analytics") },
-            onInventoryClick = { onNavigateToWeb("Inventory", "https://tiffzy.com/inventory") },
-            onShippingPolicyClick = { onNavigateToWeb("Shipping Policy", "https://tiffzy.com/shipping-policy") },
-            onLegalDisclosureClick = { onNavigateToWeb("Legal Disclosure", "https://tiffzy.com/legal-disclosure") },
+            onAboutUsClick = { onNavigateToWeb("About Us", "https://www.tiffzy.com/about-us") },
+            onContactUsClick = { onNavigateToWeb("Contact Us", "https://www.tiffzy.com/contact-us") },
+            onHelpCenterClick = { onNavigateToWeb("Help Center", "https://www.tiffzy.com/help-center") },
+            onTermsClick = { onNavigateToWeb("Terms", "https://www.tiffzy.com/terms") },
+            onPrivacyClick = { onNavigateToWeb("Privacy", "https://www.tiffzy.com/privacy") },
+            onRefundPolicyClick = { onNavigateToWeb("Refund Policy", "https://www.tiffzy.com/refund-policy") },
+            onQrOrderingClick = { onNavigateToWeb("QR Ordering", "https://www.tiffzy.com/qr-ordering") },
+            onPosDashboardClick = { onNavigateToWeb("POS Dashboard", "https://www.tiffzy.com/pos-dashboard") },
+            onAnalyticsClick = { onNavigateToWeb("Analytics", "https://www.tiffzy.com/analytics") },
+            onInventoryClick = { onNavigateToWeb("Inventory", "https://www.tiffzy.com/inventory") },
+            onShippingPolicyClick = { onNavigateToWeb("Shipping Policy", "https://www.tiffzy.com/shipping-policy") },
+            onLegalDisclosureClick = { onNavigateToWeb("Legal Info", "https://www.tiffzy.com/legal-disclosure") },
             onDeleteAccountClick = onDeleteAccount
         )
 
@@ -369,9 +422,12 @@ fun ProfileHeaderCard(
     onEditClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEditClick() }, // Make the whole card clickable for easier editing
         shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier

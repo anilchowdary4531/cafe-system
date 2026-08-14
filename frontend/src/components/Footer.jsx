@@ -32,7 +32,7 @@ export default function Footer() {
                         <ul className="space-y-4 text-[15px] text-[#f5efe0]/60">
                             <li><Link to="/about-us" className="hover:text-white transition">About Us</Link></li>
                             <li><Link to="/contact-us" className="hover:text-white transition">Contact Us</Link></li>
-                            <li><Link to="/legal-disclosure" className="text-[#f59e0b] hover:underline">Legal & Business Info</Link></li>
+                            <li><Link to="/legal-disclosure" className="text-[#f59e0b] font-bold hover:underline">Legal & Business Info</Link></li>
                             <li><Link to="/pricing" className="hover:text-white transition">Pricing</Link></li>
                         </ul>
                     </div>

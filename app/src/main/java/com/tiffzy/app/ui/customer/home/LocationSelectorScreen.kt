@@ -40,6 +40,7 @@ fun LocationSelectorScreen(
     }
 
     LaunchedEffect(Unit) {
+        viewModel.resetState()
         viewModel.loadSavedAddresses()
     }
 

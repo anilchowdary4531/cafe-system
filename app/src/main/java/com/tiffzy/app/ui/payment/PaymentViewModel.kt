@@ -1,5 +1,6 @@
 package com.tiffzy.app.ui.payment
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tiffzy.app.data.model.*
@@ -14,6 +15,7 @@ data class PaymentUiState(
     val status: PaymentResultStatus = PaymentResultStatus.IDLE,
     val paymentSessionId: String? = null,
     val orderId: String? = null,
+    val isProduction: Boolean = false,
     val amount: Double = 0.0,
     val errorMessage: String? = null,
     val txMsg: String? = null
@@ -51,7 +53,8 @@ class PaymentViewModel(
                 orderId = orderId,
                 amount = amount,
                 errorMessage = null,
-                txMsg = null
+                txMsg = null,
+                paymentSessionId = null
             )
         }
 
@@ -68,28 +71,50 @@ class PaymentViewModel(
 
             val result = paymentRepository.createCashfreeOrder(request)
             result.onSuccess { response ->
-                val sessionId = response.payment_session_id
-                if (!sessionId.isNull_or_empty_or_blank(sessionId)) {
+                val sessionId = response.paymentSessionId
+                
+                if (!sessionId.isNullOrBlank()) {
+                    // CRITICAL FIX: Prioritize order_id returned by backend to ensure it matches the token
+                    val finalOrderId = response.orderId ?: orderId
+                    
                     _uiState.update {
                         it.copy(
                             status = PaymentResultStatus.SESSION_CREATED,
                             paymentSessionId = sessionId,
-                            orderId = response.order_id ?: orderId
+                            orderId = finalOrderId,
+                            isProduction = response.isProduction
                         )
                     }
+                    Log.d("CASHFREE_DEBUG", "Session created: orderId=$finalOrderId, isProd=${response.isProduction}, cfEnv=${response.cfEnv}, tokenLength=${sessionId.length}")
                 } else {
+                    val msg = response.message ?: "Failed to generate Cashfree payment session"
                     _uiState.update {
                         it.copy(
                             status = PaymentResultStatus.FAILED,
-                            errorMessage = response.message ?: "Failed to generate Cashfree payment session"
+                            errorMessage = msg
                         )
                     }
                 }
             }.onFailure { exception ->
+                val errorMsg = if (exception is retrofit2.HttpException) {
+                    try {
+                        val body = exception.response()?.errorBody()?.string()
+                        if (body?.contains("message") == true) {
+                            com.google.gson.Gson().fromJson(body, Map::class.java)["message"] as String
+                        } else {
+                            body ?: exception.message()
+                        }
+                    } catch (e: Exception) {
+                        exception.message()
+                    }
+                } else {
+                    exception.message ?: "Network error creating payment session"
+                }
+
                 _uiState.update {
                     it.copy(
                         status = PaymentResultStatus.FAILED,
-                        errorMessage = exception.message ?: "Network error creating payment session"
+                        errorMessage = errorMsg
                     )
                 }
             }
@@ -158,9 +183,5 @@ class PaymentViewModel(
 
     fun resetState() {
         _uiState.value = PaymentUiState()
-    }
-
-    private fun String?.isNull_or_empty_or_blank(s: String?): Boolean {
-        return s == null || s.isEmpty() || s.isBlank()
     }
 }

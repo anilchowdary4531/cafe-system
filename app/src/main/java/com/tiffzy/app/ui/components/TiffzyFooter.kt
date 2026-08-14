@@ -82,7 +82,7 @@ fun TiffzyFooter(
                 FooterHeader("Company", headerColor)
                 FooterLink("About Us", textColor, onAboutUsClick)
                 FooterLink("Contact Us", textColor, onContactUsClick)
-                FooterLink("Legal & Business Info", headerColor, onLegalDisclosureClick)
+                FooterLink("Legal and Business Info", headerColor, onLegalDisclosureClick)
             }
             Column(modifier = Modifier.weight(1f)) {
                 FooterHeader("Products", headerColor)

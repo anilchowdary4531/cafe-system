@@ -25,12 +25,14 @@ import com.tiffzy.app.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.tiffzy.app.ui.auth.AuthUiState
 import com.tiffzy.app.ui.auth.AuthViewModel
 import com.tiffzy.app.ui.components.*
 import com.tiffzy.app.ui.theme.Dimens
+import com.tiffzy.app.utils.ImageUtils
 
 @Composable
 fun HomeScreen(
@@ -39,7 +41,9 @@ fun HomeScreen(
     onRestaurantClick: (String) -> Unit,
     onViewProfile: () -> Unit,
     onScanClick: () -> Unit,
+    onDeleteAccount: () -> Unit = {},
     onNavigateToWeb: (String, String) -> Unit = { _, _ -> },
+    locationName: String? = null,
     viewModel: HomeViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel()
 ) {
@@ -57,6 +61,8 @@ fun HomeScreen(
         topBar = { 
             TiffzyTopBar(
                 title = "Tiffzy",
+                subtitle = locationName ?: "Select Location",
+                onSubtitleClick = onChangeLocation,
                 navigationIcon = {
                     Box(modifier = Modifier.padding(start = Dimens.PaddingMedium)) {
                         BrandLogo(modifier = Modifier.size(32.dp))
@@ -84,7 +90,7 @@ fun HomeScreen(
                 .padding(innerPadding)
         ) {
             // Search Bar
-            Box(modifier = Modifier.padding(Dimens.PaddingMedium)) {
+            Box(modifier = Modifier.padding(horizontal = 4.dp, vertical = Dimens.PaddingMedium)) {
                 TiffzySearchBar(
                     value = searchQuery,
                     onValueChange = { 
@@ -104,8 +110,8 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(Dimens.SpacingMedium),
                         contentPadding = PaddingValues(
-                            start = Dimens.PaddingMedium,
-                            end = Dimens.PaddingMedium,
+                            start = 4.dp,
+                            end = 4.dp,
                             bottom = Dimens.PaddingExtraLarge
                         )
                     ) {
@@ -115,23 +121,23 @@ fun HomeScreen(
                                 text = stringResource(R.string.whats_on_your_mind),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(bottom = Dimens.PaddingSmall)
+                                modifier = Modifier.padding(start = 8.dp, bottom = Dimens.PaddingSmall)
                             )
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(Dimens.SpacingLarge),
                                 contentPadding = PaddingValues(vertical = Dimens.PaddingSmall)
                             ) {
-                                val categories = listOf(
-                                    CategoryItemData("All", com.tiffzy.app.R.drawable.baked_goods_1),
-                                    CategoryItemData("Pizza", com.tiffzy.app.R.drawable.baked_goods_2),
-                                    CategoryItemData("Fries", com.tiffzy.app.R.drawable.baked_goods_3),
-                                    CategoryItemData("Sandwich", com.tiffzy.app.R.drawable.baked_goods_1),
-                                    CategoryItemData("Fried Rice", com.tiffzy.app.R.drawable.baked_goods_2)
-                                )
-                                items(categories) { category ->
-                                    HomeScreenCategoryItem(category) {
-                                        searchQuery = if (category.name == "All") "" else category.name
-                                        viewModel.search(searchQuery)
+                                item {
+                                    val firstRestaurantImg = state.restaurants.firstOrNull()?.bannerUrl ?: state.restaurants.firstOrNull()?.logo
+                                    HomeScreenCategoryItem(CategoryItemData("All", com.tiffzy.app.R.drawable.baked_goods_1, firstRestaurantImg)) {
+                                        searchQuery = ""
+                                        viewModel.search("")
+                                    }
+                                }
+                                items(state.categories) { category ->
+                                    HomeScreenCategoryItem(CategoryItemData(category.name, com.tiffzy.app.R.drawable.baked_goods_2, category.imageUrl)) {
+                                        searchQuery = category.name
+                                        viewModel.search(category.name)
                                     }
                                 }
                             }
@@ -149,7 +155,7 @@ fun HomeScreen(
                                         Text(
                                             text = stringResource(R.string.restaurants),
                                             style = MaterialTheme.typography.titleLarge,
-                                            modifier = Modifier.padding(vertical = Dimens.PaddingSmall)
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = Dimens.PaddingSmall)
                                         )
                                     }
                                 }
@@ -167,7 +173,7 @@ fun HomeScreen(
                                         Text(
                                             text = stringResource(R.string.dishes),
                                             style = MaterialTheme.typography.titleLarge,
-                                            modifier = Modifier.padding(vertical = Dimens.PaddingSmall)
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = Dimens.PaddingSmall)
                                         )
                                     }
                                     
@@ -194,38 +200,33 @@ fun HomeScreen(
                                     Text(
                                         text = stringResource(R.string.restaurants_to_explore),
                                         style = MaterialTheme.typography.titleLarge,
-                                        modifier = Modifier.padding(top = Dimens.PaddingSmall)
+                                        modifier = Modifier.padding(start = 8.dp, top = Dimens.PaddingSmall)
                                     )
                                 }
                                 
-                                itemsIndexed(state.restaurants) { index, restaurant ->
-                                    // Cycle through images for variety
-                                    val imageRes = when (index % 3) {
-                                        0 -> com.tiffzy.app.R.drawable.baked_goods_1
-                                        1 -> com.tiffzy.app.R.drawable.baked_goods_2
-                                        else -> com.tiffzy.app.R.drawable.baked_goods_3
-                                    }
-                                    
+                                items(state.restaurants) { restaurant ->
                                     TiffzyRestaurantCard(
                                         restaurant = restaurant,
-                                        onClick = { onRestaurantClick(restaurant.slug) },
-                                        overrideImageRes = imageRes
+                                        onClick = { onRestaurantClick(restaurant.slug) }
                                     )
                                 }
                                 
                                 item {
                                     Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
                                     TiffzyFooter(
-                                        onAboutUsClick = { onNavigateToWeb("About Us", "https://tiffzy.com/about-us") },
-                                        onContactUsClick = { onNavigateToWeb("Contact Us", "https://tiffzy.com/contact-us") },
-                                        onHelpCenterClick = { onNavigateToWeb("Help Center", "https://tiffzy.com/help-center") },
-                                        onTermsClick = { onNavigateToWeb("Terms", "https://tiffzy.com/terms") },
-                                        onPrivacyClick = { onNavigateToWeb("Privacy", "https://tiffzy.com/privacy") },
-                                        onRefundPolicyClick = { onNavigateToWeb("Refund Policy", "https://tiffzy.com/refund-policy") },
-                                        onQrOrderingClick = { onNavigateToWeb("QR Ordering", "https://tiffzy.com/qr-ordering") },
-                                        onPosDashboardClick = { onNavigateToWeb("POS Dashboard", "https://tiffzy.com/pos-dashboard") },
-                                        onAnalyticsClick = { onNavigateToWeb("Analytics", "https://tiffzy.com/analytics") },
-                                        onInventoryClick = { onNavigateToWeb("Inventory", "https://tiffzy.com/inventory") }
+                                        onAboutUsClick = { onNavigateToWeb("About Us", "https://www.tiffzy.com/about-us") },
+                                        onContactUsClick = { onNavigateToWeb("Contact Us", "https://www.tiffzy.com/contact-us") },
+                                        onHelpCenterClick = { onNavigateToWeb("Help Center", "https://www.tiffzy.com/help-center") },
+                                        onTermsClick = { onNavigateToWeb("Terms", "https://www.tiffzy.com/terms") },
+                                        onPrivacyClick = { onNavigateToWeb("Privacy", "https://www.tiffzy.com/privacy") },
+                                        onRefundPolicyClick = { onNavigateToWeb("Refund Policy", "https://www.tiffzy.com/refund-policy") },
+                                        onQrOrderingClick = { onNavigateToWeb("QR Ordering", "https://www.tiffzy.com/qr-ordering") },
+                                        onPosDashboardClick = { onNavigateToWeb("POS Dashboard", "https://www.tiffzy.com/pos-dashboard") },
+                                        onAnalyticsClick = { onNavigateToWeb("Analytics", "https://www.tiffzy.com/analytics") },
+                                        onInventoryClick = { onNavigateToWeb("Inventory", "https://www.tiffzy.com/inventory") },
+                                        onShippingPolicyClick = { onNavigateToWeb("Shipping Policy", "https://www.tiffzy.com/shipping-policy") },
+                                        onLegalDisclosureClick = { onNavigateToWeb("Legal Info", "https://www.tiffzy.com/legal-disclosure") },
+                                        onDeleteAccountClick = onDeleteAccount
                                     )
                                 }
                             }
@@ -244,7 +245,7 @@ fun HomeScreen(
     }
 }
 
-data class CategoryItemData(val name: String, val imageRes: Int)
+data class CategoryItemData(val name: String, val imageRes: Int, val imageUrl: String? = null)
 
 @Composable
 fun HomeScreenCategoryItem(
@@ -262,12 +263,23 @@ fun HomeScreenCategoryItem(
             shape = androidx.compose.foundation.shape.CircleShape,
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         ) {
-            Image(
-                painter = painterResource(id = category.imageRes),
-                contentDescription = category.name,
-                modifier = Modifier.fillMaxSize().clip(androidx.compose.foundation.shape.CircleShape),
-                contentScale = ContentScale.Crop
-            )
+            if (category.imageUrl != null) {
+                AsyncImage(
+                    model = ImageUtils.resolveImageUrl(category.imageUrl),
+                    contentDescription = category.name,
+                    modifier = Modifier.fillMaxSize().clip(androidx.compose.foundation.shape.CircleShape),
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(id = category.imageRes),
+                    error = painterResource(id = category.imageRes)
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = category.imageRes),
+                    contentDescription = category.name,
+                    modifier = Modifier.fillMaxSize().clip(androidx.compose.foundation.shape.CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            }
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(

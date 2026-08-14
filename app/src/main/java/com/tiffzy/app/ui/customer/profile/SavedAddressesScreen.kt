@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,6 +35,7 @@ fun SavedAddressesScreen(
 ) {
     val addressState by viewModel.addressState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingAddress by remember { mutableStateOf<Address?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.loadAddresses()
@@ -53,7 +55,10 @@ fun SavedAddressesScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showAddDialog = true },
+                onClick = { 
+                    editingAddress = null
+                    showAddDialog = true 
+                },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
@@ -95,6 +100,10 @@ fun SavedAddressesScreen(
                         items(state.addresses) { address ->
                             AddressCard(
                                 address = address,
+                                onEdit = {
+                                    editingAddress = address
+                                    showAddDialog = true
+                                },
                                 onDelete = { viewModel.deleteAddress(address.id) }
                             )
                         }
@@ -106,10 +115,20 @@ fun SavedAddressesScreen(
 
         if (showAddDialog) {
             AddAddressDialog(
-                onDismiss = { showAddDialog = false },
-                onSave = { 
-                    viewModel.addAddress(it)
+                editingAddress = editingAddress,
+                onDismiss = { 
                     showAddDialog = false
+                    editingAddress = null
+                },
+                onSave = { 
+                    val addr = editingAddress
+                    if (addr != null) {
+                        viewModel.updateAddress(addr.id, it)
+                    } else {
+                        viewModel.addAddress(it)
+                    }
+                    showAddDialog = false
+                    editingAddress = null
                 }
             )
         }
@@ -117,7 +136,7 @@ fun SavedAddressesScreen(
 }
 
 @Composable
-fun AddressCard(address: Address, onDelete: () -> Unit) {
+fun AddressCard(address: Address, onEdit: () -> Unit, onDelete: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
@@ -177,8 +196,13 @@ fun AddressCard(address: Address, onDelete: () -> Unit) {
                     )
                 }
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
+            Row {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
+                }
             }
         }
     }
@@ -187,23 +211,24 @@ fun AddressCard(address: Address, onDelete: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddAddressDialog(
+    editingAddress: Address? = null,
     onDismiss: () -> Unit,
     onSave: (CreateAddressRequest) -> Unit
 ) {
-    var label by remember { mutableStateOf("Home") }
-    var line1 by remember { mutableStateOf("") }
-    var line2 by remember { mutableStateOf("") }
-    var city by remember { mutableStateOf("") }
-    var mandal by remember { mutableStateOf("") }
-    var pin by remember { mutableStateOf("") }
-    var notes by remember { mutableStateOf("") }
-    var lat by remember { mutableStateOf("") }
-    var lng by remember { mutableStateOf("") }
-    var isDefault by remember { mutableStateOf(false) }
+    var label by remember { mutableStateOf(editingAddress?.label ?: "Home") }
+    var line1 by remember { mutableStateOf(editingAddress?.line1 ?: "") }
+    var line2 by remember { mutableStateOf(editingAddress?.line2 ?: "") }
+    var city by remember { mutableStateOf(editingAddress?.city ?: "") }
+    var mandal by remember { mutableStateOf(editingAddress?.state ?: "") }
+    var pin by remember { mutableStateOf(editingAddress?.postalCode ?: "") }
+    var notes by remember { mutableStateOf(editingAddress?.notes ?: "") }
+    var lat by remember { mutableStateOf(editingAddress?.latitude?.toString() ?: "") }
+    var lng by remember { mutableStateOf(editingAddress?.longitude?.toString() ?: "") }
+    var isDefault by remember { mutableStateOf(editingAddress?.isDefault ?: false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add New Address") },
+        title = { Text(if (editingAddress != null) "Edit Address" else "Add New Address") },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -252,7 +277,7 @@ fun AddAddressDialog(
                 },
                 enabled = line1.isNotBlank() && city.isNotBlank() && mandal.isNotBlank()
             ) {
-                Text("Save Address")
+                Text(if (editingAddress != null) "Update Address" else "Save Address")
             }
         },
         dismissButton = {

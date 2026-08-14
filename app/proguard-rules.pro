@@ -69,3 +69,11 @@
 # Jetpack Compose
 -keep class androidx.compose.** { *; }
 -dontwarn androidx.compose.**
+
+# Cashfree SDK Rules
+-keep class com.cashfree.pg.** { *; }
+-dontwarn com.cashfree.pg.**
+-keepattributes *Annotation*
+-keepattributes Signature
+-keepattributes InnerClasses
+-keepattributes EnclosingMethod

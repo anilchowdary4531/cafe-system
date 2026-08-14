@@ -34,8 +34,8 @@ android {
         minSdk = 24
         targetSdk = 36
 
-        versionCode = 12
-        versionName = "1.0.11"
+        versionCode = 16
+        versionName = "1.0.15"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -88,6 +88,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.navigation.compose)
+    implementation("androidx.appcompat:appcompat:1.7.0") // Required for some SDKs
     implementation(libs.play.services.location)
     implementation(libs.play.services.auth)
     implementation(libs.play.services.basement)

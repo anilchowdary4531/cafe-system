@@ -28,6 +28,7 @@ import coil.compose.AsyncImage
 import com.tiffzy.app.data.model.CartItem
 import com.tiffzy.app.ui.components.*
 import com.tiffzy.app.ui.theme.Dimens
+import com.tiffzy.app.utils.ImageUtils
 import java.util.Locale
 
 @Composable
@@ -138,7 +139,7 @@ fun CartItemPaperRow(
     ) {
         // 1. Item Image
         AsyncImage(
-            model = item.menuItem.image,
+            model = ImageUtils.resolveImageUrl(item.menuItem.image),
             contentDescription = null,
             modifier = Modifier
                 .size(48.dp)

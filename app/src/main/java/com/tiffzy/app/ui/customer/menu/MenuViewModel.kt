@@ -2,6 +2,8 @@ package com.tiffzy.app.ui.customer.menu
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tiffzy.app.data.local.FavoritesDataStore
+import com.tiffzy.app.data.model.FavoriteItem
 import com.tiffzy.app.data.model.MenuItem
 import com.tiffzy.app.data.model.Restaurant
 import com.tiffzy.app.data.remote.RetrofitClient
@@ -10,6 +12,7 @@ import com.tiffzy.app.data.repository.RestaurantRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 sealed class MenuUiState {
@@ -17,7 +20,8 @@ sealed class MenuUiState {
     data class Success(
         val restaurant: Restaurant,
         val categories: List<MenuCategory>,
-        val menu: List<MenuItem> = emptyList()
+        val menu: List<MenuItem> = emptyList(),
+        val favorites: List<FavoriteItem> = emptyList()
     ) : MenuUiState()
     data class Error(val message: String) : MenuUiState()
 }
@@ -29,7 +33,8 @@ data class MenuCategory(
 
 class MenuViewModel(
     private val repository: RestaurantRepository = RestaurantRepository(RetrofitClient.apiService),
-    private val cartRepository: CartRepository = CartRepository.getInstance()
+    private val cartRepository: CartRepository = CartRepository.getInstance(),
+    private val favoritesDataStore: FavoritesDataStore? = null // Will be provided by Factory or in place
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<MenuUiState>(MenuUiState.Loading)
@@ -38,7 +43,24 @@ class MenuViewModel(
     private val _activeSessionId = MutableStateFlow<Int?>(null)
     val activeSessionId: StateFlow<Int?> = _activeSessionId.asStateFlow()
 
+    private var currentSlug: String? = null
+
+    init {
+        // Collect favorites if datastore is available
+        favoritesDataStore?.let { store ->
+            viewModelScope.launch {
+                store.favorites.collectLatest { favList ->
+                    val currentState = _uiState.value
+                    if (currentState is MenuUiState.Success) {
+                        _uiState.value = currentState.copy(favorites = favList)
+                    }
+                }
+            }
+        }
+    }
+
     fun loadMenu(slug: String) {
+        currentSlug = slug
         viewModelScope.launch {
             _uiState.value = MenuUiState.Loading
             try {
@@ -65,7 +87,8 @@ class MenuViewModel(
                 _uiState.value = MenuUiState.Success(
                     restaurant = response.restaurant,
                     categories = categories.sortedBy { if (it.name == "Recommended") 0 else 1 },
-                    menu = allItems
+                    menu = allItems,
+                    favorites = emptyList() // Will be updated by flow
                 )
 
                 // Check for active table session
@@ -88,6 +111,25 @@ class MenuViewModel(
         val currentState = _uiState.value
         if (currentState is MenuUiState.Success) {
             cartRepository.addToCart(item, currentState.restaurant)
+        }
+    }
+
+    fun toggleFavorite(item: MenuItem) {
+        val currentState = _uiState.value
+        if (currentState is MenuUiState.Success && favoritesDataStore != null) {
+            val restaurant = currentState.restaurant
+            val favoriteItem = FavoriteItem(
+                key = "${restaurant.slug}:${item.id}",
+                restaurantSlug = restaurant.slug,
+                restaurantName = restaurant.name,
+                menuItemId = item.id,
+                itemName = item.name,
+                image = item.image ?: "",
+                price = item.price
+            )
+            viewModelScope.launch {
+                favoritesDataStore.toggleFavorite(favoriteItem)
+            }
         }
     }
 }

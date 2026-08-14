@@ -28,6 +28,7 @@ fun CheckoutScreen(
     restaurantSlug: String,
     onBack: () -> Unit,
     onOrderSuccess: (OrderDetails) -> Unit,
+    onAddAddress: () -> Unit,
     viewModel: CheckoutViewModel,
     authViewModel: com.tiffzy.app.ui.auth.AuthViewModel
 ) {
@@ -42,8 +43,19 @@ fun CheckoutScreen(
     LaunchedEffect(uiState.orderSuccess) {
         uiState.orderSuccess?.let { 
             onOrderSuccess(it.order) 
+            // Important: we DON'T reset here yet, so placeOrder can detect existing order
         }
     }
+
+    // Reset order state when coming back to this screen (e.g. from payment activity)
+    DisposableEffect(Unit) {
+        onDispose {
+            // Optional: reset when leaving if needed
+        }
+    }
+
+    // Call reset when address or wallet is toggled to allow fresh order if needed
+    // but for now, we'll keep it simple and reuse the order.
 
     Scaffold(
         topBar = {
@@ -61,12 +73,21 @@ fun CheckoutScreen(
                 CheckoutBottomBar(
                     total = uiState.checkoutPreview!!.total,
                     isLoading = uiState.isLoading,
+                    selectedMethod = uiState.selectedPaymentMethod,
+                    isOrderPlaced = uiState.orderSuccess != null,
                     onPlaceOrder = {
-                        viewModel.placeOrder(
-                            customerName = authViewModel.name ?: "Customer",
-                            phone = authViewModel.phone,
-                            email = authViewModel.email
-                        )
+                        val currentOrder = uiState.orderSuccess
+                        if (currentOrder != null && uiState.selectedPaymentMethod == "CASHFREE") {
+                            // If order already exists, just re-trigger the payment gateway
+                            onOrderSuccess(currentOrder.order)
+                        } else {
+                            // Otherwise, place a new order
+                            viewModel.placeOrder(
+                                customerName = authViewModel.name ?: "Customer",
+                                phone = authViewModel.phone,
+                                email = authViewModel.email
+                            )
+                        }
                     }
                 )
             }
@@ -115,7 +136,12 @@ fun CheckoutScreen(
                 }
 
                 // 1. Delivery Address Section
-                SectionHeader("Delivery Address", Icons.Default.LocationOn)
+                SectionHeader(
+                    title = "Delivery Address", 
+                    icon = Icons.Default.LocationOn,
+                    actionLabel = "Add / Edit",
+                    onActionClick = onAddAddress
+                )
                 AddressSelector(
                     addresses = uiState.addresses,
                     selectedAddress = uiState.selectedAddress,
@@ -146,20 +172,11 @@ fun CheckoutScreen(
 
                 Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
-                // 4. Coupon Section
-                SectionHeader("Offers & Coupons", Icons.Default.ConfirmationNumber)
-                CouponSection(
-                    appliedCoupon = null,
-                    onApply = { /* Apply Coupon */ }
-                )
-
-                Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
-
                 // 5. Payment Method Selector (Cashfree PG)
-                SectionHeader("Payment Method", Icons.Default.Payment)
+                SectionHeader("Select Payment Method", Icons.Default.Payment)
                 PaymentMethodSelectorCard(
-                    selectedMethod = "CASHFREE",
-                    onSelectMethod = { /* Selected Method */ }
+                    selectedMethod = uiState.selectedPaymentMethod,
+                    onSelectMethod = { viewModel.selectPaymentMethod(it) }
                 )
 
                 Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
@@ -178,8 +195,33 @@ fun CheckoutScreen(
                     SectionHeader("Bill Breakdown", Icons.Default.RequestQuote)
                     BillDetailsCard(preview = uiState.checkoutPreview!!)
                 }
+
+                // Error Message Display
+                uiState.error?.let { errorMsg ->
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = errorMsg,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
                 
-                Spacer(modifier = Modifier.height(90.dp)) // Padding for fixed bottom bar
+                Spacer(modifier = Modifier.height(120.dp)) // Increased padding for fixed bottom bar
             }
 
             if (uiState.isLoading) {
@@ -190,20 +232,38 @@ fun CheckoutScreen(
 }
 
 @Composable
-fun SectionHeader(title: String, icon: ImageVector) {
+fun SectionHeader(title: String, icon: ImageVector, actionLabel: String? = null, onActionClick: (() -> Unit)? = null) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(bottom = Dimens.PaddingSmall)
+        modifier = Modifier.fillMaxWidth().padding(bottom = Dimens.PaddingSmall),
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(Dimens.SpacingSmall))
-        Text(
-            text = title.uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            letterSpacing = 1.sp
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(Dimens.SpacingSmall))
+            Text(
+                text = title.uppercase(),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 1.sp
+            )
+        }
+        
+        if (actionLabel != null && onActionClick != null) {
+            TextButton(
+                onClick = onActionClick,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Text(
+                    text = actionLabel.uppercase(),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
     }
 }
 
@@ -254,75 +314,134 @@ fun AddressSelector(
 }
 
 @Composable
-fun CouponSection(appliedCoupon: String?, onApply: (String) -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(Dimens.PaddingSmall),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.LocalOffer, null, tint = Color(0xFFEAB308))
-            Spacer(modifier = Modifier.width(Dimens.SpacingSmall))
-            Text(text = "Apply Coupon", modifier = Modifier.weight(1f))
-            TextButton(onClick = { /* Open Coupon Dialog */ }) {
-                Text("VIEW ALL")
-            }
-        }
-    }
-}
-
-@Composable
 fun PaymentMethodSelectorCard(selectedMethod: String, onSelectMethod: (String) -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(Dimens.PaddingMedium),
-            verticalAlignment = Alignment.CenterVertically
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Cashfree Option (Pay Online)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onSelectMethod("CASHFREE") },
+            colors = CardDefaults.cardColors(
+                containerColor = if (selectedMethod == "CASHFREE") 
+                    Color(0xFF059669).copy(alpha = 0.05f)
+                else MaterialTheme.colorScheme.surface
+            ),
+            border = if (selectedMethod == "CASHFREE") 
+                BorderStroke(2.dp, Color(0xFF10B981)) 
+            else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(16.dp)
         ) {
-            RadioButton(
-                selected = true,
-                onClick = { onSelectMethod("CASHFREE") }
-            )
-            Spacer(modifier = Modifier.width(Dimens.SpacingSmall))
-            Icon(
-                Icons.Default.CreditCard,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
-            )
-            Spacer(modifier = Modifier.width(Dimens.SpacingMedium))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Cashfree Payment Gateway",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.colorScheme.let { MaterialTheme.typography.titleSmall }
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Surface(
-                        color = Color(0xFF10B981),
-                        shape = RoundedCornerShape(4.dp)
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selectedMethod == "CASHFREE") Color(0xFF10B981).copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "SECURE",
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Black,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        Icon(
+                            imageVector = Icons.Default.CreditCard,
+                            contentDescription = null,
+                            tint = if (selectedMethod == "CASHFREE") Color(0xFF10B981) else Color.Gray,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Online Payment",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                color = Color(0xFF10B981),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = "UPI/Cards/More",
+                                    color = Color.White,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            text = "UPI, Cards & Netbanking via Cashfree",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    RadioButton(
+                        selected = selectedMethod == "CASHFREE",
+                        onClick = { onSelectMethod("CASHFREE") },
+                        colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF10B981))
+                    )
                 }
-                Text(
-                    text = "UPI (GPay, PhonePe, Paytm), Cards & Netbanking",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+
+                // Removed separate badges line to match screenshot
+            }
+        }
+
+        // Cash Option
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onSelectMethod("CASH") },
+            colors = CardDefaults.cardColors(
+                containerColor = if (selectedMethod == "CASH") 
+                    Color(0xFFF59E0B).copy(alpha = 0.05f)
+                else MaterialTheme.colorScheme.surface
+            ),
+            border = if (selectedMethod == "CASH") 
+                BorderStroke(2.dp, Color(0xFFF59E0B)) 
+            else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (selectedMethod == "CASH") Color(0xFFF59E0B).copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Payments,
+                        contentDescription = null,
+                        tint = if (selectedMethod == "CASH") Color(0xFFF59E0B) else Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Cash on Delivery",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "Pay when your food arrives",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                RadioButton(
+                    selected = selectedMethod == "CASH",
+                    onClick = { onSelectMethod("CASH") },
+                    colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFF59E0B))
                 )
             }
         }
@@ -359,10 +478,7 @@ fun BillDetailsCard(preview: CheckoutPreviewResponse) {
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(Dimens.PaddingMedium)) {
-            BillRow("Subtotal", preview.subtotal)
-            BillRow("GST & Restaurant Taxes", preview.taxAmount)
-            BillRow("Delivery Fee", preview.deliveryFee)
-            BillRow("Packing Charges", preview.packingCharges)
+            BillRow("Item Total", preview.subtotal)
             
             if (preview.couponDiscount > 0) {
                 BillRow("Coupon Discount", -preview.couponDiscount, color = Color(0xFF10B981))
@@ -402,7 +518,7 @@ fun BillRow(label: String, amount: Double, color: Color = MaterialTheme.colorSch
 }
 
 @Composable
-fun CheckoutBottomBar(total: Double, isLoading: Boolean, onPlaceOrder: () -> Unit) {
+fun CheckoutBottomBar(total: Double, isLoading: Boolean, selectedMethod: String, isOrderPlaced: Boolean, onPlaceOrder: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shadowElevation = 8.dp,
@@ -422,15 +538,23 @@ fun CheckoutBottomBar(total: Double, isLoading: Boolean, onPlaceOrder: () -> Uni
             Button(
                 onClick = onPlaceOrder,
                 modifier = Modifier
-                    .weight(1.5f)
+                    .weight(1.8f)
                     .height(Dimens.ButtonHeight),
                 shape = RoundedCornerShape(12.dp),
-                enabled = !isLoading
+                enabled = !isLoading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (selectedMethod == "CASHFREE") Color(0xFF10B981) else MaterialTheme.colorScheme.primary
+                )
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
                 } else {
-                    Text(text = "PLACE ORDER", fontWeight = FontWeight.Black)
+                    val label = when {
+                        isOrderPlaced && selectedMethod == "CASHFREE" -> "OPEN PAYMENT GATEWAY"
+                        selectedMethod == "CASHFREE" -> "PAY ONLINE"
+                        else -> "PLACE ORDER"
+                    }
+                    Text(text = label, fontWeight = FontWeight.Black)
                 }
             }
         }

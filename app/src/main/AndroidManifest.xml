@@ -45,7 +45,14 @@
             android:name=".ui.payment.PaymentActivity"
             android:exported="false"
             android:label="Cashfree Payment"
-            android:theme="@style/Theme.TiffzyApp" />
+            android:theme="@style/Theme.TiffzyApp.Main" />
+
+        <!-- Cashfree SDK Activity -->
+        <activity
+            android:name="com.cashfree.pg.api.CFPaymentGatewayActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/CFTheme" />
 
         <service
             android:name=".service.TiffzyMessagingService"

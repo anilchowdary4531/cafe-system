@@ -38,6 +38,9 @@ import com.tiffzy.app.data.model.MenuItem
 import com.tiffzy.app.data.repository.CartRepository
 import com.tiffzy.app.ui.components.*
 import com.tiffzy.app.ui.theme.Dimens
+import com.tiffzy.app.utils.ImageUtils
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -154,26 +157,19 @@ fun MenuScreen(
                         horizontalArrangement = Arrangement.spacedBy(Dimens.SpacingMedium)
                     ) {
                         item {
+                            val firstItemImage = state.menu.firstOrNull { !it.image.isNullOrEmpty() }?.image
                             MenuCategoryCircleItem(
                                 name = "All",
-                                imageRes = com.tiffzy.app.R.drawable.baked_goods_1,
+                                imageUrl = firstItemImage,
                                 isSelected = selectedCategory == "All",
                                 onClick = { selectedCategory = "All" }
                             )
                         }
                         items(categories) { category ->
-                            // Map category names to relevant images
-                            val imageRes = when (category.name.lowercase()) {
-                                "recommended" -> com.tiffzy.app.R.drawable.baked_goods_1
-                                "coffee", "drinks", "beverages" -> com.tiffzy.app.R.drawable.baked_goods_2
-                                "dessert", "sweets", "cakes" -> com.tiffzy.app.R.drawable.baked_goods_3
-                                "pizza", "italian" -> com.tiffzy.app.R.drawable.baked_goods_1
-                                "burger", "snacks" -> com.tiffzy.app.R.drawable.baked_goods_2
-                                else -> com.tiffzy.app.R.drawable.baked_goods_3
-                            }
+                            val categoryImage = category.items.firstOrNull { !it.image.isNullOrEmpty() }?.image
                             MenuCategoryCircleItem(
                                 name = category.name,
-                                imageRes = imageRes,
+                                imageUrl = categoryImage,
                                 isSelected = selectedCategory == category.name,
                                 onClick = { selectedCategory = category.name }
                             )
@@ -273,6 +269,9 @@ fun MenuScreen(
                     if (filteredItems.isEmpty()) {
                         TiffzyEmptyState(message = "No dishes found matching your selection.")
                     } else {
+                        val favItems = (uiState as? MenuUiState.Success)?.favorites ?: emptyList()
+                        val restaurant = (uiState as? MenuUiState.Success)?.restaurant
+
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(2),
                             modifier = Modifier.fillMaxSize(),
@@ -285,9 +284,12 @@ fun MenuScreen(
                             )
                         ) {
                             items(filteredItems) { item ->
+                                val isFavorite = restaurant != null && favItems.any { it.key == "${restaurant.slug}:${item.id}" }
                                 MenuItemGridCard(
                                     item = item,
-                                    onAdd = { viewModel.addToCart(item) }
+                                    isFavorite = isFavorite,
+                                    onAdd = { viewModel.addToCart(item) },
+                                    onToggleFavorite = { viewModel.toggleFavorite(item) }
                                 )
                             }
                         }
@@ -301,7 +303,9 @@ fun MenuScreen(
 @Composable
 fun MenuItemGridCard(
     item: MenuItem,
-    onAdd: () -> Unit
+    isFavorite: Boolean = false,
+    onAdd: () -> Unit,
+    onToggleFavorite: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -315,16 +319,32 @@ fun MenuItemGridCard(
             // Image at Top
             Box {
                 AsyncImage(
-                    model = if (item.image.isNullOrEmpty()) null else item.image,
+                    model = ImageUtils.resolveImageUrl(item.image),
                     contentDescription = item.name,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(180.dp)
-                        .clip(MaterialTheme.shapes.small),
-                    contentScale = ContentScale.Crop,
-                    placeholder = androidx.compose.ui.res.painterResource(id = com.tiffzy.app.R.drawable.baked_goods_2),
-                    error = androidx.compose.ui.res.painterResource(id = com.tiffzy.app.R.drawable.baked_goods_3)
+                        .height(150.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentScale = ContentScale.Crop
                 )
+
+                // Favorite Icon Overlay
+                IconButton(
+                    onClick = onToggleFavorite,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(32.dp)
+                        .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                        tint = if (isFavorite) Color.Red else Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
                 
                 // Rating Badge Overlay
                 Surface(
@@ -375,12 +395,12 @@ fun MenuItemGridCard(
                 }
             }
 
-            Column(modifier = Modifier.padding(8.dp)) {
+            Column(modifier = Modifier.padding(6.dp)) {
                 DietIcon(item)
                 
                 Text(
                     text = item.name.uppercase(),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Black,
                     fontFamily = FontFamily.Monospace,
                     maxLines = 1,
@@ -388,12 +408,12 @@ fun MenuItemGridCard(
                 )
                 
                 Row(
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "₹${item.price.toInt()}",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.primary,
                         fontFamily = FontFamily.Monospace
@@ -459,7 +479,7 @@ fun DietIcon(item: MenuItem) {
 @Composable
 fun MenuCategoryCircleItem(
     name: String,
-    imageRes: Int,
+    imageUrl: String?,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
@@ -475,11 +495,13 @@ fun MenuCategoryCircleItem(
             color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
         ) {
-            Image(
-                painter = painterResource(id = imageRes),
+            AsyncImage(
+                model = ImageUtils.resolveImageUrl(imageUrl),
                 contentDescription = name,
                 modifier = Modifier.fillMaxSize().clip(CircleShape),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(id = com.tiffzy.app.R.drawable.baked_goods_1),
+                error = painterResource(id = com.tiffzy.app.R.drawable.baked_goods_1)
             )
         }
         Spacer(modifier = Modifier.height(4.dp))

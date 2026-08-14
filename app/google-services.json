@@ -65,6 +65,35 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:508607286319:android:a311d4a6a138037edb0ada",
+        "android_client_info": {
+          "package_name": "com.tiffzy.restaurant"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "508607286319-gdke04tjvlmttvf5ppcm45j0ncqtuhks.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5_Z29tj5VjWrY-_oLoMTIrGXmpIU4Pr4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "508607286319-gdke04tjvlmttvf5ppcm45j0ncqtuhks.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

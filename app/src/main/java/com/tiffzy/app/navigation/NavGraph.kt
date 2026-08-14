@@ -22,6 +22,8 @@ import com.tiffzy.app.ui.customer.home.LocationSelectorScreen
 import com.tiffzy.app.ui.customer.home.HomeViewModel
 import com.tiffzy.app.ui.customer.home.LocationViewModel
 import com.tiffzy.app.ui.customer.menu.MenuScreen
+import com.tiffzy.app.ui.customer.menu.MenuViewModel
+import com.tiffzy.app.ui.customer.menu.MenuViewModelFactory
 import com.tiffzy.app.ui.customer.order.OrderSuccessScreen
 import com.tiffzy.app.ui.customer.order.OrdersScreen
 import com.tiffzy.app.ui.customer.order.OrderDetailScreen
@@ -36,6 +38,7 @@ import com.tiffzy.app.ui.customer.profile.NotificationsScreen
 import com.tiffzy.app.ui.customer.profile.SettingsScreen
 import com.tiffzy.app.ui.customer.menu.LiveBillScreen
 import com.tiffzy.app.ui.customer.scanner.ScannerScreen
+import com.tiffzy.app.ui.payment.PaymentActivity
 import com.tiffzy.app.ui.components.PlaceholderScreen
 import com.tiffzy.app.data.repository.CartRepository
 import androidx.compose.runtime.LaunchedEffect
@@ -72,7 +75,7 @@ object Routes {
     const val Scanner = "scanner"
     const val DeleteAccount = "delete_account"
     const val CompleteProfile = "complete_profile"
-    const val Web = "web?title={title}&url={url}"
+    const val Web = "web/{title}/{url}"
     
     fun restaurantDetail(slug: String) = "restaurant/$slug"
     fun menu(slug: String) = "menu/$slug"
@@ -81,7 +84,11 @@ object Routes {
     fun orderTracking(orderId: Int) = "order_tracking/$orderId"
     fun payLaterDetail(accountId: Int) = "pay_later/$accountId"
     fun liveBill(sessionId: Int) = "live_bill/$sessionId"
-    fun web(title: String, url: String) = "web?title=${android.net.Uri.encode(title)}&url=${android.net.Uri.encode(url)}"
+    fun web(title: String, url: String): String {
+        val encodedTitle = android.net.Uri.encode(title)
+        val encodedUrl = android.util.Base64.encodeToString(url.toByteArray(), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
+        return "web/$encodedTitle/$encodedUrl"
+    }
 }
 
 @Composable
@@ -228,10 +235,21 @@ fun NavGraph(
         }
 
         composable(Routes.Home) {
+            val lastLocation by locationViewModel.lastSelectedLocation.collectAsState()
+            val locationName = lastLocation?.addressName
+
+            // Refresh home if location changes
+            LaunchedEffect(lastLocation) {
+                if (lastLocation != null) {
+                    homeViewModel.loadRestaurants(lastLocation!!.latitude, lastLocation!!.longitude)
+                }
+            }
+
             HomeScreen(
                 viewModel = homeViewModel,
                 authViewModel = authViewModel,
                 onLogout = navigateToLogin,
+                locationName = locationName,
                 onChangeLocation = {
                     navController.navigate(Routes.Location)
                 },
@@ -243,6 +261,9 @@ fun NavGraph(
                 },
                 onScanClick = {
                     navController.navigate(Routes.Scanner)
+                },
+                onDeleteAccount = {
+                    navController.navigate(Routes.DeleteAccount)
                 },
                 onNavigateToWeb = { title, url ->
                     navController.navigate(Routes.web(title, url))
@@ -376,12 +397,17 @@ fun NavGraph(
             arguments = listOf(navArgument("slug") { type = NavType.StringType })
         ) { backStackEntry ->
             val slug = backStackEntry.arguments?.getString("slug") ?: ""
+            val context = LocalContext.current
+            val viewModel: MenuViewModel = viewModel(
+                factory = MenuViewModelFactory(context)
+            )
             MenuScreen(
                 slug = slug,
                 onBack = { navController.popBackStack() },
                 onViewCart = { navController.navigate(Routes.Cart) },
                 onViewLiveBill = { sessionId -> navController.navigate(Routes.liveBill(sessionId)) },
-                onLogin = navigateToLogin
+                onLogin = navigateToLogin,
+                viewModel = viewModel
             )
         }
 
@@ -405,6 +431,7 @@ fun NavGraph(
         }
 
         composable(Routes.Checkout) {
+            val context = LocalContext.current
             val cartViewModel: com.tiffzy.app.ui.customer.cart.CartViewModel = viewModel()
             val restaurantSlug = cartViewModel.uiState.collectAsState().value.restaurant?.slug ?: ""
             val checkoutViewModel: com.tiffzy.app.ui.customer.checkout.CheckoutViewModel = viewModel(
@@ -418,10 +445,33 @@ fun NavGraph(
                 restaurantSlug = restaurantSlug,
                 onBack = { navController.popBackStack() },
                 onOrderSuccess = { order ->
-                    navController.navigate(Routes.orderSuccess(order.orderNo, order.id.toString())) {
-                        popUpTo(Routes.Checkout) { inclusive = true }
-                        popUpTo(Routes.Cart) { inclusive = true }
+                    val uiState = checkoutViewModel.uiState.value
+                    if (uiState.selectedPaymentMethod == "CASHFREE") {
+                        // Start Cashfree Payment Activity
+                        PaymentActivity.start(
+                            context = context,
+                            orderId = order.id.toString(),
+                            amount = order.total,
+                            customerId = null,
+                            customerPhone = authViewModel.phone,
+                            customerName = authViewModel.name,
+                            customerEmail = authViewModel.email,
+                            restaurantId = null, // Backend will resolve this from orderId if needed
+                            env = "PRODUCTION" // Match with backend environment
+                        )
+                        // Note: We don't navigate to success screen immediately for online payments.
+                        // PaymentActivity handles its own success UI, and when finished, 
+                        // the user returns to Checkout which they can then leave.
+                    } else {
+                        // For CASH or full Wallet payments, go straight to success
+                        navController.navigate(Routes.orderSuccess(order.orderNo, order.id.toString())) {
+                            popUpTo(Routes.Checkout) { inclusive = true }
+                            popUpTo(Routes.Cart) { inclusive = true }
+                        }
                     }
+                },
+                onAddAddress = {
+                    navController.navigate(Routes.SavedAddresses)
                 },
                 viewModel = checkoutViewModel,
                 authViewModel = authViewModel
@@ -497,18 +547,19 @@ fun NavGraph(
         composable(
             route = Routes.Web,
             arguments = listOf(
-                navArgument("title") { 
-                    type = NavType.StringType 
-                    defaultValue = "Web Page"
-                },
-                navArgument("url") { 
-                    type = NavType.StringType 
-                    defaultValue = ""
-                }
+                navArgument("title") { type = NavType.StringType },
+                navArgument("url") { type = NavType.StringType }
             )
         ) { backStackEntry ->
             val title = backStackEntry.arguments?.getString("title") ?: "Web Page"
-            val url = backStackEntry.arguments?.getString("url") ?: ""
+            val encodedUrl = backStackEntry.arguments?.getString("url") ?: ""
+            
+            // Decode the URL
+            val url = try {
+                String(android.util.Base64.decode(encodedUrl, android.util.Base64.URL_SAFE))
+            } catch (e: Exception) {
+                ""
+            }
             
             // Get token from ViewModel
             val tokenState by authViewModel.authToken.collectAsState(initial = null)

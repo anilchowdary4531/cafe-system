@@ -1,5 +1,6 @@
 package com.tiffzy.app.ui.customer.details
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -23,9 +24,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.tiffzy.app.ui.components.*
 import com.tiffzy.app.ui.theme.Dimens
+import com.tiffzy.app.utils.ImageUtils
 
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.remember
@@ -79,13 +81,25 @@ fun RestaurantDetailScreen(
                 ) {
                     // Header Image
                     Box(modifier = Modifier.height(250.dp).fillMaxWidth()) {
-                        AsyncImage(
-                            model = restaurant.bannerUrl ?: restaurant.logo,
+                        SubcomposeAsyncImage(
+                            model = ImageUtils.resolveImageUrl(restaurant.bannerUrl ?: restaurant.logo),
                             contentDescription = restaurant.name,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
-                            placeholder = androidx.compose.ui.res.painterResource(id = com.tiffzy.app.R.drawable.baked_goods_1),
-                            error = androidx.compose.ui.res.painterResource(id = com.tiffzy.app.R.drawable.baked_goods_1)
+                            loading = {
+                                Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
+                            },
+                            error = {
+                                RestaurantDesignPlaceholder(restaurant.name)
+                            },
+                            success = { state ->
+                                Image(
+                                    painter = state.painter,
+                                    contentDescription = restaurant.name,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
                         )
                         Box(
                             modifier = Modifier

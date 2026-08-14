@@ -1,47 +1,51 @@
 package com.tiffzy.app.data.model
 
+import com.google.gson.annotations.SerializedName
+
 data class CashfreeCreateOrderRequest(
-    val customerId: String? = null,
-    val orderId: String,
-    val restaurantId: String? = null,
-    val amount: Double,
-    val customerPhone: String? = null,
-    val customerName: String? = null,
-    val customerEmail: String? = null
+    @SerializedName("customerId") val customerId: String? = null,
+    @SerializedName("orderId") val orderId: String,
+    @SerializedName("restaurantId") val restaurantId: String? = null,
+    @SerializedName("amount") val amount: Double,
+    @SerializedName("customerPhone") val customerPhone: String? = null,
+    @SerializedName("customerName") val customerName: String? = null,
+    @SerializedName("customerEmail") val customerEmail: String? = null
 )
 
 data class CashfreeCreateOrderResponse(
-    val payment_session_id: String? = null,
-    val order_id: String? = null,
-    val cf_order_id: String? = null,
-    val order_status: String? = null,
-    val message: String? = null
+    @SerializedName("payment_session_id") val paymentSessionId: String? = null,
+    @SerializedName("order_id") val orderId: String? = null,
+    @SerializedName("cf_order_id") val cfOrderId: String? = null,
+    @SerializedName("order_status") val orderStatus: String? = null,
+    @SerializedName("message") val message: String? = null,
+    @SerializedName("cf_env") val cfEnv: String? = null,
+    @SerializedName("is_production") val isProduction: Boolean = false
 )
 
 data class PaymentStatusRequest(
-    val orderId: String,
-    val paymentId: String? = null,
-    val status: String,
-    val txMsg: String? = null,
-    val provider: String = "CASHFREE"
+    @SerializedName("orderId") val orderId: String,
+    @SerializedName("paymentId") val paymentId: String? = null,
+    @SerializedName("status") val status: String,
+    @SerializedName("txMsg") val txMsg: String? = null,
+    @SerializedName("provider") val provider: String = "CASHFREE"
 )
 
 data class PaymentStatusResponse(
-    val success: Boolean = true,
-    val message: String? = null
+    @SerializedName("success") val success: Boolean = true,
+    @SerializedName("message") val message: String? = null
 )
 
 data class CashfreeVerifyOrderRequest(
-    val orderId: String
+    @SerializedName("orderId") val orderId: String
 )
 
 data class CashfreeVerifyOrderResponse(
-    val verified: Boolean = false,
-    val status: String = "PENDING",
-    val message: String? = null,
-    val orderId: String? = null,
-    val amount: Double? = null,
-    val invoiceUrl: String? = null
+    @SerializedName("verified") val verified: Boolean = false,
+    @SerializedName("status") val status: String = "PENDING",
+    @SerializedName("message") val message: String? = null,
+    @SerializedName("orderId") val orderId: String? = null,
+    @SerializedName("amount") val amount: Double? = null,
+    @SerializedName("invoiceUrl") val invoiceUrl: String? = null
 )
 
 enum class PaymentResultStatus {

@@ -35,6 +35,17 @@ fun OrderSuccessScreen(
     viewModel: OrdersViewModel = viewModel()
 ) {
     val uiState by viewModel.orderDetailState.collectAsState()
+    val order = (uiState as? OrderDetailUiState.Success)?.order
+    
+    val isPaid = order?.paymentStatus == "PAID" || order?.paymentStatus == "SUCCESS"
+    val statusText = if (isPaid) "Payment Successful!" else "Order Placed!"
+    val statusSubtitle = if (isPaid) {
+        "Your order has been placed and received by the restaurant."
+    } else if (order?.paymentStatus == "PENDING") {
+        "Your payment is pending. The restaurant will process your order once confirmed."
+    } else {
+        "Your order has been placed. Please pay at the counter if applicable."
+    }
 
     LaunchedEffect(orderId) {
         viewModel.loadOrderDetail(orderId.toInt())
@@ -50,26 +61,26 @@ fun OrderSuccessScreen(
     ) {
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Green Success Badge & Check Animation
+        // Badge & Check Animation
         Box(
             modifier = Modifier
                 .size(100.dp)
                 .clip(CircleShape)
-                .background(Color(0xFF10B981).copy(alpha = 0.15f)),
+                .background((if (isPaid) Color(0xFF10B981) else Color(0xFFF59E0B)).copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
         ) {
             Box(
                 modifier = Modifier
                     .size(80.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF10B981).copy(alpha = 0.25f)),
+                    .background((if (isPaid) Color(0xFF10B981) else Color(0xFFF59E0B)).copy(alpha = 0.25f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Success",
+                    contentDescription = if (isPaid) "Success" else "Placed",
                     modifier = Modifier.size(60.dp),
-                    tint = Color(0xFF10B981)
+                    tint = if (isPaid) Color(0xFF10B981) else Color(0xFFF59E0B)
                 )
             }
         }
@@ -77,15 +88,15 @@ fun OrderSuccessScreen(
         Spacer(modifier = Modifier.height(Dimens.SpacingMedium))
         
         Text(
-            text = "Payment Successful!",
+            text = statusText,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Black,
             textAlign = TextAlign.Center,
-            color = Color(0xFF10B981)
+            color = if (isPaid) Color(0xFF10B981) else Color(0xFFF59E0B)
         )
 
         Text(
-            text = "Your order has been placed and received by the restaurant.",
+            text = statusSubtitle,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -175,6 +186,8 @@ fun OrderSuccessScreen(
 
 @Composable
 fun OrderReceiptCard(order: OrderDetails, orderNo: String) {
+    val isPaid = order.paymentStatus == "PAID" || order.paymentStatus == "SUCCESS"
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -201,12 +214,12 @@ fun OrderReceiptCard(order: OrderDetails, orderNo: String) {
                     )
                 }
                 Surface(
-                    color = Color(0xFF10B981).copy(alpha = 0.15f),
+                    color = (if (isPaid) Color(0xFF10B981) else Color(0xFFF59E0B)).copy(alpha = 0.15f),
                     shape = CircleShape
                 ) {
                     Text(
-                        text = "PAID",
-                        color = Color(0xFF10B981),
+                        text = order.paymentStatus ?: "PLACED",
+                        color = if (isPaid) Color(0xFF10B981) else Color(0xFFF59E0B),
                         fontWeight = FontWeight.Black,
                         fontSize = 11.sp,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -216,29 +229,31 @@ fun OrderReceiptCard(order: OrderDetails, orderNo: String) {
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
-            // Transaction Info
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "Transaction ID", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(
-                    text = "CF_TXN_${order.id}_${order.orderNo ?: orderNo}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
+            // Transaction Info (Only show if PAID)
+            if (isPaid) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Transaction ID", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = "CF_TXN_${order.id}_${order.orderNo ?: orderNo}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
 
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "Payment Gateway", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(text = "Cashfree Payments", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-            }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Payment Gateway", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(text = "Cashfree Payments", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            }
 
             // Item summary
             order.items.forEach { item ->

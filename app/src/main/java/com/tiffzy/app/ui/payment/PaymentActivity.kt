@@ -3,19 +3,17 @@ package com.tiffzy.app.ui.payment
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.background
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.HourglassTop
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,13 +32,21 @@ import com.cashfree.pg.core.api.webcheckout.CFWebCheckoutPayment
 import com.tiffzy.app.data.model.PaymentResultStatus
 import com.tiffzy.app.ui.theme.TiffzyAppTheme
 
-class PaymentActivity : ComponentActivity(), CFCheckoutResponseCallback {
+class PaymentActivity : AppCompatActivity(), CFCheckoutResponseCallback {
 
     private val viewModel: PaymentViewModel by viewModels()
 
     private var currentOrderId: String = ""
     private var currentAmount: Double = 0.0
-    private var envMode: String = "TEST"
+    private var envMode: String = "PRODUCTION"
+
+    private var customerId: String? = null
+    private var customerPhone: String? = null
+    private var customerName: String? = null
+    private var customerEmail: String? = null
+    private var restaurantId: String? = null
+
+    private var lastSessionId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,19 +55,19 @@ class PaymentActivity : ComponentActivity(), CFCheckoutResponseCallback {
         try {
             CFPaymentGatewayService.getInstance().setCheckoutCallback(this)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("CASHFREE_DEBUG", "Failed to set callback: ${e.message}")
         }
 
         // Read intent extras
         currentOrderId = intent.getStringExtra(EXTRA_ORDER_ID) ?: ""
         currentAmount = intent.getDoubleExtra(EXTRA_AMOUNT, 0.0)
-        envMode = intent.getStringExtra(EXTRA_ENV) ?: "TEST"
+        envMode = intent.getStringExtra(EXTRA_ENV) ?: "PRODUCTION"
 
-        val customerId = intent.getStringExtra(EXTRA_CUSTOMER_ID)
-        val customerPhone = intent.getStringExtra(EXTRA_CUSTOMER_PHONE)
-        val customerName = intent.getStringExtra(EXTRA_CUSTOMER_NAME)
-        val customerEmail = intent.getStringExtra(EXTRA_CUSTOMER_EMAIL)
-        val restaurantId = intent.getStringExtra(EXTRA_RESTAURANT_ID)
+        customerId = intent.getStringExtra(EXTRA_CUSTOMER_ID)
+        customerPhone = intent.getStringExtra(EXTRA_CUSTOMER_PHONE)
+        customerName = intent.getStringExtra(EXTRA_CUSTOMER_NAME)
+        customerEmail = intent.getStringExtra(EXTRA_CUSTOMER_EMAIL)
+        restaurantId = intent.getStringExtra(EXTRA_RESTAURANT_ID)
 
         if (savedInstanceState == null && currentOrderId.isNotBlank() && currentAmount > 0) {
             viewModel.fetchPaymentSession(
@@ -80,9 +86,20 @@ class PaymentActivity : ComponentActivity(), CFCheckoutResponseCallback {
                 val uiState by viewModel.uiState.collectAsState()
 
                 // Launch Cashfree Checkout once session is generated
-                LaunchedEffect(uiState.status, uiState.paymentSessionId) {
-                    if (uiState.status == PaymentResultStatus.SESSION_CREATED && !uiState.paymentSessionId.isNull_or_blank()) {
-                        startCashfreeCheckout(uiState.paymentSessionId!!, uiState.orderId ?: currentOrderId)
+                LaunchedEffect(uiState.paymentSessionId) {
+                    val sessionId = uiState.paymentSessionId
+                    if (uiState.status == PaymentResultStatus.SESSION_CREATED && 
+                        !sessionId.isNullOrBlank() && 
+                        sessionId != lastSessionId) {
+                        
+                        lastSessionId = sessionId
+                        val targetOrderId = uiState.orderId ?: currentOrderId
+                        
+                        // Add stabilization delay before SDK launch
+                        kotlinx.coroutines.delay(500)
+                        
+                        Log.d("CASHFREE_DEBUG", "Launching checkout for Order: $targetOrderId (IsProd: ${uiState.isProduction})")
+                        startCashfreeCheckout(sessionId, targetOrderId, uiState.isProduction)
                     }
                 }
 
@@ -90,6 +107,7 @@ class PaymentActivity : ComponentActivity(), CFCheckoutResponseCallback {
                     uiState = uiState,
                     onBackClick = { finish() },
                     onRetryClick = {
+                        lastSessionId = null
                         viewModel.fetchPaymentSession(
                             orderId = currentOrderId,
                             amount = currentAmount,
@@ -100,23 +118,62 @@ class PaymentActivity : ComponentActivity(), CFCheckoutResponseCallback {
                             restaurantId = restaurantId
                         )
                     },
-                    onDoneClick = { finish() }
+                    onManualOpenClick = {
+                        uiState.paymentSessionId?.let { 
+                            val targetOrderId = uiState.orderId ?: currentOrderId
+                            startCashfreeCheckout(it, targetOrderId, uiState.isProduction)
+                        }
+                    },
+                    onDoneClick = {
+                        if (uiState.status == PaymentResultStatus.SUCCESS) {
+                            val intent = Intent(this@PaymentActivity, com.tiffzy.app.MainActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                putExtra("payment_success", true)
+                                putExtra("order_id", uiState.orderId ?: currentOrderId)
+                            }
+                            startActivity(intent)
+                        } else {
+                            viewModel.verifyPaymentWithBackend(uiState.orderId ?: currentOrderId)
+                        }
+                        finish()
+                    }
                 )
             }
         }
     }
 
-    private fun startCashfreeCheckout(sessionId: String, orderId: String) {
+    private fun startCashfreeCheckout(sessionId: String, orderId: String, isProduction: Boolean = false) {
+        val trimmedSession = sessionId.trim()
+        
+        Log.d("CASHFREE_DEBUG", "startCashfreeCheckout: orderId=$orderId, sessionLength=${trimmedSession.length}, isProdParam=$isProduction, intentEnv=$envMode")
+
+        if (trimmedSession.isBlank() || trimmedSession == "null") {
+            Toast.makeText(this, "Error: Payment session token is empty", Toast.LENGTH_LONG).show()
+            viewModel.handlePaymentResult(PaymentResultStatus.FAILED, orderId, message = "Token empty")
+            return
+        }
+
         try {
-            val environment = if (envMode.equals("PRODUCTION", ignoreCase = true)) {
+            // Environment selection logic:
+            // We strictly follow the backend's isProduction flag to ensure the SDK environment
+            // matches the session token. 
+            
+            val environment = if (isProduction || envMode.equals("PRODUCTION", ignoreCase = true)) {
+                if (com.tiffzy.app.BuildConfig.DEBUG) {
+                    Log.w("CASHFREE_DEBUG", "Running PRODUCTION session in DEBUG build.")
+                    Log.w("CASHFREE_DEBUG", "Note: Cashfree may block this request with 'NOT_AVAILABLE is not a trusted source'")
+                    Log.w("CASHFREE_DEBUG", "unless the app is installed from Google Play Store.")
+                }
                 CFSession.Environment.PRODUCTION
             } else {
                 CFSession.Environment.SANDBOX
             }
 
+            Log.d("CASHFREE_DEBUG", "Final CFSession.Environment set to: $environment")
+
             val cfSession = CFSession.CFSessionBuilder()
                 .setEnvironment(environment)
-                .setPaymentSessionID(sessionId)
+                .setPaymentSessionID(trimmedSession)
                 .setOrderId(orderId)
                 .build()
 
@@ -125,25 +182,22 @@ class PaymentActivity : ComponentActivity(), CFCheckoutResponseCallback {
                 .build()
 
             CFPaymentGatewayService.getInstance().doPayment(this, cfWebCheckoutPayment)
+            Log.d("CASHFREE_DEBUG", "CFPaymentGatewayService.doPayment called successfully")
+            
         } catch (e: CFException) {
-            e.printStackTrace()
-            viewModel.handlePaymentResult(
-                resultStatus = PaymentResultStatus.FAILED,
-                orderId = orderId,
-                message = e.message ?: "Cashfree SDK launch failed"
-            )
+            Log.e("CASHFREE_DEBUG", "CFException during checkout launch: ${e.message}")
+            Toast.makeText(this, "Cashfree SDK: ${e.message}", Toast.LENGTH_LONG).show()
+            viewModel.handlePaymentResult(PaymentResultStatus.FAILED, orderId, message = e.message)
         } catch (e: Exception) {
-            e.printStackTrace()
-            viewModel.handlePaymentResult(
-                resultStatus = PaymentResultStatus.FAILED,
-                orderId = orderId,
-                message = e.message ?: "Failed to initiate payment"
-            )
+            Log.e("CASHFREE_DEBUG", "General Exception during checkout launch: ${e.message}")
+            Toast.makeText(this, "Payment Error: ${e.message}", Toast.LENGTH_LONG).show()
+            viewModel.handlePaymentResult(PaymentResultStatus.FAILED, orderId, message = e.message)
         }
     }
 
     // Cashfree Checkout Callback: Payment Success
     override fun onPaymentVerify(orderId: String) {
+        Log.d("CASHFREE_DEBUG", "onPaymentVerify: orderId=$orderId")
         viewModel.handlePaymentResult(
             resultStatus = PaymentResultStatus.SUCCESS,
             orderId = orderId,
@@ -153,8 +207,14 @@ class PaymentActivity : ComponentActivity(), CFCheckoutResponseCallback {
 
     // Cashfree Checkout Callback: Payment Failure / Cancellation / Pending
     override fun onPaymentFailure(cfErrorResponse: CFErrorResponse, orderId: String) {
-        val statusName = cfErrorResponse.status ?: ""
-        val message = cfErrorResponse.message ?: "Payment transaction failed"
+        val statusName = cfErrorResponse.status ?: "FAILED"
+        val message = cfErrorResponse.message ?: "Transaction failed"
+
+        Log.e("CASHFREE_DEBUG", "onPaymentFailure: status=$statusName, message=$message, orderId=$orderId")
+        
+        runOnUiThread {
+            Toast.makeText(this, "Cashfree: $message ($statusName)", Toast.LENGTH_LONG).show()
+        }
 
         val resultStatus = when {
             statusName.contains("CANCEL", ignoreCase = true) || message.contains("cancel", ignoreCase = true) -> PaymentResultStatus.CANCELLED
@@ -167,10 +227,6 @@ class PaymentActivity : ComponentActivity(), CFCheckoutResponseCallback {
             orderId = orderId,
             message = message
         )
-    }
-
-    private fun String?.isNull_or_blank(): Boolean {
-        return this == null || this.isBlank()
     }
 
     companion object {
@@ -192,7 +248,7 @@ class PaymentActivity : ComponentActivity(), CFCheckoutResponseCallback {
             customerName: String? = null,
             customerEmail: String? = null,
             restaurantId: String? = null,
-            env: String = "TEST"
+            env: String = "PRODUCTION"
         ) {
             val intent = Intent(context, PaymentActivity::class.java).apply {
                 putExtra(EXTRA_ORDER_ID, orderId)
@@ -215,37 +271,27 @@ fun PaymentScreen(
     uiState: PaymentUiState,
     onBackClick: () -> Unit,
     onRetryClick: () -> Unit,
+    onManualOpenClick: () -> Unit,
     onDoneClick: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val displayError = uiState.errorMessage ?: if (uiState.status == PaymentResultStatus.CANCELLED) "Payment transaction was cancelled" else null
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "Cashfree Payment",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                },
+                title = { Text(text = "Cashfree Payment", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(20.dp),
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
@@ -256,73 +302,39 @@ fun PaymentScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Order Details",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Divider()
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(text = "Order Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    HorizontalDivider()
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(text = "Order ID", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            text = uiState.orderId ?: "N/A",
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Text(text = uiState.orderId ?: "N/A", fontWeight = FontWeight.SemiBold)
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(text = "Amount Payable", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            text = "₹${String.format("%.2f", uiState.amount)}",
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 18.sp
-                        )
+                        Text(text = "₹${String.format("%.2f", uiState.amount)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 18.sp)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // State Banners
             when (uiState.status) {
                 PaymentResultStatus.LOADING -> {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                        Text(
-                            text = "Initializing Cashfree Payment Gateway...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text(text = uiState.txMsg ?: "Initializing Cashfree...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-
                 PaymentResultStatus.SESSION_CREATED -> {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                        Text(
-                            text = "Opening Cashfree Checkout...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text(text = "Opening Cashfree Checkout...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        
+                        Button(onClick = onManualOpenClick) {
+                            Text("Open Payment Modal")
+                        }
                     }
                 }
-
                 PaymentResultStatus.SUCCESS -> {
                     StatusBanner(
                         icon = Icons.Default.CheckCircle,
@@ -331,31 +343,23 @@ fun PaymentScreen(
                         subtitle = uiState.txMsg ?: "Your payment has been processed successfully.",
                         backgroundColor = Color(0xFFE8F5E9)
                     )
-
-                    Button(
-                        onClick = onDoneClick,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(text = "Done")
+                    Button(onClick = onDoneClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                        Text(text = "View Order Details")
                     }
                 }
-
                 PaymentResultStatus.FAILED, PaymentResultStatus.CANCELLED -> {
-                    val context = androidx.compose.ui.platform.LocalContext.current
                     PaymentFailureScreen(
-                        errorMessage = uiState.errorMessage ?: if (uiState.status == PaymentResultStatus.CANCELLED) "Payment transaction was cancelled" else null,
+                        errorMessage = displayError,
                         orderId = uiState.orderId,
                         amount = uiState.amount,
                         onRetryClick = onRetryClick,
                         onChooseOtherPaymentClick = onBackClick,
                         onGoBackClick = onBackClick,
                         onSupportClick = {
-                            Toast.makeText(context, "Support requested. Contacting Tiffzy Helpdesk...", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "Support requested.", Toast.LENGTH_LONG).show()
                         }
                     )
                 }
-
                 PaymentResultStatus.PENDING -> {
                     StatusBanner(
                         icon = Icons.Default.HourglassTop,
@@ -364,21 +368,12 @@ fun PaymentScreen(
                         subtitle = "Your transaction is pending confirmation from Cashfree.",
                         backgroundColor = Color(0xFFFFF8E1)
                     )
-
-                    Button(
-                        onClick = onDoneClick,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
+                    Button(onClick = onDoneClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                         Text(text = "Check Order Status")
                     }
                 }
-
-                PaymentResultStatus.IDLE -> {
-                    Text(
-                        text = "Preparing payment...",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                else -> {
+                    Text(text = "Preparing payment...", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -399,30 +394,13 @@ fun StatusBanner(
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier
-                .padding(24.dp)
-                .fillMaxWidth(),
+            modifier = Modifier.padding(24.dp).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(56.dp)
-            )
-            Text(
-                text = title,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-            Text(
-                text = subtitle,
-                fontSize = 14.sp,
-                color = Color.DarkGray,
-                textAlign = TextAlign.Center
-            )
+            Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(56.dp))
+            Text(text = title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+            Text(text = subtitle, fontSize = 14.sp, color = Color.DarkGray, textAlign = TextAlign.Center)
         }
     }
 }

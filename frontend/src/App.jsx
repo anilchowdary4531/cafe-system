@@ -80,13 +80,21 @@ export default function App() {
                     <Routes>
 
                     {/* ================================= */}
+                    {/* LEGAL & PUBLIC INFO (High Priority) */}
+                    {/* ================================= */}
+                    <Route path="/legal-disclosure" element={<LegalDisclosure />} />
+                    <Route path="/legal-disclosure/*" element={<LegalDisclosure />} />
+                    <Route path="/legal-info" element={<LegalDisclosure />} />
+                    <Route path="/legal" element={<LegalDisclosure />} />
+                    <Route path="/legal/*" element={<LegalDisclosure />} />
+
+                    {/* ================================= */}
                     {/* PUBLIC CUSTOMER ROUTES */}
                     {/* ================================= */}
-
-                    <Route path="/" element={<Landing />} />
                     <Route path="/terms" element={<Terms />} />
                     <Route path="/privacy" element={<Privacy />} />
                     <Route path="/refund-policy" element={<RefundPolicy />} />
+                    <Route path="/shipping-policy" element={<ShippingPolicy />} />
                     <Route path="/contact-us" element={<ContactUs />} />
                     <Route path="/about-us" element={<AboutUs />} />
                     <Route path="/help-center" element={<HelpCenter />} />
@@ -95,8 +103,7 @@ export default function App() {
                     <Route path="/pos-dashboard" element={<POSDashboardPage />} />
                     <Route path="/analytics" element={<ProductAnalytics />} />
                     <Route path="/inventory" element={<InventoryPage />} />
-                    <Route path="/shipping-policy" element={<ShippingPolicy />} />
-                    <Route path="/legal-disclosure" element={<LegalDisclosure />} />
+                    <Route path="/" element={<Landing />} />
 
                     <Route
                         path="/cart"

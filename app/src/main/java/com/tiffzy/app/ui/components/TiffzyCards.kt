@@ -1,5 +1,6 @@
 package com.tiffzy.app.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,21 +15,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.tiffzy.app.data.model.Restaurant
 import com.tiffzy.app.data.model.SearchItem
 import com.tiffzy.app.ui.theme.Dimens
+import com.tiffzy.app.utils.ImageUtils
 import java.util.Locale
 
 @Composable
 fun TiffzyRestaurantCard(
     restaurant: Restaurant,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    overrideImageRes: Int? = null
+    modifier: Modifier = Modifier
 ) {
     val rating = remember(restaurant.id) { (40 + (restaurant.id % 10)) / 10.0 }
     val deliveryTime = remember(restaurant.id) { "${25 + (restaurant.id % 20)}-${35 + (restaurant.id % 20)} min" }
@@ -48,14 +52,27 @@ fun TiffzyRestaurantCard(
                 .fillMaxWidth()
                 .height(180.dp)) {
                 // Background Image - Prefer bannerUrl then logo
-                val imageUrl = restaurant.bannerUrl ?: restaurant.logo
-                AsyncImage(
-                    model = if (imageUrl.isNullOrEmpty()) null else imageUrl,
+                val imageUrl = ImageUtils.resolveImageUrl(restaurant.bannerUrl ?: restaurant.logo)
+                
+                SubcomposeAsyncImage(
+                    model = imageUrl,
                     contentDescription = restaurant.name,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
-                    placeholder = androidx.compose.ui.res.painterResource(id = overrideImageRes ?: com.tiffzy.app.R.drawable.baked_goods_1),
-                    error = androidx.compose.ui.res.painterResource(id = overrideImageRes ?: com.tiffzy.app.R.drawable.baked_goods_1)
+                    loading = {
+                        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
+                    },
+                    error = {
+                        RestaurantDesignPlaceholder(restaurant.name)
+                    },
+                    success = { state ->
+                        Image(
+                            painter = state.painter,
+                            contentDescription = restaurant.name,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
                 )
                 
                 // Rating Badge
@@ -144,6 +161,67 @@ fun TiffzyRestaurantCard(
 }
 
 @Composable
+fun RestaurantDesignPlaceholder(name: String) {
+    val gradient = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFF2C3E50),
+            Color(0xFF000000)
+        )
+    )
+    
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(gradient),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(Dimens.PaddingLarge)
+        ) {
+            // Stylized Logo Initial
+            Surface(
+                modifier = Modifier.size(64.dp),
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = Color(0xFFFFD24D).copy(alpha = 0.15f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD24D).copy(alpha = 0.5f))
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = name.take(1).uppercase(),
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFFFFD24D),
+                        fontFamily = FontFamily.Serif
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+            
+            // Premium Brand Text
+            Text(
+                text = name.uppercase(),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Black,
+                color = Color.White.copy(alpha = 0.9f),
+                letterSpacing = 4.sp,
+                textAlign = TextAlign.Center,
+                fontFamily = FontFamily.Monospace
+            )
+            
+            Box(
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .width(40.dp)
+                    .height(2.dp)
+                    .background(Color(0xFFFFD24D).copy(alpha = 0.6f))
+            )
+        }
+    }
+}
+
+@Composable
 fun TiffzySearchItemCard(
     item: SearchItem,
     onClick: () -> Unit,
@@ -166,14 +244,13 @@ fun TiffzySearchItemCard(
         ) {
             // Item Image
             AsyncImage(
-                model = item.image,
+                model = ImageUtils.resolveImageUrl(item.image),
                 contentDescription = item.name,
                 modifier = Modifier
                     .size(80.dp)
-                    .clip(MaterialTheme.shapes.small),
-                contentScale = ContentScale.Crop,
-                placeholder = androidx.compose.ui.res.painterResource(id = com.tiffzy.app.R.drawable.baked_goods_1),
-                error = androidx.compose.ui.res.painterResource(id = com.tiffzy.app.R.drawable.baked_goods_1)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentScale = ContentScale.Crop
             )
 
             Spacer(modifier = Modifier.width(Dimens.SpacingMedium))
