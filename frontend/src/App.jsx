@@ -9,23 +9,21 @@ import Landing from "./pages/Landing";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import RefundPolicy from "./pages/RefundPolicy";
-import ShippingPolicy from "./pages/ShippingPolicy";
 import ContactUs from "./pages/ContactUs";
 import AboutUs from "./pages/AboutUs";
 import HelpCenter from "./pages/HelpCenter";
-import LegalInfo from "./pages/LegalInfo";
 import Pricing from "./pages/Pricing";
 import QROrdering from "./pages/QROrdering";
 import POSDashboardPage from "./pages/POSDashboardPage";
 import ProductAnalytics from "./pages/ProductAnalytics";
 import InventoryPage from "./pages/InventoryPage";
+import ShippingPolicy from "./pages/ShippingPolicy";
+import LegalDisclosure from "./pages/LegalDisclosure";
 
 import Cart from "./pages/Cart";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
-import DeleteAccount from "./pages/DeleteAccount";
 import ThankYou from "./pages/ThankYou";
-import PaymentStatus from "./pages/PaymentStatus";
 
 // ============================
 // ADMIN PAGES
@@ -63,7 +61,6 @@ import SuperAdminDashboard from "./pages/super-admin/SuperAdminDashboard";
 import SuperAdminCreateRestaurant from "./pages/super-admin/SuperAdminCreateRestaurant";
 import SuperAdminUsers from "./pages/super-admin/SuperAdminUsers";
 import SuperAdminSettings from "./pages/super-admin/SuperAdminSettings";
-import SuperAdminSettlements from "./pages/super-admin/SuperAdminSettlements";
 import NewOrder from "./pages/admin/NewOrder.jsx";
 import PaymentSuccess from "./pages/admin/PaymentSuccess.jsx";
 import Kitchen from "./pages/Kitchen.jsx";
@@ -83,33 +80,30 @@ export default function App() {
                     <Routes>
 
                     {/* ================================= */}
-                    {/* PUBLIC CUSTOMER & LEGAL ROUTES */}
+                    {/* LEGAL & PUBLIC INFO (High Priority) */}
                     {/* ================================= */}
+                    <Route path="/legal-disclosure" element={<LegalDisclosure />} />
+                    <Route path="/legal-disclosure/*" element={<LegalDisclosure />} />
+                    <Route path="/legal-info" element={<LegalDisclosure />} />
+                    <Route path="/legal" element={<LegalDisclosure />} />
+                    <Route path="/legal/*" element={<LegalDisclosure />} />
 
-                    <Route path="/" element={<Landing />} />
+                    {/* ================================= */}
+                    {/* PUBLIC CUSTOMER ROUTES */}
+                    {/* ================================= */}
                     <Route path="/terms" element={<Terms />} />
-                    <Route path="/terms-and-conditions" element={<Terms />} />
                     <Route path="/privacy" element={<Privacy />} />
-                    <Route path="/privacy-policy" element={<Privacy />} />
                     <Route path="/refund-policy" element={<RefundPolicy />} />
-                    <Route path="/cancellation-policy" element={<RefundPolicy />} />
                     <Route path="/shipping-policy" element={<ShippingPolicy />} />
-                    <Route path="/delivery-policy" element={<ShippingPolicy />} />
                     <Route path="/contact-us" element={<ContactUs />} />
-                    <Route path="/contact" element={<ContactUs />} />
                     <Route path="/about-us" element={<AboutUs />} />
-                    <Route path="/about" element={<AboutUs />} />
                     <Route path="/help-center" element={<HelpCenter />} />
-                    <Route path="/support" element={<HelpCenter />} />
-                    <Route path="/legal" element={<LegalInfo />} />
-                    <Route path="/legal-information" element={<LegalInfo />} />
-                    <Route path="/business-disclosure" element={<LegalInfo />} />
-                    <Route path="/delete-account" element={<DeleteAccount />} />
                     <Route path="/pricing" element={<Pricing />} />
                     <Route path="/qr-ordering" element={<QROrdering />} />
                     <Route path="/pos-dashboard" element={<POSDashboardPage />} />
                     <Route path="/analytics" element={<ProductAnalytics />} />
                     <Route path="/inventory" element={<InventoryPage />} />
+                    <Route path="/" element={<Landing />} />
 
                     <Route
                         path="/cart"
@@ -244,28 +238,8 @@ export default function App() {
                             </>
                         }
                     />
-                    <Route
-                        path="/profile/delete-account"
-                        element={
-                            <>
-                                <Navbar />
-                                <Profile section="delete-account" />
-                                <Footer />
-                            </>
-                        }
-                    />
 
-                    {/* Public Play Store Account Deletion URL */}
-                    <Route
-                        path="/delete-account"
-                        element={
-                            <>
-                                <Navbar />
-                                <DeleteAccount />
-                                <Footer />
-                            </>
-                        }
-                    />
+                    {/* Backward compatible alias */}
                     <Route path="/orders/history" element={<Navigate to="/profile/order-history" replace />} />
 
                     <Route
@@ -274,28 +248,6 @@ export default function App() {
                             <>
                                 <Navbar />
                                 <ThankYou />
-                                <Footer />
-                            </>
-                        }
-                    />
-
-                    <Route
-                        path="/payment-status"
-                        element={
-                            <>
-                                <Navbar />
-                                <PaymentStatus />
-                                <Footer />
-                            </>
-                        }
-                    />
-
-                    <Route
-                        path="/payment-success"
-                        element={
-                            <>
-                                <Navbar />
-                                <PaymentStatus />
                                 <Footer />
                             </>
                         }
@@ -412,26 +364,10 @@ export default function App() {
                         }
                     />
                     <Route
-                        path="/super-admin/staff"
-                        element={
-                            <ProtectedRoute role="SUPER_ADMIN">
-                                <SuperAdminUsers />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
                         path="/super-admin/settings"
                         element={
                             <ProtectedRoute role="SUPER_ADMIN">
                                 <SuperAdminSettings />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/super-admin/settlements"
-                        element={
-                            <ProtectedRoute role="SUPER_ADMIN">
-                                <SuperAdminSettlements />
                             </ProtectedRoute>
                         }
                     />
