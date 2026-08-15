@@ -407,6 +407,7 @@ fun ProfileContent(
             onInventoryClick = { onNavigateToWeb("Inventory", "https://www.tiffzy.com/inventory") },
             onShippingPolicyClick = { onNavigateToWeb("Shipping Policy", "https://www.tiffzy.com/shipping-policy") },
             onLegalDisclosureClick = { onNavigateToWeb("Legal Info", "https://www.tiffzy.com/legal-disclosure") },
+            onDownloadAndroidClick = { onNavigateToWeb("Tiffzy App", "https://play.google.com/apps/testing/com.tiffzy.app") },
             onDeleteAccountClick = onDeleteAccount
         )
 

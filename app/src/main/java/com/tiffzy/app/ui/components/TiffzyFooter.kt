@@ -28,7 +28,9 @@ fun TiffzyFooter(
     onPosDashboardClick: () -> Unit = {},
     onAnalyticsClick: () -> Unit = {},
     onInventoryClick: () -> Unit = {},
-    onLegalDisclosureClick: () -> Unit = {}
+    onLegalDisclosureClick: () -> Unit = {},
+    onDownloadAndroidClick: () -> Unit = {},
+    onDownloadIosClick: () -> Unit = {}
 ) {
     // Colors adapted to MaterialTheme (Dark/Light support)
     val footerBackgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
@@ -108,9 +110,9 @@ fun TiffzyFooter(
             Column(modifier = Modifier.weight(1f)) {
                 FooterHeader("Get Our App", headerColor)
                 Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
-                AppDownloadButton("Download for iOS")
+                AppDownloadButton("Download for iOS", onDownloadIosClick)
                 Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
-                AppDownloadButton("Download for Android")
+                AppDownloadButton("Download for Android", onDownloadAndroidClick)
                 
                 Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -163,9 +165,9 @@ private fun FooterLink(text: String, color: Color, onClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun AppDownloadButton(text: String) {
+private fun AppDownloadButton(text: String, onClick: () -> Unit = {}) {
     Surface(
-        modifier = Modifier.fillMaxWidth().height(40.dp),
+        modifier = Modifier.fillMaxWidth().height(40.dp).clickable { onClick() },
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)

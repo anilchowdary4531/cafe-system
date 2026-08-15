@@ -103,7 +103,7 @@ fun TiffzyWebViewScreen(
                             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                 val newUrl = request?.url?.toString() ?: return false
                                 // Handle mailto, tel, etc.
-                                if (newUrl.startsWith("mailto:") || newUrl.startsWith("tel:") || newUrl.startsWith("whatsapp:")) {
+                                if (newUrl.startsWith("mailto:") || newUrl.startsWith("tel:") || newUrl.startsWith("whatsapp:") || newUrl.contains("play.google.com")) {
                                     try {
                                         val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, request.url)
                                         view?.context?.startActivity(intent)

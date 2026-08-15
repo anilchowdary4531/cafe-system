@@ -57,19 +57,33 @@ export default function Footer() {
                             <li><Link to="/refund-policy" className="hover:text-white transition">Refund & Cancellation</Link></li>
                             <li><Link to="/shipping-policy" className="hover:text-white transition">Shipping & Delivery</Link></li>
                             <li><Link to="/help-center" className="hover:text-white transition">Support & Help Center</Link></li>
-                            <li><Link to="/profile/delete" className="text-red-500 hover:text-red-400">Delete Account Request</Link></li>
                         </ul>
                     </div>
 
-                    {/* Developer Column */}
+                    {/* App & Developer Column */}
                     <div>
-                        <h3 className="mb-6 text-sm font-bold uppercase tracking-widest text-white">Developer Info</h3>
-                        <div className="space-y-3 text-[14px] text-[#f5efe0]/60">
-                            <p><strong>Legal Entity:</strong> SURVETRA SERVICES</p>
-                            <p><strong>Brand Name:</strong> Tiffzy</p>
-                            <p><strong>Email:</strong> support@tiffzy.com</p>
-                            <p><strong>Phone:</strong> +91 91779 39713</p>
-                            <p><strong>Website:</strong> https://www.tiffzy.com</p>
+                        <h3 className="mb-6 text-sm font-bold uppercase tracking-widest text-white">Get Our App</h3>
+                        <div className="space-y-3 mb-8">
+                            <a
+                                href="https://play.google.com/apps/testing/com.tiffzy.app"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center justify-center gap-2 rounded-xl bg-white/5 border border-white/10 px-4 py-2.5 text-sm font-bold text-white hover:bg-white/10 transition"
+                            >
+                                Download for Android
+                            </a>
+                            <button
+                                className="w-full flex items-center justify-center gap-2 rounded-xl bg-white/5 border border-white/10 px-4 py-2.5 text-sm font-bold text-[#f5efe0]/40 cursor-not-allowed"
+                                disabled
+                            >
+                                Download for iOS (Soon)
+                            </button>
+                        </div>
+
+                        <h3 className="mb-4 text-xs font-bold uppercase tracking-widest text-white/40">Developer Info</h3>
+                        <div className="space-y-2 text-[13px] text-[#f5efe0]/40">
+                            <p>support@tiffzy.com</p>
+                            <p>+91 91779 39713</p>
                         </div>
                     </div>
                 </div>
