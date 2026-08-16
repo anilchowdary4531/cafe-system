@@ -5,12 +5,16 @@ import {
     Coffee,
     IceCream,
     LoaderCircle,
+    Pause,
     Pizza,
+    Play,
+    Plus,
     Salad,
     Sandwich,
     Search,
     Soup,
     Tags,
+    Trash2,
     UtensilsCrossed,
     X,
 } from "lucide-react";
@@ -39,6 +43,60 @@ const categoryIconFor = (category) => {
 };
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
+const STORAGE_KEY_PREFIX = "tiffzy_pos_active_bills_";
+
+const createDefaultBill = (counter = 1) => {
+    const id = `bill_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const billNumber = `Bill #${String(counter).padStart(3, "0")}`;
+    return {
+        id,
+        billNumber,
+        cart: {},
+        customerName: "",
+        phone: "",
+        notes: "",
+        status: "ACTIVE",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+};
+
+const normalizeBills = (billsList) => {
+    if (!Array.isArray(billsList) || billsList.length === 0) {
+        const fresh = createDefaultBill(1);
+        return [fresh];
+    }
+    return billsList.map((bill, index) => ({
+        ...bill,
+        billNumber: `Bill #${String(index + 1).padStart(3, "0")}`,
+    }));
+};
+
+const loadStoredBills = (slug) => {
+    try {
+        const raw = localStorage.getItem(`${STORAGE_KEY_PREFIX}${slug || "default"}`);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed.bills) && parsed.bills.length > 0) {
+                const normalized = normalizeBills(parsed.bills);
+                const activeIdExists = normalized.some((b) => b.id === parsed.activeBillId);
+                return {
+                    bills: normalized,
+                    activeBillId: activeIdExists ? parsed.activeBillId : normalized[0].id,
+                    nextBillCounter: normalized.length + 1,
+                };
+            }
+        }
+    } catch {
+        // Fallback to default
+    }
+    const initial = createDefaultBill(1);
+    return {
+        bills: [initial],
+        activeBillId: initial.id,
+        nextBillCounter: 2,
+    };
+};
 
 const mergeQty = (prev, menuItem, delta) => {
     const next = { ...(prev || {}) };
@@ -453,17 +511,142 @@ export default function NewOrder() {
     const slug = String(user?.restaurant?.slug || "").trim();
     const restaurantName = String(user?.restaurant?.name || "Restaurant").trim() || "Restaurant";
 
-    const [cart, setCart] = useState({});
-    const [notes, setNotes] = useState("");
-    const [customerName, setCustomerName] = useState("");
-    const [phone, setPhone] = useState("");
+    const [billState, setBillState] = useState(() => loadStoredBills(slug));
     const [search, setSearch] = useState("");
     const [placing, setPlacing] = useState(false);
     const [activeCategory, setActiveCategory] = useState("ALL");
+    const [billToClose, setBillToClose] = useState(null);
     const searchRef = useRef(null);
 
     const tableNo = String(searchParams.get("table") || "").trim() || null;
     const orderType = tableNo ? "DINE_IN" : "TAKEAWAY";
+
+    // Reload bills when slug changes
+    useEffect(() => {
+        setBillState(loadStoredBills(slug));
+    }, [slug]);
+
+    // Persist active bills to localStorage
+    useEffect(() => {
+        try {
+            localStorage.setItem(
+                `${STORAGE_KEY_PREFIX}${slug || "default"}`,
+                JSON.stringify(billState)
+            );
+        } catch {
+            // ignore storage errors
+        }
+    }, [billState, slug]);
+
+    const { bills, activeBillId } = billState;
+
+    const activeBill = useMemo(() => {
+        return bills.find((b) => b.id === activeBillId) || bills[0] || createDefaultBill(1);
+    }, [bills, activeBillId]);
+
+    const cart = activeBill?.cart || {};
+    const customerName = activeBill?.customerName || "";
+    const phone = activeBill?.phone || "";
+    const notes = activeBill?.notes || "";
+    const isCurrentHeld = activeBill?.status === "HELD";
+
+    const updateActiveBill = useCallback((updater) => {
+        setBillState((prev) => {
+            const activeId = prev.activeBillId;
+            const nextBills = prev.bills.map((b) => {
+                if (b.id !== activeId) return b;
+                const updated = typeof updater === "function" ? updater(b) : { ...b, ...updater };
+                return {
+                    ...updated,
+                    updatedAt: new Date().toISOString(),
+                };
+            });
+            return { ...prev, bills: nextBills };
+        });
+    }, []);
+
+    const createNewBill = useCallback(() => {
+        setBillState((prev) => {
+            const newBill = createDefaultBill(prev.bills.length + 1);
+            const normalized = normalizeBills([...prev.bills, newBill]);
+            const newlyCreated = normalized[normalized.length - 1];
+            return {
+                ...prev,
+                bills: normalized,
+                activeBillId: newlyCreated.id,
+                nextBillCounter: normalized.length + 1,
+            };
+        });
+    }, []);
+
+    const switchBill = useCallback((billId) => {
+        setBillState((prev) => ({
+            ...prev,
+            activeBillId: billId,
+        }));
+    }, []);
+
+    const toggleHoldBill = useCallback((targetBillId) => {
+        setBillState((prev) => {
+            const idToToggle = targetBillId || prev.activeBillId;
+            const nextBills = prev.bills.map((b) => {
+                if (b.id !== idToToggle) return b;
+                const newStatus = b.status === "HELD" ? "ACTIVE" : "HELD";
+                return { ...b, status: newStatus, updatedAt: new Date().toISOString() };
+            });
+            return { ...prev, bills: nextBills };
+        });
+    }, []);
+
+    const deleteBill = useCallback((billId) => {
+        setBillState((prev) => {
+            const filtered = prev.bills.filter((b) => b.id !== billId);
+            const normalized = normalizeBills(filtered);
+            let newActiveId = prev.activeBillId;
+            if (prev.activeBillId === billId) {
+                const index = prev.bills.findIndex((b) => b.id === billId);
+                const nextActive = normalized[Math.max(0, index - 1)] || normalized[0];
+                newActiveId = nextActive.id;
+            }
+            return {
+                ...prev,
+                bills: normalized,
+                activeBillId: newActiveId,
+                nextBillCounter: normalized.length + 1,
+            };
+        });
+        setBillToClose(null);
+    }, []);
+
+    const removeCompletedBill = useCallback((completedBillId) => {
+        setBillState((prev) => {
+            const targetId = completedBillId || prev.activeBillId;
+            const filtered = prev.bills.filter((b) => b.id !== targetId);
+            const normalized = normalizeBills(filtered);
+            let newActiveId = prev.activeBillId;
+            if (prev.activeBillId === targetId) {
+                newActiveId = normalized[0].id;
+            }
+            return {
+                ...prev,
+                bills: normalized,
+                activeBillId: newActiveId,
+                nextBillCounter: normalized.length + 1,
+            };
+        });
+    }, []);
+
+    const setCustomerName = useCallback((name) => {
+        updateActiveBill({ customerName: name });
+    }, [updateActiveBill]);
+
+    const setPhone = useCallback((ph) => {
+        updateActiveBill({ phone: ph });
+    }, [updateActiveBill]);
+
+    const setNotes = useCallback((n) => {
+        updateActiveBill({ notes: n });
+    }, [updateActiveBill]);
 
     const { data: menuData, loading: menuLoading, error: menuError } = useCachedGet(
         slug ? `/r/${slug}/menu` : "/r/_/menu",
@@ -509,44 +692,58 @@ export default function NewOrder() {
 
     const totalItems = useMemo(() => cartItems.reduce((sum, it) => sum + Math.max(1, Number(it.qty || 1)), 0), [cartItems]);
 
-    const add = useCallback((item) => setCart((prev) => mergeQty(prev, item, +1)), []);
-    const sub = useCallback((item) => setCart((prev) => mergeQty(prev, item, -1)), []);
+    const add = useCallback((item) => {
+        updateActiveBill((bill) => ({
+            ...bill,
+            cart: mergeQty(bill.cart, item, +1),
+        }));
+    }, [updateActiveBill]);
+
+    const sub = useCallback((item) => {
+        updateActiveBill((bill) => ({
+            ...bill,
+            cart: mergeQty(bill.cart, item, -1),
+        }));
+    }, [updateActiveBill]);
+
     const setQty = useCallback((item, nextQty) => {
-        setCart((prev) => {
+        updateActiveBill((bill) => {
             const id = Number(item?.id || 0);
-            if (!id) return prev || {};
+            if (!id) return bill;
 
             const parsed = Number(nextQty);
             const qty = Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : 1;
-            const next = { ...(prev || {}) };
-            next[id] = {
-                ...(next[id] || {}),
+            const nextCart = { ...(bill.cart || {}) };
+            nextCart[id] = {
+                ...(nextCart[id] || {}),
                 id,
                 menuItemId: Number(item?.menuItemId || id),
                 name: String(item?.name || "").trim(),
                 price: Number(item?.price || 0),
                 qty,
             };
-            return next;
+            return { ...bill, cart: nextCart };
         });
-    }, []);
-    const removeItem = useCallback(
-        (item) =>
-            setCart((prev) => {
-                const id = Number(item?.id || 0);
-                if (!id) return prev || {};
-                const next = { ...(prev || {}) };
-                delete next[id];
-                return next;
-            }),
-        []
-    );
+    }, [updateActiveBill]);
+
+    const removeItem = useCallback((item) => {
+        updateActiveBill((bill) => {
+            const id = Number(item?.id || 0);
+            if (!id) return bill;
+            const nextCart = { ...(bill.cart || {}) };
+            delete nextCart[id];
+            return { ...bill, cart: nextCart };
+        });
+    }, [updateActiveBill]);
+
     const clear = useCallback(() => {
-        setCart({});
-        setNotes("");
-        setCustomerName("");
-        setPhone("");
-    }, []);
+        updateActiveBill({
+            cart: {},
+            notes: "",
+            customerName: "",
+            phone: "",
+        });
+    }, [updateActiveBill]);
 
     const categories = useMemo(() => {
         const counts = new Map();
@@ -653,7 +850,7 @@ export default function NewOrder() {
                             message: ack?.order?.invoiceNo || ack?.order?.orderNo || "Receipt opened for printing",
                             variant: "success",
                         });
-                        clear();
+                        removeCompletedBill(activeBill.id);
                         return;
                     }
                     cleanupPrintFrame();
@@ -667,65 +864,154 @@ export default function NewOrder() {
                 }
             }
         );
-    }, [cartItems, clear, connected, customerName, notes, orderType, phone, placing, restaurantName, socket, tableNo]);
-
-    // Reset cart between restaurant switches.
-    useEffect(() => {
-        clear();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [slug]);
+    }, [activeBill?.id, cartItems, connected, customerName, notes, orderType, phone, placing, removeCompletedBill, restaurantName, socket, tableNo]);
 
     return (
         <div className="theme-page new-order-paper new-order-no-boxes min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_430px]">
             <div className="lg:min-h-screen lg:flex lg:flex-col">
-                <header className="theme-nav">
-                    <div className="px-4 py-3">
-                    <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] lg:items-center">
-                        <div className="min-w-0">
-                            <button
-                                type="button"
-                                onClick={() => navigate("/owner")}
-                                className="theme-soft-button inline-flex h-8 w-8 items-center justify-center rounded-full"
-                                aria-label="Go to dashboard"
-                                title="Go to dashboard"
-                            >
-                                <ArrowLeft size={16} />
-                            </button>
-                            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
-                                <UtensilsCrossed size={18} className="theme-accent-text" />
-                                Billing Desk
-                            </h1>
-                            <p className="theme-muted mt-1 text-xs sm:text-sm truncate">
-                                {user?.restaurant?.name || "Restaurant"} - {connected ? "Live" : "Offline"}
-                                {socketError ? ` (${socketError})` : ""}
-                            </p>
-                        </div>
-
-                        <div className="theme-panel new-order-borderless flex w-full items-center gap-2 rounded-3xl border border-white/10 bg-black/10 px-4 py-3 lg:mx-0 lg:max-w-[520px]">
-                            <Search size={18} className="theme-muted" />
-                            <input
-                                ref={searchRef}
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Search items, categories..."
-                                className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:opacity-60 sm:text-base"
-                            />
-                            {search.length > 0 && (
+                <header className="theme-nav border-b border-white/10 bg-black/10">
+                    <div className="px-4 py-3 space-y-3">
+                        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] lg:items-center">
+                            <div className="min-w-0">
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setSearch("");
-                                        searchRef.current?.focus?.();
-                                    }}
-                                    className="theme-soft-button inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-                                    aria-label="Clear search"
-                                    title="Clear search"
+                                    onClick={() => navigate("/owner")}
+                                    className="theme-soft-button inline-flex h-8 w-8 items-center justify-center rounded-full"
+                                    aria-label="Go to dashboard"
+                                    title="Go to dashboard"
                                 >
-                                    <X size={15} />
+                                    <ArrowLeft size={16} />
                                 </button>
-                            )}
+                                <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
+                                    <UtensilsCrossed size={18} className="theme-accent-text" />
+                                    Billing Desk
+                                </h1>
+                                <p className="theme-muted mt-1 text-xs sm:text-sm truncate">
+                                    {user?.restaurant?.name || "Restaurant"} - {connected ? "Live" : "Offline"}
+                                    {socketError ? ` (${socketError})` : ""}
+                                </p>
+                            </div>
+
+                            <div className="theme-panel new-order-borderless flex w-full items-center gap-2 rounded-3xl border border-white/10 bg-black/10 px-4 py-3 lg:mx-0 lg:max-w-[520px]">
+                                <Search size={18} className="theme-muted" />
+                                <input
+                                    ref={searchRef}
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search items, categories..."
+                                    className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:opacity-60 sm:text-base"
+                                />
+                                {search.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSearch("");
+                                            searchRef.current?.focus?.();
+                                        }}
+                                        className="theme-soft-button inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                                        aria-label="Clear search"
+                                        title="Clear search"
+                                    >
+                                        <X size={15} />
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                    </div>
+
+                        {/* Active Bills / Tabs Section */}
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 border-t border-white/10">
+                            <button
+                                type="button"
+                                onClick={createNewBill}
+                                className="theme-button flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold shadow-md transition hover:scale-[1.02] active:scale-[0.98]"
+                                title="Create a new independent bill"
+                            >
+                                <Plus size={16} />
+                                <span>New Bill</span>
+                            </button>
+
+                            <div className="flex items-center gap-2 min-w-0 flex-1 overflow-x-auto no-scrollbar py-0.5">
+                                {bills.map((bill) => {
+                                    const isActive = bill.id === activeBillId;
+                                    const isHeld = bill.status === "HELD";
+                                    const bItems = Object.values(bill.cart || {});
+                                    const bItemCount = bItems.reduce((sum, it) => sum + Math.max(1, Number(it.qty || 1)), 0);
+                                    const bTotal = bItems.reduce((sum, it) => sum + Number(it.price || 0) * Math.max(1, Number(it.qty || 1)), 0);
+
+                                    return (
+                                        <div
+                                            key={bill.id}
+                                            onClick={() => switchBill(bill.id)}
+                                            className={[
+                                                "group relative flex shrink-0 cursor-pointer items-center gap-3 rounded-2xl border px-3.5 py-2 text-xs font-semibold transition select-none",
+                                                isActive
+                                                    ? "is-active border-amber-500/60 bg-amber-500/10 text-white shadow-lg ring-1 ring-amber-500/30"
+                                                    : isHeld
+                                                      ? "border-amber-400/30 bg-amber-950/20 text-amber-200/90 hover:bg-amber-900/30"
+                                                      : "border-white/10 bg-black/20 text-white/80 hover:bg-white/5 hover:text-white",
+                                            ].join(" ")}
+                                        >
+                                            <span
+                                                className={[
+                                                    "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-extrabold tracking-wider uppercase",
+                                                    isHeld
+                                                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                                        : isActive
+                                                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                                          : "bg-white/10 text-white/60",
+                                                ].join(" ")}
+                                            >
+                                                {isHeld ? "HELD" : "ACTIVE"}
+                                            </span>
+
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="font-bold text-sm leading-tight flex items-center gap-1.5">
+                                                    {bill.billNumber}
+                                                    {bill.customerName && (
+                                                        <span className="text-[11px] font-normal opacity-70 truncate max-w-[80px]">
+                                                            ({bill.customerName})
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                <span className="theme-muted text-[11px] tabular-nums">
+                                                    {bItemCount} item{bItemCount === 1 ? "" : "s"} • Rs {toInr(bTotal)}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center gap-1 ml-1 opacity-80 group-hover:opacity-100">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleHoldBill(bill.id);
+                                                    }}
+                                                    className="theme-soft-button inline-flex h-6 w-6 items-center justify-center rounded-full p-0 text-white/70 hover:text-white hover:bg-white/20"
+                                                    title={isHeld ? "Resume bill" : "Hold bill"}
+                                                >
+                                                    {isHeld ? <Play size={11} className="fill-current" /> : <Pause size={11} />}
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (bItemCount > 0) {
+                                                            setBillToClose(bill);
+                                                        } else {
+                                                            deleteBill(bill.id);
+                                                        }
+                                                    }}
+                                                    className="theme-soft-button inline-flex h-6 w-6 items-center justify-center rounded-full p-0 text-white/60 hover:text-red-400 hover:bg-red-500/20"
+                                                    title="Close / Cancel bill"
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </header>
 
@@ -773,70 +1059,141 @@ export default function NewOrder() {
 
             <div className="lg:pl-4">
                 <aside className="theme-panel new-order-borderless self-start rounded-3xl border border-white/10 bg-black/10 p-4 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:rounded-none">
-                        <div className="flex items-end justify-between gap-2">
-                            <div>
+                    <div className="flex items-end justify-between gap-2">
+                        <div>
+                            <div className="flex items-center gap-2">
                                 <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Cart</p>
-                                <p className="mt-1 text-lg font-semibold">
-                                    {totalItems} item{totalItems === 1 ? "" : "s"}
-                                </p>
+                                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-300">
+                                    {activeBill.billNumber}
+                                </span>
                             </div>
-                            <p className="theme-muted text-sm tabular-nums">Rs {toInr(subtotal)}</p>
+                            <p className="mt-1 text-lg font-semibold">
+                                {totalItems} item{totalItems === 1 ? "" : "s"}
+                            </p>
                         </div>
+                        <p className="theme-muted text-sm tabular-nums">Rs {toInr(subtotal)}</p>
+                    </div>
 
-                        <div className="mt-4 flex min-h-0 flex-1 flex-col gap-1.5 overflow-auto pr-1 divide-y divide-[#cdb99a]/60">
-                            {cartItems.length === 0 ? (
-                                <div className="new-order-borderless rounded-2xl border border-white/10 bg-black/10 p-6 text-center">
-                                    <p className="text-sm font-semibold">No items yet</p>
-                                    <p className="theme-muted mt-1 text-xs">Tap items to add them to the cart.</p>
-                                </div>
-                            ) : (
-                                cartItems.map((it) => (
-                                    <CartRow key={it.id} item={it} onAdd={add} onSub={sub} onRemove={removeItem} onSetQty={setQty} />
-                                ))
-                            )}
-                        </div>
+                    {/* Optional Customer Information */}
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <input
+                            type="text"
+                            placeholder="Customer Name"
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
+                            className="rounded-xl border border-white/10 bg-black/20 px-3 py-1.5 font-semibold text-white placeholder:text-white/40 outline-none focus:border-amber-500/50"
+                        />
+                        <input
+                            type="text"
+                            placeholder="Phone Number"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            className="rounded-xl border border-white/10 bg-black/20 px-3 py-1.5 font-semibold text-white placeholder:text-white/40 outline-none focus:border-amber-500/50"
+                        />
+                    </div>
 
-                        <div className="mt-4 shrink-0 space-y-3 border-t border-[#cdb99a] pt-4">
-                            <div className="new-order-dividerless mt-0 rounded-2xl border border-white/10 bg-black/10 p-3">
-                                <div className="flex items-center justify-between text-xs">
-                                    <span className="theme-muted">Items</span>
-                                    <span className="font-semibold tabular-nums">{totalItems}</span>
-                                </div>
-                                <div className="mt-1 flex items-center justify-between text-sm">
-                                    <span className="font-semibold">Total</span>
-                                    <span className="font-bold tabular-nums">Rs {toInr(subtotal)}</span>
-                                </div>
+                    <div className="mt-4 flex min-h-0 flex-1 flex-col gap-1.5 overflow-auto pr-1 divide-y divide-[#cdb99a]/60">
+                        {cartItems.length === 0 ? (
+                            <div className="new-order-borderless rounded-2xl border border-white/10 bg-black/10 p-6 text-center">
+                                <p className="text-sm font-semibold">No items yet</p>
+                                <p className="theme-muted mt-1 text-xs">Tap items to add them to the cart.</p>
                             </div>
+                        ) : (
+                            cartItems.map((it) => (
+                                <CartRow key={it.id} item={it} onAdd={add} onSub={sub} onRemove={removeItem} onSetQty={setQty} />
+                            ))
+                        )}
+                    </div>
 
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    type="button"
-                                    onClick={clear}
-                                    className="theme-soft-button rounded-2xl px-4 py-3 text-sm font-semibold"
-                                    disabled={placing}
-                                >
-                                    Clear
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handlePrintBill}
-                                    className="theme-button rounded-2xl px-4 py-3 text-sm font-semibold"
-                                    disabled={!connected || placing}
-                                >
-                                    {placing ? (
-                                        <span className="inline-flex items-center gap-2">
-                                            <LoaderCircle size={16} className="animate-spin" />
-                                            Printing...
-                                        </span>
-                                    ) : (
-                                        "Print Bill"
-                                    )}
-                                </button>
+                    <div className="mt-4 shrink-0 space-y-3 border-t border-[#cdb99a] pt-4">
+                        <div className="new-order-dividerless mt-0 rounded-2xl border border-white/10 bg-black/10 p-3">
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="theme-muted">Items</span>
+                                <span className="font-semibold tabular-nums">{totalItems}</span>
+                            </div>
+                            <div className="mt-1 flex items-center justify-between text-sm">
+                                <span className="font-semibold">Total</span>
+                                <span className="font-bold tabular-nums">Rs {toInr(subtotal)}</span>
                             </div>
                         </div>
 
+                        <div className="grid grid-cols-3 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => toggleHoldBill(activeBill.id)}
+                                className={[
+                                    "rounded-2xl px-2 py-3 text-xs font-bold transition flex items-center justify-center gap-1",
+                                    isCurrentHeld
+                                        ? "bg-emerald-600/30 border border-emerald-500/40 text-emerald-200 hover:bg-emerald-600/40"
+                                        : "theme-soft-button",
+                                ].join(" ")}
+                                disabled={placing}
+                                title={isCurrentHeld ? "Resume this bill" : "Put this bill on hold"}
+                            >
+                                {isCurrentHeld ? <Play size={14} /> : <Pause size={14} />}
+                                {isCurrentHeld ? "Resume" : "Hold"}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={clear}
+                                className="theme-soft-button rounded-2xl px-2 py-3 text-xs font-semibold"
+                                disabled={placing}
+                            >
+                                Clear
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handlePrintBill}
+                                className="theme-button rounded-2xl px-2 py-3 text-xs font-semibold"
+                                disabled={!connected || placing}
+                            >
+                                {placing ? (
+                                    <span className="inline-flex items-center gap-1">
+                                        <LoaderCircle size={14} className="animate-spin" />
+                                        Printing...
+                                    </span>
+                                ) : (
+                                    "Print Bill"
+                                )}
+                            </button>
+                        </div>
+                    </div>
                 </aside>
             </div>
+
+            {/* Cancel Bill Confirmation Modal */}
+            {billToClose && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+                    <div className="theme-panel new-order-borderless w-full max-w-md rounded-3xl border border-white/10 bg-zinc-900 p-6 text-white shadow-2xl">
+                        <h3 className="text-xl font-bold flex items-center gap-2">
+                            <Trash2 className="text-red-400" size={20} />
+                            Cancel {billToClose.billNumber}?
+                        </h3>
+                        <p className="theme-muted mt-2 text-sm">
+                            This bill contains <strong className="text-white">{Object.values(billToClose.cart || {}).reduce((s, i) => s + Math.max(1, Number(i.qty || 1)), 0)} item(s)</strong> totaling <strong className="text-white">Rs {toInr(Object.values(billToClose.cart || {}).reduce((s, i) => s + Number(i.price || 0) * Math.max(1, Number(i.qty || 1)), 0))}</strong>.
+                        </p>
+                        <p className="theme-muted mt-1 text-xs">
+                            Are you sure you want to cancel this bill? All items in this cart will be deleted.
+                        </p>
+                        <div className="mt-6 flex items-center justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setBillToClose(null)}
+                                className="theme-soft-button rounded-xl px-4 py-2 text-sm font-semibold"
+                            >
+                                Keep Bill
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => deleteBill(billToClose.id)}
+                                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 transition"
+                            >
+                                Cancel Bill
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
