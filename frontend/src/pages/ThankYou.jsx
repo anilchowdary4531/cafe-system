@@ -4,6 +4,7 @@ import { AlertCircle, AlertTriangle, CheckCircle2, ClipboardList, Clock, HelpCir
 import { useRestaurantContext } from "../context/RestaurantContext";
 import OrderTrackingTimeline from "../components/OrderTrackingTimeline";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
+import Footer from "../components/Footer";
 const toInr = (value) => {
     const n = Number(value || 0);
     if (!Number.isFinite(n)) return "0.00";
@@ -223,6 +224,7 @@ export default function ThankYou({ orderFromStatus = null, onRefreshStatus = nul
                     </div>
                 </div>
             </div>
+            <Footer />
         </div>
     );
 }

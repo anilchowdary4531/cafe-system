@@ -23,6 +23,7 @@ import { useCart } from "../../context/CartContext";
 import { useRestaurantContext } from "../../context/RestaurantContext";
 import CartDrawer from "../../components/CartDrawer";
 import BrandLogo from "../../components/BrandLogo";
+import Footer from "../../components/Footer";
 import VegModeToggle from "../../components/VegModeToggle";
 import useCachedGet from "../../hooks/useCachedGet";
 import { useAuth } from "../../context/AuthContext";
@@ -614,6 +615,7 @@ export default function RestaurantMenu() {
                 </button>
             )}
 
+            <Footer />
             <CartDrawer open={cartOpen} setOpen={setCartOpen} />
         </div>
     );

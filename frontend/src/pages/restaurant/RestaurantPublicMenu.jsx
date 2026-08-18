@@ -5,6 +5,7 @@ import { useCart } from "../../context/CartContext";
 import { useRestaurantContext } from "../../context/RestaurantContext";
 import CartDrawer from "../../components/CartDrawer";
 import BrandLogo from "../../components/BrandLogo";
+import Footer from "../../components/Footer";
 import useCachedGet from "../../hooks/useCachedGet";
 import { getCustomerFavorites, toggleFavoriteMenuItem } from "../../utils/customerFavorites";
 import { showToast } from "../../utils/toast";
@@ -425,6 +426,7 @@ export default function RestaurantPublicMenu() {
                 </button>
             )}
 
+            <Footer />
             <CartDrawer open={cartOpen} setOpen={setCartOpen} />
         </div>
     );

@@ -7,6 +7,7 @@ import { useRestaurantContext } from "../context/RestaurantContext";
 import useCachedGet from "../hooks/useCachedGet";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
+import Footer from "../components/Footer";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
 
@@ -201,6 +202,7 @@ export default function Cart() {
                 cart={cart}
                 clearCart={clearCart}
             />
+            <Footer />
         </>
     );
 }
