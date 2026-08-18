@@ -388,32 +388,32 @@ const ItemCard = memo(function ItemCard({ item, qty, onAdd }) {
         <button
             type="button"
             onClick={() => onAdd(item)}
-            className="group relative overflow-hidden rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4 text-left transition active:scale-[0.99] hover:bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_85%,#000_15%)] hover:shadow-md"
+            className="group relative overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-2.5 sm:p-3 text-left transition active:scale-[0.98] hover:bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_85%,#000_15%)] hover:shadow-md"
         >
             <img
                 src={imageSrc}
                 alt={item.name}
                 loading="lazy"
-                className="mb-3 h-28 w-full rounded-2xl object-cover transition duration-300 group-hover:scale-[1.02]"
+                className="mb-2 h-20 sm:h-22 w-full rounded-xl object-cover transition duration-300 group-hover:scale-[1.02]"
                 onError={(event) => {
                     event.currentTarget.src = FALLBACK_IMAGE;
                 }}
             />
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-[color:var(--app-text)] sm:text-base">{item.name}</p>
-                    <p className="theme-muted mt-1 truncate text-xs font-semibold">
+                    <p className="truncate text-xs sm:text-sm font-bold text-[color:var(--app-text)]">{item.name}</p>
+                    <p className="theme-muted mt-0.5 truncate text-[11px] font-semibold">
                         {item.category || "General"} - Rs {toInr(item.price)}
                     </p>
                 </div>
                 {qty > 0 && (
-                    <span className="theme-pos-qty-badge inline-flex h-8 min-w-8 items-center justify-center rounded-2xl px-2 text-sm font-bold tabular-nums">
+                    <span className="theme-pos-qty-badge inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-xl px-1.5 text-xs font-extrabold tabular-nums">
                         {qty}
                     </span>
                 )}
             </div>
 
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/20 to-transparent opacity-0 transition group-hover:opacity-100" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/20 to-transparent opacity-0 transition group-hover:opacity-100" />
         </button>
     );
 });
@@ -1039,7 +1039,7 @@ export default function NewOrder() {
                             </div>
                         )}
 
-                        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                        <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 sm:gap-3">
                             {menuLoading ? (
                                 <div className="theme-muted text-sm">Loading menu...</div>
                             ) : (
