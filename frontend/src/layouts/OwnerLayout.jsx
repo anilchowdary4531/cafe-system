@@ -1252,7 +1252,7 @@ export default function OwnerLayout() {
                                         <div
                                             className={
                                                 isDashboardRoute
-                                                    ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 w-full auto-rows-fr overflow-visible pb-4"
+                                                    ? "grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-3 sm:gap-4 w-full auto-rows-fr overflow-visible pb-4"
                                                     : "flex flex-wrap gap-2 pb-3"
                                             }
                                         >
@@ -1341,7 +1341,7 @@ export default function OwnerLayout() {
                                                                 ? ` - Managed by ${assignedStaffLabel}`
                                                                 : ""
                                                         }`}
-                                                        className={`theme-table-box relative w-full min-h-[220px] sm:min-h-[260px] flex flex-col justify-between rounded-2xl p-4 sm:p-5 pb-9 text-xs transition-all duration-200 shadow-md hover:shadow-xl hover:-translate-y-0.5 state-${tableStateClassToken} ${
+                                                        className={`theme-table-box relative w-full aspect-square min-h-[130px] max-w-[150px] flex flex-col justify-between rounded-2xl p-3 pb-8 text-xs transition-all duration-200 shadow-md hover:shadow-xl hover:-translate-y-0.5 state-${tableStateClassToken} ${
                                                             table.isOccupied ? "is-occupied" : ""
                                                         } ${isDropTarget ? "is-drop-target" : ""}`}
                                                     >
@@ -1349,7 +1349,7 @@ export default function OwnerLayout() {
                                                             <div className="flex items-start justify-between gap-2">
                                                                 <div className="min-w-0">
                                                                     <div className="flex items-center gap-1.5">
-                                                                        <p className="truncate text-2xl sm:text-3xl font-extrabold leading-none">
+                                                                        <p className="truncate text-xl font-bold leading-none">
                                                                             {tableLabel}
                                                                         </p>
                                                                     </div>
