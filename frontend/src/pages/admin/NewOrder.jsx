@@ -348,7 +348,7 @@ const buildBillPrintMarkup = ({ restaurantName, order } = {}) => {
 
 const CategorySidebar = memo(function CategorySidebar({ categories, activeKey, onSelect }) {
     return (
-        <aside className="theme-panel new-order-borderless self-start rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-3 lg:sticky lg:top-4">
+        <aside className="theme-panel self-start rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-3 lg:sticky lg:top-4">
             <p className="theme-muted px-2 pt-2 text-xs font-extrabold uppercase tracking-[0.24em]">Categories</p>
             <div className="mt-2 flex max-h-[calc(100vh-180px)] flex-col gap-1 overflow-auto px-1 pb-1">
                 {categories.map((cat) => {
@@ -388,7 +388,7 @@ const ItemCard = memo(function ItemCard({ item, qty, onAdd }) {
         <button
             type="button"
             onClick={() => onAdd(item)}
-            className="group new-order-borderless relative overflow-hidden rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4 text-left transition active:scale-[0.99] hover:bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_85%,#000_15%)] hover:shadow-md"
+            className="group relative overflow-hidden rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4 text-left transition active:scale-[0.99] hover:bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_85%,#000_15%)] hover:shadow-md"
         >
             <img
                 src={imageSrc}
@@ -445,7 +445,7 @@ const CartRow = memo(function CartRow({ item, onAdd, onSub, onRemove, onSetQty }
     }, [draftQty, item, onSetQty, qty]);
 
     return (
-        <div className="new-order-borderless w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] px-3.5 py-3">
+        <div className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] px-3.5 py-3">
             <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3">
                 <div className="min-w-0">
                     <p className="truncate text-[15px] font-bold text-[color:var(--app-text)] leading-tight">{item?.name || "Item"}</p>
@@ -867,9 +867,9 @@ export default function NewOrder() {
     }, [activeBill?.id, cartItems, connected, customerName, notes, orderType, phone, placing, removeCompletedBill, restaurantName, socket, tableNo]);
 
     return (
-        <div className="theme-page new-order-paper new-order-no-boxes min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_430px]">
+        <div className="theme-page min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_430px]">
             <div className="lg:min-h-screen lg:flex lg:flex-col">
-                <header className="theme-nav border-b border-white/10 bg-black/10">
+                <header className="theme-nav border-b border-[color:var(--app-border)]">
                     <div className="px-4 py-3 space-y-3">
                         <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] lg:items-center">
                             <div className="min-w-0">
@@ -892,7 +892,7 @@ export default function NewOrder() {
                                 </p>
                             </div>
 
-                            <div className="theme-panel new-order-borderless flex w-full items-center gap-2 rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] px-4 py-3 lg:mx-0 lg:max-w-[520px]">
+                            <div className="theme-panel flex w-full items-center gap-2 rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] px-4 py-3 lg:mx-0 lg:max-w-[520px]">
                                 <Search size={18} className="theme-muted" />
                                 <input
                                     ref={searchRef}
@@ -1022,7 +1022,7 @@ export default function NewOrder() {
                         onSelect={setActiveCategory}
                     />
 
-                    <section className="theme-panel new-order-borderless rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4">
+                    <section className="theme-panel rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4">
                         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                             <div>
                                 <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Items</p>
@@ -1058,7 +1058,7 @@ export default function NewOrder() {
             </div>
 
             <div className="lg:pl-4">
-                <aside className="theme-panel new-order-borderless self-start rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:rounded-none">
+                <aside className="theme-panel self-start rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:rounded-none">
                     <div className="flex items-end justify-between gap-2">
                         <div>
                             <div className="flex items-center gap-2">
@@ -1094,7 +1094,7 @@ export default function NewOrder() {
 
                     <div className="mt-4 flex min-h-0 flex-1 flex-col gap-1.5 overflow-auto pr-1 divide-y divide-[color:var(--app-border)]">
                         {cartItems.length === 0 ? (
-                            <div className="new-order-borderless rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_50%,transparent)] p-6 text-center text-[color:var(--app-text)]">
+                            <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_50%,transparent)] p-6 text-center text-[color:var(--app-text)]">
                                 <p className="text-sm font-bold text-[color:var(--app-text)]">No items yet</p>
                                 <p className="theme-muted mt-1 text-xs">Tap items to add them to the cart.</p>
                             </div>
@@ -1164,7 +1164,7 @@ export default function NewOrder() {
             {/* Cancel Bill Confirmation Modal */}
             {billToClose && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-                    <div className="theme-panel new-order-borderless w-full max-w-md rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface,var(--app-bg))] p-6 text-[color:var(--app-text)] shadow-2xl">
+                    <div className="theme-panel w-full max-w-md rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface,var(--app-bg))] p-6 text-[color:var(--app-text)] shadow-2xl">
                         <h3 className="text-xl font-bold flex items-center gap-2 text-[color:var(--app-text)]">
                             <Trash2 className="text-red-500" size={20} />
                             Cancel {billToClose.billNumber}?
