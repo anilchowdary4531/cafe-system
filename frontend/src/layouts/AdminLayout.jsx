@@ -1,4 +1,4 @@
-﻿import {
+import {
     Link,
     Outlet,
     useLocation,
@@ -9,6 +9,7 @@ import { useState } from "react";
 import { resolveRestaurantName } from "../utils/restaurantContext";
 import ThemeSelector from "../components/ThemeSelector";
 import BrandLogo from "../components/BrandLogo";
+import Footer from "../components/Footer";
 
 export default function AdminLayout() {
     const { logout, user } = useAuth();
@@ -153,6 +154,7 @@ export default function AdminLayout() {
                 <main className="p-6">
                     <Outlet />
                 </main>
+                <Footer />
 
             </div>
 

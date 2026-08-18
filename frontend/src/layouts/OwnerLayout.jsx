@@ -23,6 +23,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { resolveRestaurantName } from "../utils/restaurantContext";
 import BrandLogo from "../components/BrandLogo";
+import Footer from "../components/Footer";
 import { useAuth } from "../context/AuthContext";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
 import { showToast } from "../utils/toast";
@@ -1795,6 +1796,7 @@ export default function OwnerLayout() {
                         <Outlet />
                     ) : null}
                 </main>
+                <Footer />
             </div>
             {selectedLiveOrder && (
                 <div
