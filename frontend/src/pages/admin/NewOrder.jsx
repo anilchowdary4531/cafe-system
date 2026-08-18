@@ -348,7 +348,7 @@ const buildBillPrintMarkup = ({ restaurantName, order } = {}) => {
 
 const CategorySidebar = memo(function CategorySidebar({ categories, activeKey, onSelect }) {
     return (
-        <aside className="theme-panel new-order-borderless self-start rounded-3xl border border-white/10 bg-black/10 p-3 lg:sticky lg:top-4">
+        <aside className="theme-panel new-order-borderless self-start rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-3 lg:sticky lg:top-4">
             <p className="theme-muted px-2 pt-2 text-xs font-extrabold uppercase tracking-[0.24em]">Categories</p>
             <div className="mt-2 flex max-h-[calc(100vh-180px)] flex-col gap-1 overflow-auto px-1 pb-1">
                 {categories.map((cat) => {
@@ -365,10 +365,10 @@ const CategorySidebar = memo(function CategorySidebar({ categories, activeKey, o
                             ].join(" ")}
                             aria-current={active ? "page" : undefined}
                         >
-                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-white/10 bg-black/10">
+                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-text)_6%,transparent)]">
                                 <Icon size={16} className="theme-pos-choice-icon" />
                             </span>
-                            <span className="min-w-0 flex-1 truncate">{cat.label}</span>
+                            <span className="min-w-0 flex-1 truncate text-[color:var(--app-text)]">{cat.label}</span>
                             {typeof cat.count === "number" && (
                                 <span className="theme-pos-count-badge rounded-full px-2 py-0.5 text-xs tabular-nums">
                                     {cat.count}
@@ -388,7 +388,7 @@ const ItemCard = memo(function ItemCard({ item, qty, onAdd }) {
         <button
             type="button"
             onClick={() => onAdd(item)}
-            className="group new-order-borderless relative overflow-hidden rounded-3xl border border-white/10 bg-black/10 p-4 text-left transition active:scale-[0.99] hover:bg-black/20"
+            className="group new-order-borderless relative overflow-hidden rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4 text-left transition active:scale-[0.99] hover:bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_85%,#000_15%)] hover:shadow-md"
         >
             <img
                 src={imageSrc}
@@ -401,8 +401,8 @@ const ItemCard = memo(function ItemCard({ item, qty, onAdd }) {
             />
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold sm:text-base">{item.name}</p>
-                    <p className="theme-muted mt-1 truncate text-xs">
+                    <p className="truncate text-sm font-bold text-[color:var(--app-text)] sm:text-base">{item.name}</p>
+                    <p className="theme-muted mt-1 truncate text-xs font-semibold">
                         {item.category || "General"} - Rs {toInr(item.price)}
                     </p>
                 </div>
@@ -413,7 +413,7 @@ const ItemCard = memo(function ItemCard({ item, qty, onAdd }) {
                 )}
             </div>
 
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/30 to-transparent opacity-0 transition group-hover:opacity-100" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/20 to-transparent opacity-0 transition group-hover:opacity-100" />
         </button>
     );
 });
@@ -445,15 +445,15 @@ const CartRow = memo(function CartRow({ item, onAdd, onSub, onRemove, onSetQty }
     }, [draftQty, item, onSetQty, qty]);
 
     return (
-        <div className="new-order-borderless w-full rounded-xl border border-white/10 bg-black/10 px-3.5 py-3">
+        <div className="new-order-borderless w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] px-3.5 py-3">
             <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3">
                 <div className="min-w-0">
-                    <p className="truncate text-[15px] font-semibold leading-tight">{item?.name || "Item"}</p>
-                    <p className="theme-muted mt-0.5 text-[11px]">
+                    <p className="truncate text-[15px] font-bold text-[color:var(--app-text)] leading-tight">{item?.name || "Item"}</p>
+                    <p className="theme-muted mt-0.5 text-[11px] font-semibold">
                         Rs {toInr(item?.price)} - Qty {qty}
                     </p>
                 </div>
-                <div className="inline-flex items-center gap-1.5 justify-self-center rounded-xl border border-white/10 bg-black/10 p-0.5">
+                <div className="inline-flex items-center gap-1.5 justify-self-center rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] p-0.5">
                     <button
                         type="button"
                         onClick={() => onSub?.(item)}
@@ -486,7 +486,7 @@ const CartRow = memo(function CartRow({ item, onAdd, onSub, onRemove, onSetQty }
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2 justify-self-end">
-                    <p className="whitespace-nowrap text-[15px] font-semibold tabular-nums leading-none">Rs {toInr(Number(item?.price || 0) * qty)}</p>
+                    <p className="whitespace-nowrap text-[15px] font-bold text-[color:var(--app-text)] tabular-nums leading-none">Rs {toInr(Number(item?.price || 0) * qty)}</p>
                     <button
                         type="button"
                         onClick={() => onRemove?.(item)}
@@ -882,7 +882,7 @@ export default function NewOrder() {
                                 >
                                     <ArrowLeft size={16} />
                                 </button>
-                                <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
+                                <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-[color:var(--app-text)]">
                                     <UtensilsCrossed size={18} className="theme-accent-text" />
                                     Billing Desk
                                 </h1>
@@ -892,14 +892,14 @@ export default function NewOrder() {
                                 </p>
                             </div>
 
-                            <div className="theme-panel new-order-borderless flex w-full items-center gap-2 rounded-3xl border border-white/10 bg-black/10 px-4 py-3 lg:mx-0 lg:max-w-[520px]">
+                            <div className="theme-panel new-order-borderless flex w-full items-center gap-2 rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] px-4 py-3 lg:mx-0 lg:max-w-[520px]">
                                 <Search size={18} className="theme-muted" />
                                 <input
                                     ref={searchRef}
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     placeholder="Search items, categories..."
-                                    className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:opacity-60 sm:text-base"
+                                    className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-muted)] sm:text-base"
                                 />
                                 {search.length > 0 && (
                                     <button
@@ -919,7 +919,7 @@ export default function NewOrder() {
                         </div>
 
                         {/* Active Bills / Tabs Section */}
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 border-t border-white/10">
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 border-t border-[color:var(--app-border)]">
                             <button
                                 type="button"
                                 onClick={createNewBill}
@@ -945,30 +945,30 @@ export default function NewOrder() {
                                             className={[
                                                 "group relative flex shrink-0 cursor-pointer items-center gap-3 rounded-2xl border px-3.5 py-2 text-xs font-semibold transition select-none",
                                                 isActive
-                                                    ? "is-active border-amber-500/60 bg-amber-500/10 text-white shadow-lg ring-1 ring-amber-500/30"
+                                                    ? "is-active border-amber-500/60 bg-amber-500/15 text-[color:var(--app-text)] shadow-lg ring-1 ring-amber-500/30 font-bold"
                                                     : isHeld
-                                                      ? "border-amber-400/30 bg-amber-950/20 text-amber-200/90 hover:bg-amber-900/30"
-                                                      : "border-white/10 bg-black/20 text-white/80 hover:bg-white/5 hover:text-white",
+                                                      ? "border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
+                                                      : "border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] text-[color:var(--app-text)] hover:bg-[color:color-mix(in_srgb,var(--app-text)_6%,transparent)]",
                                             ].join(" ")}
                                         >
                                             <span
                                                 className={[
-                                                    "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-extrabold tracking-wider uppercase",
+                                                    "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-extrabold tracking-wider uppercase border",
                                                     isHeld
-                                                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                                        ? "bg-amber-500/20 text-amber-500 border-amber-500/30"
                                                         : isActive
-                                                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                                                          : "bg-white/10 text-white/60",
+                                                          ? "bg-emerald-500/20 text-emerald-500 border-emerald-500/30"
+                                                          : "bg-[color:color-mix(in_srgb,var(--app-text)_10%,transparent)] text-[color:var(--app-muted)] border-[color:var(--app-border)]",
                                                 ].join(" ")}
                                             >
                                                 {isHeld ? "HELD" : "ACTIVE"}
                                             </span>
 
                                             <div className="flex flex-col min-w-0">
-                                                <span className="font-bold text-sm leading-tight flex items-center gap-1.5">
+                                                <span className="font-bold text-sm leading-tight flex items-center gap-1.5 text-[color:var(--app-text)]">
                                                     {bill.billNumber}
                                                     {bill.customerName && (
-                                                        <span className="text-[11px] font-normal opacity-70 truncate max-w-[80px]">
+                                                        <span className="text-[11px] font-normal theme-muted truncate max-w-[80px]">
                                                             ({bill.customerName})
                                                         </span>
                                                     )}
@@ -985,7 +985,7 @@ export default function NewOrder() {
                                                         e.stopPropagation();
                                                         toggleHoldBill(bill.id);
                                                     }}
-                                                    className="theme-soft-button inline-flex h-6 w-6 items-center justify-center rounded-full p-0 text-white/70 hover:text-white hover:bg-white/20"
+                                                    className="theme-soft-button inline-flex h-6 w-6 items-center justify-center rounded-full p-0 text-[color:var(--app-muted)] hover:text-[color:var(--app-text)]"
                                                     title={isHeld ? "Resume bill" : "Hold bill"}
                                                 >
                                                     {isHeld ? <Play size={11} className="fill-current" /> : <Pause size={11} />}
@@ -1001,7 +1001,7 @@ export default function NewOrder() {
                                                             deleteBill(bill.id);
                                                         }
                                                     }}
-                                                    className="theme-soft-button inline-flex h-6 w-6 items-center justify-center rounded-full p-0 text-white/60 hover:text-red-400 hover:bg-red-500/20"
+                                                    className="theme-soft-button inline-flex h-6 w-6 items-center justify-center rounded-full p-0 text-[color:var(--app-muted)] hover:text-red-500 hover:bg-red-500/20"
                                                     title="Close / Cancel bill"
                                                 >
                                                     <X size={12} />
@@ -1022,19 +1022,19 @@ export default function NewOrder() {
                         onSelect={setActiveCategory}
                     />
 
-                    <section className="theme-panel new-order-borderless rounded-3xl border border-white/10 bg-black/10 p-4">
+                    <section className="theme-panel new-order-borderless rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4">
                         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                             <div>
                                 <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Items</p>
-                                <p className="mt-1 text-lg font-semibold">Tap to add</p>
+                                <p className="mt-1 text-lg font-bold text-[color:var(--app-text)]">Tap to add</p>
                             </div>
-                            <p className="theme-muted text-xs">
+                            <p className="theme-muted text-xs font-semibold">
                                 {filteredMenu.length} shown | {menu.length} total
                             </p>
                         </div>
 
                         {menuError && (
-                            <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+                            <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
                                 {menuError}
                             </div>
                         )}
@@ -1058,20 +1058,20 @@ export default function NewOrder() {
             </div>
 
             <div className="lg:pl-4">
-                <aside className="theme-panel new-order-borderless self-start rounded-3xl border border-white/10 bg-black/10 p-4 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:rounded-none">
+                <aside className="theme-panel new-order-borderless self-start rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:rounded-none">
                     <div className="flex items-end justify-between gap-2">
                         <div>
                             <div className="flex items-center gap-2">
                                 <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Cart</p>
-                                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-300">
+                                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500">
                                     {activeBill.billNumber}
                                 </span>
                             </div>
-                            <p className="mt-1 text-lg font-semibold">
+                            <p className="mt-1 text-lg font-bold text-[color:var(--app-text)]">
                                 {totalItems} item{totalItems === 1 ? "" : "s"}
                             </p>
                         </div>
-                        <p className="theme-muted text-sm tabular-nums">Rs {toInr(subtotal)}</p>
+                        <p className="theme-muted text-sm font-semibold tabular-nums">Rs {toInr(subtotal)}</p>
                     </div>
 
                     {/* Optional Customer Information */}
@@ -1081,21 +1081,21 @@ export default function NewOrder() {
                             placeholder="Customer Name"
                             value={customerName}
                             onChange={(e) => setCustomerName(e.target.value)}
-                            className="rounded-xl border border-white/10 bg-black/20 px-3 py-1.5 font-semibold text-white placeholder:text-white/40 outline-none focus:border-amber-500/50"
+                            className="rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] px-3 py-1.5 font-semibold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500/50"
                         />
                         <input
                             type="text"
                             placeholder="Phone Number"
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}
-                            className="rounded-xl border border-white/10 bg-black/20 px-3 py-1.5 font-semibold text-white placeholder:text-white/40 outline-none focus:border-amber-500/50"
+                            className="rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] px-3 py-1.5 font-semibold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500/50"
                         />
                     </div>
 
-                    <div className="mt-4 flex min-h-0 flex-1 flex-col gap-1.5 overflow-auto pr-1 divide-y divide-[#cdb99a]/60">
+                    <div className="mt-4 flex min-h-0 flex-1 flex-col gap-1.5 overflow-auto pr-1 divide-y divide-[color:var(--app-border)]">
                         {cartItems.length === 0 ? (
-                            <div className="new-order-borderless rounded-2xl border border-white/10 bg-black/10 p-6 text-center">
-                                <p className="text-sm font-semibold">No items yet</p>
+                            <div className="new-order-borderless rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_50%,transparent)] p-6 text-center text-[color:var(--app-text)]">
+                                <p className="text-sm font-bold text-[color:var(--app-text)]">No items yet</p>
                                 <p className="theme-muted mt-1 text-xs">Tap items to add them to the cart.</p>
                             </div>
                         ) : (
@@ -1105,8 +1105,8 @@ export default function NewOrder() {
                         )}
                     </div>
 
-                    <div className="mt-4 shrink-0 space-y-3 border-t border-[#cdb99a] pt-4">
-                        <div className="new-order-dividerless mt-0 rounded-2xl border border-white/10 bg-black/10 p-3">
+                    <div className="mt-4 shrink-0 space-y-3 border-t border-[color:var(--app-border)] pt-4">
+                        <div className="new-order-dividerless mt-0 rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] p-3 text-[color:var(--app-text)]">
                             <div className="flex items-center justify-between text-xs">
                                 <span className="theme-muted">Items</span>
                                 <span className="font-semibold tabular-nums">{totalItems}</span>
@@ -1124,7 +1124,7 @@ export default function NewOrder() {
                                 className={[
                                     "rounded-2xl px-2 py-3 text-xs font-bold transition flex items-center justify-center gap-1",
                                     isCurrentHeld
-                                        ? "bg-emerald-600/30 border border-emerald-500/40 text-emerald-200 hover:bg-emerald-600/40"
+                                        ? "bg-emerald-600/30 border border-emerald-500/40 text-emerald-500 hover:bg-emerald-600/40"
                                         : "theme-soft-button",
                                 ].join(" ")}
                                 disabled={placing}
@@ -1164,13 +1164,13 @@ export default function NewOrder() {
             {/* Cancel Bill Confirmation Modal */}
             {billToClose && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-                    <div className="theme-panel new-order-borderless w-full max-w-md rounded-3xl border border-white/10 bg-zinc-900 p-6 text-white shadow-2xl">
-                        <h3 className="text-xl font-bold flex items-center gap-2">
-                            <Trash2 className="text-red-400" size={20} />
+                    <div className="theme-panel new-order-borderless w-full max-w-md rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface,var(--app-bg))] p-6 text-[color:var(--app-text)] shadow-2xl">
+                        <h3 className="text-xl font-bold flex items-center gap-2 text-[color:var(--app-text)]">
+                            <Trash2 className="text-red-500" size={20} />
                             Cancel {billToClose.billNumber}?
                         </h3>
                         <p className="theme-muted mt-2 text-sm">
-                            This bill contains <strong className="text-white">{Object.values(billToClose.cart || {}).reduce((s, i) => s + Math.max(1, Number(i.qty || 1)), 0)} item(s)</strong> totaling <strong className="text-white">Rs {toInr(Object.values(billToClose.cart || {}).reduce((s, i) => s + Number(i.price || 0) * Math.max(1, Number(i.qty || 1)), 0))}</strong>.
+                            This bill contains <strong className="text-[color:var(--app-text)]">{Object.values(billToClose.cart || {}).reduce((s, i) => s + Math.max(1, Number(i.qty || 1)), 0)} item(s)</strong> totaling <strong className="text-[color:var(--app-text)]">Rs {toInr(Object.values(billToClose.cart || {}).reduce((s, i) => s + Number(i.price || 0) * Math.max(1, Number(i.qty || 1)), 0))}</strong>.
                         </p>
                         <p className="theme-muted mt-1 text-xs">
                             Are you sure you want to cancel this bill? All items in this cart will be deleted.

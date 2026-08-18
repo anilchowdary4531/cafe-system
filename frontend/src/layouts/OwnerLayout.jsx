@@ -1185,19 +1185,19 @@ export default function OwnerLayout() {
 
                 {showTableAssignmentStrip && (
                     <div
-                        className={`theme-nav border-b px-3 py-2 sm:px-4 md:px-6 ${
-                            isDashboardRoute ? "flex-1" : ""
+                        className={`theme-nav border-b px-3 py-3 sm:px-4 md:px-6 ${
+                            isDashboardRoute ? "flex-1 min-h-[80vh] flex flex-col justify-start gap-4" : ""
                         }`}
                     >
                         <div
                             className={
-                                isDashboardRoute ? "grid h-full gap-3 xl:grid-cols-4" : "flex flex-col gap-2.5"
+                                isDashboardRoute ? "grid min-h-[80vh] h-full gap-4 xl:grid-cols-4" : "flex flex-col gap-2.5"
                             }
                         >
                             <div
                                 className={
                                     isDashboardRoute
-                                        ? "flex min-h-0 flex-col gap-2.5 xl:col-span-3"
+                                        ? "flex min-h-0 flex-col gap-3 xl:col-span-3"
                                         : ""
                                 }
                             >
@@ -1341,15 +1341,15 @@ export default function OwnerLayout() {
                                                                 ? ` - Managed by ${assignedStaffLabel}`
                                                                 : ""
                                                         }`}
-                                                        className={`theme-table-box relative w-full min-h-[148px] sm:min-h-[162px] flex flex-col justify-between rounded-2xl p-3 pb-8 text-xs transition-all duration-200 shadow-md hover:shadow-xl hover:-translate-y-0.5 state-${tableStateClassToken} ${
+                                                        className={`theme-table-box relative w-full min-h-[220px] sm:min-h-[260px] flex flex-col justify-between rounded-2xl p-4 sm:p-5 pb-9 text-xs transition-all duration-200 shadow-md hover:shadow-xl hover:-translate-y-0.5 state-${tableStateClassToken} ${
                                                             table.isOccupied ? "is-occupied" : ""
                                                         } ${isDropTarget ? "is-drop-target" : ""}`}
                                                     >
-                                                        <div className="flex h-full flex-col">
+                                                        <div className="flex h-full flex-col justify-between">
                                                             <div className="flex items-start justify-between gap-2">
                                                                 <div className="min-w-0">
                                                                     <div className="flex items-center gap-1.5">
-                                                                        <p className="truncate text-lg font-semibold leading-none">
+                                                                        <p className="truncate text-2xl sm:text-3xl font-extrabold leading-none">
                                                                             {tableLabel}
                                                                         </p>
                                                                     </div>
