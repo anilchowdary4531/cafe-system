@@ -57,6 +57,7 @@ export default function Footer() {
                             <li><Link to="/refund-policy" className="hover:text-[color:var(--app-text)] transition">Refund & Cancellation</Link></li>
                             <li><Link to="/shipping-policy" className="hover:text-[color:var(--app-text)] transition">Shipping & Delivery</Link></li>
                             <li><Link to="/help-center" className="hover:text-[color:var(--app-text)] transition">Support & Help Center</Link></li>
+                            <li><Link to="/delete-account" className="text-red-500 font-semibold hover:underline transition">Delete Account</Link></li>
                         </ul>
                     </div>
 
