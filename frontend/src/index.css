@@ -988,9 +988,17 @@ body,
 }
 
 .theme-footer {
-    background: color-mix(in srgb, var(--app-bg) 88%, #000 12%);
+    background: color-mix(in srgb, var(--app-surface-alpha, var(--app-bg)) 95%, #000 5%);
     color: var(--app-text);
     border-color: var(--app-border);
+}
+
+.theme-footer a {
+    color: var(--app-muted);
+}
+
+.theme-footer a:hover {
+    color: var(--app-text);
 }
 
 .theme-login-brand {
