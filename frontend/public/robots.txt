@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Allow: /about-us
+Allow: /contact-us
+Allow: /legal
+Allow: /privacy
+Allow: /terms
+Allow: /refund-policy
+Allow: /shipping-policy
+Allow: /help-center
+Allow: /delete-account
+
+Sitemap: https://www.tiffzy.com/sitemap.xml

@@ -86,9 +86,5 @@ export function RestaurantContextProvider({ children }) {
 }
 
 export function useRestaurantContext() {
-    const ctx = useContext(RestaurantContext);
-    if (!ctx) {
-        throw new Error("useRestaurantContext must be used inside RestaurantContextProvider");
-    }
-    return ctx;
+    return useContext(RestaurantContext) || { restaurantContext: {}, setRestaurantContext: () => {} };
 }

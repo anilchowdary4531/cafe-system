@@ -6,7 +6,17 @@ export default function useCachedGet(
     url,
     { params, ttlMs, staleMs, scope = "public", enabled = true } = {}
 ) {
-    const key = useMemo(() => makeGetCacheKey({ url, params, scope }), [url, params, scope]);
+    const paramsKey = useMemo(() => {
+        if (!params || typeof params !== "object") return String(params || "");
+        try {
+            const keys = Object.keys(params).sort();
+            return JSON.stringify(keys.map((k) => [k, params[k]]));
+        } catch {
+            return String(params);
+        }
+    }, [params]);
+
+    const key = useMemo(() => makeGetCacheKey({ url, params, scope }), [url, paramsKey, scope]);
 
     const [data, setData] = useState(() => {
         const cached = getCacheEntry(key);
@@ -30,7 +40,7 @@ export default function useCachedGet(
         } finally {
             setLoading(false);
         }
-    }, [enabled, key, params, scope, staleMs, ttlMs, url]);
+    }, [enabled, key, paramsKey, scope, staleMs, ttlMs, url]);
 
     useEffect(() => {
         if (!enabled) return undefined;

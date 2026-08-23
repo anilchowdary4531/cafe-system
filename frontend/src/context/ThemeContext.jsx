@@ -50,9 +50,10 @@ export function RestaurantThemeProvider({ children }) {
 }
 
 export function useRestaurantTheme() {
-    const context = useContext(RestaurantThemeContext);
-    if (!context) {
-        throw new Error("useRestaurantTheme must be used inside RestaurantThemeProvider");
-    }
-    return context;
+    return useContext(RestaurantThemeContext) || {
+        activeTheme: { id: "default", tone: "dark" },
+        themeId: "default",
+        themes: restaurantThemes,
+        setThemeId: () => {},
+    };
 }

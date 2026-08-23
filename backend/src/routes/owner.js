@@ -9,10 +9,12 @@ import {
 } from "../services/staffSessionService.js";
 import { resolveMenuPricing } from "../services/menuPricingService.js";
 import { buildPayLaterController } from "../controllers/payLaterController.js";
+import { buildSettlementController } from "../controllers/settlementController.js";
 
 export default async function ownerRoutes(app, deps) {
   const { prisma, buildQrTargetUrl, FRONTEND_URL, STAFF_ACCESS_MODULES, STAFF_ALLOWED_ROLES, normalizeAccess, normalizeDbPermissions, serializeAccess, realtime } = deps;
   const uploadController = buildUploadController();
+  const settlementController = buildSettlementController({ prisma });
   const STAFF_LOGIN_LINK_EXPIRES_IN = process.env.STAFF_LOGIN_LINK_EXPIRES_IN || "30d";
   const LEGACY_ORDER_NO_PATTERN = /^ORD-\d{12,}$/i;
   const toDisplayOrderNo = (order, restaurant) => {
@@ -762,7 +764,7 @@ export default async function ownerRoutes(app, deps) {
     }
   });
 
-  app.get("/owner/:restaurantId/finance", async (req, reply) => {
+  const getFinanceAnalyticsHandler = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const range = String(req.query?.range || "7d").toLowerCase();
@@ -774,14 +776,65 @@ export default async function ownerRoutes(app, deps) {
 
       const now = new Date();
       const fromDate = new Date(now.getTime() - (range === "24h" ? 1 : range === "7d" ? 7 : 30) * 24 * 60 * 60 * 1000);
-      const [restaurant, orders, tables, menuItems, expenses] = await Promise.all([
-        prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { id: true, name: true, slug: true, invoicePrefix: true, upiId: true } }),
-        prisma.order.findMany({ where: { restaurantId, createdAt: { gte: fromDate } }, include: { items: true }, orderBy: { createdAt: "desc" } }),
-        prisma.diningTable.findMany({ where: { restaurantId }, select: { id: true, isActive: true } }),
-        prisma.menuItem.findMany({ where: { restaurantId }, select: { id: true, isAvailable: true } }),
-        prisma.expense.findMany({ where: { restaurantId, spentAt: { gte: fromDate } }, orderBy: { spentAt: "desc" } }),
-      ]);
+
+      // Safe restaurant fetch with fallback for optional bank/UPI columns
+      let restaurant = null;
+      try {
+        restaurant = await prisma.restaurant.findUnique({
+          where: { id: restaurantId },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            invoicePrefix: true,
+            upiId: true,
+            bankAccountNumber: true,
+            bankIfscCode: true,
+            bankAccountName: true,
+            bankName: true,
+          },
+        });
+      } catch (restErr) {
+        console.warn("[OwnerFinance] Detailed restaurant select failed, trying basic select:", restErr.message);
+        restaurant = await prisma.restaurant.findUnique({
+          where: { id: restaurantId },
+          select: { id: true, name: true, slug: true, invoicePrefix: true },
+        }).catch(() => null);
+      }
+
       if (!restaurant) return reply.code(404).send({ message: "Restaurant not found" });
+
+      const [orders, tables, menuItems, expenses] = await Promise.all([
+        prisma.order.findMany({
+          where: { restaurantId, createdAt: { gte: fromDate } },
+          include: { items: true },
+          orderBy: { createdAt: "desc" },
+        }).catch((err) => {
+          console.error("[OwnerFinance] Order query error:", err.message);
+          return [];
+        }),
+        prisma.diningTable.findMany({
+          where: { restaurantId },
+          select: { id: true, isActive: true },
+        }).catch((err) => {
+          console.warn("[OwnerFinance] DiningTable query warning:", err.message);
+          return [];
+        }),
+        prisma.menuItem.findMany({
+          where: { restaurantId },
+          select: { id: true, isAvailable: true },
+        }).catch((err) => {
+          console.warn("[OwnerFinance] MenuItem query warning:", err.message);
+          return [];
+        }),
+        prisma.expense.findMany({
+          where: { restaurantId, spentAt: { gte: fromDate } },
+          orderBy: { spentAt: "desc" },
+        }).catch((err) => {
+          console.warn("[OwnerFinance] Expense query warning:", err.message);
+          return [];
+        }),
+      ]);
 
       let grossSales = 0;
       let netSales = 0;
@@ -794,7 +847,7 @@ export default async function ownerRoutes(app, deps) {
       const paymentSplit = {};
       const statusMix = {};
 
-      const invoices = orders.map((order) => {
+      const invoices = (Array.isArray(orders) ? orders : []).map((order) => {
         const total = Number(order.total || 0);
         const discount = Number(order.discountAmount || 0);
         const taxAmount = Number(order.taxAmount || 0);
@@ -844,7 +897,7 @@ export default async function ownerRoutes(app, deps) {
         };
       });
 
-      const expenseTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+      const expenseTotal = (Array.isArray(expenses) ? expenses : []).reduce((sum, expense) => sum + Number(expense?.amount || 0), 0);
       const operatingProfit = netSales - expenseTotal;
       const collectionEfficiency = grossSales > 0 ? (paidAmount / grossSales) * 100 : 0;
       const marginPct = netSales > 0 ? (operatingProfit / netSales) * 100 : 0;
@@ -876,30 +929,62 @@ export default async function ownerRoutes(app, deps) {
         },
         paymentSplit: Object.entries(paymentSplit).map(([mode, amount]) => ({ mode, amount })).sort((a, b) => b.amount - a.amount),
         statusMix: Object.entries(statusMix).map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count),
-        expenses,
+        expenses: Array.isArray(expenses) ? expenses : [],
         invoices,
       };
     } catch (err) {
-      console.log(err);
+      console.error("[OwnerFinance] Error fetching finance analytics:", err);
       return reply.code(500).send({ message: "Failed to fetch finance analytics" });
     }
-  });
+  };
+
+  app.get("/owner/:restaurantId/finance", getFinanceAnalyticsHandler);
+  app.get("/api/owner/:restaurantId/finance", getFinanceAnalyticsHandler);
+
+  // SETTLEMENT DASHBOARD ENDPOINTS
+  app.get("/owner/:restaurantId/settlements/summary", settlementController.getSummary);
+  app.get("/api/owner/:restaurantId/settlements/summary", settlementController.getSummary);
+  app.get("/owner/:restaurantId/settlements/orders", settlementController.getOrders);
+  app.get("/api/owner/:restaurantId/settlements/orders", settlementController.getOrders);
+  app.get("/owner/:restaurantId/settlements/export/csv", settlementController.exportCsv);
+  app.get("/api/owner/:restaurantId/settlements/export/csv", settlementController.exportCsv);
+  app.get("/owner/:restaurantId/settlements/export/pdf", settlementController.exportPdf);
+  app.get("/api/owner/:restaurantId/settlements/export/pdf", settlementController.exportPdf);
 
   app.get("/owner/:restaurantId/settings", async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
-      const restaurant = await prisma.restaurant.findUnique({
-        where: { id: restaurantId },
-        select: {
-          id: true, name: true, legalName: true, slug: true, ownerName: true, email: true, phone: true, upiId: true,
-          addressLine1: true, city: true, state: true, country: true, pincode: true, gstNumber: true, logoUrl: true,
-          bannerUrl: true, brandColor: true, faviconUrl: true,
-          timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
-          serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
-          isActive: true, updatedAt: true,
-        },
-      });
+
+      let restaurant = null;
+      try {
+        restaurant = await prisma.restaurant.findUnique({
+          where: { id: restaurantId },
+          select: {
+            id: true, name: true, legalName: true, slug: true, ownerName: true, email: true, phone: true, upiId: true,
+            bankAccountNumber: true, bankIfscCode: true, bankAccountName: true, bankName: true,
+            addressLine1: true, city: true, state: true, country: true, pincode: true, gstNumber: true, logoUrl: true,
+            bannerUrl: true, brandColor: true, faviconUrl: true,
+            timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
+            serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
+            isActive: true, updatedAt: true,
+          },
+        });
+      } catch (err) {
+        console.warn("[OwnerSettings] Detailed select failed, trying basic select:", err.message);
+        restaurant = await prisma.restaurant.findUnique({
+          where: { id: restaurantId },
+          select: {
+            id: true, name: true, legalName: true, slug: true, ownerName: true, email: true, phone: true,
+            addressLine1: true, city: true, state: true, country: true, pincode: true, gstNumber: true, logoUrl: true,
+            bannerUrl: true, brandColor: true, faviconUrl: true,
+            timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
+            serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
+            isActive: true, updatedAt: true,
+          },
+        });
+      }
+
       if (!restaurant) return reply.code(404).send({ message: "Restaurant not found" });
       return { restaurant: { ...restaurant, logo: restaurant.logoUrl || "", logoUrl: undefined } };
     } catch (err) {
@@ -915,6 +1000,7 @@ export default async function ownerRoutes(app, deps) {
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
       const updates = {
         name: body.name, legalName: body.legalName, ownerName: body.ownerName, email: body.email, phone: body.phone, upiId: body.upiId,
+        bankAccountNumber: body.bankAccountNumber, bankIfscCode: body.bankIfscCode, bankAccountName: body.bankAccountName, bankName: body.bankName,
         addressLine1: body.addressLine1, city: body.city, state: body.state, country: body.country, pincode: body.pincode,
         gstNumber: body.gstNumber, logoUrl: body.logo, bannerUrl: body.bannerUrl, brandColor: body.brandColor, faviconUrl: body.faviconUrl,
         timezone: body.timezone, currency: body.currency, taxEnabled: body.taxEnabled,
@@ -949,18 +1035,39 @@ export default async function ownerRoutes(app, deps) {
         if (filteredData[key] !== undefined) filteredData[key] = Boolean(filteredData[key]);
       });
 
-      const updated = await prisma.restaurant.update({
-        where: { id: restaurantId },
-        data: filteredData,
-        select: {
-          id: true, name: true, legalName: true, slug: true, ownerName: true, email: true, phone: true, upiId: true,
-          addressLine1: true, city: true, state: true, country: true, pincode: true, gstNumber: true, logoUrl: true,
-          bannerUrl: true, brandColor: true, faviconUrl: true,
-          timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
-          serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
-          isActive: true, updatedAt: true,
-        },
-      });
+      let updated = null;
+      try {
+        updated = await prisma.restaurant.update({
+          where: { id: restaurantId },
+          data: filteredData,
+          select: {
+            id: true, name: true, legalName: true, slug: true, ownerName: true, email: true, phone: true, upiId: true,
+            addressLine1: true, city: true, state: true, country: true, pincode: true, gstNumber: true, logoUrl: true,
+            bannerUrl: true, brandColor: true, faviconUrl: true,
+            timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
+            serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
+            isActive: true, updatedAt: true,
+          },
+        });
+      } catch (err) {
+        console.warn("[OwnerSettings] Detailed update failed, trying fallback update:", err.message);
+        const problematicFields = ["upiId", "bankAccountNumber", "bankIfscCode", "bankAccountName", "bankName"];
+        const safeData = { ...filteredData };
+        problematicFields.forEach((f) => delete safeData[f]);
+
+        updated = await prisma.restaurant.update({
+          where: { id: restaurantId },
+          data: safeData,
+          select: {
+            id: true, name: true, legalName: true, slug: true, ownerName: true, email: true, phone: true,
+            addressLine1: true, city: true, state: true, country: true, pincode: true, gstNumber: true, logoUrl: true,
+            bannerUrl: true, brandColor: true, faviconUrl: true,
+            timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
+            serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
+            isActive: true, updatedAt: true,
+          },
+        });
+      }
       return { message: "Settings updated", restaurant: { ...updated, logo: updated.logoUrl || "", logoUrl: undefined } };
     } catch (err) {
       console.log(err);

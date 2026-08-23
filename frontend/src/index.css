@@ -365,40 +365,7 @@ body,
     color: var(--app-text);
 }
 
-.new-order-no-boxes .new-order-borderless {
-    border: 0 !important;
-    box-shadow: none !important;
-    background: transparent !important;
-}
 
-.new-order-no-boxes .new-order-dividerless {
-    border-top: 0 !important;
-}
-
-.new-order-paper {
-    background:
-        radial-gradient(1200px 520px at 18% -12%, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0) 68%),
-        linear-gradient(180deg, #f4ede1 0%, #efe5d6 100%);
-}
-
-.new-order-paper .theme-nav {
-    background: color-mix(in srgb, #f7f0e3 94%, transparent);
-    border-color: color-mix(in srgb, #bca889 40%, transparent);
-}
-
-.new-order-paper .theme-pos-choice {
-    border-color: color-mix(in srgb, #c8b79e 55%, transparent);
-    background: color-mix(in srgb, #f8f1e6 92%, transparent);
-}
-
-.new-order-paper .theme-pos-choice:hover {
-    background: color-mix(in srgb, #f2e7d6 82%, transparent);
-}
-
-.new-order-paper .theme-soft-button {
-    border-color: color-mix(in srgb, #c8b79e 55%, transparent);
-    background: color-mix(in srgb, #f7efe2 90%, transparent);
-}
 
 .kitchen-paper-page {
     --kitchen-ink: #392315;
@@ -988,9 +955,17 @@ body,
 }
 
 .theme-footer {
-    background: color-mix(in srgb, var(--app-bg) 88%, #000 12%);
+    background: color-mix(in srgb, var(--app-surface-alpha, var(--app-bg)) 95%, #000 5%);
     color: var(--app-text);
     border-color: var(--app-border);
+}
+
+.theme-footer a {
+    color: var(--app-muted);
+}
+
+.theme-footer a:hover {
+    color: var(--app-text);
 }
 
 .theme-login-brand {

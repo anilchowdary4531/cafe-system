@@ -15,6 +15,7 @@ import EditProfileSection from "./customer/profile/EditProfileSection";
 import PayLaterSection from "./customer/profile/PayLaterSection";
 import PayLaterDetailSection from "./customer/profile/PayLaterDetailSection";
 import CustomerNotifications from "./customer/profile/CustomerNotifications";
+import DeleteAccountSection from "./customer/profile/DeleteAccountSection";
 
 const formatMoney = (value) => `Rs ${Math.round(Number(value || 0))}`;
 const formatStatus = (status) => {
@@ -64,7 +65,7 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
         return { title, subtitle, phone };
     }, [profile?.email, profile?.name, profile?.phone]);
     const profileExtras = useMemo(() => getCustomerProfileExtras(sidebarMeta.phone), [sidebarMeta.phone]);
-    const avatarDataUrl = String(profileExtras?.avatarDataUrl || "").trim();
+    const avatarDataUrl = String(profile?.avatarUrl || profileExtras?.avatarDataUrl || "").trim();
 
     const activeSection = String(section || "overview").toLowerCase();
     const isOverviewPage = activeSection === "overview";
@@ -89,9 +90,12 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
             ? "Favorites"
             : activeSection === "settings"
             ? "Settings"
+            : activeSection === "delete-account"
+            ? "Delete account"
             : "Profile";
 
     const sectionNode = (() => {
+        if (activeSection === "delete-account") return <DeleteAccountSection />;
         if (activeSection === "ordersdetail") return <OrderDetailsPage />;
         if (activeSection === "orders") return <OrdersSection />;
         if (activeSection === "addresses") {

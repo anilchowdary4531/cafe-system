@@ -23,6 +23,7 @@ import { useCart } from "../../context/CartContext";
 import { useRestaurantContext } from "../../context/RestaurantContext";
 import CartDrawer from "../../components/CartDrawer";
 import BrandLogo from "../../components/BrandLogo";
+import Footer from "../../components/Footer";
 import VegModeToggle from "../../components/VegModeToggle";
 import useCachedGet from "../../hooks/useCachedGet";
 import { useAuth } from "../../context/AuthContext";
@@ -192,8 +193,8 @@ export default function RestaurantMenu() {
     const { addToCart, cart, total } = useCart();
 
     const { data, loading } = useCachedGet(`/r/${slug}/menu`, {
-        ttlMs: 2 * 60_000,
-        staleMs: 30 * 60_000,
+        ttlMs: 5_000,
+        staleMs: 15_000,
         scope: `restaurant:${slug}`,
     });
     const restaurant = data?.restaurant || null;
@@ -243,7 +244,6 @@ export default function RestaurantMenu() {
             name: data.restaurant.name || null,
             slug: data.restaurant.slug || slug || null,
             logo: data.restaurant.logo || data.restaurant.logoUrl || restaurantContext?.logo || null,
-            upiId: data.restaurant.upiId || null,
             tableNo: tableNo || null,
         });
     }, [data?.restaurant, restaurantContext?.logo, setRestaurantContext, slug, tableNo]);
@@ -615,6 +615,7 @@ export default function RestaurantMenu() {
                 </button>
             )}
 
+            <Footer />
             <CartDrawer open={cartOpen} setOpen={setCartOpen} />
         </div>
     );

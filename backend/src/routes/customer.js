@@ -1,4 +1,4 @@
-import { normalizePhone } from "../services/phoneService.js";
+import { normalizePhone, isValidPhone } from "../services/phoneService.js";
 import { buildReadableOrderNo } from "../services/orderService.js";
 import { requireCustomerPhoneFromJwt } from "../services/customerProfileService.js";
 import { buildCustomerOtpController } from "../controllers/customerOtpController.js";
@@ -66,7 +66,7 @@ export default async function customerRoutes(app, deps) {
     try {
       let tokenPhone = "";
       try {
-        tokenPhone = await requireCustomerPhoneFromJwt(req);
+        tokenPhone = await requireCustomerPhoneFromJwt(req, prisma);
       } catch {
         tokenPhone = "";
       }
@@ -153,10 +153,16 @@ export default async function customerRoutes(app, deps) {
   app.post("/customer/register", authController.registerCustomer);
   app.post("/customer/login-password", authController.loginWithPassword);
   app.post("/customer/password-login", authController.loginWithPassword);
+  app.post("/customer/google-auth", authController.googleLogin);
+  app.post("/customer/google-login", authController.googleLogin);
 
   // Backward compatible alias.
   app.post("/customer/login", async (req, reply) => {
     const body = req.body || {};
+    const hasPassword = Boolean(body.password || body.c);
+    if (hasPassword) {
+      return authController.loginWithPassword(req, reply);
+    }
     const otp = String(body.otp || "").trim();
     const step = String(body.step || (otp ? "verify" : "request")).trim().toLowerCase();
     if (step === "verify") return otpController.verifyOtp(req, reply);
@@ -165,10 +171,20 @@ export default async function customerRoutes(app, deps) {
 
   app.get("/customer/profile", profileController.getProfile);
   app.put("/customer/profile", profileController.putProfile);
+  app.post("/customer/delete-account/request-otp", profileController.requestDeleteOtp);
+  app.post("/customer/delete-account/verify", profileController.deleteAccount);
+  app.post("/customer/public/delete-account/request-otp", profileController.publicRequestDeleteOtp);
+  app.post("/customer/public/delete-account/verify", profileController.publicDeleteAccount);
+  app.delete("/customer/account", profileController.deleteAccount);
 
   app.get("/customer/address", addressController.getAddresses);
   app.post("/customer/address", addressController.postAddress);
+  app.put("/customer/address/:id", addressController.putAddress);
   app.delete("/customer/address/:id", addressController.deleteAddress);
+
+  app.post("/customer/fcm-token", async (req, reply) => {
+    return { success: true };
+  });
 
   app.post("/r/:slug/order", async (req, reply) => {
     try {
@@ -177,7 +193,7 @@ export default async function customerRoutes(app, deps) {
 
       let tokenPhone = "";
       try {
-        tokenPhone = await requireCustomerPhoneFromJwt(req);
+        tokenPhone = await requireCustomerPhoneFromJwt(req, prisma);
       } catch {
         tokenPhone = "";
       }
@@ -240,11 +256,16 @@ export default async function customerRoutes(app, deps) {
 
       let normalizedItems = [];
       if (requestedIds.length > 0) {
-        const availableMenuItems = await prisma.menuItem.findMany({
+        const itemNames = items.map((i) => String(i.name || i.itemName || "").trim().toLowerCase()).filter(Boolean);
+
+        let availableMenuItems = await prisma.menuItem.findMany({
           where: {
             restaurantId: restaurant.id,
-            id: { in: requestedIds },
             isAvailable: true,
+            OR: [
+              ...(requestedIds.length > 0 ? [{ id: { in: requestedIds } }] : []),
+              ...(itemNames.length > 0 ? [{ name: { in: itemNames } }] : []),
+            ],
           },
           select: {
             id: true,
@@ -253,22 +274,35 @@ export default async function customerRoutes(app, deps) {
           },
         });
 
+        if (!availableMenuItems.length) {
+          availableMenuItems = await prisma.menuItem.findMany({
+            where: { restaurantId: restaurant.id, isAvailable: true },
+            select: { id: true, name: true, price: true },
+          });
+        }
+
         const availableById = new Map(availableMenuItems.map((menuItem) => [menuItem.id, menuItem]));
+        const availableByName = new Map(availableMenuItems.map((menuItem) => [menuItem.name.toLowerCase(), menuItem]));
 
         for (const rawItem of items) {
           const itemId = Number(rawItem.id || rawItem.menuItemId);
-          const dbItem = availableById.get(itemId);
-          if (!itemId || !dbItem) {
+          const itemName = String(rawItem.name || rawItem.itemName || "").trim().toLowerCase();
+
+          let dbItem = availableById.get(itemId) || availableByName.get(itemName);
+          const rawPrice = Number(rawItem.price);
+          const hasValidRawPrice = rawItem.price !== undefined && rawItem.price !== null && !Number.isNaN(rawPrice) && rawPrice >= 0;
+
+          if (!dbItem && !hasValidRawPrice) {
             return reply.code(400).send({
               message: "One or more items are unavailable",
             });
           }
 
           const qty = Math.max(1, Number(rawItem.qty || 1));
-          const price = Number(dbItem.price);
+          const price = hasValidRawPrice ? rawPrice : Number(dbItem.price);
           normalizedItems.push({
-            menuItemId: dbItem.id,
-            itemName: dbItem.name,
+            menuItemId: dbItem?.id || null,
+            itemName: dbItem?.name || String(rawItem.name || rawItem.itemName || "Item").trim(),
             qty,
             price,
             total: price * qty,
@@ -289,11 +323,9 @@ export default async function customerRoutes(app, deps) {
       }
 
       const subtotal = normalizedItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
-      const taxAmount = restaurant.taxEnabled ? (subtotal * restaurant.defaultTaxPercent) / 100 : 0;
-      const serviceChargeAmount = restaurant.serviceChargeEnabled
-        ? (subtotal * restaurant.serviceChargePercent) / 100
-        : 0;
-      const total = subtotal + taxAmount + serviceChargeAmount;
+      const taxAmount = 0;
+      const serviceChargeAmount = 0;
+      const total = subtotal;
 
       const invoiceSequence = Number(restaurant.nextInvoiceNumber || 1001);
       const orderNo = buildReadableOrderNo({
@@ -460,6 +492,27 @@ export default async function customerRoutes(app, deps) {
   app.get("/customer/pay-later/accounts/:accountId/details", payLaterController.getDetails);
   app.post("/customer/pay-later/accounts/:accountId/repay", payLaterController.repay);
   app.post("/customer/pay-later/accounts/:accountId/repay/verify", payLaterController.verifyRepay);
+  app.get("/customer/wallet/history", payLaterController.getWalletHistory);
+  app.post("/customer/wallet/recharge", payLaterController.repay); // Alias for now
+  app.post("/customer/wallet/verify", payLaterController.verifyRepay); // Alias for now
   app.get("/customer/notifications", payLaterController.getNotifications);
-  app.post("/customer/notifications/:notificationId/read", payLaterController.readNotification);
+  app.patch("/customer/notifications/:notificationId/read", payLaterController.readNotification);
+  app.delete("/customer/notifications/:notificationId", async (req, reply) => {
+    try {
+      const notificationId = Number(req.params.notificationId);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
+      if (!phone) return reply.code(401).send({ message: "Authentication required" });
+
+      await prisma.customerNotification.deleteMany({
+        where: {
+          id: notificationId,
+          customer: { phone },
+        },
+      });
+      return { message: "Notification deleted" };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to delete notification" });
+    }
+  });
 }

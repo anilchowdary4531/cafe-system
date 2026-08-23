@@ -16,6 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import { cachedGet } from "../utils/apiClient";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
+import Footer from "../components/Footer";
 
 const categoryData = [
     { name: "All", image: "https://cdn-icons-png.flaticon.com/512/3075/3075977.png" },
@@ -401,6 +402,7 @@ export default function Menu() {
                     )}
                 </div>
             </div>
+            <Footer />
         </div>
     );
 }

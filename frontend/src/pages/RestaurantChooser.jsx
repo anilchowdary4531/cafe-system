@@ -95,8 +95,8 @@ export default function RestaurantChooser() {
             limit: INITIAL_RESTAURANT_LIMIT,
             offset: 0,
         },
-        ttlMs: 5 * 60_000,
-        staleMs: 30 * 60_000,
+        ttlMs: 5_000,
+        staleMs: 15_000,
     });
 
     const browseRestaurants = normalizeRestaurantList(restaurantData) || [];
@@ -138,12 +138,12 @@ export default function RestaurantChooser() {
             restaurantLimit: SEARCH_RESTAURANT_LIMIT,
             itemLimit: searchEnabled ? SEARCH_ITEM_LIMIT : FEED_ITEM_LIMIT,
         },
-        ttlMs: 2 * 60_000,
-        staleMs: 10 * 60_000,
+        ttlMs: 5_000,
+        staleMs: 15_000,
     });
 
     const visibleItems = Array.isArray(catalogData?.items)
-        ? catalogData.items.filter((item) => !vegModeEnabled || isVegModeItem(item))
+        ? catalogData.items.filter((item) => !vegModeEnabled || (typeof isVegModeItem === "function" ? isVegModeItem(item) : true))
         : [];
     const itemSections = useMemo(() => {
         const groups = new Map();

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { normalizePhone } from "./phoneService.js";
+import { normalizePhone, getPhoneVariants } from "./phoneService.js";
 import { toSubunit } from "./moneyService.js";
 
 const razorpayAuthHeader = () => {
@@ -49,14 +49,51 @@ const createRazorpayOrder = async ({ amountSubunit, currency, receipt, notes }) 
   return { keyId: auth.keyId, order: payload };
 };
 
+/**
+ * Calculates loyalty points based on repayment timing relative to a ₹500 base amount:
+ * - Paid within 15 days: +20 points per ₹500
+ * - Paid within 30 days (16-30 days): +10 points per ₹500
+ * - After 30 days: -3 points per week overdue per ₹500
+ * Point values scale dynamically with repaid/pending amount (amount / 500).
+ */
+export const calculatePayLaterLoyaltyPoints = ({ repaidAmount, creditDate, paymentDate = new Date() }) => {
+  const amount = Number(repaidAmount || 0);
+  if (amount <= 0) return 0;
+
+  const start = creditDate ? new Date(creditDate) : new Date();
+  const end = new Date(paymentDate);
+  const diffTime = Math.max(0, end.getTime() - start.getTime());
+  const daysElapsed = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  // Multiplier relative to base ₹500
+  const multiplier = amount / 500;
+
+  if (daysElapsed <= 15) {
+    // Paid within 15 days -> +20 points per ₹500
+    return Math.max(1, Math.round(20 * multiplier));
+  } else if (daysElapsed <= 30) {
+    // Paid within 16 to 30 days -> +10 points per ₹500
+    return Math.max(1, Math.round(10 * multiplier));
+  } else {
+    // Overdue after 30 days -> -3 points per week overdue per ₹500
+    const overdueDays = daysElapsed - 30;
+    const overdueWeeks = Math.max(1, Math.floor(overdueDays / 7));
+    const pointsDeducted = Math.round(3 * overdueWeeks * multiplier);
+    return -pointsDeducted;
+  }
+};
+
 export const checkPayLaterEligibility = async ({ prisma, phone, restaurantSlug }) => {
   const normPhone = normalizePhone(phone);
-  if (!normPhone) return { eligible: false };
+  const variants = getPhoneVariants(phone);
+  if (!normPhone && variants.length === 0) return { eligible: false };
 
   const account = await prisma.payLaterAccount.findFirst({
     where: {
-      customer: { phone: normPhone },
       restaurant: { slug: restaurantSlug },
+      customer: {
+        phone: { in: variants },
+      },
     },
     select: { id: true, status: true, pendingBalance: true },
   });
@@ -70,7 +107,8 @@ export const checkPayLaterEligibility = async ({ prisma, phone, restaurantSlug }
 
 export const addCustomerToPayLater = async ({ prisma, restaurantId, phone, actor }) => {
   const normPhone = normalizePhone(phone);
-  if (!normPhone) {
+  const variants = getPhoneVariants(phone);
+  if (!normPhone && variants.length === 0) {
     const err = new Error("invalid_phone");
     err.code = "invalid_phone";
     throw err;
@@ -83,9 +121,14 @@ export const addCustomerToPayLater = async ({ prisma, restaurantId, phone, actor
     throw err;
   }
 
-  // 2. Look up global CustomerAccount
-  const globalAccount = await prisma.customerAccount.findUnique({
-    where: { phone: normPhone },
+  // 2. Look up global CustomerAccount by phone variants or email
+  let globalAccount = await prisma.customerAccount.findFirst({
+    where: {
+      OR: [
+        { phone: { in: variants } },
+        ...(phone?.includes("@") ? [{ email: phone.toLowerCase() }] : []),
+      ],
+    },
   });
 
   if (!globalAccount) {
@@ -94,16 +137,24 @@ export const addCustomerToPayLater = async ({ prisma, restaurantId, phone, actor
     throw err;
   }
 
+  const matchedPhone = globalAccount.phone || normPhone;
+
   // 3. Upsert restaurant-scoped Customer record
-  let customer = await prisma.customer.findUnique({
-    where: { restaurantId_phone: { restaurantId, phone: normPhone } },
+  let customer = await prisma.customer.findFirst({
+    where: {
+      restaurantId,
+      OR: [
+        { phone: { in: getPhoneVariants(matchedPhone) } },
+        ...(globalAccount.email ? [{ email: globalAccount.email }] : []),
+      ],
+    },
   });
 
   if (!customer) {
     customer = await prisma.customer.create({
       data: {
         restaurantId,
-        phone: normPhone,
+        phone: matchedPhone,
         name: globalAccount.name,
         email: globalAccount.email,
       },
@@ -166,16 +217,64 @@ export const getRestaurantPayLaterCustomers = async ({ prisma, restaurantId, act
   }));
 };
 
-export const getCustomerPayLaterAccounts = async ({ prisma, phone }) => {
-  const normPhone = normalizePhone(phone);
-  if (!normPhone) return [];
+export const getCustomerPayLaterAccounts = async ({ prisma, phone, customerAccountId }) => {
+  let customerAccount = null;
+
+  if (customerAccountId) {
+    customerAccount = await prisma.customerAccount.findUnique({
+      where: { id: Number(customerAccountId) },
+    });
+  }
+
+  if (!customerAccount && phone) {
+    const variants = getPhoneVariants(phone);
+    customerAccount = await prisma.customerAccount.findFirst({
+      where: {
+        OR: [
+          { phone: { in: variants } },
+          ...(phone.includes("@") ? [{ email: phone.toLowerCase() }] : []),
+        ],
+      },
+    });
+  }
+
+  const phoneVariantsSet = new Set();
+  const emailSet = new Set();
+
+  if (phone) {
+    getPhoneVariants(phone).forEach((v) => phoneVariantsSet.add(v));
+    if (phone.includes("@")) emailSet.add(phone.toLowerCase());
+  }
+
+  if (customerAccount) {
+    if (customerAccount.phone) {
+      getPhoneVariants(customerAccount.phone).forEach((v) => phoneVariantsSet.add(v));
+      if (customerAccount.phone.includes("@")) emailSet.add(customerAccount.phone.toLowerCase());
+    }
+    if (customerAccount.email) {
+      emailSet.add(customerAccount.email.toLowerCase());
+    }
+  }
+
+  const phoneList = Array.from(phoneVariantsSet);
+  const emailList = Array.from(emailSet);
+
+  if (phoneList.length === 0 && emailList.length === 0) return [];
 
   const accounts = await prisma.payLaterAccount.findMany({
     where: {
-      customer: { phone: normPhone },
       status: "ACTIVE",
+      customer: {
+        OR: [
+          ...(phoneList.length > 0 ? [{ phone: { in: phoneList } }] : []),
+          ...(emailList.length > 0 ? [{ email: { in: emailList } }] : []),
+        ],
+      },
     },
     include: {
+      customer: {
+        select: { id: true, rewardPoints: true },
+      },
       restaurant: {
         select: { id: true, name: true, slug: true },
       },
@@ -190,6 +289,7 @@ export const getCustomerPayLaterAccounts = async ({ prisma, phone }) => {
     totalBorrowed: acc.totalBorrowed,
     totalPaid: acc.totalPaid,
     pendingBalance: acc.pendingBalance,
+    rewardPoints: acc.customer?.rewardPoints || 0,
   }));
 };
 
@@ -223,7 +323,16 @@ export const getPayLaterAccountDetails = async ({ prisma, accountId, actor }) =>
 
   // Auth check: Customer must match the account owner. Staff must belong to the restaurant.
   if (actor.type === "customer") {
-    if (normalizePhone(account.customer.phone) !== normalizePhone(actor.phone)) {
+    const actorVariants = new Set(getPhoneVariants(actor.phone));
+    if (actor.email) actorVariants.add(actor.email.toLowerCase());
+
+    const isOwner =
+      actorVariants.has(account.customer.phone) ||
+      (account.customer.email && actorVariants.has(account.customer.email.toLowerCase())) ||
+      (actor.phone && normalizePhone(account.customer.phone).includes(normalizePhone(actor.phone))) ||
+      (actor.phone && normalizePhone(actor.phone).includes(normalizePhone(account.customer.phone)));
+
+    if (!isOwner) {
       const err = new Error("access_denied");
       err.code = "access_denied";
       throw err;
@@ -291,6 +400,7 @@ export const adjustPayLaterBalance = async ({ prisma, restaurantId, customerId, 
     let borrowDelta = 0;
     let payDelta = 0;
     let balanceDelta = 0;
+    let pointsDelta = 0;
 
     if (type === "MANUAL_CREDIT") {
       borrowDelta = cleanAmount;
@@ -298,9 +408,29 @@ export const adjustPayLaterBalance = async ({ prisma, restaurantId, customerId, 
     } else if (type === "OFFLINE_REPAYMENT") {
       payDelta = cleanAmount;
       balanceDelta = -cleanAmount;
+
+      const oldestCredit = await tx.payLaterTransaction.findFirst({
+        where: {
+          accountId: account.id,
+          status: "SUCCESS",
+          type: { in: ["MANUAL_CREDIT", "FOOD_ORDER", "ADJUSTMENT"] },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+      const creditDate = oldestCredit?.createdAt || account.createdAt;
+      pointsDelta = calculatePayLaterLoyaltyPoints({ repaidAmount: cleanAmount, creditDate });
     } else if (type === "ADJUSTMENT") {
       borrowDelta = cleanAmount;
       balanceDelta = cleanAmount;
+    }
+
+    if (pointsDelta !== 0 && account.customerId) {
+      const currentPoints = Number(account.customer?.rewardPoints || 0);
+      const newPoints = Math.max(0, currentPoints + pointsDelta);
+      await tx.customer.update({
+        where: { id: account.customerId },
+        data: { rewardPoints: newPoints },
+      });
     }
 
     const updatedAccount = await tx.payLaterAccount.update({
@@ -312,7 +442,7 @@ export const adjustPayLaterBalance = async ({ prisma, restaurantId, customerId, 
       },
     });
 
-    return { transaction, account: updatedAccount };
+    return { transaction, account: updatedAccount, pointsDelta };
   });
 };
 
@@ -444,6 +574,26 @@ export const verifyPayLaterRepayment = async ({ prisma, accountId, input, actor 
 
   // 3. Mark successful repayment and update balance in a transaction
   return await prisma.$transaction(async (tx) => {
+    const oldestCredit = await tx.payLaterTransaction.findFirst({
+      where: {
+        accountId: account.id,
+        status: "SUCCESS",
+        type: { in: ["MANUAL_CREDIT", "FOOD_ORDER", "ADJUSTMENT"] },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    const creditDate = oldestCredit?.createdAt || account.createdAt;
+    const pointsDelta = calculatePayLaterLoyaltyPoints({ repaidAmount: pendingTx.amount, creditDate });
+
+    if (pointsDelta !== 0 && account.customerId) {
+      const currentPoints = Number(account.customer?.rewardPoints || 0);
+      const newPoints = Math.max(0, currentPoints + pointsDelta);
+      await tx.customer.update({
+        where: { id: account.customerId },
+        data: { rewardPoints: newPoints },
+      });
+    }
+
     const transaction = await tx.payLaterTransaction.update({
       where: { id: pendingTx.id },
       data: {
@@ -460,7 +610,7 @@ export const verifyPayLaterRepayment = async ({ prisma, accountId, input, actor 
       },
     });
 
-    return { transaction, account: updatedAccount };
+    return { transaction, account: updatedAccount, pointsDelta };
   });
 };
 
@@ -534,7 +684,7 @@ export const getCustomerNotifications = async ({ prisma, phone }) => {
   const normPhone = normalizePhone(phone);
   if (!normPhone) return [];
 
-  return prisma.customerNotification.findMany({
+  const dbNotifications = await prisma.customerNotification.findMany({
     where: {
       customer: { phone: normPhone },
     },
@@ -545,6 +695,20 @@ export const getCustomerNotifications = async ({ prisma, phone }) => {
     },
     orderBy: { createdAt: "desc" },
   });
+
+  // Map to the format expected by the Android app
+  return dbNotifications.map((n) => ({
+    id: n.id,
+    title: n.title,
+    body: n.message,
+    type: "promotion", // Default type since it's not in DB yet
+    isRead: n.read,
+    createdAt: n.createdAt,
+    metadata: {
+      restaurantId: String(n.restaurantId),
+      restaurantName: n.restaurant?.name || "",
+    },
+  }));
 };
 
 export const markNotificationRead = async ({ prisma, notificationId, phone }) => {
@@ -572,4 +736,51 @@ export const markNotificationRead = async ({ prisma, notificationId, phone }) =>
     where: { id: notification.id },
     data: { read: true },
   });
+};
+
+export const processWeeklyOverduePayLaterPenalties = async ({ prisma }) => {
+  const overdueAccounts = await prisma.payLaterAccount.findMany({
+    where: {
+      status: "ACTIVE",
+      pendingBalance: { gt: 0 },
+    },
+    include: {
+      customer: true,
+      transactions: {
+        where: { status: "SUCCESS", type: { in: ["MANUAL_CREDIT", "FOOD_ORDER", "ADJUSTMENT"] } },
+        orderBy: { createdAt: "asc" },
+        take: 1,
+      },
+    },
+  });
+
+  const now = new Date();
+  let penalizedCount = 0;
+
+  for (const acc of overdueAccounts) {
+    const creditDate = acc.transactions[0]?.createdAt || acc.createdAt;
+    const diffTime = Math.max(0, now.getTime() - new Date(creditDate).getTime());
+    const daysElapsed = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (daysElapsed > 30) {
+      const overdueDays = daysElapsed - 30;
+      const overdueWeeks = Math.max(1, Math.floor(overdueDays / 7));
+      const multiplier = Number(acc.pendingBalance) / 500;
+      const penaltyPoints = Math.round(3 * overdueWeeks * multiplier);
+
+      if (penaltyPoints > 0 && acc.customerId) {
+        const currentPoints = Number(acc.customer?.rewardPoints || 0);
+        const newPoints = Math.max(0, currentPoints - penaltyPoints);
+
+        await prisma.customer.update({
+          where: { id: acc.customerId },
+          data: { rewardPoints: newPoints },
+        });
+
+        penalizedCount++;
+      }
+    }
+  }
+
+  return { penalizedCount };
 };

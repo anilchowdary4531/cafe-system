@@ -25,6 +25,12 @@ model Restaurant {
   phone String?
   upiId String? @map("upi_id")
 
+  // BANK & SETTLEMENT PAYOUT DETAILS
+  bankAccountNumber String? @map("bank_account_number")
+  bankIfscCode      String? @map("bank_ifsc_code")
+  bankAccountName   String? @map("bank_account_name")
+  bankName          String? @map("bank_name")
+
   // ADDRESS
   addressLine1 String? @map("address_line1")
   city         String?
@@ -302,13 +308,16 @@ model Customer {
 model CustomerAccount {
   id Int @id @default(autoincrement())
 
-  phone String  @unique
+  phone String?  @unique
   username String? @unique
   password String? @map("password_hash")
+  googleId String? @unique @map("google_id")
   name  String?
   email String?
+  avatarUrl String? @map("avatar_url")
 
   addresses CustomerAddress[]
+  payments  Payment[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -316,6 +325,7 @@ model CustomerAccount {
   @@index([phone, createdAt])
   @@index([username])
   @@index([email])
+  @@index([googleId])
   @@map("customer_accounts")
 }
 
@@ -489,28 +499,29 @@ model Branch {
 model Payment {
   id Int @id @default(autoincrement())
 
-  orderId Int   @map("order_id")
-  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  cashfreeOrderId  String? @map("cashfree_order_id")
+  paymentSessionId String? @map("payment_session_id")
 
-  restaurantId Int        @map("restaurant_id")
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customerId   Int?             @map("customer_id")
+  customer     CustomerAccount? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
-  // Amount in smallest currency subunit (e.g., paise)
-  amountSubunit Int    @map("amount_subunit")
-  currency      String @default("INR")
+  restaurantId Int?             @map("restaurant_id")
+  restaurant   Restaurant?      @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
 
-  // CASH / CARD / UPI / ONLINE
-  method String
+  orderId      Int?             @map("order_id")
+  order        Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
-  // PENDING / PAID / FAILED / REFUNDED / PARTIAL
-  status String @default("PENDING")
+  amount        Float   @default(0)
+  amountSubunit Int?    @map("amount_subunit")
+  currency      String  @default("INR")
 
-  // RAZORPAY / STRIPE / OFFLINE
-  provider String? @map("provider")
+  status        String  @default("PENDING")
+  transactionId String? @map("transaction_id")
+  paymentMethod String? @map("payment_method")
+  method        String?
+  provider      String? @default("CASHFREE")
 
-  // External ids
   providerOrderId  String? @map("provider_order_id")
-  transactionId    String? @map("transaction_id")
   providerMetadata Json?   @map("provider_metadata")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -518,6 +529,8 @@ model Payment {
 
   @@index([restaurantId, createdAt])
   @@index([orderId])
+  @@index([cashfreeOrderId])
+  @@index([paymentSessionId])
   @@map("payments")
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import {
     Building2,
@@ -9,6 +10,7 @@ import {
     Save,
     Settings2,
     ShieldCheck,
+    Trash2,
     Upload,
     UserCircle2,
 } from "lucide-react";
@@ -612,6 +614,32 @@ export default function OwnerSettings() {
                     <div className="relative mt-4 max-w-xl overflow-visible">
                         <p className="theme-muted mb-2 text-sm font-semibold">UI Theme</p>
                         <ThemeSelector variant="compact" />
+                    </div>
+                </article>
+
+                <article className="theme-panel overflow-hidden rounded-[28px] border border-red-500/30 bg-red-500/5 p-5 sm:p-6">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-red-500/30 bg-red-500/10 text-red-500">
+                                <Trash2 size={18} />
+                            </span>
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-500">Danger Zone</p>
+                                <h3 className="text-lg font-semibold text-red-500 sm:text-xl">Delete Account</h3>
+                                <p className="theme-muted mt-0.5 text-xs sm:text-sm">
+                                    Permanently delete your account, restaurant data, and access.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="mt-4 pt-2">
+                        <Link
+                            to="/delete-account"
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-2.5 text-sm font-semibold text-red-400 transition hover:bg-red-500/25"
+                        >
+                            <Trash2 size={16} />
+                            Delete Account
+                        </Link>
                     </div>
                 </article>
 

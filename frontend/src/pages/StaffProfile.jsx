@@ -10,6 +10,7 @@ import {
     Phone,
     RefreshCw,
     Sparkles,
+    Trash2,
     UserRound,
     UtensilsCrossed,
 } from "lucide-react";
@@ -636,6 +637,25 @@ export default function StaffProfile() {
                                         </span>
                                     ))
                                 )}
+                            </div>
+                        </article>
+
+                        <article className="rounded-[28px] border border-red-500/20 bg-red-500/5 p-4 shadow-sm">
+                            <div className="flex items-center gap-2 text-red-500">
+                                <Trash2 size={18} />
+                                <h3 className="font-serif text-lg font-bold">Danger Zone</h3>
+                            </div>
+                            <p className="mt-1 text-xs text-[var(--kitchen-muted)]">
+                                Permanently delete your account and profile data.
+                            </p>
+                            <div className="mt-3">
+                                <Link
+                                    to="/delete-account"
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-xs font-bold text-red-500 transition hover:bg-red-500/20"
+                                >
+                                    <Trash2 size={14} />
+                                    Delete Account
+                                </Link>
                             </div>
                         </article>
                     </aside>

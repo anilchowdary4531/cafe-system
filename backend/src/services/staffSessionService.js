@@ -57,6 +57,7 @@ export const issueStaffSession = async ({ prisma, app, user, effectiveRole }) =>
   const sessionVersion = Number(updated.sessionVersion || 0);
   const token = app.jwt.sign({
     id: user.id,
+    phone: user.phone || "",
     role: effectiveRole,
     restaurantId: user.restaurantId || null,
     branchId: user.branchId || null,

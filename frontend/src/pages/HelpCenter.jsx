@@ -1,118 +1,118 @@
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
+import { HelpCircle, Building2, ShieldCheck, Mail, Phone, Search, Trash2, CreditCard, ChevronDown } from "lucide-react";
 
-const sections = [
+const faqs = [
     {
-        title: "Getting Started",
-        paragraphs: [
-            "Welcome to the Tiffzy Help Center. This page is here to help customers, restaurant teams, and business users understand how the platform works and where to go when they need support.",
-            "If you are visiting Tiffzy for the first time, start by choosing a restaurant, opening its menu, and checking whether you want to order for delivery, pickup, or dine-in where supported.",
-        ],
+        q: "Who owns and operates Tiffzy?",
+        a: "Tiffzy is owned and operated by SURVETRA SERVICES. All software, web platforms, and mobile apps published under Tiffzy are commercial products of SURVETRA SERVICES.",
     },
     {
-        title: "For Customers",
-        paragraphs: [
-            "You can browse menus, add items to your cart, sign in to manage your profile, and view your order history from the customer sections of the app.",
-            "If something looks wrong with an order, the fastest next step is to use the contact details on this page so the team can review your issue and guide you through the right support path.",
-        ],
+        q: "How do I place an order via QR Code?",
+        a: "Scan the QR code placed on your restaurant table using your smartphone camera or app scanner. Select menu items, add special instructions, and complete payment on screen.",
     },
     {
-        title: "For Restaurant Teams",
-        paragraphs: [
-            "Staff members can use the billing desk, kitchen tools, server screens, and staff profile pages to manage live restaurant activity.",
-            "Owners and managers can use the owner dashboard, menu studio, tables, kitchen live board, analytics, finance, staff, settings, and notifications to control operations.",
-        ],
+        q: "How do I request a refund for an order?",
+        a: "If an order was debited but failed to prepare or fulfill, contact jekkaramesh@survetra.com or call +91 91777 64632 with your order ID. Approved refunds are credited to your original payment method within 5-7 business days.",
     },
     {
-        title: "Common Questions",
-        paragraphs: [
-            "How do I open a restaurant menu? Use the restaurant link or home screen and navigate into the restaurant-specific menu or ordering flow.",
-            "How do I get help with a payment or refund? Use the support contact details below so the team can review the order and the payment state.",
-            "How do I access business tools? Business users sign in through the appropriate protected route and only see the tools allowed by their role.",
-        ],
+        q: "How do I request deletion of my account?",
+        a: "In compliance with Google Play Policy, you can request account deletion immediately via our Delete Account page (/delete-account) or by emailing jekkaramesh@survetra.com.",
     },
     {
-        title: "Need More Help",
-        paragraphs: [
-            "If your question is not covered here, please reach out using the contact details below. Include as much detail as possible so the team can respond faster, such as your restaurant name, order number, screen name, or the time the problem happened.",
-        ],
+        q: "Is payment information stored securely?",
+        a: "Yes. All payments are processed through PCI-DSS compliant third-party payment gateways. Tiffzy does not store raw credit card numbers or UPI PINs.",
     },
-];
-
-const contactLines = [
-    "Tiffzy",
-    "Website: https://www.tiffzy.com",
-    "Email: rameshnanda@tiffzy.com",
-    "Phone: +91 9177764632",
 ];
 
 export default function HelpCenter() {
+    const [openFaq, setOpenFaq] = useState(null);
+
     return (
-        <div
-            className="min-h-screen"
-            style={{
-                background:
-                    "radial-gradient(circle at top left, rgba(245,185,78,0.10), transparent 26%), radial-gradient(circle at top right, rgba(169,113,48,0.10), transparent 24%), linear-gradient(180deg, var(--app-bg) 0%, color-mix(in srgb, var(--app-bg) 86%, #1a1208 14%) 100%)",
-                color: "var(--app-text)",
-                fontFamily: 'Georgia, "Times New Roman", serif',
-            }}
-        >
-            <main className="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-14">
-                <div className="mb-10 flex items-center justify-between gap-4 text-sm">
-                    <Link
-                        to="/"
-                        className="text-[color:var(--app-primary)] transition hover:text-[color:var(--app-primary-hover)]"
-                    >
-                        Back to Tiffzy
-                    </Link>
-                    <span className="uppercase tracking-[0.35em] text-[color:var(--app-muted)]">Support page</span>
+        <div className="min-h-screen theme-adaptive flex flex-col">
+            <Navbar />
+
+            <main className="flex-1 mx-auto max-w-5xl px-6 py-12 sm:px-8 lg:px-10 w-full">
+                {/* Header */}
+                <div className="space-y-4 border-b border-[var(--app-border,rgba(0,0,0,0.1))] pb-8">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/10 px-3.5 py-1 text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                        <HelpCircle size={14} />
+                        <span>Official Support & Help Center</span>
+                    </div>
+
+                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white sm:text-5xl">
+                        Help & Support Center
+                    </h1>
+                    <p className="max-w-3xl text-base text-gray-600 dark:text-gray-300">
+                        Find answers to common questions, get assistance with orders, or contact the <strong>Tiffzy</strong> customer support desk operated by <strong>SURVETRA SERVICES</strong>.
+                    </p>
                 </div>
 
-                <header className="max-w-4xl">
-                    <p className="text-[11px] uppercase tracking-[0.42em] text-[color:var(--app-primary)]">Help Center</p>
-                    <h1 className="mt-4 text-4xl font-bold leading-tight text-[color:var(--app-text)] sm:text-5xl lg:text-6xl">
-                        Tiffzy Help Center
-                    </h1>
-                    <p className="mt-6 max-w-3xl text-lg leading-8 text-[color:var(--app-muted-strong)] sm:text-xl">
-                        This page is written for real Tiffzy users who need quick help with ordering, restaurant tools,
-                        staff workflows, and account support.
+                {/* Legal Entity Ownership Callout */}
+                <div className="my-8 rounded-3xl bg-amber-500/10 p-6 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-2">
+                    <div className="flex items-center gap-3">
+                        <Building2 className="text-amber-600 dark:text-amber-400 shrink-0" size={24} />
+                        <h2 className="text-lg font-bold">Official Business Notice</h2>
+                    </div>
+                    <p className="text-sm leading-relaxed">
+                        <strong>Tiffzy is owned and operated by SURVETRA SERVICES.</strong> Customer support tickets, payment resolutions, and partner inquiries are serviced by <strong>SURVETRA SERVICES</strong>.
                     </p>
-                </header>
+                </div>
 
-                <section className="mt-12 border-t border-[color:var(--app-border)] pt-8">
-                    <p className="text-sm uppercase tracking-[0.32em] text-[color:var(--app-muted)]">Support overview</p>
-                    <p className="mt-4 max-w-4xl text-[17px] leading-8 text-[color:var(--app-muted-strong)]">
-                        Tiffzy support is organized to help both sides of the platform. Customers can get help with browsing,
-                        ordering, and account issues, while restaurant teams can get guidance on live operations, billing,
-                        kitchen flow, and owner tools.
-                    </p>
-                </section>
+                {/* FAQ Accordion */}
+                <div className="space-y-6 my-10">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Frequently Asked Questions</h2>
 
-                <article className="mt-12 space-y-12">
-                    {sections.map((section) => (
-                        <section key={section.title} className="max-w-4xl">
-                            <h2 className="text-2xl font-bold text-[color:var(--app-text)]">{section.title}</h2>
-                            <div className="mt-4 space-y-5 text-[17px] leading-8 text-[color:var(--app-muted-strong)]">
-                                {section.paragraphs.map((paragraph) => (
-                                    <p key={paragraph}>{paragraph}</p>
-                                ))}
+                    <div className="space-y-3">
+                        {faqs.map((faq, idx) => (
+                            <div key={idx} className="rounded-2xl border border-[var(--app-border,rgba(0,0,0,0.1))] bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+                                <button
+                                    onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
+                                    className="w-full text-left p-5 font-bold text-sm text-gray-900 dark:text-white flex items-center justify-between gap-4"
+                                >
+                                    <span>{faq.q}</span>
+                                    <ChevronDown size={18} className={`transition-transform ${openFaq === idx ? "rotate-180 text-amber-500" : "text-gray-400"}`} />
+                                </button>
+                                {openFaq === idx && (
+                                    <div className="p-5 pt-0 text-xs sm:text-sm text-gray-600 dark:text-gray-300 border-t border-[var(--app-border,rgba(0,0,0,0.1))] leading-relaxed">
+                                        {faq.a}
+                                    </div>
+                                )}
                             </div>
-                        </section>
-                    ))}
-                </article>
-
-                <section className="mt-14 border-t border-[color:var(--app-border)] pt-8">
-                    <h2 className="text-2xl font-bold text-[color:var(--app-text)]">Contact Tiffzy Support</h2>
-                    <div className="mt-4 space-y-3 text-[17px] leading-8 text-[color:var(--app-muted-strong)]">
-                        {contactLines.map((line) => (
-                            <p key={line}>{line}</p>
                         ))}
                     </div>
-                </section>
+                </div>
 
-                <p className="mt-12 max-w-4xl text-sm leading-7 text-[color:var(--app-muted)]">
-                    If you want, we can also add a small FAQ link or a dedicated contact form later.
-                </p>
+                {/* Support Contact Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-10">
+                    <div className="rounded-3xl border border-[var(--app-border,rgba(0,0,0,0.1))] bg-white dark:bg-slate-900 p-6 space-y-3 shadow-sm">
+                        <Mail className="text-amber-500" size={24} />
+                        <h3 className="font-bold text-base text-gray-900 dark:text-white">Email Support</h3>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Email our support team for order inquiries or partner support.</p>
+                        <p className="font-semibold text-xs text-amber-600 dark:text-amber-400">jekkaramesh@survetra.com</p>
+                    </div>
+
+                    <div className="rounded-3xl border border-[var(--app-border,rgba(0,0,0,0.1))] bg-white dark:bg-slate-900 p-6 space-y-3 shadow-sm">
+                        <Phone className="text-amber-500" size={24} />
+                        <h3 className="font-bold text-base text-gray-900 dark:text-white">Phone Support</h3>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Call our desk Mon-Sat 9am-7pm IST for urgent assistance.</p>
+                        <p className="font-semibold text-xs text-amber-600 dark:text-amber-400">+91 91777 64632</p>
+                    </div>
+
+                    <div className="rounded-3xl border border-[var(--app-border,rgba(0,0,0,0.1))] bg-white dark:bg-slate-900 p-6 space-y-3 shadow-sm">
+                        <Trash2 className="text-rose-500" size={24} />
+                        <h3 className="font-bold text-base text-gray-900 dark:text-white">Account Deletion</h3>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Submit an online request to delete your account data.</p>
+                        <Link to="/delete-account" className="font-bold text-xs text-rose-500 underline inline-block">
+                            Go to Delete Account Page →
+                        </Link>
+                    </div>
+                </div>
             </main>
+
+            <Footer />
         </div>
     );
 }

@@ -59,8 +59,8 @@ export async function addItems(req, reply) {
     });
 
     const subtotal = rows.reduce((a, b) => a + b.total, 0);
-    const taxAmount = +(subtotal * 0.05).toFixed(2);
-    const total = subtotal + taxAmount;
+    const taxAmount = 0;
+    const total = subtotal;
 
     await prisma.tableSession.update({
         where: { id: Number(sessionId) },

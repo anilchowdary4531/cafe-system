@@ -64,23 +64,29 @@ export const computeBill = ({
 
 export const toPriceSubunitItems = ({ menuItems = [], items = [] } = {}) => {
   const byId = new Map((menuItems || []).map((m) => [Number(m.id), m]));
+  const byName = new Map((menuItems || []).map((m) => [String(m.name || "").trim().toLowerCase(), m]));
 
   const normalized = [];
   for (const raw of Array.isArray(items) ? items : []) {
     const menuItemId = Number(raw?.menuItemId || raw?.id || 0);
+    const rawName = String(raw?.itemName || raw?.name || "").trim().toLowerCase();
     const qty = Math.max(1, Number(raw?.qty || raw?.quantity || 1));
-    const dbItem = byId.get(menuItemId) || null;
-    if (!menuItemId || !dbItem) {
+
+    let dbItem = byId.get(menuItemId) || byName.get(rawName);
+    const rawPrice = Number(raw?.price);
+    const hasValidRawPrice = raw?.price !== undefined && raw?.price !== null && !Number.isNaN(rawPrice) && rawPrice >= 0;
+
+    if (!dbItem && !hasValidRawPrice) {
       const err = new Error("invalid_item");
       err.code = "invalid_item";
       throw err;
     }
     normalized.push({
-      menuItemId,
-      itemName: String(dbItem.name || "").trim(),
+      menuItemId: dbItem?.id || null,
+      itemName: String(dbItem?.name || raw?.name || raw?.itemName || "Item").trim(),
       preparedByName: String(raw?.preparedByName || raw?.chefName || raw?.preparedBy || "").trim() || null,
       qty,
-      priceSubunit: toSubunit(dbItem.price),
+      priceSubunit: hasValidRawPrice ? toSubunit(rawPrice) : toSubunit(dbItem.price),
     });
   }
 

@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { ChevronLeft, ChefHat, ShoppingCart, UserCircle2, UtensilsCrossed, LayoutGrid } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import ThemeSelector from "./ThemeSelector";
+import LanguageSelector from "./LanguageSelector";
 import RestaurantSelector from "./RestaurantSelector";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import BrandLogo from "./BrandLogo";
@@ -104,6 +105,7 @@ export default function Navbar() {
             <div className="flex w-full flex-wrap items-center justify-between gap-2 md:w-auto md:justify-end md:gap-4">
                 {!isStaff && !isProfilePage && <RestaurantSelector variant="compact" />}
                 {isStaff && <ThemeSelector />}
+                <LanguageSelector />
 
                 {staffLinks.map((link) => (
                     <Link

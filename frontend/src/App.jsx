@@ -19,6 +19,7 @@ import ProductAnalytics from "./pages/ProductAnalytics";
 import InventoryPage from "./pages/InventoryPage";
 import ShippingPolicy from "./pages/ShippingPolicy";
 import LegalDisclosure from "./pages/LegalDisclosure";
+import DeleteAccount from "./pages/DeleteAccount";
 
 import Cart from "./pages/Cart";
 import Login from "./pages/Login";
@@ -100,6 +101,7 @@ export default function App() {
                     <Route path="/contact-us" element={<ContactUs />} />
                     <Route path="/about-us" element={<AboutUs />} />
                     <Route path="/help-center" element={<HelpCenter />} />
+                    <Route path="/delete-account" element={<DeleteAccount />} />
                     <Route path="/pricing" element={<Pricing />} />
                     <Route path="/qr-ordering" element={<QROrdering />} />
                     <Route path="/pos-dashboard" element={<POSDashboardPage />} />

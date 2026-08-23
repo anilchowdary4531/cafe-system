@@ -5,11 +5,15 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import { api } from "../utils/apiClient";
 import BrandLogo from "../components/BrandLogo";
+import LanguageSelector from "../components/LanguageSelector";
+import GoogleSignInButton from "../components/GoogleSignInButton";
+import { useLanguage } from "../context/LanguageContext";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
 
 export default function Login() {
     const { login, loginSession, loginCustomer } = useAuth();
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -448,39 +452,45 @@ export default function Login() {
                 </div>
 
                 <p className="text-xl font-medium max-w-md leading-relaxed">
-                    Smart restaurant operating system for modern cafes, dining, billing and live orders.
+                    {t("smartOS")}
                 </p>
 
                 <div className="mt-10 space-y-4 text-lg font-medium">
-                    <p>⚡ QR Table Ordering</p>
-                    <p>📦 Live Kitchen Orders</p>
-                    <p>📈 Analytics Dashboard</p>
-                    <p>💳 Billing & Payments</p>
+                    <p>{t("qrOrdering")}</p>
+                    <p>{t("liveKitchen")}</p>
+                    <p>{t("analyticsDash")}</p>
+                    <p>{t("billingPayments")}</p>
                 </div>
 
                 <div className="theme-muted-strong mt-12 text-sm font-semibold">
-                    Built for growth • Built for speed
+                    {t("builtForGrowth")}
                 </div>
             </div>
 
             {/* RIGHT SIDE LOGIN */}
             <div className="login-shell flex items-center justify-center px-2 py-3 sm:px-4 sm:py-6 md:px-6 md:py-10">
 
-                <div className="login-card theme-panel w-[99%] max-w-[99vw] rounded-3xl p-5 backdrop-blur-2xl sm:w-full sm:max-w-md sm:p-8">
-                    <div className="mb-6 grid grid-cols-2 gap-2">
+                <div className="login-card theme-panel relative w-[99%] max-w-[99vw] rounded-3xl p-5 backdrop-blur-2xl sm:w-full sm:max-w-md sm:p-8">
+                    
+                    {/* TOP RIGHT LANGUAGE SELECTOR */}
+                    <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+                        <LanguageSelector />
+                    </div>
+
+                    <div className="mb-6 grid grid-cols-2 gap-2 pr-20 sm:pr-24">
                         <button
                             type="button"
                             onClick={() => setModeAndUrl("customer")}
                             className={`rounded-2xl px-4 py-2 text-sm font-semibold ${mode === "customer" ? "theme-button" : "theme-soft-button"}`}
                         >
-                            Customer
+                            {t("customer")}
                         </button>
                         <button
                             type="button"
                             onClick={() => setModeAndUrl("staff")}
                             className={`rounded-2xl px-4 py-2 text-sm font-semibold ${mode === "staff" || mode === "register" ? "theme-button" : "theme-soft-button"}`}
                         >
-                            Staff
+                            {t("staff")}
                         </button>
                     </div>
 
@@ -655,18 +665,18 @@ export default function Login() {
 
                             {customerSubMode === "password" ? (
                                 <>
-                                    <h2 className="text-3xl font-bold mb-2">Customer Login</h2>
-                                    <p className="theme-muted mb-6">Enter your username, phone or email and password to log in.</p>
+                                    <h2 className="text-3xl font-bold mb-2">{t("customerLogin")}</h2>
+                                    <p className="theme-muted mb-6">{t("loginSubtitle")}</p>
                                 </>
                             ) : customerSubMode === "register" ? (
                                 <>
-                                    <h2 className="text-3xl font-bold mb-2">Create Account</h2>
-                                    <p className="theme-muted mb-6">Sign up to view your orders, earn rewards and reorder faster.</p>
+                                    <h2 className="text-3xl font-bold mb-2">{t("createAccount")}</h2>
+                                    <p className="theme-muted mb-6">{t("createAccountSubtitle")}</p>
                                 </>
                             ) : (
                                 <>
-                                    <h2 className="text-3xl font-bold mb-2">Customer OTP Login</h2>
-                                    <p className="theme-muted mb-6">Secure OTP login to view your orders and reorder faster.</p>
+                                    <h2 className="text-3xl font-bold mb-2">{t("otpLogin")}</h2>
+                                    <p className="theme-muted mb-6">{t("otpSubtitle")}</p>
                                 </>
                             )}
 
@@ -677,15 +687,26 @@ export default function Login() {
                             )}
 
                             <div className="space-y-4">
+
+                                {/* GOOGLE OAUTH SIGN-IN BUTTON */}
+                                <div>
+                                    <GoogleSignInButton />
+                                    <div className="my-4 flex items-center gap-3">
+                                        <div className="h-[1px] flex-1 bg-black/10 dark:bg-white/10" />
+                                        <span className="text-xs font-bold uppercase tracking-wider theme-muted">or</span>
+                                        <div className="h-[1px] flex-1 bg-black/10 dark:bg-white/10" />
+                                    </div>
+                                </div>
+
                                 {customerSubMode === "password" && (
                                     <>
                                         <div>
-                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Username / Phone / Email</label>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">{t("usernamePhoneEmail")}</label>
                                             <div className="relative">
                                                 <User size={18} className="theme-muted absolute left-4 top-3.5" />
                                                 <input
                                                     type="text"
-                                                    placeholder="Username, phone number or email"
+                                                    placeholder={t("placeholderUsernamePhoneEmail")}
                                                     value={customerUsername}
                                                     onChange={(e) => setCustomerUsername(e.target.value)}
                                                     className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
@@ -694,12 +715,12 @@ export default function Login() {
                                         </div>
 
                                         <div>
-                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Password</label>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">{t("password")}</label>
                                             <div className="relative">
                                                 <Lock size={18} className="theme-muted absolute left-4 top-3.5" />
                                                 <input
                                                     type={showCustomerPassword ? "text" : "password"}
-                                                    placeholder="Enter your password"
+                                                    placeholder={t("placeholderPassword")}
                                                     value={customerPassword}
                                                     onChange={(e) => setCustomerPassword(e.target.value)}
                                                     className="theme-input w-full rounded-xl px-11 py-3 pr-12 outline-none transition"
@@ -719,28 +740,28 @@ export default function Login() {
                                             disabled={customerLoading}
                                             className="theme-button w-full rounded-xl py-3 font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70 mt-2"
                                         >
-                                            {customerLoading ? "Logging in..." : "Login"}
+                                            {customerLoading ? t("loggingIn") : t("loginBtn")}
                                         </button>
 
                                         <div className="mt-4 flex flex-col items-center gap-2 text-center text-sm">
                                             <div>
-                                                <span className="theme-muted">Don't have an account? </span>
+                                                <span className="theme-muted">{t("dontHaveAccount")}{" "}</span>
                                                 <button
                                                     type="button"
                                                     onClick={() => { setCustomerSubMode("register"); setCustomerError(""); }}
                                                     className="font-semibold theme-accent-text hover:underline"
                                                 >
-                                                    Create Account
+                                                    {t("createAccount")}
                                                 </button>
                                             </div>
                                             <div>
-                                                <span className="theme-muted">Or prefer OTP? </span>
+                                                <span className="theme-muted">{t("orPreferOtp")}{" "}</span>
                                                 <button
                                                     type="button"
                                                     onClick={() => { setCustomerSubMode("otp"); setCustomerError(""); }}
                                                     className="font-semibold theme-accent-text hover:underline"
                                                 >
-                                                    Use OTP Login
+                                                    {t("useOtpLogin")}
                                                 </button>
                                             </div>
                                         </div>
@@ -750,12 +771,12 @@ export default function Login() {
                                 {customerSubMode === "register" && (
                                     <>
                                         <div>
-                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Username *</label>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">{t("username")} *</label>
                                             <div className="relative">
                                                 <User size={18} className="theme-muted absolute left-4 top-3.5" />
                                                 <input
                                                     type="text"
-                                                    placeholder="Choose a unique username (e.g. alex_99)"
+                                                    placeholder={t("placeholderUsername")}
                                                     value={customerUsername}
                                                     onChange={(e) => setCustomerUsername(e.target.value)}
                                                     className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
@@ -764,12 +785,12 @@ export default function Login() {
                                         </div>
 
                                         <div>
-                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Phone Number *</label>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">{t("phoneNumber")} *</label>
                                             <div className="relative">
                                                 <Phone size={18} className="theme-muted absolute left-4 top-3.5" />
                                                 <input
                                                     type="tel"
-                                                    placeholder="Enter phone number"
+                                                    placeholder={t("placeholderPhone")}
                                                     value={customerPhone}
                                                     onChange={(e) => setCustomerPhone(e.target.value)}
                                                     className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
@@ -778,12 +799,12 @@ export default function Login() {
                                         </div>
 
                                         <div>
-                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Full Name (optional)</label>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">{t("fullName")}</label>
                                             <div className="relative">
                                                 <UserCircle2 size={18} className="theme-muted absolute left-4 top-3.5" />
                                                 <input
                                                     type="text"
-                                                    placeholder="Your full name"
+                                                    placeholder={t("placeholderFullName")}
                                                     value={customerName}
                                                     onChange={(e) => setCustomerName(e.target.value)}
                                                     className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
@@ -792,12 +813,12 @@ export default function Login() {
                                         </div>
 
                                         <div>
-                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Email Address (optional)</label>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">{t("emailAddress")}</label>
                                             <div className="relative">
                                                 <Mail size={18} className="theme-muted absolute left-4 top-3.5" />
                                                 <input
                                                     type="email"
-                                                    placeholder="you@example.com"
+                                                    placeholder={t("placeholderEmail")}
                                                     value={customerEmail}
                                                     onChange={(e) => setCustomerEmail(e.target.value)}
                                                     className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
@@ -806,12 +827,12 @@ export default function Login() {
                                         </div>
 
                                         <div>
-                                            <label className="theme-muted mb-1.5 block text-sm font-medium">Password *</label>
+                                            <label className="theme-muted mb-1.5 block text-sm font-medium">{t("password")} *</label>
                                             <div className="relative">
                                                 <Lock size={18} className="theme-muted absolute left-4 top-3.5" />
                                                 <input
                                                     type={showCustomerPassword ? "text" : "password"}
-                                                    placeholder="Min 6 characters"
+                                                    placeholder={t("placeholderPasswordMin")}
                                                     value={customerPassword}
                                                     onChange={(e) => setCustomerPassword(e.target.value)}
                                                     className="theme-input w-full rounded-xl px-11 py-3 pr-12 outline-none transition"
@@ -831,17 +852,17 @@ export default function Login() {
                                             disabled={customerLoading}
                                             className="theme-button w-full rounded-xl py-3 font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70 mt-2"
                                         >
-                                            {customerLoading ? "Creating Account..." : "Create Account & Continue"}
+                                            {customerLoading ? t("creatingAccount") : t("createAccountBtn")}
                                         </button>
 
                                         <div className="mt-4 text-center">
-                                            <span className="theme-muted text-sm">Already have an account? </span>
+                                            <span className="theme-muted text-sm">{t("alreadyHaveAccount")}{" "}</span>
                                             <button
                                                 type="button"
                                                 onClick={() => { setCustomerSubMode("password"); setCustomerError(""); }}
                                                 className="text-sm font-semibold theme-accent-text hover:underline"
                                             >
-                                                Login here
+                                                {t("loginHere")}
                                             </button>
                                         </div>
                                     </>
@@ -850,12 +871,12 @@ export default function Login() {
                                 {customerSubMode === "otp" && (
                                     <>
                                         <div>
-                                            <label className="theme-muted mb-2 block text-sm font-medium">Phone Number</label>
+                                            <label className="theme-muted mb-2 block text-sm font-medium">{t("phoneNumber")}</label>
                                             <div className="relative">
                                                 <Phone size={18} className="theme-muted absolute left-4 top-3.5" />
                                                 <input
                                                     type="tel"
-                                                    placeholder="Enter phone number"
+                                                    placeholder={t("placeholderPhone")}
                                                     value={customerPhone}
                                                     onChange={(e) => setCustomerPhone(e.target.value)}
                                                     className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
@@ -864,29 +885,28 @@ export default function Login() {
                                         </div>
 
                                         <div>
-                                            <label className="theme-muted mb-2 block text-sm font-medium">Email (optional)</label>
+                                            <label className="theme-muted mb-2 block text-sm font-medium">{t("emailAddress")}</label>
                                             <div className="relative">
                                                 <Mail size={18} className="theme-muted absolute left-4 top-3.5" />
                                                 <input
                                                     type="email"
-                                                    placeholder="you@example.com"
+                                                    placeholder={t("placeholderEmail")}
                                                     value={customerEmail}
                                                     onChange={(e) => setCustomerEmail(e.target.value)}
                                                     className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
                                                 />
                                             </div>
-                                            <p className="theme-muted mt-2 text-xs">If provided, we’ll send the OTP to email too.</p>
                                         </div>
 
                                         {customerStep === "otp" && (
                                             <>
                                                 <div>
-                                                    <label className="theme-muted mb-2 block text-sm font-medium">OTP</label>
+                                                    <label className="theme-muted mb-2 block text-sm font-medium">{t("otp")}</label>
                                                     <input
                                                         type="text"
                                                         inputMode="numeric"
                                                         autoComplete="one-time-code"
-                                                        placeholder="Enter 6-digit OTP"
+                                                        placeholder={t("placeholderOtp")}
                                                         value={customerOtp}
                                                         onChange={(e) => setCustomerOtp(e.target.value)}
                                                         className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
@@ -898,7 +918,7 @@ export default function Login() {
                                                             disabled={customerLoading}
                                                             className="theme-muted underline decoration-dotted underline-offset-4 hover:opacity-80 disabled:opacity-60"
                                                         >
-                                                            Resend OTP
+                                                            {t("resendOtp")}
                                                         </button>
                                                         <button
                                                             type="button"
@@ -910,26 +930,18 @@ export default function Login() {
                                                             }}
                                                             className="theme-muted underline decoration-dotted underline-offset-4 hover:opacity-80"
                                                         >
-                                                            Change number
+                                                            {t("changeNumber")}
                                                         </button>
                                                     </div>
-                                                    {import.meta.env.DEV && customerDevOtp && (
-                                                        <p className="theme-muted mt-2 text-xs">Dev OTP: {customerDevOtp}</p>
-                                                    )}
-                                                    {customerOtpExpiresAt && (
-                                                        <p className="theme-muted mt-1 text-xs">
-                                                            Expires at {new Date(customerOtpExpiresAt).toLocaleTimeString()}
-                                                        </p>
-                                                    )}
                                                 </div>
 
                                                 <div>
-                                                    <label className="theme-muted mb-2 block text-sm font-medium">Name (optional)</label>
+                                                    <label className="theme-muted mb-2 block text-sm font-medium">{t("fullName")}</label>
                                                     <div className="relative">
                                                         <UserCircle2 size={18} className="theme-muted absolute left-4 top-3.5" />
                                                         <input
                                                             type="text"
-                                                            placeholder="Your name"
+                                                            placeholder={t("placeholderFullName")}
                                                             value={customerName}
                                                             onChange={(e) => setCustomerName(e.target.value)}
                                                             className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
@@ -946,32 +958,32 @@ export default function Login() {
                                         >
                                             {customerStep === "phone"
                                                 ? customerLoading
-                                                    ? "Sending OTP..."
-                                                    : "Send OTP"
+                                                    ? t("sendingOtp")
+                                                    : t("sendOtp")
                                                 : customerLoading
-                                                    ? "Verifying..."
-                                                    : "Verify & Continue"}
+                                                    ? t("verifying")
+                                                    : t("verifyContinue")}
                                         </button>
 
                                         <div className="mt-4 flex flex-col items-center gap-2 text-center text-sm">
                                             <div>
-                                                <span className="theme-muted">Have a password? </span>
+                                                <span className="theme-muted">{t("havePassword")}{" "}</span>
                                                 <button
                                                     type="button"
                                                     onClick={() => { setCustomerSubMode("password"); setCustomerError(""); }}
                                                     className="font-semibold theme-accent-text hover:underline"
                                                 >
-                                                    Password Login
+                                                    {t("passwordLogin")}
                                                 </button>
                                             </div>
                                             <div>
-                                                <span className="theme-muted">Don't have an account? </span>
+                                                <span className="theme-muted">{t("dontHaveAccount")}{" "}</span>
                                                 <button
                                                     type="button"
                                                     onClick={() => { setCustomerSubMode("register"); setCustomerError(""); }}
                                                     className="font-semibold theme-accent-text hover:underline"
                                                 >
-                                                    Create Account
+                                                    {t("createAccount")}
                                                 </button>
                                             </div>
                                         </div>

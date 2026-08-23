@@ -118,10 +118,26 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
   }
 
   const ids = [...new Set(items.map((i) => Number(i?.menuItemId || i?.id || 0)).filter((id) => id > 0))];
-  const menuItems = await prisma.menuItem.findMany({
-    where: { restaurantId, id: { in: ids }, isAvailable: true },
+  const itemNames = items.map((i) => String(i?.itemName || i?.name || "").trim().toLowerCase()).filter(Boolean);
+
+  let menuItems = await prisma.menuItem.findMany({
+    where: {
+      restaurantId,
+      isAvailable: true,
+      OR: [
+        ...(ids.length > 0 ? [{ id: { in: ids } }] : []),
+        ...(itemNames.length > 0 ? [{ name: { in: itemNames } }] : []),
+      ],
+    },
     select: { id: true, name: true, price: true },
   });
+
+  if (!menuItems.length) {
+    menuItems = await prisma.menuItem.findMany({
+      where: { restaurantId, isAvailable: true },
+      select: { id: true, name: true, price: true },
+    });
+  }
 
   const normalizedItems = toPriceSubunitItems({ menuItems, items });
 

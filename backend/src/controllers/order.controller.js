@@ -201,13 +201,16 @@ export async function placeCustomerOrder(req, reply) {
     const normalized = items.map(raw => {
         const db = map.get(Number(raw.id));
         const qty = Number(raw.qty || 1);
+        const rawPrice = Number(raw.price);
+        const hasValidRawPrice = raw.price !== undefined && raw.price !== null && !Number.isNaN(rawPrice) && rawPrice >= 0;
+        const price = hasValidRawPrice ? rawPrice : Number(db?.price || 0);
 
         return {
-            menuItemId: db.id,
-            itemName: db.name,
+            menuItemId: db?.id || null,
+            itemName: db?.name || String(raw.name || raw.itemName || "Item").trim(),
             qty,
-            price: db.price,
-            total: qty * db.price,
+            price,
+            total: qty * price,
         };
     });
 

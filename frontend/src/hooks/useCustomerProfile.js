@@ -33,7 +33,8 @@ export default function useCustomerProfile({ enabled = true } = {}) {
                     !prev ||
                     String(prev.phone || "") !== String(next.phone || "") ||
                     String(prev.name || "") !== String(next.name || "") ||
-                    String(prev.email || "") !== String(next.email || "");
+                    String(prev.email || "") !== String(next.email || "") ||
+                    String(prev.avatarUrl || "") !== String(next.avatarUrl || "");
                 if (changed) updateCustomer(next);
             }
             return next;
@@ -57,7 +58,7 @@ export default function useCustomerProfile({ enabled = true } = {}) {
     }, [enabled, refresh]);
 
     const updateProfile = useCallback(
-        async ({ name, email } = {}) => {
+        async ({ name, email, avatarUrl } = {}) => {
             if (!enabled) return null;
             if (!customerToken) {
                 // No persisted token: update local state only (still keeps UI consistent).
@@ -65,6 +66,7 @@ export default function useCustomerProfile({ enabled = true } = {}) {
                     ...(profile || customer || {}),
                     name: String(name ?? profile?.name ?? "").trim(),
                     email: String(email ?? profile?.email ?? "").trim(),
+                    avatarUrl: avatarUrl !== undefined ? String(avatarUrl || "").trim() || null : profile?.avatarUrl,
                 };
                 setProfile(local);
                 updateCustomer(local);
@@ -81,6 +83,7 @@ export default function useCustomerProfile({ enabled = true } = {}) {
                     phone: currentPhone,
                     name: String(name || "").trim(),
                     email: String(email || "").trim(),
+                    ...(avatarUrl !== undefined ? { avatarUrl } : {}),
                 });
                 const next = res.data?.customer || null;
                 if (next) {

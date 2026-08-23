@@ -5,6 +5,7 @@ import { useCart } from "../../context/CartContext";
 import { useRestaurantContext } from "../../context/RestaurantContext";
 import CartDrawer from "../../components/CartDrawer";
 import BrandLogo from "../../components/BrandLogo";
+import Footer from "../../components/Footer";
 import useCachedGet from "../../hooks/useCachedGet";
 import { getCustomerFavorites, toggleFavoriteMenuItem } from "../../utils/customerFavorites";
 import { showToast } from "../../utils/toast";
@@ -30,8 +31,8 @@ export default function RestaurantPublicMenu() {
     const searchFromUrl = String(searchParams.get("search") || "").trim();
 
     const { data, loading } = useCachedGet(`/r/${slug}/menu`, {
-        ttlMs: 2 * 60_000,
-        staleMs: 30 * 60_000,
+        ttlMs: 5_000,
+        staleMs: 15_000,
         scope: `restaurant:${slug}`,
     });
     const restaurant = data?.restaurant || null;
@@ -59,7 +60,6 @@ export default function RestaurantPublicMenu() {
             name: data.restaurant.name || null,
             slug: data.restaurant.slug || slug || null,
             logo: data.restaurant.logo || data.restaurant.logoUrl || null,
-            upiId: data.restaurant.upiId || null,
             tableNo: null,
         });
     }, [data?.restaurant, setRestaurantContext, slug]);
@@ -426,6 +426,7 @@ export default function RestaurantPublicMenu() {
                 </button>
             )}
 
+            <Footer />
             <CartDrawer open={cartOpen} setOpen={setCartOpen} />
         </div>
     );

@@ -1,12 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Banknote, MapPin, Plus, QrCode, ShieldCheck, X, IndianRupee } from "lucide-react";
+import {
+    AlertCircle,
+    ArrowLeft,
+    Banknote,
+    CheckCircle2,
+    CreditCard,
+    IndianRupee,
+    Landmark,
+    LoaderCircle,
+    MapPin,
+    Plus,
+    QrCode,
+    RefreshCw,
+    ShieldCheck,
+    Wallet,
+    X,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import useCachedGet from "../hooks/useCachedGet";
 import { api, invalidateGetCache } from "../utils/apiClient";
-
-const UPI_PENDING_KEY = "cafe_system:customer_upi_pending:v1";
 
 const toInr = (value) => {
     const n = Number(value || 0);
@@ -29,6 +43,25 @@ const normalizeFulfillment = (value) => {
     return "delivery";
 };
 
+const loadCashfreeSdk = () => {
+    return new Promise((resolve) => {
+        if (typeof window.Cashfree === "function") {
+            resolve(window.Cashfree);
+            return;
+        }
+        const existingScript = document.getElementById("cashfree-js-sdk");
+        if (existingScript) {
+            existingScript.addEventListener("load", () => resolve(window.Cashfree));
+            return;
+        }
+        const script = document.createElement("script");
+        script.id = "cashfree-js-sdk";
+        script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
+        script.onload = () => resolve(window.Cashfree);
+        script.onerror = () => resolve(null);
+        document.head.appendChild(script);
+    });
+};
 const getPaymentMethodTitle = (value, fulfillment = "delivery") => {
     const m = normalizePaymentMethod(value);
     if (m === "CASH") {
@@ -38,21 +71,21 @@ const getPaymentMethodTitle = (value, fulfillment = "delivery") => {
                 ? "Cash on Table"
             : "Cash on Delivery";
     }
-    if (m === "PAY_LATER") return "Pay Later";
-    return "UPI";
+    if (m === "PAY_LATER") return "Khata Pay Later";
+    return "Pay Online (Recommended)";
 };
 
 const getPaymentMethodSubtitle = (value, fulfillment = "delivery") => {
     const m = normalizePaymentMethod(value);
     if (m === "CASH") {
         return fulfillment === "pickup"
-            ? "Pay when you collect your order"
+            ? "Pay cash when you collect your order"
             : fulfillment === "dinein"
-                ? "Pay when your order is served"
-            : "Pay when your order arrives";
+                ? "Pay cash when your order is served"
+            : "Pay cash when your order arrives";
     }
     if (m === "PAY_LATER") return "Charge to Khata Credit";
-    return "Pay with any UPI app";
+    return "Secure by Cashfree • UPI, Cards, Net Banking & Wallets";
 };
 
 const getPaymentFooterHint = (value, isOnlineOrder = false, fulfillment = "delivery") => {
@@ -158,14 +191,12 @@ const getCheckoutActionLabel = ({
         : "Order";
 
     if (method === "UPI") {
-        if (placedOrder?.id) return "Open UPI Apps";
-        if (customerToken) return isOnlineOrder ? `Place ${orderMode} Order & Continue` : "Place Order & Continue";
-        if (!isOnlineOrder) return "Place Table Order & Continue";
+        if (placedOrder?.id) return "Open Cashfree Gateway";
+        if (customerToken) return `Pay Rs ${toInr(payableAmount)} Online (Cashfree)`;
+        if (!isOnlineOrder) return `Pay Rs ${toInr(payableAmount)} via Cashfree`;
         return otpStep === "otp"
-            ? `Verify & Pay Rs ${toInr(payableAmount)}`
-            : isOnlineOrder
-                ? `Send OTP to Place ${orderMode} Order`
-                : "Send OTP to Place Order";
+            ? `Verify & Pay Rs ${toInr(payableAmount)} via Cashfree`
+            : `Send OTP & Pay Rs ${toInr(payableAmount)} Online`;
     }
 
     if (method === "PAY_LATER") {
@@ -207,8 +238,6 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
     const [payLaterBalance, setPayLaterBalance] = useState(0);
     const [checkoutStep, setCheckoutStep] = useState("summary"); // summary | payment
     const [placedOrder, setPlacedOrder] = useState(null);
-    const [upiPendingOrder, setUpiPendingOrder] = useState(null);
-    const [upiAttemptFailed, setUpiAttemptFailed] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
@@ -278,8 +307,6 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         setPayLaterBalance(0);
         setCheckoutStep("summary");
         setPlacedOrder(null);
-        setUpiPendingOrder(null);
-        setUpiAttemptFailed(false);
         setError("");
         setSuccess("");
     }, [open, restaurantContext?.tableNo, restaurantContext?.slug, customer?.name, customer?.email, customer?.phone, customerToken]);
@@ -328,19 +355,6 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         return normalizeDeliveryAddressText(manualAddress);
     }, [addressMode, isOnlineOrder, manualAddress, selectedFulfillment, selectedSavedAddress]);
 
-    const upiPa = String(restaurantContext?.upiId || import.meta.env.VITE_UPI_PA || "").trim().toLowerCase();
-    const upiPn = String(import.meta.env.VITE_UPI_PN || restaurantName || "CafeKing").trim() || "CafeKing";
-
-    const buildUpiLink = (orderId, amount) => {
-        const params = new URLSearchParams();
-        params.set("pa", upiPa);
-        params.set("pn", upiPn);
-        params.set("am", Number.isFinite(Number(amount)) ? Number(amount).toFixed(2) : "0.00");
-        params.set("cu", "INR");
-        params.set("tn", `Order-${String(orderId)}`);
-        return `upi://pay?${params.toString()}`;
-    };
-
     const getCustomerAuthConfig = () => {
         try {
             const token = customerToken || localStorage.getItem("customerToken") || "";
@@ -349,68 +363,6 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
             return undefined;
         }
     };
-
-    const readPendingUpiOrder = () => {
-        let raw = "";
-        try {
-            raw = sessionStorage.getItem(UPI_PENDING_KEY) || "";
-        } catch {
-            raw = "";
-        }
-        if (!raw) return null;
-
-        try {
-            const parsed = JSON.parse(raw);
-            const orderId = Number(parsed?.orderId || 0);
-            const amount = Number(parsed?.amount || 0);
-            const pendingSlug = String(parsed?.slug || "").trim();
-            const orderNo = String(parsed?.orderNo || "").trim();
-            const fulfillment = normalizeFulfillment(parsed?.fulfillment || "delivery");
-            if (!orderId || !pendingSlug) return null;
-            return {
-                orderId,
-                amount,
-                slug: pendingSlug,
-                orderNo: orderNo || String(orderId),
-                fulfillment,
-            };
-        } catch {
-            try {
-                sessionStorage.removeItem(UPI_PENDING_KEY);
-            } catch {
-                // ignore
-            }
-            return null;
-        }
-    };
-
-    useEffect(() => {
-        if (!open) return undefined;
-
-        const capturePendingUpi = () => {
-            if (document.visibilityState !== "visible") return;
-            const pending = readPendingUpiOrder();
-            if (!pending) return;
-            if (Number(upiPendingOrder?.orderId || 0) === pending.orderId) return;
-            setPlacedOrder({
-                id: pending.orderId,
-                orderNo: pending.orderNo,
-                total: pending.amount,
-                fulfillment: normalizeFulfillment(pending.fulfillment || "delivery"),
-            });
-            setUpiPendingOrder(pending);
-            setError("");
-            setSuccess("Returned from UPI app. Confirm payment status below.");
-        };
-
-        capturePendingUpi();
-        window.addEventListener("focus", capturePendingUpi);
-        document.addEventListener("visibilitychange", capturePendingUpi);
-        return () => {
-            window.removeEventListener("focus", capturePendingUpi);
-            document.removeEventListener("visibilitychange", capturePendingUpi);
-        };
-    }, [open, upiPendingOrder?.orderId]);
 
     if (!open) return null;
 
@@ -445,126 +397,11 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         setSuccess("OTP sent. Enter the code to confirm your order.");
     };
 
-    const launchUpiApps = (orderMeta) => {
-        const orderId = Number(orderMeta?.id || orderMeta?.orderId || 0);
-        const amount = Number(orderMeta?.total || orderMeta?.amount || 0);
-        const orderNo = String(orderMeta?.orderNo || orderId || "").trim();
-        const fulfillment = normalizeFulfillment(orderMeta?.fulfillment || "delivery");
-
-        if (!orderId) {
-            setError("Order is missing for UPI payment.");
-            return;
-        }
-        if (!upiPa) {
-            setError("UPI is not configured for this restaurant.");
-            return;
-        }
-
-        const pendingPayload = {
-            orderId,
-            amount,
-            slug,
-            orderNo,
-            fulfillment,
-            createdAt: Date.now(),
-        };
-
-        try {
-            sessionStorage.setItem(UPI_PENDING_KEY, JSON.stringify(pendingPayload));
-        } catch {
-            // ignore
-        }
-
-        setUpiPendingOrder({
-            orderId,
-            amount,
-            slug,
-            orderNo: orderNo || String(orderId),
-            fulfillment,
-        });
-        setUpiAttemptFailed(false);
-        setSuccess("Opening UPI app chooser...");
-        window.location.assign(buildUpiLink(orderId, amount));
-    };
-
-    const finalizeUpiPayment = async (status) => {
-        const normalizedStatus = String(status || "").toUpperCase() === "FAILED" ? "FAILED" : "SUCCESS";
-        const pending = upiPendingOrder || readPendingUpiOrder();
-        if (!pending?.orderId) {
-            setError("No pending UPI transaction found.");
-            return;
-        }
-
-        try {
-            setSubmitting(true);
-            setError("");
-            setSuccess(normalizedStatus === "SUCCESS" ? "Finalizing payment..." : "Marking payment as failed...");
-
-            await api.post(
-                "/payments/verify",
-                { orderId: pending.orderId, status: normalizedStatus, paymentMode: "UPI" },
-                getCustomerAuthConfig()
-            );
-
-            invalidateGetCache({ urlStartsWith: `/r/${pending.slug}/orders` });
-            invalidateGetCache({ urlStartsWith: "/customer/orders" });
-
-            try {
-                sessionStorage.removeItem(UPI_PENDING_KEY);
-            } catch {
-                // ignore
-            }
-
-            if (normalizedStatus === "FAILED") {
-                setUpiAttemptFailed(true);
-                setError("Payment failed. Please try again.");
-                setSuccess("");
-                return;
-            }
-
-            setUpiAttemptFailed(false);
-            clearCartRef.current?.();
-            setUpiPendingOrder(null);
-            onCloseRef.current?.();
-            navigate(
-                `/orders/thank-you?slug=${encodeURIComponent(pending.slug)}&orderNo=${encodeURIComponent(
-                    pending.orderNo || String(pending.orderId)
-                )}&orderId=${encodeURIComponent(String(pending.orderId))}&amount=${encodeURIComponent(
-                    String(toInr(pending.amount))
-                )}&paymentStatus=${encodeURIComponent(normalizedStatus)}&fulfillment=${encodeURIComponent(
-                    String(pending.fulfillment || "delivery")
-                )}`,
-                {
-                    replace: true,
-                    state: {
-                        slug: pending.slug,
-                        orderNo: pending.orderNo || String(pending.orderId),
-                        orderId: pending.orderId,
-                        amount: pending.amount,
-                        paymentStatus: normalizedStatus,
-                        fulfillment: String(pending.fulfillment || "delivery"),
-                    },
-                }
-            );
-        } catch (err) {
-            setError(err.response?.data?.message || "Payment verification failed");
-            setSuccess("");
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
     const handleSubmit = async () => {
         const tableNo = String(tableChoice || restaurantContext?.tableNo || "").trim();
         const normalizedPhone = String(phone || customer?.phone || "").trim();
         const normalizedName = String(customerName || customer?.name || "").trim();
         const normalizedEmail = String(email || customer?.email || "").trim();
-        const isUpiPayment = selectedPaymentMethod === "UPI";
-
-        if (isUpiPayment && placedOrder?.id) {
-            launchUpiApps(placedOrder);
-            return;
-        }
 
         if (isOnlineOrder && !normalizedPhone) {
             setError("Phone number is required to continue.");
@@ -723,33 +560,86 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                 return;
             }
 
-            // UPI: create order first, then let customer tap and choose any installed UPI app.
-            if (!upiPa) {
-                setError("UPI is not configured for this restaurant.");
-                return;
-            }
-
-            setUpiPendingOrder({ orderId, amount: orderTotal, slug, orderNo, fulfillment: selectedFulfillment });
-            setUpiAttemptFailed(false);
+            // Online Digital Payment via Cashfree Payment Gateway Engine
             try {
-                sessionStorage.setItem(
-                    UPI_PENDING_KEY,
-                    JSON.stringify({
+                const cashfreeRes = await api.post(
+                    "/api/payments/create-order",
+                    {
                         orderId,
                         amount: orderTotal,
-                        slug,
-                        orderNo,
-                        fulfillment: isOnlineOrder ? selectedFulfillment : "dinein",
-                        createdAt: Date.now(),
-                    })
+                        customerPhone: normalizedPhone,
+                        customerEmail: normalizedEmail,
+                    },
+                    getCustomerAuthConfig()
                 );
-            } catch {
-                // ignore
-            }
 
-            clearCart();
-            setSuccess("Order created. Tap 'Open UPI Apps' below to choose Google Pay, PhonePe, Paytm, etc.");
-            return;
+                const sessionId = cashfreeRes?.data?.payment_session_id || cashfreeRes?.data?.paymentSessionId;
+
+                if (!sessionId) {
+                    throw new Error(cashfreeRes?.data?.message || "Cashfree payment session could not be created. Please verify Cashfree API credentials.");
+                }
+
+                const CashfreeSdk = await loadCashfreeSdk();
+                if (CashfreeSdk) {
+                    const isProdSession = cashfreeRes?.data?.is_production !== undefined
+                        ? Boolean(cashfreeRes.data.is_production)
+                        : String(cashfreeRes?.data?.cf_env || "").toUpperCase() === "PRODUCTION";
+
+                    const envSetting = (import.meta.env.VITE_CASHFREE_ENV || "").toUpperCase();
+                    const isProdHostname = typeof window !== "undefined" && (window.location.hostname.includes("tiffzy.com"));
+                    const mode = isProdSession || envSetting === "PRODUCTION" || (isProdHostname && envSetting !== "TEST") ? "production" : "sandbox";
+                    const cashfree = CashfreeSdk({ mode });
+
+                    cashfree.checkout({
+                        paymentSessionId: sessionId,
+                    }).then(async (cfResult) => {
+                        if (cfResult?.error) {
+                            setError(cfResult.error.message || "Payment cancelled or failed. Please try again.");
+                            setSubmitting(false);
+                            return;
+                        }
+
+                        if (cfResult?.redirect) {
+                            return;
+                        }
+
+                        // Query backend server-side verification after Cashfree modal interaction
+                        const verifyRes = await api.get(`/api/payments/cashfree/status/${orderId}`, getCustomerAuthConfig());
+                        const verifiedData = verifyRes?.data || {};
+
+                        clearCart();
+                        onClose();
+
+                        const verifiedStatus = verifiedData.status || "UNKNOWN";
+                        const queryStatus = verifiedStatus === "SUCCESS" ? "SUCCESS" : verifiedStatus;
+
+                        navigate(
+                            `/orders/thank-you?slug=${encodeURIComponent(slug)}&orderNo=${encodeURIComponent(orderNo)}&orderId=${encodeURIComponent(
+                                String(orderId)
+                            )}&paymentStatus=${encodeURIComponent(queryStatus)}`,
+                            { replace: true, state: verifiedData }
+                        );
+                    }).catch((sdkErr) => {
+                        console.error("Cashfree SDK Checkout Error:", sdkErr);
+                        setError("Unable to open Cashfree Payment window. Please try again.");
+                        setSubmitting(false);
+                    });
+                    return;
+                }
+
+                setError("Cashfree Payment SDK could not be loaded. Please refresh and try again.");
+                setSubmitting(false);
+                return;
+            } catch (pgErr) {
+                console.error("Cashfree PG Order Creation Error:", pgErr?.response?.data || pgErr);
+                setError(
+                    pgErr?.response?.data?.message ||
+                    pgErr?.message ||
+                    "Cashfree Gateway Unavailable. Please check API credentials or try Cash on Pickup."
+                );
+                setSubmitting(false);
+                return;
+            }
 
         } catch (err) {
             setError(err.response?.data?.message || "Checkout failed");
@@ -1083,216 +973,108 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                     </div>
                                 )}
 
-                                <div className="order-1 space-y-3">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div>
-                                            <h3 className="mt-1 text-base font-semibold sm:text-lg">Pick one</h3>
+                                <div className="order-1 space-y-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <h3 className="text-base font-bold sm:text-lg">Select Payment Method</h3>
+                                                <p className="theme-muted text-xs">Choose how you would like to pay for this order.</p>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400">
+                                                <ShieldCheck size={14} />
+                                                <span>Encrypted 256-bit</span>
+                                            </div>
                                         </div>
-                                        <p className="theme-muted hidden items-center gap-2 text-[11px] sm:inline-flex sm:text-xs">
-                                            <ShieldCheck size={13} className="theme-accent-text sm:size-3.5" />
-                                            Secure payment
-                                        </p>
-                                    </div>
 
-                                    <div className={payLaterEligible ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
-                                        <button
-                                            type="button"
-                                            onClick={() => setPaymentMethod("UPI")}
-                                            className={[
-                                                "checkout-paper-option group relative flex min-h-[64px] items-center justify-between gap-2 overflow-hidden rounded-[18px] border px-3 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-primary)] hover:-translate-y-0.5",
-                                                selectedPaymentMethod === "UPI" ? "ring-1 ring-[color:var(--app-primary)]" : "",
-                                            ].join(" ")}
-                                            aria-pressed={selectedPaymentMethod === "UPI"}
-                                            style={getPaymentTileStyle("UPI", selectedPaymentMethod === "UPI")}
-                                        >
-                                            <div className="flex min-w-0 items-center gap-2">
-                                                <div
-                                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border"
-                                                    style={{
-                                                        borderColor: "color-mix(in srgb, var(--app-primary) 26%, var(--app-border) 74%)",
-                                                        background: "color-mix(in srgb, var(--app-primary) 11%, transparent)",
-                                                        color: "var(--app-primary)",
-                                                    }}
-                                                >
-                                                    <QrCode size={16} />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-[13px] font-semibold leading-tight tracking-tight sm:text-sm">{getPaymentMethodTitle("UPI")}</p>
-                                                    <p className="theme-muted mt-0.5 hidden text-[9px] leading-tight sm:block sm:text-[10px]">
-                                                        {getPaymentMethodSubtitle("UPI")}
-                                                     </p>
-                                                </div>
-                                            </div>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => setPaymentMethod("CASH")}
-                                            className={[
-                                                "checkout-paper-option group relative flex min-h-[72px] items-center justify-between gap-2 overflow-hidden rounded-[20px] border px-3 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] hover:-translate-y-0.5",
-                                                selectedPaymentMethod === "CASH" ? "ring-1 ring-[color:var(--app-accent)]" : "",
-                                            ].join(" ")}
-                                            aria-pressed={selectedPaymentMethod === "CASH"}
-                                            style={getPaymentTileStyle("CASH", selectedPaymentMethod === "CASH")}
-                                        >
-                                            <div className="flex min-w-0 items-center gap-2">
-                                                <div
-                                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border"
-                                                    style={{
-                                                        borderColor: "color-mix(in srgb, var(--app-accent) 30%, var(--app-border) 70%)",
-                                                        background: "color-mix(in srgb, var(--app-accent) 12%, transparent)",
-                                                        color: "var(--app-accent)",
-                                                    }}
-                                                >
-                                                    <Banknote size={16} />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-[13px] font-semibold leading-tight tracking-tight sm:text-sm">
-                                                        {getPaymentMethodTitle("CASH", selectedFulfillment)}
-                                                    </p>
-                                                <p className="theme-muted mt-0.5 hidden text-[9px] leading-tight sm:block sm:text-[10px]">
-                                                    {getPaymentMethodSubtitle("CASH", selectedFulfillment)}
-                                                </p>
-                                                </div>
-                                            </div>
-                                            <span
-                                                className="shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.18em] sm:text-[10px]"
-                                                style={getPaymentBadgeStyle("CASH", selectedPaymentMethod === "CASH")}
-                                            >
-                                                COD
-                                            </span>
-                                        </button>
-
-                                        {payLaterEligible && (
+                                        <div className="grid gap-3 sm:grid-cols-2">
                                             <button
                                                 type="button"
-                                                onClick={() => setPaymentMethod("PAY_LATER")}
-                                                className={[
-                                                    "checkout-paper-option group relative flex min-h-[72px] items-center justify-between gap-2 overflow-hidden rounded-[20px] border px-3 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 hover:-translate-y-0.5",
-                                                    selectedPaymentMethod === "PAY_LATER" ? "ring-1 ring-emerald-500" : "",
-                                                ].join(" ")}
-                                                aria-pressed={selectedPaymentMethod === "PAY_LATER"}
-                                                style={getPaymentTileStyle("PAY_LATER", selectedPaymentMethod === "PAY_LATER")}
+                                                onClick={() => setPaymentMethod("UPI")}
+                                                className={`group relative flex flex-col justify-between gap-3 rounded-2xl border p-4 text-left transition-all duration-200 ${
+                                                    selectedPaymentMethod === "UPI"
+                                                        ? "border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-500/5"
+                                                        : "border-white/10 hover:border-white/20 bg-white/5"
+                                                }`}
                                             >
-                                                <div className="flex min-w-0 items-center gap-2">
-                                                    <div
-                                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border"
-                                                        style={{
-                                                            borderColor: "color-mix(in srgb, #10B981 30%, var(--app-border) 70%)",
-                                                            background: "color-mix(in srgb, #10B981 12%, transparent)",
-                                                            color: "#10B981",
-                                                        }}
-                                                    >
-                                                        <IndianRupee size={16} />
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                                                            selectedPaymentMethod === "UPI" ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400" : "border-white/10 bg-white/5 text-amber-400"
+                                                        }`}>
+                                                            <CreditCard size={20} />
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-bold sm:text-base">Pay Online</span>
+                                                                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
+                                                                    Recommended
+                                                                </span>
+                                                            </div>
+                                                            <p className="theme-muted text-xs mt-0.5">Secure by Cashfree</p>
+                                                        </div>
                                                     </div>
-                                                    <div className="min-w-0">
-                                                        <p className="text-[13px] font-semibold leading-tight tracking-tight sm:text-sm">
-                                                            {getPaymentMethodTitle("PAY_LATER")}
-                                                        </p>
-                                                    <p className="theme-muted mt-0.5 hidden text-[9px] leading-tight sm:block sm:text-[10px]">
-                                                        {getPaymentMethodSubtitle("PAY_LATER")}
-                                                    </p>
+                                                    <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                        selectedPaymentMethod === "UPI" ? "border-emerald-500 bg-emerald-500 text-black" : "border-white/30"
+                                                    }`}>
+                                                        {selectedPaymentMethod === "UPI" && <CheckCircle2 size={14} className="fill-current text-white" />}
                                                     </div>
                                                 </div>
-                                                <span
-                                                    className="shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.18em] sm:text-[10px]"
-                                                    style={getPaymentBadgeStyle("PAY_LATER", selectedPaymentMethod === "PAY_LATER")}
-                                                >
-                                                    KHATA
-                                                </span>
+
+                                                <div className="mt-1 flex flex-wrap items-center gap-1.5 pt-2 border-t border-white/10">
+                                                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-bold text-emerald-300">UPI</span>
+                                                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold">Cards</span>
+                                                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold">Net Banking</span>
+                                                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold">Wallets</span>
+                                                </div>
                                             </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setPaymentMethod("CASH")}
+                                                className={`group relative flex flex-col justify-between gap-3 rounded-2xl border p-4 text-left transition-all duration-200 ${
+                                                    selectedPaymentMethod === "CASH"
+                                                        ? "border-amber-500 bg-amber-500/5 ring-2 ring-amber-500/40 shadow-lg shadow-amber-500/5"
+                                                        : "border-white/10 hover:border-white/20 bg-white/5"
+                                                }`}
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                                                            selectedPaymentMethod === "CASH" ? "border-amber-500/40 bg-amber-500/15 text-amber-400" : "border-white/10 bg-white/5 text-amber-400"
+                                                        }`}>
+                                                            <Banknote size={20} />
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-sm font-bold sm:text-base">{getPaymentMethodTitle("CASH", selectedFulfillment)}</span>
+                                                            <p className="theme-muted text-xs mt-0.5">{getPaymentMethodSubtitle("CASH", selectedFulfillment)}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                        selectedPaymentMethod === "CASH" ? "border-amber-500 bg-amber-500 text-black" : "border-white/30"
+                                                    }`}>
+                                                        {selectedPaymentMethod === "CASH" && <CheckCircle2 size={14} className="fill-current text-white" />}
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-1 flex items-center justify-between pt-2 border-t border-white/10">
+                                                    <span className="theme-muted text-[11px]">Pay when receiving order</span>
+                                                    <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-extrabold text-amber-400">
+                                                        COD
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        </div>
+
+                                        {selectedPaymentMethod === "UPI" && (
+                                            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300 flex items-center gap-2.5">
+                                                <ShieldCheck size={18} className="shrink-0 text-emerald-400" />
+                                                <span>
+                                                    You will be redirected to Cashfree Secure Checkout modal to complete payment via UPI, Cards, or Net Banking.
+                                                </span>
+                                            </div>
                                         )}
                                     </div>
 
-                                    {paymentMethod === "UPI" && (
-                                        <div className="space-y-2">
-                                            <div className="checkout-paper-flat py-1" style={getPaymentInfoStyle()}>
-                                                <p className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[color:var(--app-primary)] sm:text-xs">
-                                                    Pay Via UPI ID
-                                                </p>
-                                                {upiPa ? (
-                                                    <p className="mt-1 text-[13px] font-semibold tracking-tight sm:text-sm">{upiPa}</p>
-                                                ) : (
-                                                    <p className="mt-1 text-[13px] font-medium text-red-400 sm:text-sm">Owner has not added a UPI ID yet.</p>
-                                                )}
-                                                <p className="theme-muted mt-2 hidden text-[11px] leading-relaxed sm:block sm:text-xs">
-                                                    On mobile, this opens available apps like Google Pay, PhonePe, Paytm and others.
-                                                </p>
-                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                    {["Google Pay", "PhonePe", "Paytm", "BHIM"].map((appName) => (
-                                                        <span
-                                                            key={appName}
-                                                            className="rounded-full border px-2.5 py-1 text-[9px] font-semibold sm:text-[10px]"
-                                                            style={{
-                                                                borderColor: "color-mix(in srgb, var(--app-border-strong) 44%, var(--app-border) 56%)",
-                                                                background: "color-mix(in srgb, var(--app-surface-2) 58%, var(--app-surface) 42%)",
-                                                                color: "var(--app-muted-strong)",
-                                                            }}
-                                                        >
-                                                            {appName}
-                                                        </span>
-                                                    ))}
-                                                </div>
-
-                                                {placedOrder?.id ? (
-                                                    <div className="mt-3 space-y-2">
-                                                        <div
-                                                            className={`rounded-2xl border px-3 py-2 text-[11px] ${
-                                                                upiAttemptFailed
-                                                                    ? "border-rose-500/35 bg-rose-500/10 text-rose-200"
-                                                                    : "border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,var(--app-primary)_10%,var(--app-surface)_90%)] text-[color:var(--app-muted-strong)]"
-                                                            }`}
-                                                        >
-                                                            <p className="font-semibold text-[13px] sm:text-sm">
-                                                                Order {placedOrder.orderNo || placedOrder.id} • Rs {toInr(placedOrder.total)}
-                                                            </p>
-                                                            <p className="mt-1 text-[11px] sm:text-xs">
-                                                                {upiAttemptFailed
-                                                                    ? "Last UPI attempt failed. Tap Open UPI Apps to retry."
-                                                                    : "Complete payment in UPI app, then confirm status below."}
-                                                            </p>
-                                                        </div>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => launchUpiApps(placedOrder)}
-                                                                disabled={!upiPa || submitting}
-                                                                className="theme-button w-full rounded-2xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
-                                                            >
-                                                                Open UPI Apps
-                                                            </button>
-                                                            <div className="grid gap-2 sm:grid-cols-2">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => finalizeUpiPayment("SUCCESS")}
-                                                                    disabled={submitting}
-                                                                    className="rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,var(--app-primary)_12%,var(--app-surface)_88%)] px-3 py-2 text-[11px] font-semibold text-[color:var(--app-text)] disabled:opacity-60"
-                                                                >
-                                                                    Payment Successful
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => finalizeUpiPayment("FAILED")}
-                                                                    disabled={submitting}
-                                                                    className="rounded-2xl border border-rose-400/40 bg-rose-400/10 px-3 py-2 text-[11px] font-semibold text-rose-200 disabled:opacity-60"
-                                                                >
-                                                                    Payment Failed
-                                                                </button>
-                                                            </div>
-                                                        <p className="theme-muted hidden text-[11px] leading-relaxed sm:block">
-                                                            After payment in UPI app, come back here and pick the status.
-                                                        </p>
-                                                    </div>
-                                                ) : (
-                                                    <p className="theme-muted mt-3 hidden text-[11px] leading-relaxed sm:block">
-                                                        Place order first, then use the button above to open UPI apps.
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="order-3 space-y-3">
+                                    <div className="order-3 space-y-3">
                                     <div className="grid gap-3 md:grid-cols-2">
                                         {!customerToken && (
                                             <div>

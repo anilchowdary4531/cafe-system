@@ -78,14 +78,14 @@ export default async function (fastify) {
             0
         );
 
-        const taxAmount = +(subtotal * 0.05).toFixed(2);
+        const taxAmount = 0;
 
         await prisma.tableSession.update({
             where: { id: sessionId },
             data: {
                 subtotal,
                 taxAmount,
-                total: subtotal + taxAmount,
+                total: subtotal,
             },
         });
 

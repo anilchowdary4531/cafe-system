@@ -8,6 +8,7 @@ import { useCart } from "../context/CartContext";
 import { showToast } from "../utils/toast";
 import BrandLogo from "../components/BrandLogo";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
+import Footer from "../components/Footer";
 import {
     Cell,
     Area,
@@ -857,6 +858,7 @@ function RestaurantOrders({ group, highlightOrderId, onReorder, embedded = false
                     ))}
                 </div>
             )}
+            {!embedded && <Footer />}
         </section>
     );
 }

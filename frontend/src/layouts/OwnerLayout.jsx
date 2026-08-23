@@ -23,6 +23,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { resolveRestaurantName } from "../utils/restaurantContext";
 import BrandLogo from "../components/BrandLogo";
+import Footer from "../components/Footer";
 import { useAuth } from "../context/AuthContext";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
 import { showToast } from "../utils/toast";
@@ -1184,31 +1185,36 @@ export default function OwnerLayout() {
 
                 {showTableAssignmentStrip && (
                     <div
-                        className={`theme-nav border-b px-3 py-2 sm:px-4 md:px-6 ${
-                            isDashboardRoute ? "flex-1" : ""
+                        className={`theme-nav border-b px-3 py-3 sm:px-4 md:px-6 ${
+                            isDashboardRoute ? "flex-1 min-h-[80vh] flex flex-col justify-start gap-4" : ""
                         }`}
                     >
                         <div
                             className={
-                                isDashboardRoute ? "grid h-full gap-3 xl:grid-cols-4" : "flex flex-col gap-2.5"
+                                isDashboardRoute ? "grid min-h-[80vh] h-full gap-4 xl:grid-cols-4" : "flex flex-col gap-2.5"
                             }
                         >
                             <div
                                 className={
                                     isDashboardRoute
-                                        ? "flex min-h-0 flex-col gap-2.5 xl:col-span-3"
+                                        ? "flex min-h-0 flex-col gap-3 xl:col-span-3"
                                         : ""
                                 }
                             >
-                                <div className="flex flex-wrap items-start justify-between gap-2">
-                                    <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                                        <span className="theme-pill rounded-full px-3 py-1 font-semibold">
+                                <div className="theme-panel flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-3 sm:p-4 shadow-sm">
+                                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
+                                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 font-bold text-amber-400">
+                                            <TableProperties size={15} />
                                             Tables: {tableOverview.total}
                                         </span>
-                                        <span className="theme-chip-active rounded-full px-3 py-1 font-semibold">
+                                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 font-bold text-emerald-400">
+                                            <span className="relative flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                            </span>
                                             Occupied: {tableOverview.occupied}
                                         </span>
-                                        <span className="theme-pill rounded-full px-3 py-1 font-semibold">
+                                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-500/25 bg-slate-500/10 px-3 py-1.5 font-bold text-slate-300">
                                             Free: {freeTables}
                                         </span>
                                     </div>
@@ -1218,7 +1224,7 @@ export default function OwnerLayout() {
                                             return (
                                                 <span
                                                     key={stateKey}
-                                                    className={`theme-table-legend-item state-${stateClass}`}
+                                                    className={`theme-table-legend-item state-${stateClass} inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-semibold`}
                                                 >
                                                     <span className="theme-table-legend-dot" />
                                                     {TABLE_STATE_LABELS[stateKey]}
@@ -1231,11 +1237,11 @@ export default function OwnerLayout() {
                                 <div
                                     className={
                                         isDashboardRoute
-                                            ? "flex min-h-0 flex-1 flex-col gap-1.5"
+                                            ? "flex min-h-0 flex-1 flex-col gap-2 pt-2"
                                             : "flex flex-col gap-1.5"
                                     }
                                 >
-                                    <span className="theme-muted mr-1 text-[10px] font-semibold uppercase tracking-[0.2em]">
+                                    <span className="theme-muted mr-1 text-[11px] font-bold uppercase tracking-[0.2em]">
                                         Tables
                                     </span>
                                     {tableOverview.loading ? (
@@ -1246,7 +1252,7 @@ export default function OwnerLayout() {
                                         <div
                                             className={
                                                 isDashboardRoute
-                                                    ? "flex min-h-0 flex-wrap content-start gap-2 overflow-visible pb-3 pr-1"
+                                                    ? "grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-3 sm:gap-4 w-full auto-rows-fr overflow-visible pb-4"
                                                     : "flex flex-wrap gap-2 pb-3"
                                             }
                                         >
@@ -1335,15 +1341,15 @@ export default function OwnerLayout() {
                                                                 ? ` - Managed by ${assignedStaffLabel}`
                                                                 : ""
                                                         }`}
-                                                        className={`theme-table-box relative w-[152px] aspect-square rounded-xl p-2 pb-8 text-xs state-${tableStateClassToken} ${
+                                                        className={`theme-table-box relative w-full aspect-square min-h-[130px] max-w-[150px] flex flex-col justify-between rounded-2xl p-3 pb-8 text-xs transition-all duration-200 shadow-md hover:shadow-xl hover:-translate-y-0.5 state-${tableStateClassToken} ${
                                                             table.isOccupied ? "is-occupied" : ""
                                                         } ${isDropTarget ? "is-drop-target" : ""}`}
                                                     >
-                                                        <div className="flex h-full flex-col">
+                                                        <div className="flex h-full flex-col justify-between">
                                                             <div className="flex items-start justify-between gap-2">
                                                                 <div className="min-w-0">
                                                                     <div className="flex items-center gap-1.5">
-                                                                        <p className="truncate text-lg font-semibold leading-none">
+                                                                        <p className="truncate text-xl font-bold leading-none">
                                                                             {tableLabel}
                                                                         </p>
                                                                     </div>
@@ -1721,44 +1727,56 @@ export default function OwnerLayout() {
                                 </div>
                             </div>
                             {isDashboardRoute && (
-                                <aside className="theme-panel rounded-2xl p-3 sm:p-4 xl:col-span-1 xl:flex xl:h-full xl:flex-col">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <p className="text-sm font-semibold uppercase tracking-[0.14em]">
-                                            Online Orders
-                                        </p>
+                                <aside className="theme-panel rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4 shadow-sm xl:col-span-1 xl:flex xl:h-full xl:flex-col">
+                                    <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)] pb-3">
+                                        <div className="flex items-center gap-2">
+                                            <Globe2 size={16} className="text-amber-400" />
+                                            <p className="text-sm font-bold uppercase tracking-[0.14em]">
+                                                Online Orders
+                                            </p>
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={() => navigate("/owner/online-orders")}
-                                            className="theme-soft-button rounded-md px-2 py-1 text-[10px] font-semibold"
+                                            className="theme-button rounded-xl px-2.5 py-1 text-xs font-semibold"
                                         >
                                             View all
                                         </button>
                                     </div>
-                                    <p className="theme-muted mt-1 text-[11px]">
-                                        {stripOnlineOrders.length} active online order
-                                        {stripOnlineOrders.length === 1 ? "" : "s"}
-                                    </p>
-                                    <div className="mt-2 space-y-1.5 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1">
+                                    <div className="mt-3 flex items-center justify-between text-xs text-[color:var(--app-muted)] font-semibold">
+                                        <span>Active Orders</span>
+                                        <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-amber-300 text-[10px] font-bold">
+                                            {stripOnlineOrders.length} active
+                                        </span>
+                                    </div>
+                                    <div className="mt-3 space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1">
                                         {stripOnlineOrders.length === 0 ? (
-                                            <div className="theme-table-order-row rounded-lg px-2 py-2 text-[11px]">
-                                                No online orders.
+                                            <div className="theme-table-order-row rounded-xl px-3 py-3 text-xs theme-muted text-center">
+                                                No active online orders.
                                             </div>
                                         ) : (
                                             stripOnlineOrders.map((order) => {
                                                 const orderTimeLabel = formatOrderTime(order.createdAt);
+                                                const status = String(order.status || "PLACED").toUpperCase();
+                                                const statusTone =
+                                                    status === "READY"
+                                                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                                                        : status === "PREPARING"
+                                                        ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                                                        : "border-cyan-500/30 bg-cyan-500/10 text-cyan-300";
                                                 return (
                                                     <button
                                                         key={`${order.tableKey}-${order.id}`}
                                                         type="button"
                                                         onClick={() => setSelectedLiveOrder(order)}
-                                                        className="theme-table-order-row block w-full rounded-lg px-2 py-2 text-left transition hover:opacity-90"
+                                                        className="theme-table-order-row block w-full rounded-2xl border border-[color:var(--app-border)] p-3 text-left transition duration-200 hover:border-amber-500/40 hover:bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_85%,#000_15%)]"
                                                     >
                                                         <div className="flex items-start justify-between gap-2">
                                                             <div className="min-w-0">
-                                                                <p className="truncate text-xs font-semibold">
+                                                                <p className="truncate text-xs font-bold">
                                                                     {order.orderNo ? order.orderNo : `#${order.id}`}
                                                                 </p>
-                                                                <p className="theme-muted text-[10px]">
+                                                                <p className="theme-muted mt-0.5 text-[11px]">
                                                                     Table {order.tableNo || "--"}
                                                                 </p>
                                                                 {orderTimeLabel ? (
@@ -1767,13 +1785,16 @@ export default function OwnerLayout() {
                                                                     </p>
                                                                 ) : null}
                                                             </div>
-                                                            <p className="text-[10px] font-semibold uppercase">
-                                                                {order.status || "PLACED"}
-                                                            </p>
+                                                            <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${statusTone}`}>
+                                                                {status}
+                                                            </span>
                                                         </div>
-                                                        <p className="mt-1 text-xs font-semibold">
-                                                            {formatReceiptAmount(getReceiptOrderTotal(order))}
-                                                        </p>
+                                                        <div className="mt-2 flex items-center justify-between border-t border-[color:var(--app-border)] pt-2 text-xs">
+                                                            <span className="theme-muted text-[10px]">Total</span>
+                                                            <span className="font-bold text-amber-400">
+                                                                {formatReceiptAmount(getReceiptOrderTotal(order))}
+                                                            </span>
+                                                        </div>
                                                     </button>
                                                 );
                                             })
@@ -1795,6 +1816,7 @@ export default function OwnerLayout() {
                         <Outlet />
                     ) : null}
                 </main>
+                <Footer />
             </div>
             {selectedLiveOrder && (
                 <div
