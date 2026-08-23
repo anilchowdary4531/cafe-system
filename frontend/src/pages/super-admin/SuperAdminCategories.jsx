@@ -1,0 +1,189 @@
+import { useEffect, useState } from "react";
+import {
+    LayoutDashboard,
+    Building2,
+    Users,
+    Store,
+    Settings,
+    Menu,
+    X,
+    Plus,
+    Trash2,
+    Save,
+    Image as ImageIcon
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { api } from "../../utils/apiClient";
+import tiffzyLogo from "../../assets/tiffzy-logo.png";
+
+const SUPER_ADMIN_MENU_ITEMS = [
+    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, to: "/super-admin" },
+    { key: "users", label: "Users", icon: Users, to: "/super-admin/users" },
+    { key: "restaurants", label: "Restaurants", icon: Building2, to: "/super-admin#restaurants-section" },
+    { key: "categories", label: "Categories", icon: Menu, to: "/super-admin/categories" },
+    { key: "banners", label: "Banners", icon: ImageIcon, to: "/super-admin/banners" },
+    { key: "create-restaurant", label: "Create Restaurant", icon: Store, to: "/super-admin/create-restaurant" },
+    { key: "settings", label: "Settings", icon: Settings, to: "/super-admin/settings" },
+];
+
+export default function SuperAdminCategories() {
+    const navigate = useNavigate();
+    const { user, logout } = useAuth();
+    const [categories, setCategories] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    // New Category Form
+    const [showForm, setShowForm] = useState(false);
+    const [formData, setFormData] = useState({ name: "", imageUrl: "", priority: 0 });
+
+    const loadCategories = async () => {
+        try {
+            setLoading(true);
+            const { data } = await api.get("/super-admin/categories");
+            setCategories(data.categories || []);
+        } catch (err) {
+            setError("Failed to load categories");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadCategories();
+    }, []);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            await api.post("/super-admin/categories", formData);
+            setShowForm(false);
+            setFormData({ name: "", imageUrl: "", priority: 0 });
+            loadCategories();
+        } catch (err) {
+            setError(err.response?.data?.message || "Failed to create category");
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this category?")) return;
+        try {
+            await api.delete(`/super-admin/categories/${id}`);
+            loadCategories();
+        } catch (err) {
+            setError("Failed to delete category");
+        }
+    };
+
+    const toggleStatus = async (category) => {
+        try {
+            await api.patch(`/super-admin/categories/${category.id}`, { isActive: !category.isActive });
+            loadCategories();
+        } catch (err) {
+            setError("Failed to update category status");
+        }
+    };
+
+    return (
+        <div className="theme-page min-h-screen">
+            {/* Sidebar remains the same as Dashboard for consistency */}
+            <div className={`fixed inset-0 z-50 transition ${sidebarOpen ? "pointer-events-auto" : "pointer-events-none"}`}>
+                <button onClick={() => setSidebarOpen(false)} className={`absolute inset-0 bg-black/45 transition-opacity ${sidebarOpen ? "opacity-100" : "opacity-0"}`} />
+                <aside className={`theme-panel theme-border absolute left-0 top-0 h-full w-72 max-w-[84vw] border-r p-5 shadow-2xl transition-transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+                    <div className="flex items-center justify-between mb-8">
+                        <h2 className="text-xl font-bold">Tiffzy Admin</h2>
+                        <button onClick={() => setSidebarOpen(false)} className="theme-soft-button p-2 rounded-xl"><X size={18} /></button>
+                    </div>
+                    <nav className="grid gap-2">
+                        {SUPER_ADMIN_MENU_ITEMS.map((item) => (
+                            <button key={item.key} onClick={() => { navigate(item.to); setSidebarOpen(false); }} className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left font-semibold transition ${item.key === "categories" ? "theme-button" : "theme-soft-button"}`}>
+                                <item.icon size={18} /> {item.label}
+                            </button>
+                        ))}
+                    </nav>
+                </aside>
+            </div>
+
+            <header className="theme-nav border-b px-4 py-4 md:px-8">
+                <div className="mx-auto flex max-w-7xl items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => setSidebarOpen(true)} className="theme-soft-button p-2 rounded-full"><Menu size={20} /></button>
+                        <h1 className="text-2xl font-bold">Global Categories</h1>
+                    </div>
+                    <button onClick={() => setShowForm(true)} className="theme-button flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold">
+                        <Plus size={18} /> Add Category
+                    </button>
+                </div>
+            </header>
+
+            <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+                {error && <div className="mb-6 rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-300 text-sm">{error}</div>}
+
+                {showForm && (
+                    <div className="theme-panel mb-8 rounded-3xl p-6 border theme-border">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-bold text-white">Create New Category</h3>
+                            <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-white"><X size={20} /></button>
+                        </div>
+                        <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-3">
+                            <div className="grid gap-1.5">
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Category Name</label>
+                                <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="theme-input rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g. Pizza" />
+                            </div>
+                            <div className="grid gap-1.5">
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Image URL</label>
+                                <input value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} className="theme-input rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="https://unsplash..." />
+                            </div>
+                            <div className="grid gap-1.5">
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Priority</label>
+                                <div className="flex gap-2">
+                                    <input type="number" value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})} className="theme-input rounded-xl px-4 py-3 text-sm outline-none w-full" />
+                                    <button type="submit" className="theme-button rounded-xl px-6 font-bold"><Save size={18} /></button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                )}
+
+                {loading ? (
+                    <div className="text-center py-12 text-gray-400">Loading categories...</div>
+                ) : (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {categories.map((category) => (
+                            <div key={category.id} className="theme-panel rounded-3xl overflow-hidden border theme-border group transition-all hover:border-orange-500/50">
+                                <div className="h-32 bg-gray-900 relative">
+                                    {category.imageUrl ? (
+                                        <img src={category.imageUrl} className="w-full h-full object-cover" alt={category.name} />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-gray-700"><ImageIcon size={40} /></div>
+                                    )}
+                                    <div className="absolute top-2 right-2 flex gap-1">
+                                        <button onClick={() => toggleStatus(category)} className={`p-2 rounded-full shadow-lg ${category.isActive ? "bg-green-500 text-white" : "bg-gray-700 text-gray-400"}`}>
+                                            <Power size={14} />
+                                        </button>
+                                        <button onClick={() => handleDelete(category.id)} className="p-2 rounded-full bg-red-500 text-white shadow-lg">
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="p-4 flex items-center justify-between">
+                                    <div>
+                                        <h4 className="font-bold text-white uppercase tracking-tight">{category.name}</h4>
+                                        <p className="text-xs text-gray-500">Priority: {category.priority}</p>
+                                    </div>
+                                    <div className={`h-2 w-2 rounded-full ${category.isActive ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-gray-600"}`} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+}
+
+function Power({ size, className }) {
+    return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" /></svg>;
+}

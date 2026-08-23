@@ -33,6 +33,7 @@ import com.tiffzy.app.data.model.OrderDetails
 import com.tiffzy.app.ui.auth.AuthViewModel
 import com.tiffzy.app.ui.components.*
 import com.tiffzy.app.ui.theme.Dimens
+import com.tiffzy.app.utils.ImageUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -450,10 +451,11 @@ fun ProfileHeaderCard(
             ) {
                 if (!avatarUrl.isNullOrEmpty()) {
                     AsyncImage(
-                        model = avatarUrl,
+                        model = ImageUtils.resolveImageUrl(avatarUrl),
                         contentDescription = "Profile Picture",
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
+                        error = androidx.compose.ui.graphics.vector.rememberVectorPainter(Icons.Default.Person)
                     )
                 } else {
                     val initials = nickname?.take(1)?.uppercase() ?: customer.name?.take(1)?.uppercase() ?: customer.phone.take(1)

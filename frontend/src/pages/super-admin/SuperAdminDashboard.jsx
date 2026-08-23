@@ -11,6 +11,7 @@ import {
     UserRound,
     Users,
     X,
+    Image as ImageIcon
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -47,6 +48,8 @@ const SUPER_ADMIN_MENU_ITEMS = [
     { key: "profile", label: "Profile", icon: UserRound, to: "/super-admin#profile-section" },
     { key: "users", label: "Users", icon: Users, to: "/super-admin/users" },
     { key: "restaurants", label: "Restaurants", icon: Building2, to: "/super-admin#restaurants-section" },
+    { key: "categories", label: "Categories", icon: Menu, to: "/super-admin/categories" },
+    { key: "banners", label: "Banners", icon: ImageIcon, to: "/super-admin/banners" },
     { key: "create-restaurant", label: "Create Restaurant", icon: Store, to: "/super-admin/create-restaurant" },
     { key: "settings", label: "Settings", icon: Settings, to: "/super-admin/settings" },
 ];

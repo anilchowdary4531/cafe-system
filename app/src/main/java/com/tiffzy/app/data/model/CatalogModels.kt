@@ -31,3 +31,20 @@ data class SearchItemRestaurant(
     val state: String?,
     val logo: String?
 )
+
+data class BannerResponse(
+    val id: Int,
+    val title: String?,
+    val imageUrl: String,
+    val actionUrl: String?,
+    val isActive: Boolean,
+    val priority: Int
+)
+
+data class GlobalCategoryResponse(
+    val id: Int,
+    val name: String,
+    val imageUrl: String?,
+    val isActive: Boolean,
+    val priority: Int
+)

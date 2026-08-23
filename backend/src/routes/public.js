@@ -57,6 +57,20 @@ export default async function publicRoutes(app, deps) {
     return { status: "ok" };
   });
 
+  app.get("/banners", async () => {
+    return await prisma.banner.findMany({
+      where: { isActive: true },
+      orderBy: { priority: "desc" },
+    });
+  });
+
+  app.get("/global-categories", async () => {
+    return await prisma.globalCategory.findMany({
+      where: { isActive: true },
+      orderBy: { priority: "desc" },
+    });
+  });
+
   // Public restaurant list for customer-side auto selection (geo or manual).
   app.get("/restaurants", async (req, reply) => {
     try {

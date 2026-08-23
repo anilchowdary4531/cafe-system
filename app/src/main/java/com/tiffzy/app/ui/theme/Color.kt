@@ -2,21 +2,21 @@ package com.tiffzy.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Tiffzy Luxury Dark Palette (Primary Design System)
-val TiffzyPrimary = Color(0xFFF5B94E)
-val TiffzyPrimaryHover = Color(0xFFFFD166)
-val TiffzyBackground = Color(0xFF07090D)
-val TiffzySurface = Color(0xFF15151A)
-val TiffzySurfaceAlpha = Color(0xD215151A) // 82% opacity
-val TiffzyInput = Color(0xFF10121A)
-val TiffzyOnSurface = Color(0xFFFFF8E7)
-val TiffzyMuted = Color(0xFFB8AB91)
-val TiffzyAccent = Color(0xFFA97130)
-val TiffzyBorder = Color(0x1AFFFFFF) // 10% white
-val TiffzyError = Color(0xFFEF4444)
-val TiffzySuccess = Color(0xFFA6E6A9)
-val TiffzyWarning = Color(0xFFF1D25F)
+// Tiffzy Premium Palette - Refined and Sophisticated
+val TiffzyPrimary = Color(0xFFF35E05) // Refined Orange (More premium, less saturated)
+val TiffzyPrimaryHover = Color(0xFFFF7034)
+val TiffzyBackground = Color(0xFFF8F8F8) 
+val TiffzySurface = Color(0xFFFFFFFF)
+val TiffzySurfaceAlpha = Color(0xFFF0F0F0) 
+val TiffzyInput = Color(0xFFE9EAED) 
+val TiffzyOnSurface = Color(0xFF0F0F0F) // World Class Rich Black (Deep Obsidian)
+val TiffzyMuted = Color(0xFF666666) // Refined Muted Gray
+val TiffzyAccent = Color(0xFFF35E05)
+val TiffzyBorder = Color(0xFFE0E0E0) 
+val TiffzyError = Color(0xFFD32F2F)
+val TiffzySuccess = Color(0xFF2E7D32)
+val TiffzyWarning = Color(0xFFFFA000)
 
 // Base Brand Colors
-val TiffzyOrange = Color(0xFFFC8019)
-val TiffzyGreen = Color(0xFF16A34A)
+val TiffzyOrange = Color(0xFFF35E05)
+val TiffzyGreen = Color(0xFF2E7D32)

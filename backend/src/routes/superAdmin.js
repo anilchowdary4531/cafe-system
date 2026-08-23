@@ -316,4 +316,143 @@ export default async function superAdminRoutes(app, deps) {
       return reply.code(500).send({ message: "Failed to update restaurant status" });
     }
   });
+
+  ///////////////////////////////////////////////////////////
+  // GLOBAL CATEGORIES
+  ///////////////////////////////////////////////////////////
+
+  app.get("/super-admin/categories", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const categories = await prisma.globalCategory.findMany({
+        orderBy: { priority: "desc" },
+      });
+      return { categories };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to fetch categories" });
+    }
+  });
+
+  app.post("/super-admin/categories", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const { name, imageUrl, priority, isActive } = req.body || {};
+      if (!name) return reply.code(400).send({ message: "Category name is required" });
+
+      const category = await prisma.globalCategory.create({
+        data: {
+          name,
+          imageUrl,
+          priority: Number(priority || 0),
+          isActive: isActive !== false,
+        },
+      });
+      return { message: "Category created", category };
+    } catch (err) {
+      console.log(err);
+      if (err.code === "P2002") return reply.code(409).send({ message: "Category name already exists" });
+      return reply.code(500).send({ message: "Failed to create category" });
+    }
+  });
+
+  app.patch("/super-admin/categories/:id", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const id = Number(req.params.id);
+      const data = req.body || {};
+
+      const category = await prisma.globalCategory.update({
+        where: { id },
+        data: {
+          name: data.name,
+          imageUrl: data.imageUrl,
+          priority: data.priority !== undefined ? Number(data.priority) : undefined,
+          isActive: data.isActive,
+        },
+      });
+      return { message: "Category updated", category };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to update category" });
+    }
+  });
+
+  app.delete("/super-admin/categories/:id", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const id = Number(req.params.id);
+      await prisma.globalCategory.delete({ where: { id } });
+      return { message: "Category deleted" };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to delete category" });
+    }
+  });
+
+  ///////////////////////////////////////////////////////////
+  // BANNERS
+  ///////////////////////////////////////////////////////////
+
+  app.get("/super-admin/banners", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const banners = await prisma.banner.findMany({
+        orderBy: { priority: "desc" },
+      });
+      return { banners };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to fetch banners" });
+    }
+  });
+
+  app.post("/super-admin/banners", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const { title, imageUrl, actionUrl, priority, isActive } = req.body || {};
+      if (!imageUrl) return reply.code(400).send({ message: "Banner image URL is required" });
+
+      const banner = await prisma.banner.create({
+        data: {
+          title,
+          imageUrl,
+          actionUrl,
+          priority: Number(priority || 0),
+          isActive: isActive !== false,
+        },
+      });
+      return { message: "Banner created", banner };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to create banner" });
+    }
+  });
+
+  app.patch("/super-admin/banners/:id", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const id = Number(req.params.id);
+      const data = req.body || {};
+
+      const banner = await prisma.banner.update({
+        where: { id },
+        data: {
+          title: data.title,
+          imageUrl: data.imageUrl,
+          actionUrl: data.actionUrl,
+          priority: data.priority !== undefined ? Number(data.priority) : undefined,
+          isActive: data.isActive,
+        },
+      });
+      return { message: "Banner updated", banner };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to update banner" });
+    }
+  });
+
+  app.delete("/super-admin/banners/:id", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const id = Number(req.params.id);
+      await prisma.banner.delete({ where: { id } });
+      return { message: "Banner deleted" };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to delete banner" });
+    }
+  });
 }

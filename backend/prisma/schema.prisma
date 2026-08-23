@@ -610,3 +610,28 @@ model CustomerNotification {
   @@map("customer_notifications")
 }
 
+model GlobalCategory {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  imageUrl  String?  @map("image_url")
+  isActive  Boolean  @default(true) @map("is_active")
+  priority  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("global_categories")
+}
+
+model Banner {
+  id        Int      @id @default(autoincrement())
+  title     String?
+  imageUrl  String   @map("image_url")
+  actionUrl String?  @map("action_url")
+  isActive  Boolean  @default(true) @map("is_active")
+  priority  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("banners")
+}
+

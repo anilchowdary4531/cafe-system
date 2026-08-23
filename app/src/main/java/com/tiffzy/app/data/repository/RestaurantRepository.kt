@@ -10,6 +10,14 @@ class RestaurantRepository(private val apiService: ApiService) {
         return apiService.checkHealth()
     }
 
+    suspend fun getBanners(): List<BannerResponse> {
+        return try { apiService.getBanners() } catch (e: Exception) { emptyList() }
+    }
+
+    suspend fun getGlobalCategories(): List<GlobalCategoryResponse> {
+        return try { apiService.getGlobalCategories() } catch (e: Exception) { emptyList() }
+    }
+
     suspend fun getRestaurants(): List<Restaurant> {
         return apiService.getRestaurants()
     }

@@ -30,6 +30,7 @@ import com.tiffzy.app.ui.components.TiffzyPrimaryButton
 import com.tiffzy.app.ui.components.TiffzyTextField
 import com.tiffzy.app.ui.components.TiffzyTopBar
 import com.tiffzy.app.ui.theme.Dimens
+import com.tiffzy.app.utils.ImageUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,7 +99,7 @@ fun EditProfileScreen(
                     Box {
                         if (!avatarUri.isNullOrEmpty()) {
                             AsyncImage(
-                                model = avatarUri,
+                                model = ImageUtils.resolveImageUrl(avatarUri),
                                 contentDescription = "Profile Photo",
                                 modifier = Modifier
                                     .size(100.dp)

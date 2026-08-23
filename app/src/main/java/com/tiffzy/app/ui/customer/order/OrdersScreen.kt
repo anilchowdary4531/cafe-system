@@ -91,7 +91,7 @@ fun OrdersScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = Dimens.PaddingLarge), // ~98% width
+                        contentPadding = PaddingValues(start = 4.dp, end = 4.dp, top = Dimens.PaddingSmall, bottom = Dimens.PaddingLarge),
                         verticalArrangement = Arrangement.spacedBy(Dimens.SpacingLarge)
                     ) {
                         item {

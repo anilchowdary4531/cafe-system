@@ -41,6 +41,7 @@ import com.tiffzy.app.ui.theme.Dimens
 import com.tiffzy.app.utils.ImageUtils
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import com.tiffzy.app.ui.customer.home.getCategoryIcon
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -157,22 +158,29 @@ fun MenuScreen(
                         horizontalArrangement = Arrangement.spacedBy(Dimens.SpacingMedium)
                     ) {
                         item {
-                            val firstItemImage = state.menu.firstOrNull { !it.image.isNullOrEmpty() }?.image
                             MenuCategoryCircleItem(
                                 name = "All",
-                                imageUrl = firstItemImage,
                                 isSelected = selectedCategory == "All",
                                 onClick = { selectedCategory = "All" }
                             )
                         }
-                        items(categories) { category ->
-                            val categoryImage = category.items.firstOrNull { !it.image.isNullOrEmpty() }?.image
+                        item {
                             MenuCategoryCircleItem(
-                                name = category.name,
-                                imageUrl = categoryImage,
-                                isSelected = selectedCategory == category.name,
-                                onClick = { selectedCategory = category.name }
+                                name = "Biryani",
+                                isSelected = selectedCategory == "Biryani",
+                                onClick = { selectedCategory = "Biryani" }
                             )
+                        }
+                        items(categories) { category ->
+                            if (category.name.lowercase() != "biryani") {
+                                val categoryImage = category.items.firstOrNull { !it.image.isNullOrEmpty() }?.image
+                                MenuCategoryCircleItem(
+                                    name = category.name,
+                                    imageUrl = categoryImage,
+                                    isSelected = selectedCategory == category.name,
+                                    onClick = { selectedCategory = category.name }
+                                )
+                            }
                         }
                     }
 
@@ -479,7 +487,7 @@ fun DietIcon(item: MenuItem) {
 @Composable
 fun MenuCategoryCircleItem(
     name: String,
-    imageUrl: String?,
+    imageUrl: String? = null,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
@@ -492,23 +500,33 @@ fun MenuCategoryCircleItem(
         Surface(
             modifier = Modifier.size(60.dp),
             shape = CircleShape,
-            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
             border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
         ) {
-            AsyncImage(
-                model = ImageUtils.resolveImageUrl(imageUrl),
-                contentDescription = name,
-                modifier = Modifier.fillMaxSize().clip(CircleShape),
-                contentScale = ContentScale.Crop,
-                placeholder = painterResource(id = com.tiffzy.app.R.drawable.baked_goods_1),
-                error = painterResource(id = com.tiffzy.app.R.drawable.baked_goods_1)
-            )
+            Box(contentAlignment = Alignment.Center) {
+                if (!imageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = ImageUtils.resolveImageUrl(imageUrl),
+                        contentDescription = name,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(id = com.tiffzy.app.R.drawable.baked_goods_1)
+                    )
+                } else {
+                    Icon(
+                        imageVector = getCategoryIcon(name),
+                        contentDescription = name,
+                        modifier = Modifier.size(30.dp),
+                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                    )
+                }
+            }
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = name,
             style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold,
             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             maxLines = 1

@@ -1,6 +1,12 @@
 package com.tiffzy.app.navigation
 
 import androidx.activity.ComponentActivity
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -21,6 +27,7 @@ import com.tiffzy.app.ui.customer.home.HomeScreen
 import com.tiffzy.app.ui.customer.home.LocationSelectorScreen
 import com.tiffzy.app.ui.customer.home.HomeViewModel
 import com.tiffzy.app.ui.customer.home.LocationViewModel
+import com.tiffzy.app.ui.customer.search.SearchScreen
 import com.tiffzy.app.ui.customer.menu.MenuScreen
 import com.tiffzy.app.ui.customer.menu.MenuViewModel
 import com.tiffzy.app.ui.customer.menu.MenuViewModelFactory
@@ -41,10 +48,34 @@ import com.tiffzy.app.ui.customer.scanner.ScannerScreen
 import com.tiffzy.app.ui.payment.PaymentActivity
 import com.tiffzy.app.ui.components.PlaceholderScreen
 import com.tiffzy.app.data.repository.CartRepository
+import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 
@@ -55,6 +86,7 @@ object Routes {
     const val Otp = "otp"
     const val Location = "location"
     const val Home = "home"
+    const val Search = "search"
     const val RestaurantDetail = "restaurant/{slug}"
     const val Menu = "menu/{slug}"
     const val Cart = "cart"
@@ -91,14 +123,36 @@ object Routes {
     }
 }
 
+data class BottomNavItem(
+    val route: String,
+    val label: String,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector
+)
+
+val bottomNavItems = listOf(
+    BottomNavItem(Routes.Home, "Home", Icons.Filled.Home, Icons.Outlined.Home),
+    BottomNavItem(Routes.Search, "Search", Icons.Filled.Search, Icons.Outlined.Search),
+    BottomNavItem(Routes.Orders, "Orders", Icons.AutoMirrored.Filled.Assignment, Icons.AutoMirrored.Outlined.Assignment),
+    BottomNavItem(Routes.Cart, "Cart", Icons.Filled.ShoppingCart, Icons.Outlined.ShoppingCart),
+    BottomNavItem(Routes.Profile, "Profile", Icons.Filled.Person, Icons.Outlined.Person)
+)
+
 @Composable
 fun NavGraph(
     navController: NavHostController = rememberNavController(),
     authViewModel: AuthViewModel = viewModel()
 ) {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val locationViewModel: LocationViewModel = viewModel(activity)
     val homeViewModel: HomeViewModel = viewModel()
+
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+
+    val showBottomBar = bottomNavItems.any { item ->
+        currentDestination?.hierarchy?.any { it.route == item.route } == true
+    }
 
     val navigateToLogin = {
         authViewModel.logout()
@@ -107,10 +161,62 @@ fun NavGraph(
         }
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = Routes.Splash
-    ) {
+    Scaffold(
+        bottomBar = {
+            if (showBottomBar) {
+                NavigationBar(
+                    modifier = Modifier.height(80.dp), // Increased for visibility
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    tonalElevation = 8.dp,
+                    windowInsets = NavigationBarDefaults.windowInsets // Properly handle system bottom bar
+                ) {
+                    bottomNavItems.forEach { item ->
+                        val isSelected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+                        NavigationBarItem(
+                            icon = {
+                                Icon(
+                                    imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                                    contentDescription = item.label,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            },
+                            label = { 
+                                Text(
+                                    item.label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium
+                                ) 
+                            },
+                            selected = isSelected,
+                            onClick = {
+                                navController.navigate(item.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            alwaysShowLabel = true,
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = Color(0xFFFE5102),
+                                selectedTextColor = Color(0xFFFE5102),
+                                unselectedIconColor = Color.Gray,
+                                unselectedTextColor = Color.Gray,
+                                indicatorColor = Color(0xFFFE5102).copy(alpha = 0.1f)
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = Routes.Splash,
+            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
+        ) {
         composable(Routes.Splash) {
             SplashScreen(
                 viewModel = authViewModel,
@@ -234,7 +340,9 @@ fun NavGraph(
             )
         }
 
-        composable(Routes.Home) {
+        composable(
+            route = Routes.Home
+        ) { backStackEntry ->
             val lastLocation by locationViewModel.lastSelectedLocation.collectAsState()
             val locationName = lastLocation?.addressName
 
@@ -259,6 +367,9 @@ fun NavGraph(
                 onViewProfile = {
                     navController.navigate(Routes.Profile)
                 },
+                onNotificationsClick = {
+                    navController.navigate(Routes.Notifications)
+                },
                 onScanClick = {
                     navController.navigate(Routes.Scanner)
                 },
@@ -267,6 +378,14 @@ fun NavGraph(
                 },
                 onNavigateToWeb = { title, url ->
                     navController.navigate(Routes.web(title, url))
+                }
+            )
+        }
+
+        composable(Routes.Search) {
+            SearchScreen(
+                onRestaurantClick = { slug ->
+                    navController.navigate(Routes.menu(slug))
                 }
             )
         }
@@ -297,23 +416,6 @@ fun NavGraph(
                     navController.navigate(Routes.Home)
                 },
                 onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Routes.Profile) {
-            ProfileScreen(
-                onEditProfile = { navController.navigate(Routes.EditProfile) },
-                onOrdersClick = { navController.navigate(Routes.Orders) },
-                onFavoritesClick = { navController.navigate(Routes.Favorites) },
-                onPayLaterClick = { navController.navigate(Routes.PayLater) },
-                onNotificationsClick = { navController.navigate(Routes.Notifications) },
-                onSettingsClick = { navController.navigate(Routes.Settings) },
-                onDeleteAccount = { navController.navigate(Routes.DeleteAccount) },
-                onLogout = navigateToLogin,
-                onBack = { navController.popBackStack() },
-                onNavigateToWeb = { title, url ->
-                    navController.navigate(Routes.web(title, url))
-                }
             )
         }
 
@@ -460,7 +562,7 @@ fun NavGraph(
                             env = "PRODUCTION" // Match with backend environment
                         )
                         // Note: We don't navigate to success screen immediately for online payments.
-                        // PaymentActivity handles its own success UI, and when finished, 
+                        // PaymentActivity handles its own success UI, and when finished,
                         // the user returns to Checkout which they can then leave.
                     } else {
                         // For CASH or full Wallet payments, go straight to success
@@ -544,6 +646,24 @@ fun NavGraph(
             )
         }
 
+        composable(Routes.Profile) {
+            ProfileScreen(
+                onEditProfile = { navController.navigate(Routes.EditProfile) },
+                onOrdersClick = { navController.navigate(Routes.Orders) },
+                onFavoritesClick = { navController.navigate(Routes.Favorites) },
+                onPayLaterClick = { navController.navigate(Routes.PayLater) },
+                onNotificationsClick = { navController.navigate(Routes.Notifications) },
+                onSettingsClick = { navController.navigate(Routes.Settings) },
+                onDeleteAccount = { navController.navigate(Routes.DeleteAccount) },
+                onLogout = navigateToLogin,
+                onBack = { navController.popBackStack() },
+                onNavigateToWeb = { title, url ->
+                    navController.navigate(Routes.web(title, url))
+                },
+                authViewModel = authViewModel
+            )
+        }
+
         composable(
             route = Routes.Web,
             arguments = listOf(
@@ -553,14 +673,14 @@ fun NavGraph(
         ) { backStackEntry ->
             val title = backStackEntry.arguments?.getString("title") ?: "Web Page"
             val encodedUrl = backStackEntry.arguments?.getString("url") ?: ""
-            
+
             // Decode the URL
             val url = try {
                 String(android.util.Base64.decode(encodedUrl, android.util.Base64.URL_SAFE))
             } catch (e: Exception) {
                 ""
             }
-            
+
             // Get token from ViewModel
             val tokenState by authViewModel.authToken.collectAsState(initial = null)
 
@@ -572,4 +692,5 @@ fun NavGraph(
             )
         }
     }
+}
 }

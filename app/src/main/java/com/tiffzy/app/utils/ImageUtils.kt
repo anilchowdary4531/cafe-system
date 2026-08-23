@@ -16,7 +16,9 @@ object ImageUtils {
 
         // Handle absolute URLs
         if (value.startsWith("http://", ignoreCase = true) || 
-            value.startsWith("https://", ignoreCase = true)) {
+            value.startsWith("https://", ignoreCase = true) ||
+            value.startsWith("content://", ignoreCase = true) ||
+            value.startsWith("file://", ignoreCase = true)) {
             
             try {
                 val url = URL(value)

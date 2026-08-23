@@ -8,6 +8,12 @@ interface ApiService {
     @GET("healthz")
     suspend fun checkHealth(): HealthResponse
 
+    @GET("banners")
+    suspend fun getBanners(): List<BannerResponse>
+
+    @GET("global-categories")
+    suspend fun getGlobalCategories(): List<GlobalCategoryResponse>
+
     @GET("restaurants")
     suspend fun getRestaurants(): List<Restaurant>
 
