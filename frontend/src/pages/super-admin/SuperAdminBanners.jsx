@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+    BarChart3,
     LayoutDashboard,
     Building2,
     Users,
@@ -18,13 +19,14 @@ import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/apiClient";
 
 const SUPER_ADMIN_MENU_ITEMS = [
-    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, to: "/super-admin" },
-    { key: "users", label: "Users", icon: Users, to: "/super-admin/users" },
-    { key: "restaurants", label: "Restaurants", icon: Building2, to: "/super-admin#restaurants-section" },
-    { key: "categories", label: "Categories", icon: Menu, to: "/super-admin/categories" },
-    { key: "banners", label: "Banners", icon: ImageIcon, to: "/super-admin/banners" },
+    { key: "dashboard", label: "Dashboard Overview", icon: LayoutDashboard, to: "/super-admin" },
+    { key: "restaurants", label: "Restaurant Management", icon: Building2, to: "/super-admin#restaurants-section" },
+    { key: "categories", label: "Home Categories", icon: Menu, to: "/super-admin/categories" },
+    { key: "banners", label: "Promotion Banners", icon: ImageIcon, to: "/super-admin/banners" },
+    { key: "users", label: "Customer & Staff Users", icon: Users, to: "/super-admin/users" },
+    { key: "settlements", label: "Cashfree Easy Split", icon: BarChart3, to: "/super-admin/settlements" },
     { key: "create-restaurant", label: "Create Restaurant", icon: Store, to: "/super-admin/create-restaurant" },
-    { key: "settings", label: "Settings", icon: Settings, to: "/super-admin/settings" },
+    { key: "settings", label: "System Settings", icon: Settings, to: "/super-admin/settings" },
 ];
 
 export default function SuperAdminBanners() {

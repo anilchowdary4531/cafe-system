@@ -1,20 +1,20 @@
 import { useEffect, useState } from "react";
 import {
+    BarChart3,
     Building2,
     LayoutDashboard,
     Menu,
     Search,
     Settings,
     Store,
-    UserRound,
     Users,
-    UserCheck,
     X,
     Coins,
     ShieldCheck,
     Calendar,
     Sparkles,
-    Trash2
+    Trash2,
+    Image as ImageIcon
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -24,13 +24,14 @@ import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import tiffzyLogo from "../../assets/tiffzy-logo.png";
 
 const SUPER_ADMIN_MENU_ITEMS = [
-    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, to: "/super-admin" },
-    { key: "profile", label: "Profile", icon: UserRound, to: "/super-admin#profile-section" },
-    { key: "staff", label: "Staff", icon: UserCheck, to: "/super-admin/staff" },
-    { key: "users", label: "Users / Customers", icon: Users, to: "/super-admin/users" },
-    { key: "restaurants", label: "Restaurants", icon: Building2, to: "/super-admin#restaurants-section" },
+    { key: "dashboard", label: "Dashboard Overview", icon: LayoutDashboard, to: "/super-admin" },
+    { key: "restaurants", label: "Restaurant Management", icon: Building2, to: "/super-admin#restaurants-section" },
+    { key: "categories", label: "Home Categories", icon: Menu, to: "/super-admin/categories" },
+    { key: "banners", label: "Promotion Banners", icon: ImageIcon, to: "/super-admin/banners" },
+    { key: "users", label: "Customer & Staff Users", icon: Users, to: "/super-admin/users" },
+    { key: "settlements", label: "Cashfree Easy Split", icon: BarChart3, to: "/super-admin/settlements" },
     { key: "create-restaurant", label: "Create Restaurant", icon: Store, to: "/super-admin/create-restaurant" },
-    { key: "settings", label: "Settings", icon: Settings, to: "/super-admin/settings" },
+    { key: "settings", label: "System Settings", icon: Settings, to: "/super-admin/settings" },
 ];
 
 const formatPhone = (raw) => {

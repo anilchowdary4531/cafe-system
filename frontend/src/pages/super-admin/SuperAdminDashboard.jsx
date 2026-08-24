@@ -51,24 +51,16 @@ const shortName = (value) => {
 
 const SUPER_ADMIN_MENU_ITEMS = [
     { key: "dashboard", label: "Dashboard Overview", icon: LayoutDashboard, to: "/super-admin" },
-    { key: "profile", label: "Profile", icon: UserRound, to: "/super-admin#profile-section" },
     { key: "restaurants", label: "Restaurant Management", icon: Building2, to: "/super-admin#restaurants-section" },
     { key: "categories", label: "Home Categories", icon: Menu, to: "/super-admin/categories" },
     { key: "banners", label: "Promotion Banners", icon: ImageIcon, to: "/super-admin/banners" },
-    { key: "users", label: "Customer Management", icon: Users, to: "/super-admin/users" },
-    { key: "orders", label: "Orders Ledger", icon: Receipt, to: "/super-admin/settlements" },
-    { key: "revenue", label: "Revenue & Commission", icon: DollarSign, to: "/super-admin/settlements" },
+    { key: "users", label: "Customer & Staff Users", icon: Users, to: "/super-admin/users" },
     { key: "settlements", label: "Cashfree Easy Split", icon: BarChart3, to: "/super-admin/settlements" },
-    { key: "refunds", label: "Refunds Ledger", icon: RotateCcw, to: "/super-admin/settlements" },
-    { key: "coupons", label: "Coupons & Offers", icon: Tag, to: "/super-admin/settings" },
-    { key: "reports", label: "Reports & Analytics", icon: Download, to: "/super-admin/settlements" },
-    { key: "staff", label: "Staff Management", icon: UserCheck, to: "/super-admin/staff" },
     { key: "create-restaurant", label: "Create Restaurant", icon: Store, to: "/super-admin/create-restaurant" },
     { key: "settings", label: "System Settings", icon: Settings, to: "/super-admin/settings" },
 ];
 
 const HASH_TO_MENU_KEY = {
-    "profile-section": "profile",
     "restaurants-section": "restaurants",
 };
 
