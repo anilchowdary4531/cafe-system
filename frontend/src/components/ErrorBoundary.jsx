@@ -1,4 +1,5 @@
 import React from "react";
+import noConnectionImg from "../assets/no-connection.jpg";
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -41,60 +42,77 @@ export default class ErrorBoundary extends React.Component {
           textAlign: "center"
         }}>
           <div style={{
-            maxWidth: "540px",
+            maxWidth: "480px",
             width: "100%",
             backgroundColor: "#15151a",
             border: "1px solid rgba(245, 185, 78, 0.3)",
-            borderRadius: "24px",
+            borderRadius: "28px",
             padding: "32px",
-            boxShadow: "0 24px 80px rgba(0, 0, 0, 0.4)"
+            boxShadow: "0 24px 80px rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center"
           }}>
             <div style={{
-              fontSize: "48px",
-              marginBottom: "16px"
-            }}>⚠️</div>
+              width: "220px",
+              height: "220px",
+              borderRadius: "24px",
+              overflow: "hidden",
+              marginBottom: "24px",
+              boxShadow: "0 12px 32px rgba(0,0,0,0.3)"
+            }}>
+              <img 
+                src={noConnectionImg} 
+                alt="Connection Lost" 
+                style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+              />
+            </div>
             <h1 style={{
-              fontSize: "24px",
+              fontSize: "22px",
               fontWeight: "bold",
-              color: "#f5b94e",
-              margin: "0 0 12px 0"
-            }}>Something went wrong</h1>
+              color: "#ffffff",
+              margin: "0 0 8px 0"
+            }}>Oops! Connection Lost</h1>
             <p style={{
               fontSize: "14px",
-              color: "#b8ab91",
-              margin: "0 0 24px 0",
+              color: "#a1a1aa",
+              margin: "0 0 20px 0",
               lineHeight: "1.6"
             }}>
-              Tiffzy encountered an unexpected error. Tap reset below to refresh your session.
+              Tiffzy lost connection to the server or encountered an error. Check your connection and tap reset below.
             </p>
             <div style={{
               backgroundColor: "rgba(255, 255, 255, 0.05)",
               borderRadius: "12px",
-              padding: "12px 16px",
+              padding: "10px 14px",
               fontSize: "12px",
               fontFamily: "monospace",
               color: "#ef4444",
               textAlign: "left",
+              width: "100%",
               overflowX: "auto",
-              marginBottom: "24px"
+              marginBottom: "20px",
+              boxSizing: "border-box"
             }}>
-              {this.state.error?.toString() || "Unknown Error"}
+              {this.state.error?.toString() || "Connection or Render Error"}
             </div>
             <button
               onClick={this.handleReset}
               style={{
-                backgroundColor: "#f5b94e",
-                color: "#12100b",
+                backgroundColor: "#f97316",
+                color: "#ffffff",
                 border: "none",
-                borderRadius: "14px",
-                padding: "12px 28px",
+                borderRadius: "9999px",
+                padding: "14px 32px",
                 fontSize: "14px",
                 fontWeight: "bold",
                 cursor: "pointer",
+                width: "100%",
+                boxShadow: "0 8px 24px rgba(249, 115, 22, 0.3)",
                 transition: "transform 0.2s"
               }}
             >
-              Reset App & Refresh
+              Reset App & Reconnect
             </button>
           </div>
         </div>

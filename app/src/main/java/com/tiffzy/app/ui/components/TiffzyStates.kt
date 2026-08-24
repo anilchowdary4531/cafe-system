@@ -11,6 +11,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.tiffzy.app.ui.theme.Dimens
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.tiffzy.app.R
+
 @Composable
 fun TiffzyLoadingIndicator(
     modifier: Modifier = Modifier
@@ -41,26 +48,55 @@ fun TiffzyErrorState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        // Attractive Connection Lost Illustration
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            modifier = Modifier.padding(bottom = 20.dp)
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.no_connection),
+                contentDescription = "No Internet Connection",
+                modifier = Modifier
+                    .size(220.dp)
+                    .clip(RoundedCornerShape(24.dp)),
+                contentScale = ContentScale.Crop
+            )
+        }
+
         Text(
-            text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.error,
+            text = if (isUnauthorized) "Session Expired" else "Oops! Connection Lost",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
-        
-        Spacer(modifier = Modifier.height(Dimens.SpacingMedium))
-        
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = if (isUnauthorized) "Please log in again to continue using Tiffzy." else "We couldn't connect to Tiffzy servers. Please check your internet connection and try again.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         if (isUnauthorized && onLogin != null) {
             TiffzyPrimaryButton(
                 text = "Login Again",
                 onClick = onLogin,
-                modifier = Modifier.width(200.dp),
+                modifier = Modifier.width(220.dp),
                 fullWidth = false
             )
         } else {
-            TiffzySecondaryButton(
-                text = "Retry",
-                onClick = onRetry
+            TiffzyPrimaryButton(
+                text = "Retry Connection",
+                onClick = onRetry,
+                modifier = Modifier.width(220.dp),
+                fullWidth = false
             )
         }
     }
