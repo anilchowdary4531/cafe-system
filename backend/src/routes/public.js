@@ -58,17 +58,27 @@ export default async function publicRoutes(app, deps) {
   });
 
   app.get("/banners", async () => {
-    return await prisma.banner.findMany({
-      where: { isActive: true },
-      orderBy: { priority: "desc" },
-    });
+    try {
+      if (!prisma.banner) return [];
+      return await prisma.banner.findMany({
+        where: { isActive: true },
+        orderBy: { priority: "desc" },
+      });
+    } catch {
+      return [];
+    }
   });
 
   app.get("/global-categories", async () => {
-    return await prisma.globalCategory.findMany({
-      where: { isActive: true },
-      orderBy: { priority: "desc" },
-    });
+    try {
+      if (!prisma.globalCategory) return [];
+      return await prisma.globalCategory.findMany({
+        where: { isActive: true },
+        orderBy: { priority: "desc" },
+      });
+    } catch {
+      return [];
+    }
   });
 
   // Public restaurant list for customer-side auto selection (geo or manual).

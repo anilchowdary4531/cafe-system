@@ -422,13 +422,16 @@ export default async function superAdminRoutes(app, deps) {
 
   app.get("/super-admin/categories", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
+      if (!prisma.globalCategory) {
+        return { categories: [] };
+      }
       const categories = await prisma.globalCategory.findMany({
         orderBy: { priority: "desc" },
       });
-      return { categories };
+      return { categories: categories || [] };
     } catch (err) {
-      console.log(err);
-      return reply.code(500).send({ message: "Failed to fetch categories" });
+      console.warn("[SuperAdmin] fetch categories warning:", err?.message || err);
+      return { categories: [] };
     }
   });
 
@@ -437,19 +440,23 @@ export default async function superAdminRoutes(app, deps) {
       const { name, imageUrl, priority, isActive } = req.body || {};
       if (!name) return reply.code(400).send({ message: "Category name is required" });
 
+      if (!prisma.globalCategory) {
+        return reply.code(500).send({ message: "Database model not initialized. Please run npx prisma db push on server." });
+      }
+
       const category = await prisma.globalCategory.create({
         data: {
-          name,
-          imageUrl,
+          name: String(name).trim(),
+          imageUrl: imageUrl ? String(imageUrl).trim() : null,
           priority: Number(priority || 0),
           isActive: isActive !== false,
         },
       });
       return { message: "Category created", category };
     } catch (err) {
-      console.log(err);
+      console.error("[SuperAdmin] create category error:", err);
       if (err.code === "P2002") return reply.code(409).send({ message: "Category name already exists" });
-      return reply.code(500).send({ message: "Failed to create category" });
+      return reply.code(500).send({ message: `Failed to create category: ${err.message || "Unknown error"}` });
     }
   });
 
@@ -458,18 +465,22 @@ export default async function superAdminRoutes(app, deps) {
       const id = Number(req.params.id);
       const data = req.body || {};
 
+      if (!prisma.globalCategory) {
+        return reply.code(500).send({ message: "Database model not initialized." });
+      }
+
       const category = await prisma.globalCategory.update({
         where: { id },
         data: {
-          name: data.name,
-          imageUrl: data.imageUrl,
+          name: data.name !== undefined ? String(data.name).trim() : undefined,
+          imageUrl: data.imageUrl !== undefined ? (data.imageUrl ? String(data.imageUrl).trim() : null) : undefined,
           priority: data.priority !== undefined ? Number(data.priority) : undefined,
           isActive: data.isActive,
         },
       });
       return { message: "Category updated", category };
     } catch (err) {
-      console.log(err);
+      console.error("[SuperAdmin] update category error:", err);
       return reply.code(500).send({ message: "Failed to update category" });
     }
   });
@@ -477,10 +488,11 @@ export default async function superAdminRoutes(app, deps) {
   app.delete("/super-admin/categories/:id", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
       const id = Number(req.params.id);
+      if (!prisma.globalCategory) return reply.code(500).send({ message: "Database model not initialized." });
       await prisma.globalCategory.delete({ where: { id } });
       return { message: "Category deleted" };
     } catch (err) {
-      console.log(err);
+      console.error("[SuperAdmin] delete category error:", err);
       return reply.code(500).send({ message: "Failed to delete category" });
     }
   });
@@ -491,13 +503,16 @@ export default async function superAdminRoutes(app, deps) {
 
   app.get("/super-admin/banners", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
+      if (!prisma.banner) {
+        return { banners: [] };
+      }
       const banners = await prisma.banner.findMany({
         orderBy: { priority: "desc" },
       });
-      return { banners };
+      return { banners: banners || [] };
     } catch (err) {
-      console.log(err);
-      return reply.code(500).send({ message: "Failed to fetch banners" });
+      console.warn("[SuperAdmin] fetch banners warning:", err?.message || err);
+      return { banners: [] };
     }
   });
 
@@ -506,19 +521,23 @@ export default async function superAdminRoutes(app, deps) {
       const { title, imageUrl, actionUrl, priority, isActive } = req.body || {};
       if (!imageUrl) return reply.code(400).send({ message: "Banner image URL is required" });
 
+      if (!prisma.banner) {
+        return reply.code(500).send({ message: "Database model not initialized. Please run npx prisma db push on server." });
+      }
+
       const banner = await prisma.banner.create({
         data: {
-          title,
-          imageUrl,
-          actionUrl,
+          title: title ? String(title).trim() : null,
+          imageUrl: String(imageUrl).trim(),
+          actionUrl: actionUrl ? String(actionUrl).trim() : null,
           priority: Number(priority || 0),
           isActive: isActive !== false,
         },
       });
       return { message: "Banner created", banner };
     } catch (err) {
-      console.log(err);
-      return reply.code(500).send({ message: "Failed to create banner" });
+      console.error("[SuperAdmin] create banner error:", err);
+      return reply.code(500).send({ message: `Failed to create banner: ${err.message || "Unknown error"}` });
     }
   });
 
@@ -527,19 +546,23 @@ export default async function superAdminRoutes(app, deps) {
       const id = Number(req.params.id);
       const data = req.body || {};
 
+      if (!prisma.banner) {
+        return reply.code(500).send({ message: "Database model not initialized." });
+      }
+
       const banner = await prisma.banner.update({
         where: { id },
         data: {
-          title: data.title,
-          imageUrl: data.imageUrl,
-          actionUrl: data.actionUrl,
+          title: data.title !== undefined ? (data.title ? String(data.title).trim() : null) : undefined,
+          imageUrl: data.imageUrl !== undefined ? String(data.imageUrl).trim() : undefined,
+          actionUrl: data.actionUrl !== undefined ? (data.actionUrl ? String(data.actionUrl).trim() : null) : undefined,
           priority: data.priority !== undefined ? Number(data.priority) : undefined,
           isActive: data.isActive,
         },
       });
       return { message: "Banner updated", banner };
     } catch (err) {
-      console.log(err);
+      console.error("[SuperAdmin] update banner error:", err);
       return reply.code(500).send({ message: "Failed to update banner" });
     }
   });
@@ -547,10 +570,11 @@ export default async function superAdminRoutes(app, deps) {
   app.delete("/super-admin/banners/:id", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
       const id = Number(req.params.id);
+      if (!prisma.banner) return reply.code(500).send({ message: "Database model not initialized." });
       await prisma.banner.delete({ where: { id } });
       return { message: "Banner deleted" };
     } catch (err) {
-      console.log(err);
+      console.error("[SuperAdmin] delete banner error:", err);
       return reply.code(500).send({ message: "Failed to delete banner" });
     }
   });
