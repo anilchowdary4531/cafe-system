@@ -425,9 +425,23 @@ export default async function superAdminRoutes(app, deps) {
       if (!prisma.globalCategory) {
         return { categories: [] };
       }
-      const categories = await prisma.globalCategory.findMany({
+      let categories = await prisma.globalCategory.findMany({
         orderBy: { priority: "desc" },
       });
+      if (categories.length === 0) {
+        const defaults = [
+          { name: "Biryani", imageUrl: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", priority: 100 },
+          { name: "Pizza", imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", priority: 90 },
+          { name: "Burger", imageUrl: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=300&q=80", priority: 80 },
+          { name: "Coffee", imageUrl: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=300&q=80", priority: 70 },
+          { name: "Fast Food", imageUrl: "https://images.unsplash.com/photo-1561758033-d89a9ad46330?auto=format&fit=crop&w=300&q=80", priority: 60 },
+          { name: "Desserts", imageUrl: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=300&q=80", priority: 50 },
+          { name: "Beverages", imageUrl: "https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=300&q=80", priority: 40 },
+          { name: "Ice Cream", imageUrl: "https://images.unsplash.com/photo-1570197788417-0e82375c9371?auto=format&fit=crop&w=300&q=80", priority: 30 }
+        ];
+        await prisma.globalCategory.createMany({ data: defaults, skipDuplicates: true }).catch(() => {});
+        categories = await prisma.globalCategory.findMany({ orderBy: { priority: "desc" } });
+      }
       return { categories: categories || [] };
     } catch (err) {
       console.warn("[SuperAdmin] fetch categories warning:", err?.message || err);
@@ -506,9 +520,29 @@ export default async function superAdminRoutes(app, deps) {
       if (!prisma.banner) {
         return { banners: [] };
       }
-      const banners = await prisma.banner.findMany({
+      let banners = await prisma.banner.findMany({
         orderBy: { priority: "desc" },
       });
+      if (banners.length === 0) {
+        const defaults = [
+          {
+            title: "50% Off On First Order",
+            imageUrl: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1000&q=80",
+            actionUrl: "/r/starbucks/menu",
+            priority: 100,
+            isActive: true
+          },
+          {
+            title: "Delicious Meals Delivered Fast",
+            imageUrl: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1000&q=80",
+            actionUrl: "/r/cafe-king/menu",
+            priority: 90,
+            isActive: true
+          }
+        ];
+        await prisma.banner.createMany({ data: defaults, skipDuplicates: true }).catch(() => {});
+        banners = await prisma.banner.findMany({ orderBy: { priority: "desc" } });
+      }
       return { banners: banners || [] };
     } catch (err) {
       console.warn("[SuperAdmin] fetch banners warning:", err?.message || err);

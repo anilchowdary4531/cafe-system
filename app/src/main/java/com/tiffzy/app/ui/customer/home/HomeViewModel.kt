@@ -126,8 +126,19 @@ class HomeViewModel(
                         )
                     }
 
-                // Merge with global categories from super admin
-                val mergedCategories = (globalCategories.map { HomeCategory(it.name, it.imageUrl) } + dynamicCategories)
+                val defaultFallbackCategories = listOf(
+                    HomeCategory("Biryani"),
+                    HomeCategory("Pizza"),
+                    HomeCategory("Burger"),
+                    HomeCategory("Coffee"),
+                    HomeCategory("Fast Food"),
+                    HomeCategory("Desserts"),
+                    HomeCategory("Beverages"),
+                    HomeCategory("Ice Cream")
+                )
+
+                // Merge with global categories from super admin and fallback categories
+                val mergedCategories = (globalCategories.map { HomeCategory(it.name, it.imageUrl) } + dynamicCategories + defaultFallbackCategories)
                     .distinctBy { it.name.lowercase() }
                     .take(12)
 
