@@ -40,10 +40,14 @@ export default function SuperAdminBanners() {
     const loadBanners = async () => {
         try {
             setLoading(true);
-            const { data } = await api.get("/super-admin/banners");
-            setBanners(data.banners || []);
+            setError("");
+            const res = await api.get("/super-admin/banners");
+            const data = res?.data || res;
+            const bannersList = Array.isArray(data) ? data : (data?.banners || []);
+            setBanners(bannersList);
         } catch (err) {
-            setError("Failed to load banners");
+            console.error("[SuperAdminBanners] Load error:", err);
+            setError(err.response?.data?.message || err.message || "Failed to load banners");
         } finally {
             setLoading(false);
         }
@@ -150,6 +154,15 @@ export default function SuperAdminBanners() {
 
                 {loading ? (
                     <div className="text-center py-12 text-gray-400">Loading banners...</div>
+                ) : banners.length === 0 ? (
+                    <div className="theme-panel rounded-3xl p-12 text-center text-gray-400 border theme-border">
+                        <ImageIcon className="mx-auto mb-4 text-gray-600" size={48} />
+                        <h3 className="text-lg font-bold text-white mb-1">No Promotion Banners Yet</h3>
+                        <p className="text-sm text-gray-400 mb-6">Create promotional banners to highlight deals on the mobile app home screen.</p>
+                        <button onClick={() => setShowForm(true)} className="theme-button inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-bold">
+                            <Plus size={18} /> Add First Banner
+                        </button>
+                    </div>
                 ) : (
                     <div className="grid gap-6 md:grid-cols-2">
                         {banners.map((banner) => (

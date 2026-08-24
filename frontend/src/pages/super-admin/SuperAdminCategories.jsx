@@ -42,10 +42,14 @@ export default function SuperAdminCategories() {
     const loadCategories = async () => {
         try {
             setLoading(true);
-            const { data } = await api.get("/super-admin/categories");
-            setCategories(data.categories || []);
+            setError("");
+            const res = await api.get("/super-admin/categories");
+            const data = res?.data || res;
+            const categoriesList = Array.isArray(data) ? data : (data?.categories || []);
+            setCategories(categoriesList);
         } catch (err) {
-            setError("Failed to load categories");
+            console.error("[SuperAdminCategories] Load error:", err);
+            setError(err.response?.data?.message || err.message || "Failed to load categories");
         } finally {
             setLoading(false);
         }
@@ -149,6 +153,15 @@ export default function SuperAdminCategories() {
 
                 {loading ? (
                     <div className="text-center py-12 text-gray-400">Loading categories...</div>
+                ) : categories.length === 0 ? (
+                    <div className="theme-panel rounded-3xl p-12 text-center text-gray-400 border theme-border">
+                        <Menu className="mx-auto mb-4 text-gray-600" size={48} />
+                        <h3 className="text-lg font-bold text-white mb-1">No Global Categories Yet</h3>
+                        <p className="text-sm text-gray-400 mb-6">Add curated global categories (like Pizza, Biryani, Coffee) for the mobile app home screen.</p>
+                        <button onClick={() => setShowForm(true)} className="theme-button inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-bold">
+                            <Plus size={18} /> Add First Category
+                        </button>
+                    </div>
                 ) : (
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {categories.map((category) => (
