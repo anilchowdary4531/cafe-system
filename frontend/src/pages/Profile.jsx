@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import { Link, NavLink, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Gift, Heart, IndianRupee, MapPin, Settings, Sparkles, Star, UserCircle2, Bell } from "lucide-react";
+import { ArrowLeft, Gift, Heart, IndianRupee, MapPin, Settings, Sparkles, Star, UserCircle2, Bell, Wallet } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import useCustomerProfile from "../hooks/useCustomerProfile";
 import useCachedGet from "../hooks/useCachedGet";
@@ -157,6 +157,12 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
 
                         <nav className="mt-4 flex flex-wrap items-center gap-2.5">
                             <OverviewActionCard
+                                to={buildProfilePath("/profile/wallet")}
+                                icon={<Wallet size={19} />}
+                                label="Wallet"
+                                caption="Prepaid balance & top-up"
+                            />
+                            <OverviewActionCard
                                 to={buildProfilePath("/profile/edit")}
                                 icon={<UserCircle2 size={19} />}
                                 label="Edit profile"
@@ -202,22 +208,28 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
                                     <p className="theme-accent-text text-[11px] font-semibold uppercase tracking-[0.26em]">
                                         Wallet preview
                                     </p>
-                                    <h2 className="mt-1 text-lg font-semibold">Rewards at a glance</h2>
+                                    <h2 className="mt-1 text-lg font-semibold">Rewards & Wallet</h2>
                                 </div>
-                                <span className="theme-soft-button inline-flex items-center gap-1 rounded-xl px-3 py-1 text-xs font-semibold">
-                                    <Sparkles size={14} />
-                                    Coming soon
-                                </span>
+                                <NavLink
+                                    to={buildProfilePath("/profile/wallet")}
+                                    reloadDocument
+                                    className="theme-button inline-flex items-center gap-1 rounded-xl px-3.5 py-1.5 text-xs font-bold shadow-md"
+                                >
+                                    <Wallet size={14} />
+                                    Manage Wallet
+                                </NavLink>
                             </div>
 
                             <div className="mt-3 grid grid-cols-3 gap-2 sm:mt-4 sm:gap-3">
-                                <ProfileValueCard
-                                    icon={<IndianRupee size={18} />}
-                                    label="Wallet balance"
-                                    hint="Coming soon"
-                                    value="Rs 0"
-                                    toneClass="from-orange-500/18 to-amber-500/8"
-                                />
+                                <Link to={buildProfilePath("/profile/wallet")}>
+                                    <ProfileValueCard
+                                        icon={<Wallet size={18} />}
+                                        label="Wallet balance"
+                                        hint="Click to top-up"
+                                        value={walletBalance}
+                                        toneClass="from-orange-500/18 to-amber-500/8 hover:ring-1 hover:ring-amber-500/50 transition-all"
+                                    />
+                                </Link>
                                 <ProfileValueCard
                                     icon={<Star size={18} />}
                                     label="Reward points"
