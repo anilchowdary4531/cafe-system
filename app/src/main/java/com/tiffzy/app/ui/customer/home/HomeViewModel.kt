@@ -56,11 +56,11 @@ class HomeViewModel(
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             try {
-                // Parallel fetch
+                // Parallel fetch with fallback protection for optional catalog metadata
                 val restaurants = repository.getRestaurants()
-                val banners = repository.getBanners()
-                val globalCategories = repository.getGlobalCategories()
-                
+                val banners = runCatching { repository.getBanners() }.getOrDefault(emptyList())
+                val globalCategories = runCatching { repository.getGlobalCategories() }.getOrDefault(emptyList())
+
                 allRestaurants = restaurants
                 discoveryBanners = banners
                 

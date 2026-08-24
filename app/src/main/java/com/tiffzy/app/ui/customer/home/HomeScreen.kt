@@ -147,12 +147,12 @@ fun HomeScreen(
                             ) {
                                 item {
                                     HomeScreenCategoryItem(CategoryItemData("All", null)) {
-                                        // Filter All logic here if needed
+                                        viewModel.search("")
                                     }
                                 }
                                 items(state.categories) { category ->
                                     HomeScreenCategoryItem(CategoryItemData(category.name, category.imageUrl)) {
-                                        // Category click logic
+                                        viewModel.search(category.name)
                                     }
                                 }
                             }
