@@ -32,6 +32,7 @@ const normalizePaymentMethod = (value) => {
     const s = String(value || "UPI").trim().toUpperCase();
     if (s === "CASH") return "CASH";
     if (s === "PAY_LATER") return "PAY_LATER";
+    if (s === "WALLET") return "WALLET";
     return "UPI";
 };
 
@@ -534,6 +535,37 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                 return;
             }
 
+            // Tiffzy Wallet checkout flow
+            if (selectedPaymentMethod === "WALLET") {
+                await api.post("/api/wallet/pay-order", {
+                    orderId,
+                    amount: orderTotal,
+                    idempotencyKey: `PAY_ORD_${orderId}_${Date.now()}`
+                }, getCustomerAuthConfig());
+
+                clearCart();
+                onClose();
+                navigate(
+                    `/orders/thank-you?slug=${encodeURIComponent(slug)}&orderNo=${encodeURIComponent(orderNo)}&orderId=${encodeURIComponent(
+                        String(orderId)
+                    )}&amount=${encodeURIComponent(String(toInr(orderTotal)))}&fulfillment=${encodeURIComponent(
+                        isOnlineOrder ? selectedFulfillment : "dinein"
+                    )}`,
+                    {
+                        replace: true,
+                        state: {
+                            slug,
+                            orderNo,
+                            orderId,
+                            amount: orderTotal,
+                            paymentStatus: "SUCCESS",
+                            fulfillment: isOnlineOrder ? selectedFulfillment : "dinein",
+                        },
+                    }
+                );
+                return;
+            }
+
             // Cash on delivery: verify immediately and go to success page.
             if (selectedPaymentMethod === "CASH") {
                 await api.post("/payments/verify", { orderId, status: "SUCCESS", paymentMode: "CASH" }, getCustomerAuthConfig());
@@ -986,6 +1018,41 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                         </div>
 
                                         <div className="grid gap-3 sm:grid-cols-2">
+                                            {/* Tiffzy Wallet Option */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setPaymentMethod("WALLET")}
+                                                className={`group relative flex flex-col justify-between gap-3 rounded-2xl border p-4 text-left transition-all duration-200 ${
+                                                    selectedPaymentMethod === "WALLET"
+                                                        ? "border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/40 shadow-lg shadow-amber-500/5"
+                                                        : "border-white/10 hover:border-white/20 bg-white/5"
+                                                }`}
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                                                            selectedPaymentMethod === "WALLET" ? "border-amber-500/40 bg-amber-500/20 text-amber-400" : "border-white/10 bg-white/5 text-amber-400"
+                                                        }`}>
+                                                            <Wallet size={20} />
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-bold sm:text-base">Tiffzy Wallet</span>
+                                                                <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/30">
+                                                                    1-Click Pay
+                                                                </span>
+                                                            </div>
+                                                            <p className="theme-muted text-xs mt-0.5">Instant checkout from prepaid balance</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                        selectedPaymentMethod === "WALLET" ? "border-amber-500 bg-amber-500 text-black" : "border-white/30"
+                                                    }`}>
+                                                        {selectedPaymentMethod === "WALLET" && <CheckCircle2 size={14} className="fill-current text-black" />}
+                                                    </div>
+                                                </div>
+                                            </button>
+
                                             <button
                                                 type="button"
                                                 onClick={() => setPaymentMethod("UPI")}

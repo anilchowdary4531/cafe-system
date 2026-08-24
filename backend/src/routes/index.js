@@ -7,6 +7,7 @@ import superAdminRoutes from "./superAdmin.js";
 import kitchenRoutes from "./kitchen.js";
 import paymentRoutes from "./payment.routes.js";
 import vendorRoutes from "./vendor.routes.js";
+import walletRoutes from "./wallet.routes.js";
 
 // Single route entrypoint to keep server.js simple.
 export default async function routes(app, deps) {
@@ -19,4 +20,5 @@ export default async function routes(app, deps) {
   await kitchenRoutes(app, deps);
   await paymentRoutes(app, deps);
   await vendorRoutes(app, deps);
+  await walletRoutes(app, deps);
 }

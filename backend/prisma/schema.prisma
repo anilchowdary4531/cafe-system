@@ -318,6 +318,7 @@ model CustomerAccount {
 
   addresses CustomerAddress[]
   payments  Payment[]
+  wallet    Wallet?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -646,5 +647,84 @@ model Banner {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("banners")
+}
+
+///////////////////////////////////////////////////////////
+// TIFFZY CUSTOMER WALLET SYSTEM
+///////////////////////////////////////////////////////////
+
+model Wallet {
+  id                Int             @id @default(autoincrement())
+  customerAccountId Int             @unique @map("customer_account_id")
+  customerAccount   CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+
+  currency          String          @default("INR")
+  balance           Float           @default(0)
+  status            String          @default("ACTIVE") // ACTIVE | BLOCKED | CLOSED
+
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at")
+
+  ledgers           WalletLedger[]
+  topups            WalletTopup[]
+
+  @@map("wallets")
+}
+
+model WalletLedger {
+  id                Int          @id @default(autoincrement())
+  walletId          Int          @map("wallet_id")
+  wallet            Wallet       @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  customerAccountId Int          @map("customer_account_id")
+
+  type              String       // WALLET_TOPUP | ORDER_PAYMENT | REFUND | REVERSAL | ADJUSTMENT_CREDIT | ADJUSTMENT_DEBIT
+  direction         String       // CREDIT | DEBIT
+  amount            Float
+  balanceBefore     Float        @map("balance_before")
+  balanceAfter      Float        @map("balance_after")
+
+  referenceType     String?      @map("reference_type") // ORDER | TOPUP | REFUND | ADMIN
+  referenceId       String?      @map("reference_id")
+  paymentId         Int?         @map("payment_id")
+  orderId           Int?         @map("order_id")
+
+  description       String
+  idempotencyKey    String?      @unique @map("idempotency_key")
+  status            String       @default("SUCCESS")
+  metadata          Json?
+
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  @@index([walletId, createdAt])
+  @@index([customerAccountId, createdAt])
+  @@index([orderId])
+  @@map("wallet_ledgers")
+}
+
+model WalletTopup {
+  id                Int             @id @default(autoincrement())
+  walletId          Int             @map("wallet_id")
+  wallet            Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  customerAccountId Int             @map("customer_account_id")
+  topupTxnId        String          @unique @map("topup_txn_id")
+
+  amount            Float
+  currency          String          @default("INR")
+
+  gateway           String          @default("CASHFREE")
+  gatewayOrderId    String?         @map("gateway_order_id")
+  gatewayPaymentId  String?         @map("gateway_payment_id")
+
+  status            String          @default("PENDING") // PENDING | SUCCESS | FAILED | CANCELLED
+  idempotencyKey    String?         @unique @map("idempotency_key")
+
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at")
+
+  @@index([walletId, createdAt])
+  @@index([customerAccountId])
+  @@map("wallet_topups")
 }
 
