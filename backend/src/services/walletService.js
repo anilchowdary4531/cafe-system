@@ -130,26 +130,6 @@ export const getWalletTransactions = async (
   }
 };
 
-  return {
-    page: p,
-    limit: l,
-    total,
-    totalPages: Math.ceil(total / l),
-    transactions: items.map((txn) => ({
-      id: txn.id,
-      type: txn.type,
-      direction: txn.direction,
-      amount: round2(txn.amount),
-      balanceBefore: round2(txn.balanceBefore),
-      balanceAfter: round2(txn.balanceAfter),
-      orderId: txn.orderId,
-      description: txn.description,
-      status: txn.status,
-      createdAt: txn.createdAt,
-    })),
-  };
-};
-
 /**
  * Create Top-up Order with Cashfree
  */
