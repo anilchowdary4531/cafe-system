@@ -23,7 +23,7 @@ import {
     MapPin,
     DollarSign
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/apiClient";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
@@ -43,12 +43,15 @@ const SUPER_ADMIN_MENU_ITEMS = [
 
 export default function SuperAdminRestaurantProfiles() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const initialQuery = searchParams.get("q") || searchParams.get("search") || "";
+
     const { logout } = useAuth();
 
     const [restaurants, setRestaurants] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useState(initialQuery);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [copiedKey, setCopiedKey] = useState(null);
 

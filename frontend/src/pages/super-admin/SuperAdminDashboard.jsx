@@ -451,9 +451,9 @@ export default function SuperAdminDashboard() {
                                              <div>
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <h3 
-                                                        onClick={() => navigate(`/r/${restaurant.slug}/menu`)}
+                                                        onClick={() => navigate(`/super-admin/restaurant-profiles?q=${encodeURIComponent(restaurant.name)}`)}
                                                         className="text-lg font-bold text-amber-400 hover:text-amber-300 hover:underline cursor-pointer flex items-center gap-1.5 transition-colors"
-                                                        title={`Click to view ${restaurant.name} public page`}
+                                                        title={`Click to view ${restaurant.name} profile details in Super Admin`}
                                                     >
                                                         {restaurant.name}
                                                         <ExternalLink size={15} className="opacity-70" />
@@ -463,9 +463,9 @@ export default function SuperAdminDashboard() {
                                                     </span>
                                                 </div>
                                                 <p 
-                                                    onClick={() => navigate(`/r/${restaurant.slug}/menu`)}
+                                                    onClick={() => navigate(`/super-admin/restaurant-profiles?q=${encodeURIComponent(restaurant.name)}`)}
                                                     className="theme-muted mt-1 text-sm cursor-pointer hover:text-amber-300 hover:underline"
-                                                    title={`Click to view ${restaurant.name} public page`}
+                                                    title={`Click to view ${restaurant.name} profile details in Super Admin`}
                                                 >
                                                     /{restaurant.slug} - {restaurant.city || "City not set"}
                                                 </p>
@@ -494,11 +494,11 @@ export default function SuperAdminDashboard() {
                                         <div className="flex items-center gap-2">
                                             <button
                                                 type="button"
-                                                onClick={() => navigate(`/r/${restaurant.slug}/menu`)}
+                                                onClick={() => navigate(`/super-admin/restaurant-profiles?q=${encodeURIComponent(restaurant.name)}`)}
                                                 className="theme-button inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold shadow-md active:scale-95 transition-all"
                                             >
-                                                <ExternalLink size={15} />
-                                                View Restaurant Page
+                                                <Utensils size={15} />
+                                                View Restaurant Profile
                                             </button>
                                             <button
                                                 onClick={() => toggleRestaurant(restaurant)}
