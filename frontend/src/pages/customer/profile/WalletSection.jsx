@@ -27,14 +27,20 @@ export default function WalletSection({ customerToken }) {
     const [topupAmount, setTopupAmount] = useState(500);
     const [topupLoading, setTopupLoading] = useState(false);
 
+    const getAuthConfig = () => {
+        const token = customerToken || localStorage.getItem("customerToken");
+        return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+    };
+
     const loadWalletData = async () => {
         try {
             setLoading(true);
             setError("");
             
+            const config = getAuthConfig();
             const [wRes, tRes] = await Promise.all([
-                api.get("/api/wallet"),
-                api.get("/api/wallet/transactions?limit=30"),
+                api.get("/api/wallet", config),
+                api.get("/api/wallet/transactions?limit=30", config),
             ]);
 
             const wData = wRes?.data || wRes;
@@ -66,11 +72,13 @@ export default function WalletSection({ customerToken }) {
             setError("");
             setSuccessMsg("");
 
+            const config = getAuthConfig();
+
             // Step 1: Create top-up session
             const res = await api.post("/api/wallet/topup/create", {
                 amount: amt,
                 returnUrl: window.location.href,
-            });
+            }, config);
 
             const data = res?.data || res;
             const session = data?.session;
@@ -80,7 +88,6 @@ export default function WalletSection({ customerToken }) {
             }
 
             // Step 2: Open Cashfree Drop-in / SDK or Simulate/Verify Cashfree Payment
-            // For Cashfree SDK Drop-in integration:
             if (window.Cashfree && session.paymentSessionId) {
                 const cashfree = window.Cashfree({ mode: "sandbox" });
                 cashfree.checkout({
@@ -93,7 +100,7 @@ export default function WalletSection({ customerToken }) {
                     topupTxnId: session.topupTxnId,
                     gatewayOrderId: session.paymentSessionId || session.topupTxnId,
                     gatewayPaymentId: `PAY_${Date.now()}`,
-                });
+                }, config);
 
                 const vData = verifyRes?.data || verifyRes;
                 if (vData?.success) {
