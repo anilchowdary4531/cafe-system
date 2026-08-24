@@ -12,7 +12,8 @@ import {
     Trash2,
     Save,
     Image as ImageIcon,
-    ExternalLink
+    ExternalLink,
+    Utensils
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -21,6 +22,7 @@ import { api } from "../../utils/apiClient";
 const SUPER_ADMIN_MENU_ITEMS = [
     { key: "dashboard", label: "Dashboard Overview", icon: LayoutDashboard, to: "/super-admin" },
     { key: "restaurants", label: "Restaurant Management", icon: Building2, to: "/super-admin#restaurants-section" },
+    { key: "restaurant-profile", label: "Restaurant Profile Page", icon: Utensils, to: "/r/beanhouse/menu" },
     { key: "categories", label: "Home Categories", icon: Menu, to: "/super-admin/categories" },
     { key: "banners", label: "Promotion Banners", icon: ImageIcon, to: "/super-admin/banners" },
     { key: "users", label: "Customer & Staff Users", icon: Users, to: "/super-admin/users" },

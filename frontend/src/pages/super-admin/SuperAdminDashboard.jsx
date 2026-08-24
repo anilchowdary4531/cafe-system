@@ -18,6 +18,8 @@ import {
     RotateCcw,
     Tag,
     Download,
+    ExternalLink,
+    Utensils,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -38,9 +40,13 @@ import {
 } from "recharts";
 
 const formatMoney = (value) =>
-    `\u20B9${Math.round(Number(value || 0)).toLocaleString("en-IN")}`;
+    new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+    }).format(Number(value || 0));
 
-const CHART_COLORS = ["#f97316", "#f59e0b", "#22c55e", "#14b8a6", "#3b82f6", "#a855f7"];
+const CHART_COLORS = ["#f97316", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#eab308"];
 
 const shortName = (value) => {
     const text = String(value || "").trim();
@@ -52,6 +58,7 @@ const shortName = (value) => {
 const SUPER_ADMIN_MENU_ITEMS = [
     { key: "dashboard", label: "Dashboard Overview", icon: LayoutDashboard, to: "/super-admin" },
     { key: "restaurants", label: "Restaurant Management", icon: Building2, to: "/super-admin#restaurants-section" },
+    { key: "restaurant-profile", label: "Restaurant Profile Page", icon: Utensils, to: "/r/beanhouse/menu" },
     { key: "categories", label: "Home Categories", icon: Menu, to: "/super-admin/categories" },
     { key: "banners", label: "Promotion Banners", icon: ImageIcon, to: "/super-admin/banners" },
     { key: "users", label: "Customer & Staff Users", icon: Users, to: "/super-admin/users" },
@@ -441,14 +448,27 @@ export default function SuperAdminDashboard() {
                                                     <Store size={20} className="theme-muted" />
                                                 )}
                                             </div>
-                                            <div>
+                                             <div>
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    <h3 className="text-lg font-bold">{restaurant.name}</h3>
+                                                    <h3 
+                                                        onClick={() => navigate(`/r/${restaurant.slug}/menu`)}
+                                                        className="text-lg font-bold text-amber-400 hover:text-amber-300 hover:underline cursor-pointer flex items-center gap-1.5 transition-colors"
+                                                        title={`Click to view ${restaurant.name} public page`}
+                                                    >
+                                                        {restaurant.name}
+                                                        <ExternalLink size={15} className="opacity-70" />
+                                                    </h3>
                                                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${restaurant.isActive ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"}`}>
                                                         {restaurant.isActive ? "Active" : "Disabled"}
                                                     </span>
                                                 </div>
-                                                <p className="theme-muted mt-1 text-sm">/{restaurant.slug} - {restaurant.city || "City not set"}</p>
+                                                <p 
+                                                    onClick={() => navigate(`/r/${restaurant.slug}/menu`)}
+                                                    className="theme-muted mt-1 text-sm cursor-pointer hover:text-amber-300 hover:underline"
+                                                    title={`Click to view ${restaurant.name} public page`}
+                                                >
+                                                    /{restaurant.slug} - {restaurant.city || "City not set"}
+                                                </p>
                                                 <div className="theme-muted-strong mt-3 grid gap-1 text-sm md:grid-cols-2">
                                                     <span>Owner: {restaurant.owner?.name || restaurant.ownerName || "Not set"}</span>
                                                     <span>Email: {restaurant.owner?.email || restaurant.email || "Not set"}</span>
@@ -471,13 +491,23 @@ export default function SuperAdminDashboard() {
                                             <UserRound className="theme-accent-text" size={16} />
                                             <span className="theme-muted">Owner can log in and manage this restaurant.</span>
                                         </div>
-                                        <button
-                                            onClick={() => toggleRestaurant(restaurant)}
-                                            className="theme-soft-button inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold"
-                                        >
-                                            <Power size={15} />
-                                            {restaurant.isActive ? "Disable" : "Activate"}
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => navigate(`/r/${restaurant.slug}/menu`)}
+                                                className="theme-button inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold shadow-md active:scale-95 transition-all"
+                                            >
+                                                <ExternalLink size={15} />
+                                                View Restaurant Page
+                                            </button>
+                                            <button
+                                                onClick={() => toggleRestaurant(restaurant)}
+                                                className="theme-soft-button inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold"
+                                            >
+                                                <Power size={15} />
+                                                {restaurant.isActive ? "Disable" : "Activate"}
+                                            </button>
+                                        </div>
                                     </div>
                                 </article>
                             ))}
