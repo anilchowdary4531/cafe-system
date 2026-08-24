@@ -1,3 +1,4 @@
+import defaultPrisma from "../prisma.js";
 import {
   getWalletSummary,
   getWalletTransactions,
@@ -9,7 +10,7 @@ import {
 } from "../services/walletService.js";
 
 export default async function walletRoutes(app, deps) {
-  const { prisma } = deps;
+  const prisma = deps?.prisma || defaultPrisma;
 
   // Middleware: Require Customer Authentication
   const requireCustomer = async (req, reply) => {

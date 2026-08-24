@@ -1,6 +1,8 @@
 import { createCashfreePaymentSession } from "./cashfree.service.js";
+import defaultPrisma from "../prisma.js";
 
 const round2 = (num) => Math.round(Number(num || 0) * 100) / 100;
+const getDb = (passedPrisma) => passedPrisma || defaultPrisma;
 
 // Configurable limits
 export const WALLET_CONFIG = {
@@ -13,8 +15,12 @@ export const WALLET_CONFIG = {
 /**
  * Get or automatically create wallet for customer
  */
-export const getOrCreateWallet = async (prisma, customerAccountId) => {
+export const getOrCreateWallet = async (passedPrisma, customerAccountId) => {
   if (!customerAccountId) throw new Error("Customer Account ID is required");
+  const prisma = getDb(passedPrisma);
+  if (!prisma || !prisma.wallet) {
+    throw new Error("Wallet database model is unavailable. Please run prisma db push.");
+  }
 
   let wallet = await prisma.wallet.findUnique({
     where: { customerAccountId: Number(customerAccountId) },
@@ -37,7 +43,8 @@ export const getOrCreateWallet = async (prisma, customerAccountId) => {
 /**
  * Get Wallet Balance & Details
  */
-export const getWalletSummary = async (prisma, customerAccountId) => {
+export const getWalletSummary = async (passedPrisma, customerAccountId) => {
+  const prisma = getDb(passedPrisma);
   const wallet = await getOrCreateWallet(prisma, customerAccountId);
   return {
     walletId: wallet.id,
@@ -53,10 +60,14 @@ export const getWalletSummary = async (prisma, customerAccountId) => {
  * Get Wallet Transaction History with filtering & pagination
  */
 export const getWalletTransactions = async (
-  prisma,
+  passedPrisma,
   customerAccountId,
   { page = 1, limit = 20, type = null, direction = null } = {}
 ) => {
+  const prisma = getDb(passedPrisma);
+  if (!prisma || !prisma.walletLedger) {
+    return { page: 1, limit: 20, total: 0, totalPages: 0, transactions: [] };
+  }
   const wallet = await getOrCreateWallet(prisma, customerAccountId);
   const p = Math.max(1, Number(page || 1));
   const l = Math.min(100, Math.max(1, Number(limit || 20)));
