@@ -58,6 +58,12 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
     const profileState = useCustomerProfile();
     const { profile, customerToken, loading, saving, error, updateProfile, setError } = profileState;
 
+    const { data: walletData } = useCachedGet("/api/wallet", {
+        enabled: Boolean(customerToken),
+        ttlMs: 15_000,
+    });
+    const walletBalance = walletData?.wallet?.balance !== undefined ? `Rs ${walletData.wallet.balance.toFixed(2)}` : "Rs 0.00";
+
     const sidebarMeta = useMemo(() => {
         const phone = String(profile?.phone || "").trim();
         const title = String(profile?.name || "Customer").trim();
