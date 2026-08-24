@@ -15,7 +15,8 @@ import {
     Sparkles,
     Trash2,
     Image as ImageIcon,
-    Utensils
+    Utensils,
+    Wallet
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -28,6 +29,7 @@ const SUPER_ADMIN_MENU_ITEMS = [
     { key: "dashboard", label: "Dashboard Overview", icon: LayoutDashboard, to: "/super-admin" },
     { key: "restaurants", label: "Restaurant Management", icon: Building2, to: "/super-admin#restaurants-section" },
     { key: "restaurant-profile", label: "Restaurant Profile Page", icon: Utensils, to: "/super-admin/restaurant-profiles" },
+    { key: "wallets", label: "Customer Wallet Ledger", icon: Wallet, to: "/super-admin/wallets" },
     { key: "categories", label: "Home Categories", icon: Menu, to: "/super-admin/categories" },
     { key: "banners", label: "Promotion Banners", icon: ImageIcon, to: "/super-admin/banners" },
     { key: "users", label: "Customer & Staff Users", icon: Users, to: "/super-admin/users" },

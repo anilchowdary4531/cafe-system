@@ -20,6 +20,7 @@ import {
     Download,
     ExternalLink,
     Utensils,
+    Wallet,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
