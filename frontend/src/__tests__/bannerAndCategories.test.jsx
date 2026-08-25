@@ -48,7 +48,7 @@ describe("PromoBannerSlider & PopularCategories Audit", () => {
         );
 
         expect(screen.getByText(/Popular Categories/i)).toBeInTheDocument();
-        expect(screen.getByText(/All/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/All/i).length).toBeGreaterThan(0);
         expect(screen.getByText(/Biryani/i)).toBeInTheDocument();
         expect(screen.getByText(/Pizza/i)).toBeInTheDocument();
         expect(screen.getByText(/Chinese/i)).toBeInTheDocument();

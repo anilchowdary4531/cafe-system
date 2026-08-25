@@ -12,6 +12,25 @@ import {
 import useCachedGet from "../hooks/useCachedGet";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
 
+const CATEGORY_DEFAULT_IMAGES = {
+    all: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=300&q=80",
+    biryani: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80",
+    briyani: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80",
+    pizza: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80",
+    burger: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=300&q=80",
+    coffee: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=300&q=80",
+    cofee: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=300&q=80",
+    "fast food": "https://images.unsplash.com/photo-1561758033-d89a9ad46330?auto=format&fit=crop&w=300&q=80",
+    dessert: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=300&q=80",
+    desserts: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=300&q=80",
+    beverage: "https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=300&q=80",
+    beverages: "https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=300&q=80",
+    "ice cream": "https://images.unsplash.com/photo-1567206563064-6f60f4006501?auto=format&fit=crop&w=300&q=80",
+    food: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80",
+    sweet: "https://images.unsplash.com/photo-1587314168485-3236d6710814?auto=format&fit=crop&w=300&q=80",
+    sweets: "https://images.unsplash.com/photo-1587314168485-3236d6710814?auto=format&fit=crop&w=300&q=80",
+};
+
 const DEFAULT_FALLBACK_CATEGORIES = [
     { name: "Biryani" },
     { name: "Pizza" },
@@ -22,6 +41,19 @@ const DEFAULT_FALLBACK_CATEGORIES = [
     { name: "Beverages" },
     { name: "Ice Cream" },
 ];
+
+export const getCategoryFallbackImage = (name = "") => {
+    const clean = String(name).toLowerCase().trim();
+    if (CATEGORY_DEFAULT_IMAGES[clean]) {
+        return CATEGORY_DEFAULT_IMAGES[clean];
+    }
+
+    for (const [key, url] of Object.entries(CATEGORY_DEFAULT_IMAGES)) {
+        if (clean.includes(key)) return url;
+    }
+
+    return CATEGORY_DEFAULT_IMAGES.food;
+};
 
 export const getCategoryIcon = (name = "") => {
     const clean = String(name).toLowerCase().trim();
@@ -63,7 +95,7 @@ export default function PopularCategories({
                 seenNames.add(name.toLowerCase());
                 dynamicCategories.push({
                     name,
-                    imageUrl: cat.imageUrl || null,
+                    imageUrl: cat.imageUrl || getCategoryFallbackImage(name),
                 });
             }
         }
@@ -76,7 +108,7 @@ export default function PopularCategories({
                     seenNames.add(name.toLowerCase());
                     dynamicCategories.push({
                         name,
-                        imageUrl: item.image || null,
+                        imageUrl: item.image || getCategoryFallbackImage(name),
                     });
                 }
             }
@@ -86,24 +118,30 @@ export default function PopularCategories({
         for (const fb of DEFAULT_FALLBACK_CATEGORIES) {
             if (!seenNames.has(fb.name.toLowerCase())) {
                 seenNames.add(fb.name.toLowerCase());
-                dynamicCategories.push(fb);
+                dynamicCategories.push({
+                    name: fb.name,
+                    imageUrl: getCategoryFallbackImage(fb.name),
+                });
             }
         }
 
-        return [{ name: "All", imageUrl: null }, ...dynamicCategories.slice(0, 12)];
+        return [
+            { name: "All", imageUrl: CATEGORY_DEFAULT_IMAGES.all },
+            ...dynamicCategories.slice(0, 14),
+        ];
     }, [globalCategories, items]);
 
     return (
-        <div className={`space-y-2.5 ${className}`}>
+        <div className={`space-y-3 ${className}`}>
             <div className="flex items-center justify-between">
-                <h2 className="text-sm font-black uppercase tracking-[0.15em] text-[color:var(--app-text)] sm:text-base">
+                <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[color:var(--app-text)] sm:text-sm">
                     Popular Categories
                 </h2>
                 {selectedCategory ? (
                     <button
                         type="button"
                         onClick={() => onSelectCategory?.("")}
-                        className="text-xs font-bold text-[color:var(--app-accent)] hover:underline"
+                        className="text-xs font-extrabold text-[color:var(--app-accent)] hover:underline"
                     >
                         Clear Filter
                     </button>
@@ -111,15 +149,14 @@ export default function PopularCategories({
             </div>
 
             <div className="snap-x snap-mandatory overflow-x-auto pb-2 pt-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex w-max gap-3 sm:gap-4">
+                <div className="flex w-max gap-3.5 sm:gap-4">
                     {categoriesList.map((cat) => {
                         const isAll = cat.name.toLowerCase() === "all";
                         const isActive = isAll
                             ? !selectedCategory
                             : selectedCategory.toLowerCase() === cat.name.toLowerCase();
 
-                        const IconComp = getCategoryIcon(cat.name);
-                        const resolvedImg = resolveImageUrl(cat.imageUrl);
+                        const imgUrl = resolveImageUrl(cat.imageUrl) || getCategoryFallbackImage(cat.name);
 
                         return (
                             <button
@@ -135,28 +172,30 @@ export default function PopularCategories({
                                 className="group flex w-[64px] shrink-0 snap-start flex-col items-center gap-1.5 focus:outline-none sm:w-[72px]"
                             >
                                 <div
-                                    className={`relative flex h-[52px] w-[52px] items-center justify-center rounded-full transition duration-300 sm:h-[60px] sm:w-[60px] ${
+                                    className={`relative h-[56px] w-[56px] rounded-full p-[2.5px] transition duration-300 sm:h-[64px] sm:w-[64px] ${
                                         isActive
-                                            ? "ring-4 ring-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white shadow-lg shadow-[color:var(--app-accent)]/30 scale-105"
-                                            : "border border-[var(--app-border)] bg-black/20 text-white/80 hover:border-white/30 hover:bg-black/40 hover:scale-105"
+                                            ? "bg-[linear-gradient(135deg,#ff8a1f_0%,#d97706_100%)] shadow-lg shadow-[#ff8a1f]/35 scale-105"
+                                            : "border border-[var(--app-border)] bg-white/10 hover:border-[#ff8a1f]/50 hover:scale-105"
                                     }`}
                                 >
-                                    {resolvedImg && !isAll ? (
+                                    <div className="relative h-full w-full overflow-hidden rounded-full bg-zinc-900">
                                         <img
-                                            src={resolvedImg}
+                                            src={imgUrl}
                                             alt={cat.name}
-                                            className="h-full w-full rounded-full object-cover"
+                                            className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
                                             loading="lazy"
                                         />
-                                    ) : (
-                                        <IconComp
-                                            size={isActive ? 26 : 24}
-                                            className={`transition ${isActive ? "text-white" : "text-[color:var(--app-accent)] group-hover:scale-110"}`}
-                                        />
-                                    )}
+                                        {isAll ? (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[1px]">
+                                                <span className="text-[11px] font-black uppercase tracking-wider text-white">
+                                                    ALL
+                                                </span>
+                                            </div>
+                                        ) : null}
+                                    </div>
                                 </div>
                                 <span
-                                    className={`truncate text-center text-[10.5px] font-bold sm:text-[11.5px] max-w-[64px] sm:max-w-[72px] ${
+                                    className={`truncate text-center text-[10.5px] font-bold capitalize sm:text-[11.5px] max-w-[64px] sm:max-w-[72px] ${
                                         isActive
                                             ? "text-[color:var(--app-accent)]"
                                             : "text-[color:var(--app-muted)] group-hover:text-[color:var(--app-text)]"

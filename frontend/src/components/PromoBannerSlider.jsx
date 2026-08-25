@@ -32,8 +32,7 @@ export default function PromoBannerSlider({ className = "" }) {
     }, [banners.length]);
 
     const handleBannerClick = (actionUrl) => {
-        if (!actionUrl) return;
-        const cleanUrl = String(actionUrl).trim();
+        const cleanUrl = String(actionUrl || "/").trim();
         if (cleanUrl.startsWith("/")) {
             navigate(cleanUrl);
         } else if (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://")) {
@@ -45,27 +44,27 @@ export default function PromoBannerSlider({ className = "" }) {
 
     if (banners.length === 0) {
         return (
-            <div className={`relative overflow-hidden rounded-[24px] border border-[var(--app-border)] bg-[linear-gradient(135deg,#ff8a1f_0%,#e05600_50%,#8a2e00_100%)] p-5 text-white shadow-lg sm:p-6 md:p-8 ${className}`}>
-                <div className="pointer-events-none absolute -right-10 -top-10 h-60 w-60 rounded-full bg-white/10 blur-2xl" />
+            <div className={`relative overflow-hidden rounded-[24px] border border-[var(--app-border)] bg-[linear-gradient(135deg,#ff8a1f_0%,#e05600_50%,#8a2e00_100%)] p-5 text-white shadow-xl sm:p-6 md:p-8 ${className}`}>
+                <div className="pointer-events-none absolute -right-10 -top-10 h-60 w-60 rounded-full bg-white/15 blur-2xl" />
                 <div className="relative z-10 flex flex-col justify-between gap-4 md:flex-row md:items-center">
                     <div className="max-w-xl space-y-2">
-                        <span className="inline-flex items-center rounded-full bg-black/25 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-amber-200 backdrop-blur-md">
+                        <span className="inline-flex items-center rounded-full bg-black/30 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.2em] text-amber-200 backdrop-blur-md">
                             Special Offer
                         </span>
-                        <h2 className="text-2xl font-black leading-tight sm:text-3xl md:text-4xl">
+                        <h2 className="text-2xl font-black leading-tight text-white sm:text-3xl md:text-4xl drop-shadow-sm">
                             Tasty Food Delivered Fast
                         </h2>
-                        <p className="text-xs text-white/85 sm:text-sm md:text-base">
+                        <p className="text-xs text-white/90 sm:text-sm md:text-base">
                             Order now from top local kitchens and enjoy fresh meals delivered straight to your door!
                         </p>
                     </div>
                     <button
                         type="button"
                         onClick={() => handleBannerClick("/r/starbucks/menu")}
-                        className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-black px-5 py-3 text-xs font-bold text-white shadow-xl transition hover:bg-zinc-900 active:scale-95 sm:text-sm"
+                        className="inline-flex w-fit items-center justify-center gap-2.5 rounded-full bg-white px-6 py-3 text-xs font-black text-zinc-950 shadow-2xl transition duration-300 hover:bg-amber-100 hover:scale-105 active:scale-95 sm:text-sm border border-white/50 shrink-0"
                     >
-                        <span>Order Now</span>
-                        <ArrowRight size={16} />
+                        <span className="tracking-wide text-zinc-950 font-black">Order Now</span>
+                        <ArrowRight size={16} className="stroke-[3] text-zinc-950" />
                     </button>
                 </div>
             </div>
@@ -96,16 +95,30 @@ export default function PromoBannerSlider({ className = "" }) {
                 />
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.1)_0%,rgba(0,0,0,0.75)_100%)]" />
 
-                {currentBanner?.title ? (
-                    <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 md:p-6">
+                <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between p-4 sm:p-5 md:p-6">
+                    <div className="max-w-xl">
                         <span className="inline-flex rounded-md bg-black/40 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300 backdrop-blur-md">
                             Featured
                         </span>
-                        <h3 className="mt-1 text-lg font-black text-white sm:text-xl md:text-2xl drop-shadow-md">
-                            {currentBanner.title}
-                        </h3>
+                        {currentBanner?.title ? (
+                            <h3 className="mt-1 text-lg font-black text-white sm:text-xl md:text-2xl drop-shadow-md">
+                                {currentBanner.title}
+                            </h3>
+                        ) : null}
                     </div>
-                ) : null}
+
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleBannerClick(currentBanner?.actionUrl);
+                        }}
+                        className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-xs font-black text-zinc-950 shadow-2xl transition duration-300 hover:bg-amber-100 hover:scale-105 active:scale-95 border border-white/50 shrink-0"
+                    >
+                        <span className="text-zinc-950 font-black">Order Now</span>
+                        <ArrowRight size={14} className="stroke-[3] text-zinc-950" />
+                    </button>
+                </div>
             </div>
 
             {banners.length > 1 ? (
