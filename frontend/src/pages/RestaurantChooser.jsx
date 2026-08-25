@@ -11,6 +11,8 @@ import BrandLogo from "../components/BrandLogo";
 import CartDrawer from "../components/CartDrawer";
 import VegModeToggle from "../components/VegModeToggle";
 import Footer from "../components/Footer";
+import PromoBannerSlider from "../components/PromoBannerSlider";
+import PopularCategories from "../components/PopularCategories";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 import { isVegModeItem } from "./restaurant/RestaurantMenu";
 
@@ -86,6 +88,7 @@ export default function RestaurantChooser() {
     const [selectedItem, setSelectedItem] = useState(null);
     const [popupAnchor, setPopupAnchor] = useState(null);
     const [cartOpen, setCartOpen] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState("");
     const vegModeEnabled = Boolean(restaurantContext?.vegOnly);
     const profilePath = customer ? "/profile/overview?scope=customer" : "/login?mode=customer";
     const profileLabel = customer ? "Profile" : "Login";
@@ -142,9 +145,21 @@ export default function RestaurantChooser() {
         staleMs: 15_000,
     });
 
-    const visibleItems = Array.isArray(catalogData?.items)
-        ? catalogData.items.filter((item) => !vegModeEnabled || (typeof isVegModeItem === "function" ? isVegModeItem(item) : true))
-        : [];
+    const visibleItems = useMemo(() => {
+        let items = Array.isArray(catalogData?.items) ? catalogData.items : [];
+        if (vegModeEnabled) {
+            items = items.filter((item) => (typeof isVegModeItem === "function" ? isVegModeItem(item) : true));
+        }
+        if (selectedCategory) {
+            const target = selectedCategory.toLowerCase();
+            items = items.filter((item) => {
+                const cat = String(item?.category || "").toLowerCase();
+                const name = String(item?.name || "").toLowerCase();
+                return cat.includes(target) || name.includes(target);
+            });
+        }
+        return items;
+    }, [catalogData?.items, vegModeEnabled, selectedCategory]);
     const itemSections = useMemo(() => {
         const groups = new Map();
 
@@ -300,12 +315,20 @@ export default function RestaurantChooser() {
                         </div>
                     </header>
 
-                    <div className="mt-4 space-y-3 sm:mt-5 sm:space-y-4">
+                    <div className="mt-4 space-y-4 sm:mt-5 sm:space-y-6">
                         {locationHint ? (
                             <div className="rounded-2xl border border-[var(--app-border)] bg-black/5 px-4 py-3 text-sm">
                                 {locationHint}
                             </div>
                         ) : null}
+
+                        <PromoBannerSlider />
+
+                        <PopularCategories
+                            items={catalogData?.items || []}
+                            selectedCategory={selectedCategory}
+                            onSelectCategory={setSelectedCategory}
+                        />
 
                         {backendState === "checking" ? (
                             <InitialBrowseLoadingCard />
