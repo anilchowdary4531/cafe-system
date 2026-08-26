@@ -98,19 +98,23 @@ export default function SuperAdminCategories() {
     const handleDelete = async (id) => {
         if (!window.confirm("Are you sure you want to delete this category?")) return;
         try {
+            setError("");
+            setCategories((prev) => prev.filter((c) => c.id !== id));
             await api.delete(`/super-admin/categories/${id}`);
-            loadCategories();
         } catch (err) {
-            setError("Failed to delete category");
+            console.warn("[SuperAdminCategories] Delete warning:", err);
+            loadCategories();
         }
     };
 
     const toggleStatus = async (category) => {
         try {
+            setError("");
+            setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, isActive: !c.isActive } : c)));
             await api.patch(`/super-admin/categories/${category.id}`, { isActive: !category.isActive });
-            loadCategories();
         } catch (err) {
-            setError("Failed to update category status");
+            console.warn("[SuperAdminCategories] Toggle status warning:", err);
+            loadCategories();
         }
     };
 

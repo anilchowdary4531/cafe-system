@@ -79,19 +79,23 @@ export default function SuperAdminBanners() {
     const handleDelete = async (id) => {
         if (!window.confirm("Delete this banner?")) return;
         try {
+            setError("");
+            setBanners((prev) => prev.filter((b) => b.id !== id));
             await api.delete(`/super-admin/banners/${id}`);
-            loadBanners();
         } catch (err) {
-            setError("Failed to delete banner");
+            console.warn("[SuperAdminBanners] Delete warning:", err);
+            loadBanners();
         }
     };
 
     const toggleStatus = async (banner) => {
         try {
+            setError("");
+            setBanners((prev) => prev.map((b) => (b.id === banner.id ? { ...b, isActive: !b.isActive } : b)));
             await api.patch(`/super-admin/banners/${banner.id}`, { isActive: !banner.isActive });
-            loadBanners();
         } catch (err) {
-            setError("Failed to update status");
+            console.warn("[SuperAdminBanners] Toggle status warning:", err);
+            loadBanners();
         }
     };
 
