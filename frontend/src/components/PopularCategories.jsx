@@ -67,6 +67,19 @@ export const getCategoryIcon = (name = "") => {
     return Utensils;
 };
 
+export const normalizeCategoryName = (raw = "") => {
+    const s = String(raw || "").trim();
+    if (!s) return "";
+    const lower = s.toLowerCase();
+    if (lower === "cofee") return "Coffee";
+    if (lower === "dessert") return "Desserts";
+    if (lower === "briyani") return "Biryani";
+    if (lower === "beverage") return "Beverages";
+    if (lower === "sweet" || lower === "sweets") return "Sweet";
+    if (lower === "food") return "Food";
+    return s.charAt(0).toUpperCase() + s.slice(1);
+};
+
 export default function PopularCategories({
     items = [],
     selectedCategory = "",
@@ -90,7 +103,8 @@ export default function PopularCategories({
 
         // 1. Add global categories from server
         for (const cat of globalCategories) {
-            const name = String(cat?.name || "").trim();
+            const rawName = String(cat?.name || "").trim();
+            const name = normalizeCategoryName(rawName);
             if (name && !seenNames.has(name.toLowerCase())) {
                 seenNames.add(name.toLowerCase());
                 dynamicCategories.push({
@@ -103,7 +117,8 @@ export default function PopularCategories({
         // 2. Add dynamic categories from available items
         if (Array.isArray(items)) {
             for (const item of items) {
-                const name = String(item?.category || "").trim();
+                const rawName = String(item?.category || "").trim();
+                const name = normalizeCategoryName(rawName);
                 if (name && !seenNames.has(name.toLowerCase())) {
                     seenNames.add(name.toLowerCase());
                     dynamicCategories.push({
@@ -116,11 +131,12 @@ export default function PopularCategories({
 
         // 3. Add default fallbacks if missing
         for (const fb of DEFAULT_FALLBACK_CATEGORIES) {
-            if (!seenNames.has(fb.name.toLowerCase())) {
-                seenNames.add(fb.name.toLowerCase());
+            const name = normalizeCategoryName(fb.name);
+            if (!seenNames.has(name.toLowerCase())) {
+                seenNames.add(name.toLowerCase());
                 dynamicCategories.push({
-                    name: fb.name,
-                    imageUrl: getCategoryFallbackImage(fb.name),
+                    name,
+                    imageUrl: getCategoryFallbackImage(name),
                 });
             }
         }

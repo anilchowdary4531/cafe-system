@@ -522,32 +522,147 @@ export default async function superAdminRoutes(app, deps) {
   // GLOBAL CATEGORIES
   ///////////////////////////////////////////////////////////
 
+  const CATEGORY_DEFAULT_IMAGES = {
+    biryani: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80",
+    pizza: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80",
+    burger: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=300&q=80",
+    coffee: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=300&q=80",
+    "fast food": "https://images.unsplash.com/photo-1561758033-d89a9ad46330?auto=format&fit=crop&w=300&q=80",
+    desserts: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=300&q=80",
+    beverages: "https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=300&q=80",
+    "ice cream": "https://images.unsplash.com/photo-1570197788417-0e82375c9371?auto=format&fit=crop&w=300&q=80",
+    food: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80",
+    sweet: "https://images.unsplash.com/photo-1587314168485-3236d6710814?auto=format&fit=crop&w=300&q=80",
+    sweets: "https://images.unsplash.com/photo-1587314168485-3236d6710814?auto=format&fit=crop&w=300&q=80",
+  };
+
+  const normalizeCatName = (raw) => {
+    const s = String(raw || "").trim();
+    if (!s) return "";
+    const lower = s.toLowerCase();
+    if (lower === "cofee") return "Coffee";
+    if (lower === "dessert") return "Desserts";
+    if (lower === "briyani") return "Biryani";
+    if (lower === "beverage") return "Beverages";
+    if (lower === "sweet" || lower === "sweets") return "Sweet";
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  };
+
   app.get("/super-admin/categories", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
       if (!prisma.globalCategory) {
         return { categories: [] };
       }
+
+      // 1. Fetch existing menu items to discover category names & counts
+      const menuItems = await prisma.menuItem.findMany({
+        where: { isAvailable: true },
+        select: { category: true },
+      }).catch(() => []);
+
+      const itemCountMap = {};
+      const discoveredCategoryNames = new Set();
+
+      for (const item of menuItems) {
+        const cat = normalizeCatName(item.category);
+        if (cat) {
+          discoveredCategoryNames.add(cat);
+          itemCountMap[cat.toLowerCase()] = (itemCountMap[cat.toLowerCase()] || 0) + 1;
+        }
+      }
+
+      // Default fallback categories
+      const defaults = ["Biryani", "Pizza", "Burger", "Coffee", "Fast Food", "Desserts", "Beverages", "Ice Cream", "Food", "Sweet"];
+      defaults.forEach((d) => discoveredCategoryNames.add(d));
+
+      // 2. Fetch current global categories from database
       let categories = await prisma.globalCategory.findMany({
         orderBy: { priority: "desc" },
       });
-      if (categories.length === 0) {
-        const defaults = [
-          { name: "Biryani", imageUrl: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", priority: 100 },
-          { name: "Pizza", imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", priority: 90 },
-          { name: "Burger", imageUrl: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=300&q=80", priority: 80 },
-          { name: "Coffee", imageUrl: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=300&q=80", priority: 70 },
-          { name: "Fast Food", imageUrl: "https://images.unsplash.com/photo-1561758033-d89a9ad46330?auto=format&fit=crop&w=300&q=80", priority: 60 },
-          { name: "Desserts", imageUrl: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=300&q=80", priority: 50 },
-          { name: "Beverages", imageUrl: "https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=300&q=80", priority: 40 },
-          { name: "Ice Cream", imageUrl: "https://images.unsplash.com/photo-1570197788417-0e82375c9371?auto=format&fit=crop&w=300&q=80", priority: 30 }
-        ];
-        await prisma.globalCategory.createMany({ data: defaults, skipDuplicates: true }).catch(() => {});
+
+      const existingNames = new Set(categories.map((c) => c.name.toLowerCase()));
+
+      // 3. Auto-insert missing discovered categories
+      const toInsert = [];
+      let priorityCounter = 100;
+      for (const catName of discoveredCategoryNames) {
+        if (!existingNames.has(catName.toLowerCase())) {
+          const lower = catName.toLowerCase();
+          const imgUrl = CATEGORY_DEFAULT_IMAGES[lower] || CATEGORY_DEFAULT_IMAGES.food;
+          toInsert.push({
+            name: catName,
+            imageUrl: imgUrl,
+            priority: priorityCounter,
+            isActive: true,
+          });
+          priorityCounter -= 5;
+        }
+      }
+
+      if (toInsert.length > 0) {
+        await prisma.globalCategory.createMany({ data: toInsert, skipDuplicates: true }).catch(() => {});
         categories = await prisma.globalCategory.findMany({ orderBy: { priority: "desc" } });
       }
-      return { categories: categories || [] };
+
+      // 4. Attach itemCount to each category object
+      const enrichedCategories = categories.map((cat) => {
+        const lowerName = String(cat.name || "").toLowerCase();
+        return {
+          ...cat,
+          itemCount: itemCountMap[lowerName] || 0,
+        };
+      });
+
+      return { categories: enrichedCategories };
     } catch (err) {
       console.warn("[SuperAdmin] fetch categories warning:", err?.message || err);
       return { categories: [] };
+    }
+  });
+
+  app.post("/super-admin/categories/sync", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      if (!prisma.globalCategory) {
+        return reply.code(500).send({ message: "Database model not initialized." });
+      }
+
+      const menuItems = await prisma.menuItem.findMany({
+        select: { category: true },
+      }).catch(() => []);
+
+      const discovered = new Set();
+      for (const item of menuItems) {
+        const cat = normalizeCatName(item.category);
+        if (cat) discovered.add(cat);
+      }
+
+      const existing = await prisma.globalCategory.findMany();
+      const existingNames = new Set(existing.map((c) => c.name.toLowerCase()));
+
+      const toInsert = [];
+      let p = 90;
+      for (const name of discovered) {
+        if (!existingNames.has(name.toLowerCase())) {
+          const imgUrl = CATEGORY_DEFAULT_IMAGES[name.toLowerCase()] || CATEGORY_DEFAULT_IMAGES.food;
+          toInsert.push({
+            name,
+            imageUrl: imgUrl,
+            priority: p,
+            isActive: true,
+          });
+          p -= 5;
+        }
+      }
+
+      if (toInsert.length > 0) {
+        await prisma.globalCategory.createMany({ data: toInsert, skipDuplicates: true });
+      }
+
+      const categories = await prisma.globalCategory.findMany({ orderBy: { priority: "desc" } });
+      return { message: `Synced ${toInsert.length} new categories from menu items`, categories };
+    } catch (err) {
+      console.error("[SuperAdmin] sync categories error:", err);
+      return reply.code(500).send({ message: "Failed to sync categories" });
     }
   });
 

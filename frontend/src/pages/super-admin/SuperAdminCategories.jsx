@@ -14,7 +14,8 @@ import {
     Image as ImageIcon,
     Utensils,
     Power,
-    Wallet
+    Wallet,
+    Sparkles
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -46,6 +47,8 @@ export default function SuperAdminCategories() {
     const [showForm, setShowForm] = useState(false);
     const [formData, setFormData] = useState({ name: "", imageUrl: "", priority: 0 });
 
+    const [syncing, setSyncing] = useState(false);
+
     const loadCategories = async () => {
         try {
             setLoading(true);
@@ -59,6 +62,20 @@ export default function SuperAdminCategories() {
             setError(err.response?.data?.message || err.message || "Failed to load categories");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSync = async () => {
+        try {
+            setSyncing(true);
+            setError("");
+            await api.post("/super-admin/categories/sync");
+            await loadCategories();
+        } catch (err) {
+            console.error("[SuperAdminCategories] Sync error:", err);
+            setError(err.response?.data?.message || "Failed to sync categories from menu items");
+        } finally {
+            setSyncing(false);
         }
     };
 
@@ -123,9 +140,14 @@ export default function SuperAdminCategories() {
                         <button onClick={() => setSidebarOpen(true)} className="theme-soft-button p-2 rounded-full"><Menu size={20} /></button>
                         <h1 className="text-2xl font-bold">Global Categories</h1>
                     </div>
-                    <button onClick={() => setShowForm(true)} className="theme-button flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold">
-                        <Plus size={18} /> Add Category
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button onClick={handleSync} disabled={syncing} className="theme-soft-button flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold border border-amber-500/30 text-amber-400 hover:bg-amber-500/10">
+                            <Sparkles size={16} className={syncing ? "animate-spin" : ""} /> {syncing ? "Syncing..." : "Sync All Item Categories"}
+                        </button>
+                        <button onClick={() => setShowForm(true)} className="theme-button flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold">
+                            <Plus size={18} /> Add Category
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -159,15 +181,22 @@ export default function SuperAdminCategories() {
                 )}
 
                 {loading ? (
-                    <div className="text-center py-12 text-gray-400">Loading categories...</div>
+                    <div className="text-center py-12 text-gray-400 flex items-center justify-center gap-2">
+                        <Sparkles className="animate-spin text-amber-500" size={20} /> Loading categories...
+                    </div>
                 ) : categories.length === 0 ? (
                     <div className="theme-panel rounded-3xl p-12 text-center text-gray-400 border theme-border">
                         <Menu className="mx-auto mb-4 text-gray-600" size={48} />
                         <h3 className="text-lg font-bold text-white mb-1">No Global Categories Yet</h3>
-                        <p className="text-sm text-gray-400 mb-6">Add curated global categories (like Pizza, Biryani, Coffee) for the mobile app home screen.</p>
-                        <button onClick={() => setShowForm(true)} className="theme-button inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-bold">
-                            <Plus size={18} /> Add First Category
-                        </button>
+                        <p className="text-sm text-gray-400 mb-6">Add curated global categories (like Pizza, Biryani, Coffee) or click below to auto-sync existing categories from restaurant menu items.</p>
+                        <div className="flex items-center justify-center gap-3">
+                            <button onClick={handleSync} disabled={syncing} className="theme-soft-button inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-bold border border-amber-500/40 text-amber-400">
+                                <Sparkles size={18} className={syncing ? "animate-spin" : ""} /> Sync All Item Categories
+                            </button>
+                            <button onClick={() => setShowForm(true)} className="theme-button inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-bold">
+                                <Plus size={18} /> Add Category
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -191,9 +220,11 @@ export default function SuperAdminCategories() {
                                 <div className="p-4 flex items-center justify-between">
                                     <div>
                                         <h4 className="font-bold text-white uppercase tracking-tight">{category.name}</h4>
-                                        <p className="text-xs text-gray-500">Priority: {category.priority}</p>
+                                        <p className="text-xs text-amber-400 font-extrabold mt-0.5">
+                                            {category.itemCount || 0} {category.itemCount === 1 ? "dish connected" : "dishes connected"}
+                                        </p>
                                     </div>
-                                    <div className={`h-2 w-2 rounded-full ${category.isActive ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-gray-600"}`} />
+                                    <div className={`h-2.5 w-2.5 rounded-full ${category.isActive ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-gray-600"}`} />
                                 </div>
                             </div>
                         ))}

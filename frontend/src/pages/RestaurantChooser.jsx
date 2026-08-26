@@ -12,7 +12,7 @@ import CartDrawer from "../components/CartDrawer";
 import VegModeToggle from "../components/VegModeToggle";
 import Footer from "../components/Footer";
 import PromoBannerSlider from "../components/PromoBannerSlider";
-import PopularCategories from "../components/PopularCategories";
+import PopularCategories, { normalizeCategoryName } from "../components/PopularCategories";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 import { isVegModeItem } from "./restaurant/RestaurantMenu";
 
@@ -151,11 +151,11 @@ export default function RestaurantChooser() {
             items = items.filter((item) => (typeof isVegModeItem === "function" ? isVegModeItem(item) : true));
         }
         if (selectedCategory) {
-            const target = selectedCategory.toLowerCase();
+            const target = normalizeCategoryName(selectedCategory).toLowerCase();
             items = items.filter((item) => {
-                const cat = String(item?.category || "").toLowerCase();
+                const cat = normalizeCategoryName(item?.category).toLowerCase();
                 const name = String(item?.name || "").toLowerCase();
-                return cat.includes(target) || name.includes(target);
+                return cat.includes(target) || target.includes(cat) || name.includes(target);
             });
         }
         return items;
@@ -165,7 +165,7 @@ export default function RestaurantChooser() {
 
         for (const item of visibleItems) {
             const rawCategory = String(item?.category || "").trim();
-            const label = rawCategory || "Other";
+            const label = normalizeCategoryName(rawCategory) || "Other";
             const key = label.toLowerCase();
 
             if (!groups.has(key)) {
