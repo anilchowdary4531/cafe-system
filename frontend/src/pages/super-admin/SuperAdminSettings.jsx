@@ -15,20 +15,7 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import ThemeSelector from "../../components/ThemeSelector";
 import { useAuth } from "../../context/AuthContext";
-import tiffzyLogo from "../../assets/tiffzy-logo.png";
-
-const SUPER_ADMIN_MENU_ITEMS = [
-    { key: "dashboard", label: "Dashboard Overview", icon: LayoutDashboard, to: "/super-admin" },
-    { key: "restaurants", label: "Restaurant Management", icon: Building2, to: "/super-admin#restaurants-section" },
-    { key: "restaurant-profile", label: "Restaurant Profile Page", icon: Utensils, to: "/super-admin/restaurant-profiles" },
-    { key: "wallets", label: "Customer Wallet Ledger", icon: Wallet, to: "/super-admin/wallets" },
-    { key: "categories", label: "Home Categories", icon: Menu, to: "/super-admin/categories" },
-    { key: "banners", label: "Promotion Banners", icon: ImageIcon, to: "/super-admin/banners" },
-    { key: "users", label: "All Users & Staff", icon: Users, to: "/super-admin/users" },
-    { key: "settlements", label: "Cashfree Easy Split", icon: BarChart3, to: "/super-admin/settlements" },
-    { key: "create-restaurant", label: "Create Restaurant", icon: Store, to: "/super-admin/create-restaurant" },
-    { key: "settings", label: "System Settings", icon: Settings, to: "/super-admin/settings" },
-];
+import SuperAdminSidebar from "../../components/super-admin/SuperAdminSidebar";
 
 export default function SuperAdminSettings() {
     const navigate = useNavigate();
@@ -65,49 +52,7 @@ export default function SuperAdminSettings() {
 
     return (
         <div className="theme-page min-h-screen">
-            <div className={`fixed inset-0 z-50 transition ${sidebarOpen ? "pointer-events-auto" : "pointer-events-none"}`}>
-                <button
-                    type="button"
-                    aria-label="Close Tiffzy menu"
-                    onClick={() => setSidebarOpen(false)}
-                    className={`absolute inset-0 bg-black/45 transition-opacity ${sidebarOpen ? "opacity-100" : "opacity-0"}`}
-                />
-                <aside
-                    className={`theme-panel theme-border absolute left-0 top-0 h-full w-72 max-w-[84vw] border-r p-5 shadow-2xl transition-transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
-                >
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="theme-muted text-xs uppercase tracking-[0.2em]">Menu</p>
-                            <h2 className="text-xl font-bold">Tiffzy</h2>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => setSidebarOpen(false)}
-                            className="theme-soft-button inline-flex h-9 w-9 items-center justify-center rounded-xl"
-                            aria-label="Close sidebar"
-                        >
-                            <X size={18} />
-                        </button>
-                    </div>
-                    <nav className="mt-5 grid gap-2">
-                        {SUPER_ADMIN_MENU_ITEMS.map((item) => {
-                            const Icon = item.icon;
-                            const isActive = item.key === activeMenuKey;
-                            return (
-                                <button
-                                    key={item.key}
-                                    type="button"
-                                    onClick={() => handleMenuClick(item)}
-                                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${isActive ? "theme-button" : "theme-soft-button"}`}
-                                >
-                                    <Icon size={17} />
-                                    {item.label}
-                                </button>
-                            );
-                        })}
-                    </nav>
-                </aside>
-            </div>
+            <SuperAdminSidebar open={sidebarOpen} setOpen={setSidebarOpen} currentKey="settings" />
 
             <header className="theme-nav border-b px-4 py-4 md:px-8">
                 <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">

@@ -40,6 +40,8 @@ import {
     YAxis,
 } from "recharts";
 
+import SuperAdminSidebar from "../../components/super-admin/SuperAdminSidebar";
+
 const formatMoney = (value) =>
     new Intl.NumberFormat("en-IN", {
         style: "currency",
@@ -210,49 +212,7 @@ export default function SuperAdminDashboard() {
 
     return (
         <div className="theme-page min-h-screen" id="super-admin-top">
-            <div className={`fixed inset-0 z-50 transition ${sidebarOpen ? "pointer-events-auto" : "pointer-events-none"}`}>
-                <button
-                    type="button"
-                    aria-label="Close Tiffzy menu"
-                    onClick={() => setSidebarOpen(false)}
-                    className={`absolute inset-0 bg-black/45 transition-opacity ${sidebarOpen ? "opacity-100" : "opacity-0"}`}
-                />
-                <aside
-                    className={`theme-panel theme-border absolute left-0 top-0 h-full w-72 max-w-[84vw] border-r p-5 shadow-2xl transition-transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
-                >
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="theme-muted text-xs uppercase tracking-[0.2em]">Menu</p>
-                            <h2 className="text-xl font-bold">Tiffzy</h2>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => setSidebarOpen(false)}
-                            className="theme-soft-button inline-flex h-9 w-9 items-center justify-center rounded-xl"
-                            aria-label="Close sidebar"
-                        >
-                            <X size={18} />
-                        </button>
-                    </div>
-                    <nav className="mt-5 grid gap-2">
-                        {SUPER_ADMIN_MENU_ITEMS.map((item) => {
-                            const Icon = item.icon;
-                            const isActive = item.key === activeMenuKey;
-                            return (
-                                <button
-                                    key={item.key}
-                                    type="button"
-                                    onClick={() => handleMenuClick(item)}
-                                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${isActive ? "theme-button" : "theme-soft-button"}`}
-                                >
-                                    <Icon size={17} />
-                                    {item.label}
-                                </button>
-                            );
-                        })}
-                    </nav>
-                </aside>
-            </div>
+            <SuperAdminSidebar open={sidebarOpen} setOpen={setSidebarOpen} currentKey={activeMenuKey} />
 
             <header className="theme-nav border-b px-4 py-4 md:px-8">
                 <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">

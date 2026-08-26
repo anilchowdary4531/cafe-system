@@ -21,18 +21,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/apiClient";
 
-const SUPER_ADMIN_MENU_ITEMS = [
-    { key: "dashboard", label: "Dashboard Overview", icon: LayoutDashboard, to: "/super-admin" },
-    { key: "restaurants", label: "Restaurant Management", icon: Building2, to: "/super-admin#restaurants-section" },
-    { key: "restaurant-profile", label: "Restaurant Profile Page", icon: Utensils, to: "/super-admin/restaurant-profiles" },
-    { key: "wallets", label: "Customer Wallet Ledger", icon: Wallet, to: "/super-admin/wallets" },
-    { key: "categories", label: "Home Categories", icon: Menu, to: "/super-admin/categories" },
-    { key: "banners", label: "Promotion Banners", icon: ImageIcon, to: "/super-admin/banners" },
-    { key: "users", label: "All Users & Staff", icon: Users, to: "/super-admin/users" },
-    { key: "settlements", label: "Cashfree Easy Split", icon: BarChart3, to: "/super-admin/settlements" },
-    { key: "create-restaurant", label: "Create Restaurant", icon: Store, to: "/super-admin/create-restaurant" },
-    { key: "settings", label: "System Settings", icon: Settings, to: "/super-admin/settings" },
-];
+import SuperAdminSidebar from "../../components/super-admin/SuperAdminSidebar";
 
 export default function SuperAdminBanners() {
     const navigate = useNavigate();
@@ -101,22 +90,7 @@ export default function SuperAdminBanners() {
 
     return (
         <div className="theme-page min-h-screen">
-            <div className={`fixed inset-0 z-50 transition ${sidebarOpen ? "pointer-events-auto" : "pointer-events-none"}`}>
-                <button onClick={() => setSidebarOpen(false)} className={`absolute inset-0 bg-black/45 transition-opacity ${sidebarOpen ? "opacity-100" : "opacity-0"}`} />
-                <aside className={`theme-panel theme-border absolute left-0 top-0 h-full w-72 max-w-[84vw] border-r p-5 shadow-2xl transition-transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-                    <div className="flex items-center justify-between mb-8">
-                        <h2 className="text-xl font-bold text-white">Tiffzy Admin</h2>
-                        <button onClick={() => setSidebarOpen(false)} className="theme-soft-button p-2 rounded-xl text-white"><X size={18} /></button>
-                    </div>
-                    <nav className="grid gap-2">
-                        {SUPER_ADMIN_MENU_ITEMS.map((item) => (
-                            <button key={item.key} onClick={() => { navigate(item.to); setSidebarOpen(false); }} className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left font-semibold transition ${item.key === "banners" ? "theme-button" : "theme-soft-button"}`}>
-                                <item.icon size={18} /> {item.label}
-                            </button>
-                        ))}
-                    </nav>
-                </aside>
-            </div>
+            <SuperAdminSidebar open={sidebarOpen} setOpen={setSidebarOpen} currentKey="banners" />
 
             <header className="theme-nav border-b px-4 py-4 md:px-8">
                 <div className="mx-auto flex max-w-7xl items-center justify-between">
