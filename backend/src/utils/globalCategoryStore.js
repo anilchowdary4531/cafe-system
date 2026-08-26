@@ -24,11 +24,11 @@ let inMemoryCategories = DEFAULT_NAMES.map((name, idx) => ({
 let isInitializedWithDb = false;
 
 export const getGlobalCategoriesStore = async (prisma) => {
-  if (prisma?.globalCategory) {
+  if (prisma?.globalCategory && !isInitializedWithDb) {
+    isInitializedWithDb = true;
     try {
       let dbCats = await prisma.globalCategory.findMany({ orderBy: { priority: "desc" } });
-      if (dbCats.length === 0 && !isInitializedWithDb) {
-        isInitializedWithDb = true;
+      if (dbCats.length === 0) {
         const toInsert = inMemoryCategories.map((c) => ({
           name: c.name,
           imageUrl: c.imageUrl,
