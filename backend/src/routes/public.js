@@ -150,6 +150,8 @@ export default async function publicRoutes(app, deps) {
           priority: p - idx * 5,
           isActive: true,
         }));
+      }
+
       // Deduplicate by normalized name
       const deduplicatedMap = new Map();
       for (const cat of categories) {
