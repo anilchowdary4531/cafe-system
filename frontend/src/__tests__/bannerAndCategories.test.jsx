@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi } from "vitest";
 import PromoBannerSlider from "../components/PromoBannerSlider";
-import PopularCategories, { getCategoryIcon } from "../components/PopularCategories";
+import PopularCategories, { getCategoryIcon, normalizeCategoryName } from "../components/PopularCategories";
 
 vi.mock("../utils/apiClient", async () => {
     const actual = await vi.importActual("../utils/apiClient");
@@ -33,6 +33,15 @@ describe("PromoBannerSlider & PopularCategories Audit", () => {
         expect(getCategoryIcon("Coffee")).toBeDefined();
         expect(getCategoryIcon("Desserts")).toBeDefined();
         expect(getCategoryIcon("Biryani")).toBeDefined();
+    });
+
+    it("normalizes category typos like Cofee, Dessert, and Sweets correctly", () => {
+        expect(normalizeCategoryName("Cofee")).toBe("Coffee");
+        expect(normalizeCategoryName("coffee")).toBe("Coffee");
+        expect(normalizeCategoryName("Dessert")).toBe("Desserts");
+        expect(normalizeCategoryName("desserts")).toBe("Desserts");
+        expect(normalizeCategoryName("sweets")).toBe("Sweet");
+        expect(normalizeCategoryName("Briyani")).toBe("Biryani");
     });
 
     it("renders PopularCategories with fallback options and triggers selection callback", () => {
