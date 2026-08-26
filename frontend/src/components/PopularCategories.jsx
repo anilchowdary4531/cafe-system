@@ -91,6 +91,7 @@ export default function PopularCategories({
         staleMs: 60_000,
     });
 
+    const hasServerCategories = Array.isArray(globalCatData) || Array.isArray(globalCatData?.categories);
     const globalCategories = Array.isArray(globalCatData)
         ? globalCatData.filter((c) => c?.isActive !== false)
         : Array.isArray(globalCatData?.categories)
@@ -114,30 +115,31 @@ export default function PopularCategories({
             }
         }
 
-        // 2. Add dynamic categories from available items
-        if (Array.isArray(items)) {
-            for (const item of items) {
-                const rawName = String(item?.category || "").trim();
-                const name = normalizeCategoryName(rawName);
-                if (name && !seenNames.has(name.toLowerCase())) {
+        // 2. If server did NOT provide categories, fall back to menu items and defaults
+        if (!hasServerCategories || dynamicCategories.length === 0) {
+            if (Array.isArray(items)) {
+                for (const item of items) {
+                    const rawName = String(item?.category || "").trim();
+                    const name = normalizeCategoryName(rawName);
+                    if (name && !seenNames.has(name.toLowerCase())) {
+                        seenNames.add(name.toLowerCase());
+                        dynamicCategories.push({
+                            name,
+                            imageUrl: item.image || getCategoryFallbackImage(name),
+                        });
+                    }
+                }
+            }
+
+            for (const fb of DEFAULT_FALLBACK_CATEGORIES) {
+                const name = normalizeCategoryName(fb.name);
+                if (!seenNames.has(name.toLowerCase())) {
                     seenNames.add(name.toLowerCase());
                     dynamicCategories.push({
                         name,
-                        imageUrl: item.image || getCategoryFallbackImage(name),
+                        imageUrl: getCategoryFallbackImage(name),
                     });
                 }
-            }
-        }
-
-        // 3. Add default fallbacks if missing
-        for (const fb of DEFAULT_FALLBACK_CATEGORIES) {
-            const name = normalizeCategoryName(fb.name);
-            if (!seenNames.has(name.toLowerCase())) {
-                seenNames.add(name.toLowerCase());
-                dynamicCategories.push({
-                    name,
-                    imageUrl: getCategoryFallbackImage(name),
-                });
             }
         }
 

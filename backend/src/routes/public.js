@@ -118,12 +118,20 @@ export default async function publicRoutes(app, deps) {
   app.get("/global-categories", async () => {
     try {
       let categories = [];
+      let inactiveNames = new Set();
+
       if (prisma.globalCategory) {
         try {
           categories = await prisma.globalCategory.findMany({
             where: { isActive: true },
             orderBy: { priority: "desc" },
           });
+
+          const inactiveList = await prisma.globalCategory.findMany({
+            where: { isActive: false },
+            select: { name: true },
+          }).catch(() => []);
+          inactiveNames = new Set(inactiveList.map((c) => normalizePublicCat(c.name).toLowerCase()));
         } catch {
           categories = [];
         }
@@ -138,9 +146,11 @@ export default async function publicRoutes(app, deps) {
         const discovered = new Set();
         for (const item of menuItems) {
           const cat = normalizePublicCat(item.category);
-          if (cat) discovered.add(cat);
+          if (cat && !inactiveNames.has(cat.toLowerCase())) discovered.add(cat);
         }
-        ["Biryani", "Pizza", "Burger", "Coffee", "Fast Food", "Desserts", "Beverages", "Ice Cream", "Food", "Sweet"].forEach((d) => discovered.add(d));
+        ["Biryani", "Pizza", "Burger", "Coffee", "Fast Food", "Desserts", "Beverages", "Ice Cream", "Food", "Sweet"]
+          .filter((d) => !inactiveNames.has(d.toLowerCase()))
+          .forEach((d) => discovered.add(d));
 
         let p = 100;
         categories = Array.from(discovered).map((name, idx) => ({
