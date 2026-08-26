@@ -40,7 +40,7 @@ import {
     YAxis,
 } from "recharts";
 
-import SuperAdminSidebar from "../../components/super-admin/SuperAdminSidebar";
+import SuperAdminSidebar, { SUPER_ADMIN_MENU_ITEMS } from "../../components/super-admin/SuperAdminSidebar";
 
 const formatMoney = (value) =>
     new Intl.NumberFormat("en-IN", {
@@ -57,19 +57,6 @@ const shortName = (value) => {
     if (text.length <= 12) return text;
     return `${text.slice(0, 11)}...`;
 };
-
-const SUPER_ADMIN_MENU_ITEMS = [
-    { key: "dashboard", label: "Dashboard Overview", icon: LayoutDashboard, to: "/super-admin" },
-    { key: "restaurants", label: "Restaurant Management", icon: Building2, to: "/super-admin#restaurants-section" },
-    { key: "restaurant-profile", label: "Restaurant Profile Page", icon: Utensils, to: "/super-admin/restaurant-profiles" },
-    { key: "wallets", label: "Customer Wallet Ledger", icon: Wallet, to: "/super-admin/wallets" },
-    { key: "categories", label: "Home Categories", icon: Menu, to: "/super-admin/categories" },
-    { key: "banners", label: "Promotion Banners", icon: ImageIcon, to: "/super-admin/banners" },
-    { key: "users", label: "All Users & Staff", icon: Users, to: "/super-admin/users" },
-    { key: "settlements", label: "Cashfree Easy Split", icon: BarChart3, to: "/super-admin/settlements" },
-    { key: "create-restaurant", label: "Create Restaurant", icon: Store, to: "/super-admin/create-restaurant" },
-    { key: "settings", label: "System Settings", icon: Settings, to: "/super-admin/settings" },
-];
 
 const HASH_TO_MENU_KEY = {
     "restaurants-section": "restaurants",

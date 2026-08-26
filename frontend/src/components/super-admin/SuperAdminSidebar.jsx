@@ -77,7 +77,7 @@ export default function SuperAdminSidebar({ open, setOpen, currentKey }) {
                     <div className="flex items-center gap-2.5">
                         <img src={tiffzyLogo} alt="Tiffzy" className="h-7 w-auto object-contain" />
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] theme-muted">Admin Panel</p>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] theme-muted">MENU</p>
                             <h2 className="text-base font-extrabold text-[color:var(--app-text)] leading-none">Tiffzy Admin</h2>
                         </div>
                     </div>
