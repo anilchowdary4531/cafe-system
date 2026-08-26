@@ -578,13 +578,11 @@ export default async function superAdminRoutes(app, deps) {
             orderBy: { priority: "desc" },
           });
 
-          const existingNames = new Set(categories.map((c) => c.name.toLowerCase()));
-
-          // Auto-insert missing discovered categories into DB table
-          const toInsert = [];
-          let priorityCounter = 100;
-          for (const catName of discoveredCategoryNames) {
-            if (!existingNames.has(catName.toLowerCase())) {
+          // Only seed initial default categories if DB table has NEVER been populated before
+          if (categories.length === 0) {
+            const toInsert = [];
+            let priorityCounter = 100;
+            for (const catName of discoveredCategoryNames) {
               const lower = catName.toLowerCase();
               const imgUrl = CATEGORY_DEFAULT_IMAGES[lower] || CATEGORY_DEFAULT_IMAGES.food;
               toInsert.push({
@@ -595,11 +593,11 @@ export default async function superAdminRoutes(app, deps) {
               });
               priorityCounter -= 5;
             }
-          }
 
-          if (toInsert.length > 0) {
-            await prisma.globalCategory.createMany({ data: toInsert, skipDuplicates: true }).catch(() => {});
-            categories = await prisma.globalCategory.findMany({ orderBy: { priority: "desc" } });
+            if (toInsert.length > 0) {
+              await prisma.globalCategory.createMany({ data: toInsert, skipDuplicates: true }).catch(() => {});
+              categories = await prisma.globalCategory.findMany({ orderBy: { priority: "desc" } });
+            }
           }
         } catch (dbErr) {
           console.warn("[SuperAdmin] globalCategory DB query warning:", dbErr.message);

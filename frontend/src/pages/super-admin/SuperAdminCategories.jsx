@@ -86,10 +86,12 @@ export default function SuperAdminCategories() {
 
     const handleDelete = async (id) => {
         if (!window.confirm("Are you sure you want to delete this category?")) return;
+        const targetCat = categories.find((c) => c.id === id);
         try {
             setError("");
             setCategories((prev) => prev.filter((c) => c.id !== id));
-            await api.delete(`/super-admin/categories/${id}`);
+            await api.delete(`/super-admin/categories/${id}`, { data: { name: targetCat?.name } });
+            await loadCategories();
         } catch (err) {
             console.warn("[SuperAdminCategories] Delete warning:", err);
             loadCategories();
@@ -100,7 +102,8 @@ export default function SuperAdminCategories() {
         try {
             setError("");
             setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, isActive: !c.isActive } : c)));
-            await api.patch(`/super-admin/categories/${category.id}`, { isActive: !category.isActive });
+            await api.patch(`/super-admin/categories/${category.id}`, { isActive: !category.isActive, name: category.name });
+            await loadCategories();
         } catch (err) {
             console.warn("[SuperAdminCategories] Toggle status warning:", err);
             loadCategories();
