@@ -28,7 +28,7 @@ const SUPER_ADMIN_MENU_ITEMS = [
     { key: "wallets", label: "Customer Wallet Ledger", icon: Wallet, to: "/super-admin/wallets" },
     { key: "categories", label: "Home Categories", icon: Menu, to: "/super-admin/categories" },
     { key: "banners", label: "Promotion Banners", icon: ImageIcon, to: "/super-admin/banners" },
-    { key: "users", label: "Customer & Staff Users", icon: Users, to: "/super-admin/users" },
+    { key: "users", label: "All Users & Staff", icon: Users, to: "/super-admin/users" },
     { key: "settlements", label: "Cashfree Easy Split", icon: BarChart3, to: "/super-admin/settlements" },
     { key: "create-restaurant", label: "Create Restaurant", icon: Store, to: "/super-admin/create-restaurant" },
     { key: "settings", label: "System Settings", icon: Settings, to: "/super-admin/settings" },
