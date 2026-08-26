@@ -394,6 +394,22 @@ export default function App() {
                         }
                     />
                     <Route
+                        path="/super-admin/staff"
+                        element={
+                            <ProtectedRoute role="SUPER_ADMIN">
+                                <SuperAdminUsers />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/super-admin/customers"
+                        element={
+                            <ProtectedRoute role="SUPER_ADMIN">
+                                <SuperAdminUsers />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/super-admin/categories"
                         element={
                             <ProtectedRoute role="SUPER_ADMIN">
