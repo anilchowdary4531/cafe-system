@@ -16,6 +16,7 @@ import {
     Trash2,
     Image as ImageIcon,
     Utensils,
+    UserCheck,
     Wallet
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
