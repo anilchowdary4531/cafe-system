@@ -150,9 +150,20 @@ export default async function publicRoutes(app, deps) {
           priority: p - idx * 5,
           isActive: true,
         }));
+      // Deduplicate by normalized name
+      const deduplicatedMap = new Map();
+      for (const cat of categories) {
+        const normName = normalizePublicCat(cat.name);
+        const lowerKey = normName.toLowerCase();
+        if (!deduplicatedMap.has(lowerKey)) {
+          deduplicatedMap.set(lowerKey, {
+            ...cat,
+            name: normName,
+          });
+        }
       }
 
-      return categories || [];
+      return Array.from(deduplicatedMap.values());
     } catch {
       return [];
     }

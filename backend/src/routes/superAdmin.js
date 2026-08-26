@@ -618,16 +618,24 @@ export default async function superAdminRoutes(app, deps) {
         }));
       }
 
-      // Attach itemCount to each category object
-      const enrichedCategories = categories.map((cat) => {
-        const lowerName = String(cat.name || "").toLowerCase();
-        return {
-          ...cat,
-          itemCount: itemCountMap[lowerName] || 0,
-        };
-      });
+      // Deduplicate categories by normalized name and attach itemCount
+      const deduplicatedMap = new Map();
+      for (const cat of categories) {
+        const normName = normalizeCatName(cat.name);
+        const lowerKey = normName.toLowerCase();
+        if (!deduplicatedMap.has(lowerKey)) {
+          deduplicatedMap.set(lowerKey, {
+            ...cat,
+            name: normName,
+            itemCount: itemCountMap[lowerKey] || 0,
+          });
+        } else {
+          const existing = deduplicatedMap.get(lowerKey);
+          existing.itemCount = (existing.itemCount || 0) + (itemCountMap[lowerKey] || 0);
+        }
+      }
 
-      return { categories: enrichedCategories };
+      return { categories: Array.from(deduplicatedMap.values()) };
     } catch (err) {
       console.warn("[SuperAdmin] fetch categories warning:", err?.message || err);
       return { categories: [] };
