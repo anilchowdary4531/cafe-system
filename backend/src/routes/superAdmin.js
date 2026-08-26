@@ -3,6 +3,12 @@ import { requireStaffJwt } from "../services/staffAuthService.js";
 import { getPhoneVariants, isValidPhone } from "../services/phoneService.js";
 import { createCashfreeVendor } from "../services/vendor.service.js";
 import { buildAdminSettlementController } from "../controllers/adminSettlementController.js";
+import {
+  getGlobalCategoriesStore,
+  updateGlobalCategoryStore,
+  deleteGlobalCategoryStore,
+  createGlobalCategoryStore,
+} from "../utils/globalCategoryStore.js";
 
 const slugify = (value) =>
   String(value || "")
@@ -550,73 +556,21 @@ export default async function superAdminRoutes(app, deps) {
 
   app.get("/super-admin/categories", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
-      // 1. Fetch existing menu items to discover category names & counts
       const menuItems = await prisma.menuItem.findMany({
         where: { isAvailable: true },
         select: { category: true },
       }).catch(() => []);
 
       const itemCountMap = {};
-      const discoveredCategoryNames = new Set();
-
       for (const item of menuItems) {
         const cat = normalizeCatName(item.category);
         if (cat) {
-          discoveredCategoryNames.add(cat);
           itemCountMap[cat.toLowerCase()] = (itemCountMap[cat.toLowerCase()] || 0) + 1;
         }
       }
 
-      // Default fallback categories
-      const defaults = ["Biryani", "Pizza", "Burger", "Coffee", "Fast Food", "Desserts", "Beverages", "Ice Cream", "Food", "Sweet"];
-      defaults.forEach((d) => discoveredCategoryNames.add(d));
+      const categories = await getGlobalCategoriesStore(prisma);
 
-      let categories = [];
-      if (prisma.globalCategory) {
-        try {
-          categories = await prisma.globalCategory.findMany({
-            orderBy: { priority: "desc" },
-          });
-
-          // Only seed initial default categories if DB table has NEVER been populated before
-          if (categories.length === 0) {
-            const toInsert = [];
-            let priorityCounter = 100;
-            for (const catName of discoveredCategoryNames) {
-              const lower = catName.toLowerCase();
-              const imgUrl = CATEGORY_DEFAULT_IMAGES[lower] || CATEGORY_DEFAULT_IMAGES.food;
-              toInsert.push({
-                name: catName,
-                imageUrl: imgUrl,
-                priority: priorityCounter,
-                isActive: true,
-              });
-              priorityCounter -= 5;
-            }
-
-            if (toInsert.length > 0) {
-              await prisma.globalCategory.createMany({ data: toInsert, skipDuplicates: true }).catch(() => {});
-              categories = await prisma.globalCategory.findMany({ orderBy: { priority: "desc" } });
-            }
-          }
-        } catch (dbErr) {
-          console.warn("[SuperAdmin] globalCategory DB query warning:", dbErr.message);
-        }
-      }
-
-      // Fallback if DB table wasn't created yet or returned empty
-      if (!categories || categories.length === 0) {
-        let p = 100;
-        categories = Array.from(discoveredCategoryNames).map((catName, idx) => ({
-          id: idx + 1,
-          name: catName,
-          imageUrl: CATEGORY_DEFAULT_IMAGES[catName.toLowerCase()] || CATEGORY_DEFAULT_IMAGES.food,
-          priority: p - idx * 5,
-          isActive: true,
-        }));
-      }
-
-      // Deduplicate categories by normalized name and attach itemCount
       const deduplicatedMap = new Map();
       for (const cat of categories) {
         const normName = normalizeCatName(cat.name);
@@ -642,63 +596,11 @@ export default async function superAdminRoutes(app, deps) {
 
   app.post("/super-admin/categories/sync", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
-      const menuItems = await prisma.menuItem.findMany({
-        select: { category: true },
-      }).catch(() => []);
-
-      const discovered = new Set();
-      for (const item of menuItems) {
-        const cat = normalizeCatName(item.category);
-        if (cat) discovered.add(cat);
-      }
-      ["Biryani", "Pizza", "Burger", "Coffee", "Fast Food", "Desserts", "Beverages", "Ice Cream", "Food", "Sweet"].forEach((d) => discovered.add(d));
-
-      let categories = [];
-      if (prisma.globalCategory) {
-        try {
-          const existing = await prisma.globalCategory.findMany().catch(() => []);
-          const existingNames = new Set(existing.map((c) => c.name.toLowerCase()));
-
-          const toInsert = [];
-          let p = 90;
-          for (const name of discovered) {
-            if (!existingNames.has(name.toLowerCase())) {
-              const imgUrl = CATEGORY_DEFAULT_IMAGES[name.toLowerCase()] || CATEGORY_DEFAULT_IMAGES.food;
-              toInsert.push({
-                name,
-                imageUrl: imgUrl,
-                priority: p,
-                isActive: true,
-              });
-              p -= 5;
-            }
-          }
-
-          if (toInsert.length > 0) {
-            await prisma.globalCategory.createMany({ data: toInsert, skipDuplicates: true }).catch(() => {});
-          }
-
-          categories = await prisma.globalCategory.findMany({ orderBy: { priority: "desc" } }).catch(() => []);
-        } catch (dbErr) {
-          console.warn("[SuperAdmin] globalCategory sync DB warning:", dbErr.message);
-        }
-      }
-
-      if (!categories || categories.length === 0) {
-        let p = 100;
-        categories = Array.from(discovered).map((name, idx) => ({
-          id: idx + 1,
-          name,
-          imageUrl: CATEGORY_DEFAULT_IMAGES[name.toLowerCase()] || CATEGORY_DEFAULT_IMAGES.food,
-          priority: p - idx * 5,
-          isActive: true,
-        }));
-      }
-
-      return { message: "Synced all categories from menu items successfully", categories };
+      const categories = await getGlobalCategoriesStore(prisma);
+      return { message: "Synced all categories successfully", categories };
     } catch (err) {
       console.error("[SuperAdmin] sync categories error:", err);
-      return { message: "Synced categories from menu items", categories: [] };
+      return { message: "Synced categories", categories: [] };
     }
   });
 
@@ -707,25 +609,10 @@ export default async function superAdminRoutes(app, deps) {
       const { name, imageUrl, priority, isActive } = req.body || {};
       if (!name) return reply.code(400).send({ message: "Category name is required" });
 
-      if (prisma.globalCategory) {
-        try {
-          const category = await prisma.globalCategory.create({
-            data: {
-              name,
-              imageUrl: imageUrl || CATEGORY_DEFAULT_IMAGES[name.toLowerCase()] || CATEGORY_DEFAULT_IMAGES.food,
-              priority: Number(priority) || 0,
-              isActive: isActive !== undefined ? Boolean(isActive) : true,
-            },
-          });
-          return reply.code(201).send({ message: "Category created", category });
-        } catch (dbErr) {
-          console.warn("[SuperAdmin] create globalCategory warning:", dbErr.message);
-        }
-      }
-
-      return reply.code(200).send({ message: "Category created", category: { id: Date.now(), name, imageUrl, priority, isActive: true } });
+      const category = await createGlobalCategoryStore(prisma, { name, imageUrl, priority, isActive });
+      return reply.code(201).send({ message: "Category created", category });
     } catch (err) {
-      console.log(err);
+      console.error("[SuperAdmin] create category error:", err);
       return reply.code(500).send({ message: "Failed to create category" });
     }
   });
@@ -735,44 +622,15 @@ export default async function superAdminRoutes(app, deps) {
       const id = Number(req.params.id);
       const data = req.body || {};
 
-      if (prisma.globalCategory) {
-        try {
-          let existing = await prisma.globalCategory.findUnique({ where: { id } }).catch(() => null);
-          if (!existing && data.name) {
-            existing = await prisma.globalCategory.findFirst({
-              where: { name: { equals: String(data.name).trim(), mode: "insensitive" } },
-            }).catch(() => null);
-          }
+      const category = await updateGlobalCategoryStore(prisma, {
+        id,
+        name: data.name,
+        isActive: data.isActive,
+        imageUrl: data.imageUrl,
+        priority: data.priority,
+      });
 
-          let category;
-          if (existing) {
-            category = await prisma.globalCategory.update({
-              where: { id: existing.id },
-              data: {
-                name: data.name !== undefined ? String(data.name).trim() : undefined,
-                imageUrl: data.imageUrl !== undefined ? (data.imageUrl ? String(data.imageUrl).trim() : null) : undefined,
-                priority: data.priority !== undefined ? Number(data.priority) : undefined,
-                isActive: data.isActive !== undefined ? Boolean(data.isActive) : undefined,
-              },
-            });
-          } else {
-            const nameToUse = data.name ? String(data.name).trim() : `Category ${id}`;
-            category = await prisma.globalCategory.create({
-              data: {
-                name: nameToUse,
-                imageUrl: data.imageUrl ? String(data.imageUrl).trim() : null,
-                priority: data.priority !== undefined ? Number(data.priority) : 50,
-                isActive: data.isActive !== undefined ? Boolean(data.isActive) : false,
-              },
-            });
-          }
-          return { message: "Category updated", category };
-        } catch (dbErr) {
-          console.warn("[SuperAdmin] update category DB warning:", dbErr.message);
-        }
-      }
-
-      return { message: "Category updated", category: { id, ...data } };
+      return { message: "Category updated", category };
     } catch (err) {
       console.error("[SuperAdmin] update category error:", err);
       return reply.code(500).send({ message: "Failed to update category" });
@@ -784,18 +642,7 @@ export default async function superAdminRoutes(app, deps) {
       const id = Number(req.params.id);
       const name = req.query?.name || req.body?.name;
 
-      if (prisma.globalCategory) {
-        try {
-          await prisma.globalCategory.delete({ where: { id } }).catch(() => {});
-          if (name) {
-            await prisma.globalCategory.deleteMany({
-              where: { name: { equals: String(name).trim(), mode: "insensitive" } },
-            }).catch(() => {});
-          }
-        } catch (dbErr) {
-          console.warn("[SuperAdmin] delete category DB warning:", dbErr.message);
-        }
-      }
+      await deleteGlobalCategoryStore(prisma, { id, name });
       return { message: "Category deleted" };
     } catch (err) {
       console.error("[SuperAdmin] delete category error:", err);

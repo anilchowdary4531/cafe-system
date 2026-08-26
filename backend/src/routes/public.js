@@ -4,6 +4,7 @@ import {
   issueStaffSession,
 } from "../services/staffSessionService.js";
 import { resolveMenuPricing } from "../services/menuPricingService.js";
+import { getPublicGlobalCategoriesStore } from "../utils/globalCategoryStore.js";
 
 export default async function publicRoutes(app, deps) {
   const { prisma, normalizeDbPermissions, buildQrTargetUrl, STAFF_ACCESS_MODULES } = deps;
@@ -117,52 +118,8 @@ export default async function publicRoutes(app, deps) {
 
   app.get("/global-categories", async () => {
     try {
-      let categories = [];
-      let inactiveNames = new Set();
+      const categories = await getPublicGlobalCategoriesStore(prisma);
 
-      if (prisma.globalCategory) {
-        try {
-          categories = await prisma.globalCategory.findMany({
-            where: { isActive: true },
-            orderBy: { priority: "desc" },
-          });
-
-          const inactiveList = await prisma.globalCategory.findMany({
-            where: { isActive: false },
-            select: { name: true },
-          }).catch(() => []);
-          inactiveNames = new Set(inactiveList.map((c) => normalizePublicCat(c.name).toLowerCase()));
-        } catch {
-          categories = [];
-        }
-      }
-
-      if (!categories || categories.length === 0) {
-        const menuItems = await prisma.menuItem.findMany({
-          where: { isAvailable: true },
-          select: { category: true },
-        }).catch(() => []);
-
-        const discovered = new Set();
-        for (const item of menuItems) {
-          const cat = normalizePublicCat(item.category);
-          if (cat && !inactiveNames.has(cat.toLowerCase())) discovered.add(cat);
-        }
-        ["Biryani", "Pizza", "Burger", "Coffee", "Fast Food", "Desserts", "Beverages", "Ice Cream", "Food", "Sweet"]
-          .filter((d) => !inactiveNames.has(d.toLowerCase()))
-          .forEach((d) => discovered.add(d));
-
-        let p = 100;
-        categories = Array.from(discovered).map((name, idx) => ({
-          id: idx + 1,
-          name,
-          imageUrl: PUBLIC_CATEGORY_FALLBACK_IMAGES[name.toLowerCase()] || PUBLIC_CATEGORY_FALLBACK_IMAGES.food,
-          priority: p - idx * 5,
-          isActive: true,
-        }));
-      }
-
-      // Deduplicate by normalized name
       const deduplicatedMap = new Map();
       for (const cat of categories) {
         const normName = normalizePublicCat(cat.name);
