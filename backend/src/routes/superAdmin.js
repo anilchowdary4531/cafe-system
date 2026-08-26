@@ -270,6 +270,100 @@ export default async function superAdminRoutes(app, deps) {
     }
   });
 
+  app.get("/super-admin/all-users", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const q = String(req.query?.q || "").trim();
+
+      // 1. Fetch Staff/Owners/SuperAdmins
+      const staffUsers = await prisma.user.findMany({
+        where: q
+          ? {
+              OR: [
+                { name: { contains: q, mode: "insensitive" } },
+                { email: { contains: q, mode: "insensitive" } },
+                { phone: { contains: q, mode: "insensitive" } },
+                { role: { contains: q, mode: "insensitive" } },
+                { restaurant: { name: { contains: q, mode: "insensitive" } } },
+              ],
+            }
+          : {},
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          restaurant: {
+            select: { id: true, name: true, slug: true, logoUrl: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      // 2. Fetch Customer Accounts
+      const customerAccounts = await prisma.customerAccount.findMany({
+        where: q
+          ? {
+              OR: [
+                { name: { contains: q, mode: "insensitive" } },
+                { username: { contains: q, mode: "insensitive" } },
+                { email: { contains: q, mode: "insensitive" } },
+                { phone: { contains: q, mode: "insensitive" } },
+              ],
+            }
+          : {},
+        orderBy: { createdAt: "desc" },
+      });
+
+      const formattedStaff = staffUsers.map((u) => ({
+        id: `staff_${u.id}`,
+        rawId: u.id,
+        userType: "STAFF",
+        name: u.name || "Staff Member",
+        email: u.email || "Not set",
+        phone: (u.phone && isValidPhone(u.phone)) ? u.phone : "Not set",
+        role: u.role || "STAFF",
+        isActive: u.isActive !== false,
+        restaurant: u.restaurant ? { id: u.restaurant.id, name: u.restaurant.name, slug: u.restaurant.slug, logoUrl: u.restaurant.logoUrl } : null,
+        createdAt: u.createdAt,
+      }));
+
+      const formattedCustomers = customerAccounts.map((c) => ({
+        id: `cust_${c.id}`,
+        rawId: c.id,
+        userType: "CUSTOMER",
+        name: c.name || "Customer",
+        email: c.email || "Not set",
+        phone: (c.phone && isValidPhone(c.phone)) ? c.phone : "Not set",
+        role: "CUSTOMER",
+        avatarUrl: c.avatarUrl || null,
+        isActive: true,
+        restaurant: null,
+        createdAt: c.createdAt,
+      }));
+
+      const allUsers = [...formattedStaff, ...formattedCustomers].sort(
+        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+      );
+
+      return {
+        users: allUsers,
+        summary: {
+          totalUsers: allUsers.length,
+          staffCount: formattedStaff.length,
+          customerCount: formattedCustomers.length,
+          ownersCount: formattedStaff.filter((s) => s.role === "OWNER").length,
+          superAdminCount: formattedStaff.filter((s) => s.role === "SUPER_ADMIN").length,
+        },
+      };
+    } catch (err) {
+      console.error("[/super-admin/all-users] Error:", err);
+      return reply.code(500).send({ message: "Failed to fetch all platform users" });
+    }
+  });
+
   app.delete("/super-admin/customers/:id", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
       const customerId = Number(req.params.id);
