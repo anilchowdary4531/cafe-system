@@ -36,6 +36,7 @@ export default function SuperAdminWalletManagement() {
     const [ledgers, setLedgers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // Adjustment Modal
