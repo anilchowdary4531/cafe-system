@@ -90,7 +90,8 @@ export default function SuperAdminCategories() {
         try {
             setError("");
             setCategories((prev) => prev.filter((c) => c.id !== id));
-            await api.delete(`/super-admin/categories/${id}`, { data: { name: targetCat?.name } });
+            const catNameParam = targetCat?.name ? `?name=${encodeURIComponent(targetCat.name)}` : "";
+            await api.delete(`/super-admin/categories/${id}${catNameParam}`, { data: { name: targetCat?.name } });
             await loadCategories();
         } catch (err) {
             console.warn("[SuperAdminCategories] Delete warning:", err);

@@ -737,11 +737,17 @@ export default async function superAdminRoutes(app, deps) {
 
       if (prisma.globalCategory) {
         try {
-          const existing = await prisma.globalCategory.findUnique({ where: { id } }).catch(() => null);
+          let existing = await prisma.globalCategory.findUnique({ where: { id } }).catch(() => null);
+          if (!existing && data.name) {
+            existing = await prisma.globalCategory.findFirst({
+              where: { name: { equals: String(data.name).trim(), mode: "insensitive" } },
+            }).catch(() => null);
+          }
+
           let category;
           if (existing) {
             category = await prisma.globalCategory.update({
-              where: { id },
+              where: { id: existing.id },
               data: {
                 name: data.name !== undefined ? String(data.name).trim() : undefined,
                 imageUrl: data.imageUrl !== undefined ? (data.imageUrl ? String(data.imageUrl).trim() : null) : undefined,
@@ -751,29 +757,14 @@ export default async function superAdminRoutes(app, deps) {
             });
           } else {
             const nameToUse = data.name ? String(data.name).trim() : `Category ${id}`;
-            const byName = await prisma.globalCategory.findFirst({
-              where: { name: { equals: nameToUse, mode: "insensitive" } },
-            }).catch(() => null);
-
-            if (byName) {
-              category = await prisma.globalCategory.update({
-                where: { id: byName.id },
-                data: {
-                  imageUrl: data.imageUrl !== undefined ? (data.imageUrl ? String(data.imageUrl).trim() : null) : undefined,
-                  priority: data.priority !== undefined ? Number(data.priority) : undefined,
-                  isActive: data.isActive !== undefined ? Boolean(data.isActive) : undefined,
-                },
-              });
-            } else {
-              category = await prisma.globalCategory.create({
-                data: {
-                  name: nameToUse,
-                  imageUrl: data.imageUrl ? String(data.imageUrl).trim() : null,
-                  priority: data.priority !== undefined ? Number(data.priority) : 50,
-                  isActive: data.isActive !== undefined ? Boolean(data.isActive) : false,
-                },
-              });
-            }
+            category = await prisma.globalCategory.create({
+              data: {
+                name: nameToUse,
+                imageUrl: data.imageUrl ? String(data.imageUrl).trim() : null,
+                priority: data.priority !== undefined ? Number(data.priority) : 50,
+                isActive: data.isActive !== undefined ? Boolean(data.isActive) : false,
+              },
+            });
           }
           return { message: "Category updated", category };
         } catch (dbErr) {
@@ -791,7 +782,7 @@ export default async function superAdminRoutes(app, deps) {
   app.delete("/super-admin/categories/:id", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
       const id = Number(req.params.id);
-      const { name } = req.body || req.query || {};
+      const name = req.query?.name || req.body?.name;
 
       if (prisma.globalCategory) {
         try {
