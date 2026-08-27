@@ -30,6 +30,7 @@ export default function SuperAdminCategories() {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // New Category Form
@@ -58,7 +59,9 @@ export default function SuperAdminCategories() {
         try {
             setSyncing(true);
             setError("");
+            setSuccess("");
             await api.post("/super-admin/categories/sync");
+            setSuccess("Synced all categories successfully");
             await loadCategories();
         } catch (err) {
             console.error("[SuperAdminCategories] Sync error:", err);
@@ -75,7 +78,10 @@ export default function SuperAdminCategories() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            setError("");
+            setSuccess("");
             await api.post("/super-admin/categories", formData);
+            setSuccess("Category created successfully");
             setShowForm(false);
             setFormData({ name: "", imageUrl: "", priority: 0 });
             loadCategories();
@@ -89,9 +95,11 @@ export default function SuperAdminCategories() {
         const targetCat = categories.find((c) => c.id === id);
         try {
             setError("");
+            setSuccess("");
             setCategories((prev) => prev.filter((c) => c.id !== id));
             const catNameParam = targetCat?.name ? `?name=${encodeURIComponent(targetCat.name)}` : "";
             await api.delete(`/super-admin/categories/${id}${catNameParam}`, { data: { name: targetCat?.name } });
+            setSuccess(`Deleted category "${targetCat?.name || id}"`);
             await loadCategories();
         } catch (err) {
             console.warn("[SuperAdminCategories] Delete warning:", err);
@@ -102,8 +110,11 @@ export default function SuperAdminCategories() {
     const toggleStatus = async (category) => {
         try {
             setError("");
-            setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, isActive: !c.isActive } : c)));
-            await api.patch(`/super-admin/categories/${category.id}`, { isActive: !category.isActive, name: category.name });
+            setSuccess("");
+            const nextStatus = !category.isActive;
+            setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, isActive: nextStatus } : c)));
+            await api.patch(`/super-admin/categories/${category.id}`, { isActive: nextStatus, name: category.name });
+            setSuccess(`Category "${category.name}" is now ${nextStatus ? "Active" : "Paused"}`);
             await loadCategories();
         } catch (err) {
             console.warn("[SuperAdminCategories] Toggle status warning:", err);
@@ -134,6 +145,7 @@ export default function SuperAdminCategories() {
 
             <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
                 {error && <div className="mb-6 rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-300 text-sm">{error}</div>}
+                {success && <div className="mb-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4 text-emerald-300 text-sm font-bold">{success}</div>}
 
                 {showForm && (
                     <div className="theme-panel mb-8 rounded-3xl p-6 border theme-border">
@@ -189,12 +201,30 @@ export default function SuperAdminCategories() {
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-gray-700"><ImageIcon size={40} /></div>
                                     )}
-                                    <div className="absolute top-2 right-2 flex gap-1">
-                                        <button onClick={() => toggleStatus(category)} className={`p-2 rounded-full shadow-lg ${category.isActive ? "bg-green-500 text-white" : "bg-gray-700 text-gray-400"}`}>
-                                            <Power size={14} />
+                                    <div className="absolute top-2 right-2 z-20 flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleStatus(category);
+                                            }}
+                                            title={category.isActive ? "Pause Category" : "Activate Category"}
+                                            className={`p-2.5 rounded-full shadow-xl transition-all active:scale-90 cursor-pointer ${
+                                                category.isActive ? "bg-emerald-500 text-white hover:bg-emerald-600" : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                                            }`}
+                                        >
+                                            <Power size={16} />
                                         </button>
-                                        <button onClick={() => handleDelete(category.id)} className="p-2 rounded-full bg-red-500 text-white shadow-lg">
-                                            <Trash2 size={14} />
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDelete(category.id);
+                                            }}
+                                            title="Delete Category"
+                                            className="p-2.5 rounded-full bg-red-500 text-white shadow-xl hover:bg-red-600 transition-all active:scale-90 cursor-pointer"
+                                        >
+                                            <Trash2 size={16} />
                                         </button>
                                     </div>
                                 </div>
