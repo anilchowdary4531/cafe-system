@@ -246,6 +246,8 @@ await app.register(cors, {
     cb(new Error("Origin not allowed by CORS"), false);
   },
   credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
 });
 
 await app.register(jwt, { secret: JWT_SECRET });
