@@ -4,7 +4,6 @@ import {
   issueStaffSession,
 } from "../services/staffSessionService.js";
 import { resolveMenuPricing } from "../services/menuPricingService.js";
-import { getPublicGlobalCategoriesStore } from "../utils/globalCategoryStore.js";
 
 export default async function publicRoutes(app, deps) {
   const { prisma, normalizeDbPermissions, buildQrTargetUrl, STAFF_ACCESS_MODULES } = deps;
@@ -82,7 +81,7 @@ export default async function publicRoutes(app, deps) {
             isActive: true
           }
         ];
-        await prisma.banner.createMany({ data: defaults, skipDuplicates: true }).catch(() => {});
+        await prisma.banner.createMany({ data: defaults, skipDuplicates: true }).catch(() => { });
         banners = await prisma.banner.findMany({ where: { isActive: true }, orderBy: { priority: "desc" } });
       }
       return banners || [];
@@ -118,8 +117,42 @@ export default async function publicRoutes(app, deps) {
 
   app.get("/global-categories", async () => {
     try {
-      const categories = await getPublicGlobalCategoriesStore(prisma);
+      let categories = [];
+      if (prisma.globalCategory) {
+        try {
+          categories = await prisma.globalCategory.findMany({
+            where: { isActive: true },
+            orderBy: { priority: "desc" },
+          });
+        } catch {
+          categories = [];
+        }
+      }
 
+      if (!categories || categories.length === 0) {
+        const menuItems = await prisma.menuItem.findMany({
+          where: { isAvailable: true },
+          select: { category: true },
+        }).catch(() => []);
+
+        const discovered = new Set();
+        for (const item of menuItems) {
+          const cat = normalizePublicCat(item.category);
+          if (cat) discovered.add(cat);
+        }
+        ["Biryani", "Pizza", "Burger", "Coffee", "Fast Food", "Desserts", "Beverages", "Ice Cream", "Food", "Sweet"].forEach((d) => discovered.add(d));
+
+        let p = 100;
+        categories = Array.from(discovered).map((name, idx) => ({
+          id: idx + 1,
+          name,
+          imageUrl: PUBLIC_CATEGORY_FALLBACK_IMAGES[name.toLowerCase()] || PUBLIC_CATEGORY_FALLBACK_IMAGES.food,
+          priority: p - idx * 5,
+          isActive: true,
+        }));
+      }
+
+      // Deduplicate by normalized name
       const deduplicatedMap = new Map();
       for (const cat of categories) {
         const normName = normalizePublicCat(cat.name);
@@ -152,8 +185,8 @@ export default async function publicRoutes(app, deps) {
         isActive: true,
         ...(hasQuery
           ? {
-              OR: restaurantSearchOr(query),
-            }
+            OR: restaurantSearchOr(query),
+          }
           : {}),
       };
 
@@ -161,27 +194,27 @@ export default async function publicRoutes(app, deps) {
         where,
         select: isCoordsOnly
           ? {
-              id: true,
-              name: true,
-              slug: true,
-              city: true,
-              state: true,
-              logoUrl: true,
-              latitude: true,
-              longitude: true,
-            }
+            id: true,
+            name: true,
+            slug: true,
+            city: true,
+            state: true,
+            logoUrl: true,
+            latitude: true,
+            longitude: true,
+          }
           : {
-              id: true,
-              name: true,
-              slug: true,
-              city: true,
-              state: true,
-              country: true,
-              pincode: true,
-              logoUrl: true,
-              latitude: true,
-              longitude: true,
-            },
+            id: true,
+            name: true,
+            slug: true,
+            city: true,
+            state: true,
+            country: true,
+            pincode: true,
+            logoUrl: true,
+            latitude: true,
+            longitude: true,
+          },
         orderBy: { name: "asc" },
         ...(limit !== null ? { take: limit, skip: offset } : {}),
       });

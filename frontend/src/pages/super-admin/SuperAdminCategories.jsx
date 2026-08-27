@@ -23,6 +23,8 @@ import { api } from "../../utils/apiClient";
 import tiffzyLogo from "../../assets/tiffzy-logo.png";
 
 import SuperAdminSidebar from "../../components/super-admin/SuperAdminSidebar";
+import { resolveImageUrl } from "../../utils/resolveImageUrl";
+import { getCategoryFallbackImage } from "../../components/PopularCategories";
 
 export default function SuperAdminCategories() {
     const navigate = useNavigate();
@@ -180,11 +182,15 @@ export default function SuperAdminCategories() {
                         {categories.map((category) => (
                             <div key={category.id} className="theme-panel rounded-3xl overflow-hidden border theme-border group transition-all hover:border-orange-500/50">
                                 <div className="h-32 bg-gray-900 relative">
-                                    {category.imageUrl ? (
-                                        <img src={category.imageUrl} className="w-full h-full object-cover" alt={category.name} />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-gray-700"><ImageIcon size={40} /></div>
-                                    )}
+                                    <img
+                                        src={resolveImageUrl(category.imageUrl) || getCategoryFallbackImage(category.name)}
+                                        className="w-full h-full object-cover"
+                                        alt={category.name}
+                                        onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.src = getCategoryFallbackImage(category.name);
+                                        }}
+                                    />
                                     <div className="absolute top-2 right-2 z-20 flex gap-2">
                                         <button
                                             type="button"

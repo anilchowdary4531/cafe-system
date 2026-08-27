@@ -91,12 +91,11 @@ export default function PopularCategories({
         staleMs: 60_000,
     });
 
-    const hasServerCategories = Array.isArray(globalCatData) || Array.isArray(globalCatData?.categories);
     const globalCategories = Array.isArray(globalCatData)
         ? globalCatData.filter((c) => c?.isActive !== false)
         : Array.isArray(globalCatData?.categories)
-        ? globalCatData.categories.filter((c) => c?.isActive !== false)
-        : [];
+            ? globalCatData.categories.filter((c) => c?.isActive !== false)
+            : [];
 
     const categoriesList = useMemo(() => {
         const dynamicCategories = [];
@@ -115,22 +114,23 @@ export default function PopularCategories({
             }
         }
 
-        // 2. If server did NOT provide categories, fall back to menu items and defaults
-        if (!hasServerCategories || dynamicCategories.length === 0) {
-            if (Array.isArray(items)) {
-                for (const item of items) {
-                    const rawName = String(item?.category || "").trim();
-                    const name = normalizeCategoryName(rawName);
-                    if (name && !seenNames.has(name.toLowerCase())) {
-                        seenNames.add(name.toLowerCase());
-                        dynamicCategories.push({
-                            name,
-                            imageUrl: item.image || getCategoryFallbackImage(name),
-                        });
-                    }
+        // 2. Add dynamic categories from available items
+        if (Array.isArray(items)) {
+            for (const item of items) {
+                const rawName = String(item?.category || "").trim();
+                const name = normalizeCategoryName(rawName);
+                if (name && !seenNames.has(name.toLowerCase())) {
+                    seenNames.add(name.toLowerCase());
+                    dynamicCategories.push({
+                        name,
+                        imageUrl: item.image || getCategoryFallbackImage(name),
+                    });
                 }
             }
+        }
 
+        // 3. Add default fallbacks ONLY if server global categories were empty or un-reachable
+        if (!globalCategories || globalCategories.length === 0) {
             for (const fb of DEFAULT_FALLBACK_CATEGORIES) {
                 const name = normalizeCategoryName(fb.name);
                 if (!seenNames.has(name.toLowerCase())) {
@@ -190,11 +190,10 @@ export default function PopularCategories({
                                 className="group flex w-[64px] shrink-0 snap-start flex-col items-center gap-1.5 focus:outline-none sm:w-[72px]"
                             >
                                 <div
-                                    className={`relative h-[56px] w-[56px] rounded-full p-[2.5px] transition duration-300 sm:h-[64px] sm:w-[64px] ${
-                                        isActive
+                                    className={`relative h-[56px] w-[56px] rounded-full p-[2.5px] transition duration-300 sm:h-[64px] sm:w-[64px] ${isActive
                                             ? "bg-[linear-gradient(135deg,#ff8a1f_0%,#d97706_100%)] shadow-lg shadow-[#ff8a1f]/35 scale-105"
                                             : "border border-[var(--app-border)] bg-white/10 hover:border-[#ff8a1f]/50 hover:scale-105"
-                                    }`}
+                                        }`}
                                 >
                                     <div className="relative h-full w-full overflow-hidden rounded-full bg-zinc-900">
                                         <img
@@ -202,6 +201,10 @@ export default function PopularCategories({
                                             alt={cat.name}
                                             className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
                                             loading="lazy"
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                e.target.src = getCategoryFallbackImage(cat.name);
+                                            }}
                                         />
                                         {isAll ? (
                                             <div className="absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[1px]">
@@ -213,11 +216,10 @@ export default function PopularCategories({
                                     </div>
                                 </div>
                                 <span
-                                    className={`truncate text-center text-[10.5px] font-bold capitalize sm:text-[11.5px] max-w-[64px] sm:max-w-[72px] ${
-                                        isActive
+                                    className={`truncate text-center text-[10.5px] font-bold capitalize sm:text-[11.5px] max-w-[64px] sm:max-w-[72px] ${isActive
                                             ? "text-[color:var(--app-accent)]"
                                             : "text-[color:var(--app-muted)] group-hover:text-[color:var(--app-text)]"
-                                    }`}
+                                        }`}
                                 >
                                     {cat.name}
                                 </span>

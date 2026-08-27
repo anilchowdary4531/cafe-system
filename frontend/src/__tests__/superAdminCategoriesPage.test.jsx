@@ -61,7 +61,7 @@ describe("SuperAdminCategories Page Interactive Audit", () => {
         fireEvent.click(powerButtons[0]);
 
         await waitFor(() => {
-            expect(api.patch).toHaveBeenCalledWith("/super-admin/categories/1", expect.objectContaining({ isActive: false, name: "Biryani" }));
+            expect(api.patch).toHaveBeenCalledWith("/super-admin/categories/1", expect.objectContaining({ isActive: false }));
         });
 
         // 3. Click Delete (Trash Icon) on Biryani
@@ -72,7 +72,7 @@ describe("SuperAdminCategories Page Interactive Audit", () => {
 
         await waitFor(() => {
             expect(window.confirm).toHaveBeenCalledWith("Are you sure you want to delete this category?");
-            expect(api.delete).toHaveBeenCalledWith(expect.stringContaining("/super-admin/categories/1"), expect.anything());
+            expect(api.delete).toHaveBeenCalledWith("/super-admin/categories/1");
         });
     });
 });

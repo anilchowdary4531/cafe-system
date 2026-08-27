@@ -5,7 +5,6 @@ import {
   getPublicGlobalCategoriesStore,
   updateGlobalCategoryStore,
   deleteGlobalCategoryStore,
-  createGlobalCategoryStore,
 } from "../utils/globalCategoryStore.js";
 
 test("Global Category Store Audit - Pause, Delete, and Public Filtering", async () => {
