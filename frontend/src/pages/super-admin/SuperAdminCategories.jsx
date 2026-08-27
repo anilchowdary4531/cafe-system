@@ -141,17 +141,17 @@ export default function SuperAdminCategories() {
                         </div>
                         <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-3">
                             <div className="grid gap-1.5">
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Category Name</label>
-                                <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="theme-input rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g. Pizza" />
+                                <label htmlFor="category-name-input" className="text-xs font-bold text-gray-400 uppercase tracking-wider">Category Name</label>
+                                <input id="category-name-input" name="name" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="theme-input rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g. Pizza" />
                             </div>
                             <div className="grid gap-1.5">
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Image URL</label>
-                                <input value={formData.imageUrl} onChange={e => setFormData({ ...formData, imageUrl: e.target.value })} className="theme-input rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="https://unsplash..." />
+                                <label htmlFor="category-image-input" className="text-xs font-bold text-gray-400 uppercase tracking-wider">Image URL</label>
+                                <input id="category-image-input" name="imageUrl" value={formData.imageUrl} onChange={e => setFormData({ ...formData, imageUrl: e.target.value })} className="theme-input rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="https://unsplash..." />
                             </div>
                             <div className="grid gap-1.5">
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Priority</label>
+                                <label htmlFor="category-priority-input" className="text-xs font-bold text-gray-400 uppercase tracking-wider">Priority</label>
                                 <div className="flex gap-2">
-                                    <input type="number" value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value })} className="theme-input rounded-xl px-4 py-3 text-sm outline-none w-full" />
+                                    <input id="category-priority-input" name="priority" type="number" value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value })} className="theme-input rounded-xl px-4 py-3 text-sm outline-none w-full" />
                                     <button type="submit" className="theme-button rounded-xl px-6 font-bold"><Save size={18} /></button>
                                 </div>
                             </div>
