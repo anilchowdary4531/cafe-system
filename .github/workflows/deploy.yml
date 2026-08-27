@@ -1,4 +1,4 @@
-name: Build and Deploy Backend
+name: Deploy Backend to AWS EC2
 
 on:
   push:
@@ -7,46 +7,54 @@ on:
 
 jobs:
   deploy:
+    name: Deploy Backend Service
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Google Auth
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Configure Docker for GCP
-        run: |
-          gcloud auth configure-docker ${{ secrets.GCP_REGISTRY_URL || 'gcr.io' }}
-
-      - name: Build Docker Image
-        run: |
-          docker build -t ${{ secrets.GCP_REGISTRY_URL || 'gcr.io' }}/${{ secrets.GCP_PROJECT_ID }}/backend ./backend
-
-      - name: Push Docker Image
-        run: |
-          docker push ${{ secrets.GCP_REGISTRY_URL || 'gcr.io' }}/${{ secrets.GCP_PROJECT_ID }}/backend
-
-      - name: Deploy to GCP VM
+      - name: Deploy via SSH to AWS EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.GCP_VM_HOST || secrets.EC2_HOST }}
-          username: ${{ secrets.GCP_VM_USER || secrets.EC2_USER }}
-          key: ${{ secrets.GCP_VM_SSH_KEY || secrets.EC2_SSH_KEY }}
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
+
+            echo "Starting backend deployment..."
+
+            echo "=== Step 1: Updating Repository ==="
             cd ~/cafe-system
-            git pull origin main
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
 
-            cd backend
-            npm install
+            echo "=== Step 2: Installing Dependencies ==="
+            cd ~/cafe-system/backend
+            npm ci
 
+            echo "=== Step 3: Generating Prisma Client ==="
             npx prisma generate
 
-            pm2 restart cafe-backend
+            echo "=== Step 4: Restarting Production Service ==="
+            sudo systemctl restart tiffzy
 
+            echo "=== Step 5: Verifying Service Status ==="
+            if sudo systemctl is-active --quiet tiffzy; then
+              echo "SUCCESS: tiffzy.service is active and running."
+            else
+              echo "ERROR: tiffzy.service is not active."
+              exit 1
+            fi
+
+            echo "=== Step 6: Verifying Port 3000 ==="
+            if sudo ss -ltnp | grep -q ':3000'; then
+              echo "SUCCESS: Backend process is listening on port 3000."
+            else
+              echo "ERROR: Port 3000 is not listening."
+              exit 1
+            fi
+
+            echo "Deployment completed successfully!"
