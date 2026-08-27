@@ -30,7 +30,6 @@ export default function SuperAdminCategories() {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // New Category Form
@@ -59,9 +58,7 @@ export default function SuperAdminCategories() {
         try {
             setSyncing(true);
             setError("");
-            setSuccess("");
             await api.post("/super-admin/categories/sync");
-            setSuccess("Synced all categories successfully");
             await loadCategories();
         } catch (err) {
             console.error("[SuperAdminCategories] Sync error:", err);
@@ -78,10 +75,7 @@ export default function SuperAdminCategories() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            setError("");
-            setSuccess("");
             await api.post("/super-admin/categories", formData);
-            setSuccess("Category created successfully");
             setShowForm(false);
             setFormData({ name: "", imageUrl: "", priority: 0 });
             loadCategories();
@@ -92,15 +86,10 @@ export default function SuperAdminCategories() {
 
     const handleDelete = async (id) => {
         if (!window.confirm("Are you sure you want to delete this category?")) return;
-        const targetCat = categories.find((c) => c.id === id);
         try {
             setError("");
-            setSuccess("");
             setCategories((prev) => prev.filter((c) => c.id !== id));
-            const catNameParam = targetCat?.name ? `?name=${encodeURIComponent(targetCat.name)}` : "";
-            await api.delete(`/super-admin/categories/${id}${catNameParam}`, { data: { name: targetCat?.name } });
-            setSuccess(`Deleted category "${targetCat?.name || id}"`);
-            await loadCategories();
+            await api.delete(`/super-admin/categories/${id}`);
         } catch (err) {
             console.warn("[SuperAdminCategories] Delete warning:", err);
             loadCategories();
@@ -110,12 +99,8 @@ export default function SuperAdminCategories() {
     const toggleStatus = async (category) => {
         try {
             setError("");
-            setSuccess("");
-            const nextStatus = !category.isActive;
-            setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, isActive: nextStatus } : c)));
-            await api.patch(`/super-admin/categories/${category.id}`, { isActive: nextStatus, name: category.name });
-            setSuccess(`Category "${category.name}" is now ${nextStatus ? "Active" : "Paused"}`);
-            await loadCategories();
+            setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, isActive: !c.isActive } : c)));
+            await api.patch(`/super-admin/categories/${category.id}`, { isActive: !category.isActive });
         } catch (err) {
             console.warn("[SuperAdminCategories] Toggle status warning:", err);
             loadCategories();
@@ -145,7 +130,6 @@ export default function SuperAdminCategories() {
 
             <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
                 {error && <div className="mb-6 rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-300 text-sm">{error}</div>}
-                {success && <div className="mb-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4 text-emerald-300 text-sm font-bold">{success}</div>}
 
                 {showForm && (
                     <div className="theme-panel mb-8 rounded-3xl p-6 border theme-border">
@@ -156,16 +140,16 @@ export default function SuperAdminCategories() {
                         <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-3">
                             <div className="grid gap-1.5">
                                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Category Name</label>
-                                <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="theme-input rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g. Pizza" />
+                                <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="theme-input rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g. Pizza" />
                             </div>
                             <div className="grid gap-1.5">
                                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Image URL</label>
-                                <input value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} className="theme-input rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="https://unsplash..." />
+                                <input value={formData.imageUrl} onChange={e => setFormData({ ...formData, imageUrl: e.target.value })} className="theme-input rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="https://unsplash..." />
                             </div>
                             <div className="grid gap-1.5">
                                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Priority</label>
                                 <div className="flex gap-2">
-                                    <input type="number" value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})} className="theme-input rounded-xl px-4 py-3 text-sm outline-none w-full" />
+                                    <input type="number" value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value })} className="theme-input rounded-xl px-4 py-3 text-sm outline-none w-full" />
                                     <button type="submit" className="theme-button rounded-xl px-6 font-bold"><Save size={18} /></button>
                                 </div>
                             </div>
@@ -235,7 +219,7 @@ export default function SuperAdminCategories() {
                                             {category.itemCount || 0} {category.itemCount === 1 ? "dish connected" : "dishes connected"}
                                         </p>
                                     </div>
-                                    <div className={`h-2.5 w-2.5 rounded-full ${category.isActive ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-gray-600"}`} />
+                                    <div className={`h-2.5 w-2.5 rounded-full ${category.isActive ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" : "bg-gray-600"}`} />
                                 </div>
                             </div>
                         ))}
@@ -244,8 +228,4 @@ export default function SuperAdminCategories() {
             </main>
         </div>
     );
-}
-
-function PowerIcon({ size, className }) {
-    return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" /></svg>;
 }

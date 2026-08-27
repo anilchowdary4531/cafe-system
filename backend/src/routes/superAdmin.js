@@ -63,12 +63,12 @@ export default async function superAdminRoutes(app, deps) {
       updatedAt: restaurant.updatedAt,
       owner: owners[0]
         ? {
-            id: owners[0].id,
-            name: owners[0].name,
-            email: owners[0].email,
-            phone: owners[0].phone,
-            isActive: owners[0].isActive,
-          }
+          id: owners[0].id,
+          name: owners[0].name,
+          email: owners[0].email,
+          phone: owners[0].phone,
+          isActive: owners[0].isActive,
+        }
         : null,
       counts: {
         users: restaurant._count?.users || 0,
@@ -87,15 +87,15 @@ export default async function superAdminRoutes(app, deps) {
       const restaurants = await prisma.restaurant.findMany({
         where: q
           ? {
-              OR: [
-                { name: { contains: q, mode: "insensitive" } },
-                { slug: { contains: q, mode: "insensitive" } },
-                { ownerName: { contains: q, mode: "insensitive" } },
-                { email: { contains: q, mode: "insensitive" } },
-                { phone: { contains: q, mode: "insensitive" } },
-                { city: { contains: q, mode: "insensitive" } },
-              ],
-            }
+            OR: [
+              { name: { contains: q, mode: "insensitive" } },
+              { slug: { contains: q, mode: "insensitive" } },
+              { ownerName: { contains: q, mode: "insensitive" } },
+              { email: { contains: q, mode: "insensitive" } },
+              { phone: { contains: q, mode: "insensitive" } },
+              { city: { contains: q, mode: "insensitive" } },
+            ],
+          }
           : {},
         include: {
           users: {
@@ -139,23 +139,23 @@ export default async function superAdminRoutes(app, deps) {
       const restaurants = await prisma.restaurant.findMany({
         where: q
           ? {
-              OR: [
-                { name: { contains: q, mode: "insensitive" } },
-                { slug: { contains: q, mode: "insensitive" } },
-                { city: { contains: q, mode: "insensitive" } },
-                {
-                  users: {
-                    some: {
-                      OR: [
-                        { name: { contains: q, mode: "insensitive" } },
-                        { email: { contains: q, mode: "insensitive" } },
-                        { phone: { contains: q, mode: "insensitive" } },
-                      ],
-                    },
+            OR: [
+              { name: { contains: q, mode: "insensitive" } },
+              { slug: { contains: q, mode: "insensitive" } },
+              { city: { contains: q, mode: "insensitive" } },
+              {
+                users: {
+                  some: {
+                    OR: [
+                      { name: { contains: q, mode: "insensitive" } },
+                      { email: { contains: q, mode: "insensitive" } },
+                      { phone: { contains: q, mode: "insensitive" } },
+                    ],
                   },
                 },
-              ],
-            }
+              },
+            ],
+          }
           : {},
         select: {
           id: true,
@@ -221,13 +221,13 @@ export default async function superAdminRoutes(app, deps) {
       const customerAccounts = await prisma.customerAccount.findMany({
         where: q
           ? {
-              OR: [
-                { name: { contains: q, mode: "insensitive" } },
-                { username: { contains: q, mode: "insensitive" } },
-                { email: { contains: q, mode: "insensitive" } },
-                { phone: { contains: q, mode: "insensitive" } },
-              ],
-            }
+            OR: [
+              { name: { contains: q, mode: "insensitive" } },
+              { username: { contains: q, mode: "insensitive" } },
+              { email: { contains: q, mode: "insensitive" } },
+              { phone: { contains: q, mode: "insensitive" } },
+            ],
+          }
           : {},
         orderBy: { createdAt: "desc" },
       });
@@ -284,14 +284,14 @@ export default async function superAdminRoutes(app, deps) {
       const staffUsers = await prisma.user.findMany({
         where: q
           ? {
-              OR: [
-                { name: { contains: q, mode: "insensitive" } },
-                { email: { contains: q, mode: "insensitive" } },
-                { phone: { contains: q, mode: "insensitive" } },
-                { role: { contains: q, mode: "insensitive" } },
-                { restaurant: { name: { contains: q, mode: "insensitive" } } },
-              ],
-            }
+            OR: [
+              { name: { contains: q, mode: "insensitive" } },
+              { email: { contains: q, mode: "insensitive" } },
+              { phone: { contains: q, mode: "insensitive" } },
+              { role: { contains: q, mode: "insensitive" } },
+              { restaurant: { name: { contains: q, mode: "insensitive" } } },
+            ],
+          }
           : {},
         select: {
           id: true,
@@ -312,13 +312,13 @@ export default async function superAdminRoutes(app, deps) {
       const customerAccounts = await prisma.customerAccount.findMany({
         where: q
           ? {
-              OR: [
-                { name: { contains: q, mode: "insensitive" } },
-                { username: { contains: q, mode: "insensitive" } },
-                { email: { contains: q, mode: "insensitive" } },
-                { phone: { contains: q, mode: "insensitive" } },
-              ],
-            }
+            OR: [
+              { name: { contains: q, mode: "insensitive" } },
+              { username: { contains: q, mode: "insensitive" } },
+              { email: { contains: q, mode: "insensitive" } },
+              { phone: { contains: q, mode: "insensitive" } },
+            ],
+          }
           : {},
         orderBy: { createdAt: "desc" },
       });
@@ -682,7 +682,7 @@ export default async function superAdminRoutes(app, deps) {
             orderBy: { priority: "desc" },
           });
           if (banners.length === 0) {
-            await prisma.banner.createMany({ data: DEFAULT_BANNERS.map(({ id, ...b }) => b), skipDuplicates: true }).catch(() => {});
+            await prisma.banner.createMany({ data: DEFAULT_BANNERS.map(({ id, ...b }) => b), skipDuplicates: true }).catch(() => { });
             banners = await prisma.banner.findMany({ orderBy: { priority: "desc" } }).catch(() => []);
           }
         } catch (dbErr) {
@@ -764,7 +764,7 @@ export default async function superAdminRoutes(app, deps) {
     try {
       const id = Number(req.params.id);
       if (prisma.banner) {
-        await prisma.banner.delete({ where: { id } }).catch(() => {});
+        await prisma.banner.delete({ where: { id } }).catch(() => { });
       }
       return { message: "Banner deleted" };
     } catch (err) {
