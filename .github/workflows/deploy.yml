@@ -50,9 +50,18 @@ jobs:
             fi
 
             echo "=== Step 6: Verifying Port 3000 ==="
-            if sudo ss -ltnp | grep -q ':3000'; then
-              echo "SUCCESS: Backend process is listening on port 3000."
-            else
+            PORT_BOUND=0
+            for i in {1..30}; do
+              if sudo ss -ltnp | grep -q ':3000'; then
+                echo "SUCCESS: Backend process is listening on port 3000."
+                PORT_BOUND=1
+                break
+              fi
+              echo "Waiting for backend to listen on port 3000... ($i/30)"
+              sleep 1
+            done
+
+            if [ "$PORT_BOUND" -ne 1 ]; then
               echo "ERROR: Port 3000 is not listening."
               exit 1
             fi
