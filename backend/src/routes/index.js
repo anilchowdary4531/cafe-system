@@ -8,6 +8,7 @@ import kitchenRoutes from "./kitchen.js";
 import paymentRoutes from "./payment.routes.js";
 import vendorRoutes from "./vendor.routes.js";
 import walletRoutes from "./wallet.routes.js";
+import notificationRoutes from "./notification.routes.js";
 
 // Single route entrypoint to keep server.js simple.
 export default async function routes(app, deps) {
@@ -21,4 +22,5 @@ export default async function routes(app, deps) {
   await paymentRoutes(app, deps);
   await vendorRoutes(app, deps);
   await walletRoutes(app, deps);
+  await notificationRoutes(app, deps);
 }

@@ -624,6 +624,62 @@ model CustomerNotification {
   @@map("customer_notifications")
 }
 
+model Notification {
+  id               Int       @id @default(autoincrement())
+  recipientType    String    @map("recipient_type") // CUSTOMER | USER | RESTAURANT | DELIVERY_PARTNER
+  recipientId      Int       @map("recipient_id")
+  orderId          Int?      @map("order_id")
+  restaurantId     Int?      @map("restaurant_id")
+  notificationType String    @map("notification_type")
+  title            String
+  message          String
+  data             Json?
+  channel          String    @default("IN_APP")
+  priority         String    @default("NORMAL")
+  isRead           Boolean   @default(false) @map("is_read")
+  idempotencyKey   String?   @unique @map("idempotency_key")
+  readAt           DateTime? @map("read_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@index([recipientType, recipientId, isRead])
+  @@index([orderId])
+  @@index([restaurantId])
+  @@map("notifications")
+}
+
+model DeviceToken {
+  id          Int      @id @default(autoincrement())
+  userId      Int?     @map("user_id")
+  customerId  Int?     @map("customer_id")
+  deviceToken String   @map("device_token")
+  platform    String   @default("ANDROID") // ANDROID | IOS | WEB
+  deviceId    String?  @map("device_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  lastUsedAt  DateTime @default(now()) @map("last_used_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([deviceToken])
+  @@index([userId, isActive])
+  @@index([customerId, isActive])
+  @@map("device_tokens")
+}
+
+model NotificationPreference {
+  id              Int      @id @default(autoincrement())
+  userId          Int?     @unique @map("user_id")
+  customerId      Int?     @unique @map("customer_id")
+  orderUpdates    Boolean  @default(true) @map("order_updates")
+  paymentUpdates  Boolean  @default(true) @map("payment_updates")
+  deliveryUpdates Boolean  @default(true) @map("delivery_updates")
+  promotions      Boolean  @default(true)
+  coupons         Boolean  @default(true)
+  reviewReminders Boolean  @default(true) @map("review_reminders")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("notification_preferences")
+}
+
 model GlobalCategory {
   id        Int      @id @default(autoincrement())
   name      String   @unique

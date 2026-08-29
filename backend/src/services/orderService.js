@@ -1,6 +1,7 @@
 import { computeBill, toPriceSubunitItems } from "./billingService.js";
 import { reserveStockForOrder, restoreStockForOrder } from "./inventoryService.js";
 import { normalizePhone } from "./phoneService.js";
+import { createAndDispatchNotification } from "./notificationService.js";
 
 const SAFE_STATUSES = ["PLACED", "ACCEPTED", "PREPARING", "READY", "DELIVERED", "CANCELLED"];
 
@@ -299,6 +300,48 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
         statusEvents: { orderBy: { createdAt: "asc" } },
       },
     });
+
+    // Trigger Notification for Customer on Order Status Change
+    if (updated?.customer?.id) {
+      const statusTypeMap = {
+        ACCEPTED: "ORDER_ACCEPTED",
+        PREPARING: "FOOD_PREPARING",
+        READY: "FOOD_READY",
+        DELIVERED: "ORDER_DELIVERED",
+        CANCELLED: "ORDER_CANCELLED",
+      };
+
+      const notificationType = statusTypeMap[targetStatus];
+      if (notificationType) {
+        const titles = {
+          ACCEPTED: "Order Accepted",
+          PREPARING: "Food Is Being Prepared",
+          READY: "Order Ready!",
+          DELIVERED: "Order Delivered",
+          CANCELLED: "Order Cancelled",
+        };
+        const messages = {
+          ACCEPTED: `Your order #${updated.orderNo || id} has been accepted by the restaurant.`,
+          PREPARING: `The kitchen has started preparing your food for order #${updated.orderNo || id}.`,
+          READY: `Your food for order #${updated.orderNo || id} is ready!`,
+          DELIVERED: `Your order #${updated.orderNo || id} has been delivered. Enjoy your meal!`,
+          CANCELLED: `Your order #${updated.orderNo || id} was cancelled.`,
+        };
+
+        createAndDispatchNotification({
+          prisma,
+          recipientType: "CUSTOMER",
+          recipientId: updated.customer.id,
+          orderId: id,
+          restaurantId: updated.restaurantId,
+          notificationType,
+          title: titles[targetStatus] || `Order ${targetStatus}`,
+          message: messages[targetStatus] || `Order #${updated.orderNo || id} status updated to ${targetStatus}.`,
+          data: { orderId: id, orderNo: updated.orderNo, status: targetStatus, screen: "ORDER_TRACKING" },
+          idempotencyKey: `ORDER_${id}_${targetStatus}`,
+        }).catch(() => {});
+      }
+    }
 
     return updated;
   });
