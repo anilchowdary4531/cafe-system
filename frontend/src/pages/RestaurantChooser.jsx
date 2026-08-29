@@ -10,6 +10,7 @@ import { resolveImageUrl } from "../utils/resolveImageUrl";
 import BrandLogo from "../components/BrandLogo";
 import CartDrawer from "../components/CartDrawer";
 import VegModeToggle from "../components/VegModeToggle";
+import CustomerNotificationBell from "../components/CustomerNotificationBell";
 import Footer from "../components/Footer";
 import PromoBannerSlider from "../components/PromoBannerSlider";
 import PopularCategories, { normalizeCategoryName } from "../components/PopularCategories";
@@ -282,6 +283,8 @@ export default function RestaurantChooser() {
                                     compact
                                     className="shrink-0"
                                 />
+
+                                <CustomerNotificationBell className="shrink-0" />
 
                                 <Link
                                     to={profilePath}

@@ -497,6 +497,7 @@ export default async function customerRoutes(app, deps) {
   app.post("/customer/wallet/verify", payLaterController.verifyRepay); // Alias for now
   app.get("/customer/notifications", payLaterController.getNotifications);
   app.patch("/customer/notifications/:notificationId/read", payLaterController.readNotification);
+  app.post("/customer/notifications/:notificationId/read", payLaterController.readNotification);
   app.delete("/customer/notifications/:notificationId", async (req, reply) => {
     try {
       const notificationId = Number(req.params.notificationId);
