@@ -6,6 +6,7 @@ import LanguageSelector from "./LanguageSelector";
 import RestaurantSelector from "./RestaurantSelector";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import BrandLogo from "./BrandLogo";
+import BrandHeader from "./BrandHeader";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
 
@@ -83,23 +84,9 @@ export default function Navbar() {
     return (
         <div className="theme-nav flex w-full flex-col gap-4 border-b px-4 py-4 md:flex-row md:items-center md:justify-between md:px-8">
             {!isProfilePage && (
-                <div className="flex items-center gap-3">
-                    <Link
-                        to="/"
-                        className="inline-flex h-14 w-14 items-center justify-center"
-                        aria-label="Tiffzy Home"
-                    >
-                        <BrandLogo className="theme-brand-logo h-full w-full" title="Tiffzy logo" />
-                    </Link>
-                    <div>
-                        <Link to="/" className="theme-brand-text text-3xl font-bold leading-none">
-                            Tiffzy
-                        </Link>
-                        <p className="theme-muted text-xs">
-                            {isStaff ? restaurantName : customer?.phone || restaurantName}
-                        </p>
-                    </div>
-                </div>
+                <Link to="/" className="flex items-center gap-3">
+                    <BrandHeader size="md" />
+                </Link>
             )}
 
             <div className="flex w-full flex-wrap items-center justify-between gap-2 md:w-auto md:justify-end md:gap-4">
@@ -150,11 +137,11 @@ export default function Navbar() {
                         {!isStaff && isProfilePage && (
                             <Link
                                 to="/"
-                                className="inline-flex h-12 w-12 items-center justify-center"
+                                className="inline-flex items-center"
                                 aria-label="Tiffzy Home"
                                 title="Home"
                             >
-                                <BrandLogo className="theme-brand-logo h-10 w-10" title="Tiffzy Home" />
+                                <BrandHeader size="sm" showText={false} />
                             </Link>
                         )}
 
