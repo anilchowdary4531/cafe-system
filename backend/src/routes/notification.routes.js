@@ -7,7 +7,7 @@ import {
   getNotificationPreferences,
   updateNotificationPreferences,
 } from "../services/notificationService.js";
-import { requireCustomerPhoneFromJwt } from "./customer.js";
+import { requireCustomerPhoneFromJwt } from "../services/customerProfileService.js";
 import { RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 
 export default async function notificationRoutes(app, deps) {
