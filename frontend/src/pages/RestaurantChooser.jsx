@@ -8,7 +8,6 @@ import { api, cachedGet } from "../utils/apiClient";
 import useCachedGet from "../hooks/useCachedGet";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
 import BrandLogo from "../components/BrandLogo";
-import BrandHeader from "../components/BrandHeader";
 import CartDrawer from "../components/CartDrawer";
 import VegModeToggle from "../components/VegModeToggle";
 import CustomerNotificationBell from "../components/CustomerNotificationBell";
@@ -265,8 +264,15 @@ export default function RestaurantChooser() {
                     <div className="pointer-events-none absolute -left-12 bottom-0 h-52 w-52 rounded-full bg-[#c78f4a]/10 blur-3xl" />
 
                     <header className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="flex w-full items-center lg:max-w-[58%]">
-                            <BrandHeader size="md" />
+                        <div className="flex w-full items-start gap-3 sm:items-center sm:gap-4 lg:max-w-[58%]">
+                            <div className="chooser-logo-shell theme-card flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:h-14 sm:w-14">
+                                <BrandLogo className="h-8 w-8 sm:h-9 sm:w-9" title="Brand logo" />
+                            </div>
+                            <div className="min-w-0">
+                                <span className="inline-flex bg-gradient-to-r from-[#ff8a1f] via-[#d97706] to-[#8a4b11] bg-clip-text text-[12px] font-black uppercase tracking-[0.5em] text-transparent drop-shadow-[0_1px_0_rgba(255,255,255,0.45)] sm:text-[13px]">
+                                    Tiffzy
+                                </span>
+                            </div>
                         </div>
 
                         <div className="relative z-10 flex w-full flex-col items-stretch gap-3 lg:max-w-[680px] lg:items-end">
