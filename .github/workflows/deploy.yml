@@ -35,8 +35,9 @@ jobs:
             cd ~/cafe-system/backend
             npm ci
 
-            echo "=== Step 3: Generating Prisma Client ==="
+            echo "=== Step 3: Generating Prisma Client & Syncing DB Schema ==="
             npx prisma generate
+            npx prisma db push --accept-data-loss
 
             echo "=== Step 4: Restarting Production Service ==="
             sudo systemctl restart tiffzy
@@ -46,6 +47,7 @@ jobs:
               echo "SUCCESS: tiffzy.service is active and running."
             else
               echo "ERROR: tiffzy.service is not active."
+              sudo journalctl -u tiffzy --no-pager -n 40
               exit 1
             fi
 
@@ -62,7 +64,8 @@ jobs:
             done
 
             if [ "$PORT_BOUND" -ne 1 ]; then
-              echo "ERROR: Port 3000 is not listening."
+              echo "ERROR: Port 3000 is not listening. Fetching backend logs:"
+              sudo journalctl -u tiffzy --no-pager -n 40
               exit 1
             fi
 
