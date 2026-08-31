@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Bell, Shield, Sparkles, Tag, Star, PackageCheck, AlertCircle } from "lucide-react";
 import { api } from "../../../utils/apiClient";
 import { showToast } from "../../../utils/toast";
+import NotificationSoundPicker from "../../../components/NotificationSoundPicker";
 
 export default function NotificationSettings() {
   const [loading, setLoading] = useState(true);
@@ -162,6 +163,8 @@ export default function NotificationSettings() {
           </div>
         ))}
       </div>
+
+      <NotificationSoundPicker />
     </div>
   );
 }

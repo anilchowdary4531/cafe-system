@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { Bell, Check, Calendar, ChevronRight } from "lucide-react";
 import { api } from "../utils/apiClient";
 
+import { playNotificationSound } from "../utils/soundPlayer";
+
 const formatDate = (dateStr) => {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return "—";
@@ -19,12 +21,21 @@ export default function CustomerNotificationBell({ className = "" }) {
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const dropdownRef = useRef(null);
+  const prevUnreadRef = useRef(0);
 
   const fetchNotifications = async () => {
     try {
       setLoading(true);
       const res = await api.get("/customer/notifications");
-      setNotifications(res.data?.notifications || []);
+      const list = res.data?.notifications || [];
+      const currentUnread = list.filter((n) => !n.read && !n.isRead).length;
+
+      if (currentUnread > prevUnreadRef.current && prevUnreadRef.current !== 0) {
+        playNotificationSound();
+      }
+      prevUnreadRef.current = currentUnread;
+
+      setNotifications(list);
     } catch {
       // Silently handle offline or non-logged-in customers
     } finally {
