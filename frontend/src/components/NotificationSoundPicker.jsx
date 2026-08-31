@@ -67,14 +67,14 @@ export default function NotificationSoundPicker({ className = "" }) {
   };
 
   return (
-    <div className={`theme-panel rounded-3xl border border-white/10 p-6 space-y-5 ${className}`}>
+    <div className={`theme-panel rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface-1)] p-6 space-y-5 ${className}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
             <Volume2 size={20} />
           </div>
           <div>
-            <h3 className="font-bold text-white/90 text-base">Notification Sound</h3>
+            <h3 className="font-bold text-base">Notification Sound</h3>
             <p className="theme-muted text-xs">
               Choose or upload custom alert sound (.mp3, .wav, .ogg)
             </p>
@@ -83,8 +83,10 @@ export default function NotificationSoundPicker({ className = "" }) {
 
         <button
           onClick={handlePlayPreview}
-          className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition ${
-            isPlaying ? "bg-amber-500 text-white scale-95" : "theme-soft-button"
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition shadow-sm ${
+            isPlaying
+              ? "bg-amber-500 text-white scale-95"
+              : "theme-button"
           }`}
         >
           <Play size={14} className={isPlaying ? "animate-pulse" : ""} />
@@ -92,7 +94,7 @@ export default function NotificationSoundPicker({ className = "" }) {
         </button>
       </div>
 
-      {/* Preset Sound Buttons */}
+      {/* Sound Selection Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {BUILTIN_SOUNDS.map((sound) => {
           const isSelected = selectedSound?.id === sound.id;
@@ -100,17 +102,17 @@ export default function NotificationSoundPicker({ className = "" }) {
             <button
               key={sound.id}
               onClick={() => handleSelectBuiltin(sound)}
-              className={`flex items-center justify-between rounded-2xl border p-4 text-left transition ${
+              className={`flex items-center justify-between rounded-2xl border p-4 text-left transition shadow-sm ${
                 isSelected
-                  ? "border-amber-500/50 bg-amber-500/10 text-white"
-                  : "border-white/5 bg-white/[0.02] text-white/70 hover:bg-white/[0.05]"
+                  ? "border-amber-500 bg-amber-500/15 text-amber-900 dark:text-amber-200 font-bold"
+                  : "border-[var(--app-border)] bg-[var(--app-surface-2)] text-[var(--app-text)] hover:border-amber-500/50 hover:bg-amber-500/5 font-semibold"
               }`}
             >
               <div className="flex items-center gap-3">
-                <Music size={16} className={isSelected ? "text-amber-400" : "text-white/40"} />
-                <span className="text-sm font-semibold">{sound.name}</span>
+                <Music size={16} className={isSelected ? "text-amber-500" : "opacity-50"} />
+                <span className="text-sm">{sound.name}</span>
               </div>
-              {isSelected && <Check size={16} className="text-amber-400" />}
+              {isSelected && <Check size={16} className="text-amber-500 font-bold" />}
             </button>
           );
         })}
@@ -128,14 +130,14 @@ export default function NotificationSoundPicker({ className = "" }) {
 
         <div
           onClick={() => fileInputRef.current?.click()}
-          className={`flex cursor-pointer items-center justify-between rounded-2xl border border-dashed p-4 transition ${
+          className={`flex cursor-pointer items-center justify-between rounded-2xl border border-dashed p-4 transition shadow-sm ${
             selectedSound?.type === "custom"
-              ? "border-amber-500/50 bg-amber-500/10 text-white"
-              : "border-white/20 bg-white/[0.02] text-white/70 hover:border-amber-500/40 hover:bg-white/[0.05]"
+              ? "border-amber-500 bg-amber-500/15 text-amber-900 dark:text-amber-200 font-bold"
+              : "border-[var(--app-border)] bg-[var(--app-surface-2)] text-[var(--app-text)] hover:border-amber-500/50 hover:bg-amber-500/5"
           }`}
         >
           <div className="flex items-center gap-3">
-            <Upload size={18} className="text-amber-400" />
+            <Upload size={18} className="text-amber-500" />
             <div>
               <p className="text-sm font-bold">
                 {selectedSound?.type === "custom" ? selectedSound.name : "Upload Custom Sound File"}
@@ -146,7 +148,7 @@ export default function NotificationSoundPicker({ className = "" }) {
             </div>
           </div>
           {selectedSound?.type === "custom" ? (
-            <span className="rounded-full bg-amber-500/20 px-2.5 py-1 text-[10px] font-bold text-amber-400">
+            <span className="rounded-full bg-amber-500/20 px-3 py-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
               Active Custom
             </span>
           ) : (
