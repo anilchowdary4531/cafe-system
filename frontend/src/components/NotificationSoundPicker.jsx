@@ -95,7 +95,7 @@ export default function NotificationSoundPicker({ className = "" }) {
       {/* Preset Sound Buttons */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {BUILTIN_SOUNDS.map((sound) => {
-          const isSelected = selectedSound?.type === "builtin" && selectedSound?.id === sound.id;
+          const isSelected = selectedSound?.id === sound.id;
           return (
             <button
               key={sound.id}
