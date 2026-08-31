@@ -6,6 +6,8 @@ import { buildCustomerProfileController } from "../controllers/customerProfileCo
 import { buildCustomerAddressController } from "../controllers/customerAddressController.js";
 import { buildCustomerAuthController } from "../controllers/customerAuthController.js";
 import { buildPayLaterController } from "../controllers/payLaterController.js";
+import { createAndDispatchNotification } from "../services/notificationService.js";
+import { RECIPIENT_TYPES, NOTIFICATION_TYPES } from "../constants/notificationTypes.js";
 
 const normalizeDeliveryAddress = (value) => {
   if (!value) return "";
@@ -431,6 +433,49 @@ export default async function customerRoutes(app, deps) {
       });
 
       realtime?.emitOrderCreated?.(order);
+
+      // 🔔 Dispatch Realtime Notifications & Save in DB
+      try {
+        const io = req.server.io;
+        if (io) {
+          io.to(`restaurant_${restaurant.id}`).emit("new_order", order);
+          io.to(`restaurant:${restaurant.id}`).emit("new_order", order);
+        }
+
+        const summaryText = `New order #${order.orderNo} for ₹${order.total}${order.customerName ? ` from ${order.customerName}` : ""}${order.tableNo ? ` (Table ${order.tableNo})` : ""}.`;
+
+        await createAndDispatchNotification({
+          prisma,
+          realtime: { io },
+          recipientType: RECIPIENT_TYPES.RESTAURANT,
+          recipientId: restaurant.id,
+          restaurantId: restaurant.id,
+          orderId: order.id,
+          notificationType: NOTIFICATION_TYPES.NEW_ORDER,
+          title: "🔔 New Order Received!",
+          message: summaryText,
+          data: { orderId: order.id, orderNo: order.orderNo, total: order.total, tableNo: order.tableNo },
+          idempotencyKey: `cust_route_order_rest_${order.id}`,
+        }).catch((e) => console.log("Notif dispatch error:", e?.message));
+
+        if (customerRecord?.id) {
+          await createAndDispatchNotification({
+            prisma,
+            realtime: { io },
+            recipientType: RECIPIENT_TYPES.CUSTOMER,
+            recipientId: customerRecord.id,
+            restaurantId: restaurant.id,
+            orderId: order.id,
+            notificationType: NOTIFICATION_TYPES.ORDER_PLACED,
+            title: "Order Placed Successfully! 🛒",
+            message: `Your order #${order.orderNo} for ₹${order.total} has been received by ${restaurant.name}.`,
+            data: { orderId: order.id, orderNo: order.orderNo, total: order.total },
+            idempotencyKey: `cust_route_order_cust_${order.id}`,
+          }).catch((e) => console.log("Notif dispatch error:", e?.message));
+        }
+      } catch (notifErr) {
+        console.log("Order notification dispatch error:", notifErr?.message);
+      }
 
       return {
         message: "Order placed successfully",

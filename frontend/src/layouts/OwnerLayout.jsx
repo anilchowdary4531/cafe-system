@@ -28,6 +28,7 @@ import { useAuth } from "../context/AuthContext";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
 import { showToast } from "../utils/toast";
 import tiffzyLogo from "../assets/tiffzy-logo.png";
+import NewOrderPopup from "../components/NewOrderPopup";
 import {
     getOwnerUnreadCount,
     subscribeOwnerNotifications,
@@ -568,6 +569,9 @@ export default function OwnerLayout() {
         return unsubscribe;
     }, []);
 
+    const [popupOrder, setPopupOrder] = useState(null);
+    const knownOrderIdsRef = useState(() => new Set())[0];
+
     useEffect(() => {
         let mounted = true;
 
@@ -588,8 +592,19 @@ export default function OwnerLayout() {
                 if (!mounted) return;
 
                 const tables = normalizeTableRows(res.data);
-
                 const occupied = tables.filter((table) => table.isOccupied).length;
+
+                // Detect newly arrived active orders
+                const activeOrders = tables.flatMap((t) => (Array.isArray(t.activeOrders) ? t.activeOrders : []));
+                if (knownOrderIdsRef.size > 0) {
+                    const brandNewOrder = activeOrders.find((o) => o?.id && !knownOrderIdsRef.has(o.id));
+                    if (brandNewOrder) {
+                        setPopupOrder(brandNewOrder);
+                    }
+                }
+                activeOrders.forEach((o) => {
+                    if (o?.id) knownOrderIdsRef.add(o.id);
+                });
 
                 setTableOverview({
                     loading: false,
@@ -607,13 +622,13 @@ export default function OwnerLayout() {
         };
 
         loadTableOverview();
-        const intervalId = setInterval(loadTableOverview, 20000);
+        const intervalId = setInterval(loadTableOverview, 10000);
 
         return () => {
             mounted = false;
             clearInterval(intervalId);
         };
-    }, [restaurantId]);
+    }, [knownOrderIdsRef, restaurantId]);
 
     useEffect(() => {
         let mounted = true;
@@ -1926,6 +1941,16 @@ export default function OwnerLayout() {
                     </div>
                 </div>
             )}
+
+            {/* REAL-TIME NEW ORDER POPUP ALERT */}
+            <NewOrderPopup
+                order={popupOrder}
+                onClose={() => setPopupOrder(null)}
+                onViewOrder={() => {
+                    setPopupOrder(null);
+                    navigate("/owner/orders");
+                }}
+            />
         </div>
     );
 }
