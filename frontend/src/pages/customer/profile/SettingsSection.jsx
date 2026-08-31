@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, Bell, Lock, Mail, MapPin, Phone, Save, Trash2, UserCircle2, X } from "lucide-react";
 import ThemeSelector from "../../../components/ThemeSelector";
 import LanguageSelector from "../../../components/LanguageSelector";
+import NotificationSoundPicker from "../../../components/NotificationSoundPicker";
 import { useLanguage } from "../../../context/LanguageContext";
 import { clearAllCache } from "../../../utils/localCache";
 import { getCustomerSettings, setCustomerSettings } from "../../../utils/customerSettings";
@@ -282,10 +283,14 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                     <SettingToggle
                         icon={<Bell size={16} />}
                         title="Order update notifications"
-                        description="Show order status updates on this device (coming soon)."
+                        description="Show order status updates on this device."
                         checked={settings.orderUpdateNotifications !== false}
                         onChange={(nextValue) => updateSettings({ orderUpdateNotifications: nextValue })}
                     />
+                </div>
+
+                <div className="pt-3">
+                    <NotificationSoundPicker />
                 </div>
             </section>
 
