@@ -85,6 +85,8 @@ model Restaurant {
   payLaterAccounts     PayLaterAccount[]
   payLaterTransactions PayLaterTransaction[]
   customerNotifications CustomerNotification[]
+  supplyCarts          SupplyCart[]
+  supplyOrders         SupplyOrder[]
 
   @@map("restaurants")
 }
@@ -782,5 +784,460 @@ model WalletTopup {
   @@index([walletId, createdAt])
   @@index([customerAccountId])
   @@map("wallet_topups")
+}
+
+///////////////////////////////////////////////////////////
+// TIFFZY SUPPLY CHAIN MARKETPLACE MODELS
+///////////////////////////////////////////////////////////
+
+model Supplier {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  phone        String   @unique
+  passwordHash String   @map("password_hash")
+  status       String   @default("PENDING") // PENDING | APPROVED | REJECTED | SUSPENDED | BLOCKED | ACTIVE
+  isVerified   Boolean  @default(false) @map("is_verified")
+  sessionVersion Int    @default(0) @map("session_version")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  profile      SupplierProfile?
+  addresses    SupplierAddress[]
+  products     SupplyProduct[]
+  orders       SupplyOrder[]
+  settlements  SupplierSettlement[]
+  reviews      SupplyReview[]
+
+  @@index([status, createdAt])
+  @@index([phone])
+  @@map("suppliers")
+}
+
+model SupplierProfile {
+  id               Int      @id @default(autoincrement())
+  supplierId       Int      @unique @map("supplier_id")
+  supplier         Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  businessName     String   @map("business_name")
+  legalName        String?  @map("legal_name")
+  gstin            String?  @unique
+  fssaiLicense     String?  @map("fssai_license")
+  logoUrl          String?  @map("logo_url")
+  bannerUrl        String?  @map("banner_url")
+  description      String?
+  rating           Float    @default(4.8)
+  reviewCount      Int      @default(0) @map("review_count")
+
+  // BANK & SETTLEMENT PAYOUT DETAILS
+  bankAccountNumber String? @map("bank_account_number")
+  bankIfscCode      String? @map("bank_ifsc_code")
+  bankAccountName   String? @map("bank_account_name")
+  bankName          String? @map("bank_name")
+
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("supplier_profiles")
+}
+
+model SupplierAddress {
+  id          Int      @id @default(autoincrement())
+  supplierId  Int      @map("supplier_id")
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  label       String   @default("Warehouse") // Main Warehouse, Branch Pick-up
+  line1       String   @map("address_line1")
+  line2       String?  @map("address_line2")
+  city        String
+  state       String
+  pincode     String   @map("postal_code")
+  country     String   @default("India")
+  latitude    Float?
+  longitude   Float?
+  isPrimary   Boolean  @default(true) @map("is_primary")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([supplierId, isPrimary])
+  @@map("supplier_addresses")
+}
+
+model SupplyCategory {
+  id        Int             @id @default(autoincrement())
+  name      String          @unique
+  slug      String          @unique
+  imageUrl  String?         @map("image_url")
+  isActive  Boolean         @default(true) @map("is_active")
+  priority  Int             @default(0)
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @default(now()) @updatedAt @map("updated_at")
+
+  products  SupplyProduct[]
+
+  @@map("supply_categories")
+}
+
+model SupplyProduct {
+  id           Int            @id @default(autoincrement())
+  supplierId   Int            @map("supplier_id")
+  supplier     Supplier       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  categoryId   Int?           @map("category_id")
+  category     SupplyCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  name         String
+  slug         String         @unique
+  description  String?
+  unit         String         @default("KG") // KG, GRAM, LITER, PACK, PIECE, BOX
+  moq          Float          @default(1)    // Minimum Order Quantity
+  availability Boolean        @default(true) @map("is_available")
+  status       String         @default("PENDING") // PENDING | APPROVED | REJECTED | DISABLED
+  isDeleted    Boolean        @default(false) @map("is_deleted")
+
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at")
+
+  images       SupplyProductImage[]
+  prices       SupplyPrice[]
+  discounts    SupplyDiscount[]
+  inventory    SupplyInventory?
+  cartItems    SupplyCartItem[]
+  orderItems   SupplyOrderItem[]
+  reviews      SupplyReview[]
+
+  @@index([supplierId, status, isDeleted])
+  @@index([categoryId, availability, status])
+  @@map("supply_products")
+}
+
+model SupplyProductImage {
+  id        Int           @id @default(autoincrement())
+  productId Int           @map("product_id")
+  product   SupplyProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  imageUrl  String        @map("image_url")
+  priority  Int           @default(0)
+  isPrimary Boolean       @default(false) @map("is_primary")
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  @@index([productId, isPrimary])
+  @@map("supply_product_images")
+}
+
+model SupplyPrice {
+  id        Int           @id @default(autoincrement())
+  productId Int           @map("product_id")
+  product   SupplyProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  basePrice Float         @map("base_price") // Cost before discount & tax
+  taxPercent Float        @default(5.0) @map("tax_percent")
+  currency  String        @default("INR")
+  isActive  Boolean       @default(true) @map("is_active")
+
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  @@index([productId, isActive])
+  @@map("supply_prices")
+}
+
+model SupplyDiscount {
+  id           Int           @id @default(autoincrement())
+  productId    Int           @map("product_id")
+  product      SupplyProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  type         String        @default("PERCENTAGE") // PERCENTAGE | FIXED
+  value        Float         // e.g. 8.0 for 8% or 20.0 for ₹20
+  startDate    DateTime?     @map("start_date")
+  endDate      DateTime?     @map("end_date")
+  isActive     Boolean       @default(true) @map("is_active")
+
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  @@index([productId, isActive])
+  @@map("supply_discounts")
+}
+
+model SupplyInventory {
+  id             Int           @id @default(autoincrement())
+  productId      Int           @unique @map("product_id")
+  product        SupplyProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  totalStock     Float         @default(0) @map("total_stock")
+  reservedStock  Float         @default(0) @map("reserved_stock")
+  availableStock Float         @default(0) @map("available_stock") // available_stock = total_stock - reserved_stock
+  lowStockAlert  Float         @default(10) @map("low_stock_alert")
+
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  transactions   SupplyInventoryTransaction[]
+  batches        SupplyInventoryBatch[]
+
+  @@map("supply_inventories")
+}
+
+model SupplyInventoryTransaction {
+  id            Int             @id @default(autoincrement())
+  inventoryId   Int             @map("inventory_id")
+  inventory     SupplyInventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  type          String          // STOCK_ADD | STOCK_RESERVE | STOCK_RELEASE | STOCK_CONSUMED | STOCK_ADJUSTMENT
+  quantity      Float
+  balanceBefore Float           @map("balance_before")
+  balanceAfter  Float           @map("balance_after")
+
+  referenceType String?         @map("reference_type") // SUPPLY_ORDER | SUPPLIER_ADJUSTMENT | SYSTEM
+  referenceId   String?         @map("reference_id")
+  notes         String?
+
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  @@index([inventoryId, createdAt])
+  @@map("supply_inventory_transactions")
+}
+
+model SupplyInventoryBatch {
+  id              Int             @id @default(autoincrement())
+  inventoryId     Int             @map("inventory_id")
+  inventory       SupplyInventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  batchNumber     String          @map("batch_number")
+  quantity        Float
+  costPrice       Float?          @map("cost_price")
+  manufactureDate DateTime?       @map("manufacture_date")
+  expiryDate      DateTime?       @map("expiry_date")
+
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @default(now()) @updatedAt @map("updated_at")
+
+  @@index([inventoryId, batchNumber])
+  @@map("supply_inventory_batches")
+}
+
+model SupplyCart {
+  id           Int              @id @default(autoincrement())
+  restaurantId Int              @unique @map("restaurant_id")
+  restaurant   Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @default(now()) @updatedAt @map("updated_at")
+
+  items        SupplyCartItem[]
+
+  @@map("supply_carts")
+}
+
+model SupplyCartItem {
+  id         Int           @id @default(autoincrement())
+  cartId     Int           @map("cart_id")
+  cart       SupplyCart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  productId  Int           @map("product_id")
+  product    SupplyProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  quantity   Float
+  unitPrice  Float         @map("unit_price")
+  discount   Float         @default(0)
+  finalPrice Float         @map("final_price")
+
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([cartId, productId])
+  @@map("supply_cart_items")
+}
+
+model SupplyOrder {
+  id              Int        @id @default(autoincrement())
+  orderNo         String     @unique @map("order_no")
+
+  restaurantId    Int        @map("restaurant_id")
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  supplierId      Int        @map("supplier_id")
+  supplier        Supplier   @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  // BILLING
+  subtotal        Float
+  discountAmount  Float      @default(0) @map("discount_amount")
+  taxAmount       Float      @default(0) @map("tax_amount")
+  deliveryFee     Float      @default(0) @map("delivery_fee")
+  totalAmount     Float      @map("total_amount")
+
+  // STATUS
+  status          String     @default("PLACED")
+  // PLACED / ACCEPTED / PROCESSING / READY / DISPATCHED / DELIVERED / COMPLETED / CANCELLED / REJECTED
+
+  paymentStatus   String     @default("PENDING") @map("payment_status") // PENDING | PAID | FAILED | REFUNDED
+  paymentMode     String?    @map("payment_mode") // ONLINE | CASH_ON_DELIVERY | CREDIT
+
+  notes           String?
+  deliveryAddress String?    @map("delivery_address")
+
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  items           SupplyOrderItem[]
+  statusEvents    SupplyOrderStatusEvent[]
+  payments        SupplyPayment[]
+  refunds         SupplyRefund[]
+  settlementItem  SupplierSettlementItem?
+
+  @@index([restaurantId, createdAt])
+  @@index([supplierId, status, createdAt])
+  @@map("supply_orders")
+}
+
+model SupplyOrderItem {
+  id         Int           @id @default(autoincrement())
+  orderId    Int           @map("order_id")
+  order      SupplyOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId  Int?          @map("product_id")
+  product    SupplyProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  productName String       @map("product_name")
+  unit        String
+  quantity    Float
+  unitPrice   Float        @map("unit_price")
+  discount    Float        @default(0)
+  totalPrice  Float        @map("total_price")
+
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@map("supply_order_items")
+}
+
+model SupplyOrderStatusEvent {
+  id          Int         @id @default(autoincrement())
+  orderId     Int         @map("order_id")
+  order       SupplyOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  status      String
+  notes       String?
+  createdRole String?     @map("created_role")
+  createdBy   String?     @map("created_by")
+
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  @@index([orderId, createdAt])
+  @@map("supply_order_status_events")
+}
+
+model SupplyPayment {
+  id               Int         @id @default(autoincrement())
+  orderId          Int         @map("order_id")
+  order            SupplyOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  gatewayTxnId     String?     @map("gateway_txn_id")
+  paymentSessionId String?     @map("payment_session_id")
+  amount           Float
+  currency         String      @default("INR")
+  status           String      @default("PENDING") // PENDING | SUCCESS | FAILED | CANCELLED
+  provider         String      @default("CASHFREE")
+  metadata         Json?
+
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @default(now()) @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@index([gatewayTxnId])
+  @@map("supply_payments")
+}
+
+model SupplyRefund {
+  id           Int         @id @default(autoincrement())
+  orderId      Int         @map("order_id")
+  order        SupplyOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  refundTxnId  String      @unique @map("refund_txn_id")
+  amount       Float
+  reason       String?
+  status       String      @default("PENDING") // PENDING | COMPLETED | FAILED
+
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @default(now()) @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@map("supply_refunds")
+}
+
+model SupplierSettlement {
+  id              Int                      @id @default(autoincrement())
+  settlementNo    String                   @unique @map("settlement_no")
+
+  supplierId      Int                      @map("supplier_id")
+  supplier        Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  grossAmount     Float                    @map("gross_amount")
+  commissionFee   Float                    @default(0) @map("commission_fee")
+  taxDeductions   Float                    @default(0) @map("tax_deductions")
+  netPayable      Float                    @map("net_payable")
+
+  status          String                   @default("PENDING") // PENDING | PROCESSING | COMPLETED | FAILED
+  payoutRef       String?                  @map("payout_ref")
+  settledAt       DateTime?                @map("settled_at")
+
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @default(now()) @updatedAt @map("updated_at")
+
+  items           SupplierSettlementItem[]
+
+  @@index([supplierId, status, createdAt])
+  @@map("supplier_settlements")
+}
+
+model SupplierSettlementItem {
+  id           Int                @id @default(autoincrement())
+  settlementId Int                @map("settlement_id")
+  settlement   SupplierSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  orderId      Int                @unique @map("order_id")
+  order        SupplyOrder        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  orderAmount  Float              @map("order_amount")
+  commission   Float              @map("commission")
+  netAmount    Float              @map("net_amount")
+
+  createdAt    DateTime           @default(now()) @map("created_at")
+
+  @@map("supplier_settlement_items")
+}
+
+model SupplyReview {
+  id          Int           @id @default(autoincrement())
+  supplierId  Int           @map("supplier_id")
+  supplier    Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  productId   Int?          @map("product_id")
+  product     SupplyProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  restaurantId Int          @map("restaurant_id")
+
+  rating      Float         // 1.0 - 5.0
+  comment     String?
+
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  @@index([supplierId, rating])
+  @@index([productId, rating])
+  @@map("supply_reviews")
+}
+
+model SupplyAnalyticsEvent {
+  id          Int      @id @default(autoincrement())
+  eventType   String   @map("event_type") // PRODUCT_VIEW | CART_ADD | ORDER_PLACED | SUPPLIER_IMPRESSION
+  actorType   String   @map("actor_type") // RESTAURANT | SUPPLIER | GUEST
+  actorId     Int?     @map("actor_id")
+  targetId    Int?     @map("target_id")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([eventType, createdAt])
+  @@index([actorType, actorId])
+  @@map("supply_analytics_events")
 }
 
