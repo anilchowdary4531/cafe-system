@@ -67,7 +67,7 @@ export default function NotificationSoundPicker({ className = "" }) {
   };
 
   return (
-    <div className={`theme-panel rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface-1)] p-6 space-y-5 ${className}`}>
+    <div className={`theme-panel rounded-3xl border border-[var(--app-border)] bg-[#171410] dark:bg-[#15151a] p-6 space-y-5 ${className}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400">

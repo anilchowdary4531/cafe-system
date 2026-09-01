@@ -1074,7 +1074,7 @@ export default function Kitchen() {
 
             {soundModalOpen ? (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(18,12,8,0.55)] px-4 py-6 backdrop-blur-sm"
+                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-md"
                     onClick={() => setSoundModalOpen(false)}
                     role="presentation"
                 >
@@ -1082,36 +1082,36 @@ export default function Kitchen() {
                         role="dialog"
                         aria-modal="true"
                         aria-label="Notification Sound Settings"
-                        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] border border-[rgba(95,61,31,0.16)] bg-[var(--app-surface-1)] shadow-2xl"
+                        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] border border-[rgba(217,200,175,0.25)] bg-[#181410] text-[#fff8e7] shadow-2xl"
                         onClick={(event) => event.stopPropagation()}
                     >
-                        <div className="flex shrink-0 items-center justify-between border-b border-[var(--app-border)] px-6 py-4">
+                        <div className="flex shrink-0 items-center justify-between border-b border-[rgba(255,255,255,0.1)] px-6 py-4">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                                    <Bell size={20} />
+                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400">
+                                    <Bell size={20} className="animate-pulse" />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold">Kitchen Order Alerts</h3>
-                                    <p className="theme-muted text-xs">Configure sound chime when new live tickets arrive</p>
+                                    <h3 className="text-lg font-bold text-white">Kitchen Order Alerts & Sound</h3>
+                                    <p className="text-xs text-amber-200/70">Configure sound chime when new live tickets arrive</p>
                                 </div>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setSoundModalOpen(false)}
-                                className="theme-soft-button flex h-9 w-9 items-center justify-center rounded-xl"
+                                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 transition"
                             >
                                 <X size={18} />
                             </button>
                         </div>
 
-                        <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4">
+                        <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-5">
                             {/* Sound Mute Toggle Bar */}
-                            <div className="flex items-center justify-between rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-4">
+                            <div className="flex items-center justify-between rounded-2xl border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] p-4">
                                 <div className="flex items-center gap-3">
-                                    {soundMuted ? <VolumeX size={20} className="text-gray-400" /> : <Volume2 size={20} className="text-amber-500" />}
+                                    {soundMuted ? <VolumeX size={20} className="text-gray-400" /> : <Volume2 size={20} className="text-amber-400" />}
                                     <div>
-                                        <p className="text-sm font-bold">{soundMuted ? "Sound Alerts Muted" : "Sound Alerts Active"}</p>
-                                        <p className="theme-muted text-xs">Plays chime automatically when live tickets arrive</p>
+                                        <p className="text-sm font-bold text-white">{soundMuted ? "Sound Alerts Muted" : "Sound Alerts Active"}</p>
+                                        <p className="text-xs text-amber-200/70">Plays chime automatically when live tickets arrive</p>
                                     </div>
                                 </div>
                                 <button
@@ -1119,8 +1119,8 @@ export default function Kitchen() {
                                     onClick={toggleSoundMute}
                                     className={`rounded-full px-4 py-2 text-xs font-bold transition ${
                                         soundMuted
-                                            ? "bg-amber-500 text-white"
-                                            : "bg-red-500/15 text-red-500 hover:bg-red-500/25"
+                                            ? "bg-amber-500 text-black hover:bg-amber-400"
+                                            : "bg-red-500/20 text-red-300 hover:bg-red-500/30"
                                     }`}
                                 >
                                     {soundMuted ? "Unmute Sound" : "Mute Sound"}
@@ -1129,6 +1129,44 @@ export default function Kitchen() {
 
                             {/* Sound Selector Component */}
                             <NotificationSoundPicker />
+
+                            {/* Live Tickets Notification List */}
+                            <div className="rounded-2xl border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] p-4 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-bold text-amber-400 uppercase tracking-wider">Live Ticket Alerts</h4>
+                                    <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs text-amber-300 font-semibold">
+                                        {ticketRows.length} Active
+                                    </span>
+                                </div>
+
+                                {ticketRows.length === 0 ? (
+                                    <p className="text-xs text-amber-100/60">No active ticket notifications currently.</p>
+                                ) : (
+                                    <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                                        {ticketRows.slice(0, 10).map((ticket) => (
+                                            <div key={ticket.itemKey} className="flex items-center justify-between rounded-xl bg-black/30 p-3 text-xs border border-white/5">
+                                                <div>
+                                                    <p className="font-bold text-white">{ticket.itemName} ({ticket.qty}x)</p>
+                                                    <p className="text-[11px] text-amber-200/70">{ticket.orderRef} • {ticket.orderLabel}</p>
+                                                </div>
+                                                <span className="rounded-full bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-300 border border-amber-500/20">
+                                                    {ticket.ageText}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex justify-end">
+                                <Link
+                                    to="/owner/notifications"
+                                    onClick={() => setSoundModalOpen(false)}
+                                    className="inline-flex items-center gap-2 text-xs font-bold text-amber-400 hover:text-amber-300 underline"
+                                >
+                                    Open Full Owner Notifications Page →
+                                </Link>
+                            </div>
                         </div>
                     </div>
                 </div>
