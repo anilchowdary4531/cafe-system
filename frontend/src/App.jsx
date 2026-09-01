@@ -66,6 +66,10 @@ import SuperAdminCategories from "./pages/super-admin/SuperAdminCategories";
 import SuperAdminBanners from "./pages/super-admin/SuperAdminBanners";
 import SuperAdminRestaurantProfiles from "./pages/super-admin/SuperAdminRestaurantProfiles";
 import SuperAdminWalletManagement from "./pages/super-admin/SuperAdminWalletManagement";
+import SupplierLogin from "./pages/supplier/SupplierLogin";
+import SupplierDashboard from "./pages/supplier/SupplierDashboard";
+import OwnerSupplyMarketplace from "./pages/admin/OwnerSupplyMarketplace";
+import SuperAdminSupplyChain from "./pages/super-admin/SuperAdminSupplyChain";
 import NewOrder from "./pages/admin/NewOrder.jsx";
 import PaymentSuccess from "./pages/admin/PaymentSuccess.jsx";
 import Kitchen from "./pages/Kitchen.jsx";
@@ -459,7 +463,23 @@ export default function App() {
                         <Route path="staff" element={<OwnerStaff />} />
                         <Route path="settings" element={<OwnerSettings />} />
                         <Route path="notifications" element={<OwnerNotifications />} />
+                        <Route path="supply" element={<OwnerSupplyMarketplace />} />
                     </Route>
+
+                    {/* ================================= */}
+                    {/* SUPPLIER PORTAL ROUTES */}
+                    {/* ================================= */}
+                    <Route path="/supplier/login" element={<SupplierLogin />} />
+                    <Route path="/supplier/register" element={<SupplierLogin />} />
+                    <Route path="/supplier" element={<SupplierDashboard />} />
+                    <Route
+                        path="/super-admin/supply"
+                        element={
+                            <ProtectedRoute role="SUPER_ADMIN">
+                                <SuperAdminSupplyChain />
+                            </ProtectedRoute>
+                        }
+                    />
 
 
                     {/* ================================= */}

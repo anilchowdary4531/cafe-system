@@ -11,11 +11,19 @@ import walletRoutes from "./wallet.routes.js";
 import notificationRoutes from "./notification.routes.js";
 import healthRoutes from "./health.routes.js";
 import supplierAuthRoutes from "./supplierAuth.routes.js";
+import supplierProfileRoutes from "./supplierProfile.routes.js";
+import supplierProductRoutes from "./supplierProduct.routes.js";
+import supplyMarketplaceRoutes from "./supplyMarketplace.routes.js";
+import superAdminSupplyRoutes from "./superAdminSupply.routes.js";
 
 // Single route entrypoint to keep server.js simple.
 export default async function routes(app, deps) {
   await healthRoutes(app, deps);
   await supplierAuthRoutes(app, deps);
+  await supplierProfileRoutes(app, deps);
+  await supplierProductRoutes(app, deps);
+  await supplyMarketplaceRoutes(app, deps);
+  await superAdminSupplyRoutes(app, deps);
   await publicRoutes(app, deps);
   await authRoutes(app, deps);
   await customerRoutes(app, deps);
