@@ -9,9 +9,11 @@ import paymentRoutes from "./payment.routes.js";
 import vendorRoutes from "./vendor.routes.js";
 import walletRoutes from "./wallet.routes.js";
 import notificationRoutes from "./notification.routes.js";
+import healthRoutes from "./health.routes.js";
 
 // Single route entrypoint to keep server.js simple.
 export default async function routes(app, deps) {
+  await healthRoutes(app, deps);
   await publicRoutes(app, deps);
   await authRoutes(app, deps);
   await customerRoutes(app, deps);
