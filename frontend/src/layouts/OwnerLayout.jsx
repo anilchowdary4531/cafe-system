@@ -18,6 +18,7 @@ import {
     MoreHorizontal,
     Printer,
     IndianRupee,
+    Truck,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
@@ -46,6 +47,7 @@ const MODULES = [
     "staff",
     "settings",
     "notifications",
+    "supply",
 ];
 
 const defaultAccessByRole = (role) => {
@@ -504,6 +506,12 @@ export default function OwnerLayout() {
             accessKey: "finance",
         },
         {
+            label: "Supply Marketplace",
+            path: "/owner/supply",
+            icon: <Truck size={18} />,
+            accessKey: "supply",
+        },
+        {
             label: "Staff",
             path: "/owner/staff",
             icon: <Users size={18} />,
@@ -545,6 +553,7 @@ export default function OwnerLayout() {
         "/owner/pay-later",
         "/owner/analytics",
         "/owner/settings",
+        "/owner/supply",
     ];
     const showTableAssignmentStrip = !hideTableAssignmentStripOn.some((path) =>
         location.pathname.startsWith(path)

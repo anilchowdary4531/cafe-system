@@ -12,6 +12,7 @@ import {
     Image as ImageIcon,
     Utensils,
     Wallet,
+    Truck,
 } from "lucide-react";
 import tiffzyLogo from "../../assets/tiffzy-logo.png";
 
@@ -24,6 +25,7 @@ export const SUPER_ADMIN_MENU_ITEMS = [
     { key: "banners", label: "Promotion Banners", icon: ImageIcon, to: "/super-admin/banners" },
     { key: "users", label: "All Users & Staff", icon: Users, to: "/super-admin/users" },
     { key: "settlements", label: "Cashfree Easy Split", icon: BarChart3, to: "/super-admin/settlements" },
+    { key: "supply", label: "Supply Chain Hub", icon: Truck, to: "/super-admin/supply" },
     { key: "create-restaurant", label: "Create Restaurant", icon: Store, to: "/super-admin/create-restaurant" },
     { key: "settings", label: "System Settings", icon: Settings, to: "/super-admin/settings" },
 ];
