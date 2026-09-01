@@ -477,20 +477,27 @@ export default function Login() {
                         <LanguageSelector />
                     </div>
 
-                    <div className="mb-6 grid grid-cols-2 gap-2 pr-20 sm:pr-24">
+                    <div className="mb-6 grid grid-cols-3 gap-1.5 pr-20 sm:pr-24">
                         <button
                             type="button"
                             onClick={() => setModeAndUrl("customer")}
-                            className={`rounded-2xl px-4 py-2 text-sm font-semibold ${mode === "customer" ? "theme-button" : "theme-soft-button"}`}
+                            className={`rounded-2xl px-2.5 py-2 text-xs sm:text-sm font-semibold ${mode === "customer" ? "theme-button" : "theme-soft-button"}`}
                         >
                             {t("customer")}
                         </button>
                         <button
                             type="button"
                             onClick={() => setModeAndUrl("staff")}
-                            className={`rounded-2xl px-4 py-2 text-sm font-semibold ${mode === "staff" || mode === "register" ? "theme-button" : "theme-soft-button"}`}
+                            className={`rounded-2xl px-2.5 py-2 text-xs sm:text-sm font-semibold ${mode === "staff" || mode === "register" ? "theme-button" : "theme-soft-button"}`}
                         >
                             {t("staff")}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => navigate("/supplier/login")}
+                            className={`rounded-2xl px-2.5 py-2 text-xs sm:text-sm font-semibold ${mode === "supplier" ? "theme-button" : "theme-soft-button"}`}
+                        >
+                            Supplier
                         </button>
                     </div>
 
