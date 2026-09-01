@@ -109,7 +109,12 @@ export default function SuperAdminCreateRestaurant() {
             setError("");
             setSuccess("");
 
-            await api.post("/super-admin/restaurants", form);
+            const payload = {
+                ...form,
+                slug: slugify(form.slug || form.name),
+            };
+
+            await api.post("/super-admin/restaurants", payload);
 
             setSuccess("Restaurant and owner created successfully.");
             setForm(initialForm);
@@ -187,7 +192,7 @@ export default function SuperAdminCreateRestaurant() {
 
                     <form onSubmit={handleSubmit} className="mt-5 grid gap-3">
                         <Input label="Restaurant Name" value={form.name} onChange={(value) => updateForm("name", value)} required />
-                        <Input label="Slug" value={form.slug} onChange={(value) => updateForm("slug", slugify(value))} required />
+                        <Input label="Slug" value={form.slug} onChange={(value) => updateForm("slug", value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} required />
                         <Input label="Legal Name" value={form.legalName} onChange={(value) => updateForm("legalName", value)} />
                         <Input label="Owner Name" value={form.ownerName} onChange={(value) => updateForm("ownerName", value)} required />
                         <Input label="Owner Email" type="email" value={form.ownerEmail} onChange={(value) => updateForm("ownerEmail", value)} required />

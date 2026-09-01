@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import {
+    Bell,
+    BellOff,
     ChefHat,
     GripVertical,
     LoaderCircle,
@@ -9,11 +11,15 @@ import {
     Sparkles,
     UtensilsCrossed,
     Users,
+    Volume2,
+    VolumeX,
     X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import { api } from "../utils/apiClient";
+import NotificationSoundPicker from "../components/NotificationSoundPicker";
+import { playNotificationSound } from "../utils/soundPlayer";
 import {
     appendKitchenAssignmentHistory,
     createKitchenAssignmentHistoryEntry,
@@ -413,6 +419,29 @@ export default function Kitchen() {
     const [assignmentsReady, setAssignmentsReady] = useState(false);
     const [draggingItemKey, setDraggingItemKey] = useState("");
     const [dropChefId, setDropChefId] = useState("");
+    const [soundModalOpen, setSoundModalOpen] = useState(false);
+    const [soundMuted, setSoundMuted] = useState(() => {
+        try {
+            return localStorage.getItem("tiffzy_kitchen_sound_muted") === "true";
+        } catch {
+            return false;
+        }
+    });
+
+    const toggleSoundMute = () => {
+        setSoundMuted((prev) => {
+            const next = !prev;
+            try {
+                localStorage.setItem("tiffzy_kitchen_sound_muted", String(next));
+                if (!next) {
+                    playNotificationSound();
+                }
+            } catch {
+                // ignore
+            }
+            return next;
+        });
+    };
 
     const loadOrders = useCallback(
         async ({ initial = false } = {}) => {
@@ -890,6 +919,22 @@ export default function Kitchen() {
                         </div>
 
                         <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setSoundModalOpen(true)}
+                                className="kitchen-paper-action"
+                                title="Order Notification Sound Alerts"
+                            >
+                                <span className="inline-flex items-center gap-2">
+                                    {soundMuted ? (
+                                        <BellOff size={14} className="text-gray-400" />
+                                    ) : (
+                                        <Bell size={14} className="text-amber-500 animate-pulse" />
+                                    )}
+                                    {soundMuted ? "Sound Muted" : "Order Alert On"}
+                                </span>
+                            </button>
+
                             <button type="button" onClick={clearBoard} className="kitchen-paper-action">
                                 Clear Assignments
                             </button>
@@ -1026,6 +1071,68 @@ export default function Kitchen() {
                     </aside>
                 </div>
             </div>
+
+            {soundModalOpen ? (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(18,12,8,0.55)] px-4 py-6 backdrop-blur-sm"
+                    onClick={() => setSoundModalOpen(false)}
+                    role="presentation"
+                >
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Notification Sound Settings"
+                        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] border border-[rgba(95,61,31,0.16)] bg-[var(--app-surface-1)] shadow-2xl"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="flex shrink-0 items-center justify-between border-b border-[var(--app-border)] px-6 py-4">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                                    <Bell size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold">Kitchen Order Alerts</h3>
+                                    <p className="theme-muted text-xs">Configure sound chime when new live tickets arrive</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSoundModalOpen(false)}
+                                className="theme-soft-button flex h-9 w-9 items-center justify-center rounded-xl"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4">
+                            {/* Sound Mute Toggle Bar */}
+                            <div className="flex items-center justify-between rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-4">
+                                <div className="flex items-center gap-3">
+                                    {soundMuted ? <VolumeX size={20} className="text-gray-400" /> : <Volume2 size={20} className="text-amber-500" />}
+                                    <div>
+                                        <p className="text-sm font-bold">{soundMuted ? "Sound Alerts Muted" : "Sound Alerts Active"}</p>
+                                        <p className="theme-muted text-xs">Plays chime automatically when live tickets arrive</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={toggleSoundMute}
+                                    className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                                        soundMuted
+                                            ? "bg-amber-500 text-white"
+                                            : "bg-red-500/15 text-red-500 hover:bg-red-500/25"
+                                    }`}
+                                >
+                                    {soundMuted ? "Unmute Sound" : "Mute Sound"}
+                                </button>
+                            </div>
+
+                            {/* Sound Selector Component */}
+                            <NotificationSoundPicker />
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }

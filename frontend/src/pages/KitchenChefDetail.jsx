@@ -1,18 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
+    ArrowLeft,
+    Bell,
+    BellOff,
     CheckCircle2,
     ChefHat,
+    History,
     LoaderCircle,
     RefreshCw,
     Sparkles,
-    History,
     UtensilsCrossed,
+    Volume2,
+    VolumeX,
+    X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
 import useKitchenLiveBoardData from "../hooks/useKitchenLiveBoardData";
+import NotificationSoundPicker from "../components/NotificationSoundPicker";
+import { playNotificationSound } from "../utils/soundPlayer";
 import {
     buildKitchenTicketRows,
     appendKitchenAssignmentHistory,
@@ -244,6 +252,29 @@ export default function KitchenChefDetail() {
     const [historyEntries, setHistoryEntries] = useState([]);
     const [historyReady, setHistoryReady] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
+    const [soundModalOpen, setSoundModalOpen] = useState(false);
+    const [soundMuted, setSoundMuted] = useState(() => {
+        try {
+            return localStorage.getItem("tiffzy_kitchen_sound_muted") === "true";
+        } catch {
+            return false;
+        }
+    });
+
+    const toggleSoundMute = () => {
+        setSoundMuted((prev) => {
+            const next = !prev;
+            try {
+                localStorage.setItem("tiffzy_kitchen_sound_muted", String(next));
+                if (!next) {
+                    playNotificationSound();
+                }
+            } catch {
+                // ignore
+            }
+            return next;
+        });
+    };
 
     const { orders, staffUsers, ordersLoading, staffLoading, refreshing, ordersError, staffError, lastSyncAt, refreshBoard } =
         useKitchenLiveBoardData(restaurantId, socket);
@@ -460,11 +491,12 @@ export default function KitchenChefDetail() {
     const isSenior = /SENIOR/i.test(pageDesignation);
 
     useEffect(() => {
-        if (!historyOpen) return undefined;
+        if (!historyOpen && !soundModalOpen) return undefined;
 
         const onKeyDown = (event) => {
             if (event.key === "Escape") {
                 setHistoryOpen(false);
+                setSoundModalOpen(false);
             }
         };
 
@@ -480,7 +512,7 @@ export default function KitchenChefDetail() {
                 document.body.style.overflow = previousOverflow;
             }
         };
-    }, [historyOpen]);
+    }, [historyOpen, soundModalOpen]);
 
     if (!restaurantId) {
         return (
@@ -493,23 +525,24 @@ export default function KitchenChefDetail() {
     }
 
     return (
-        <div className="theme-page kitchen-paper-page min-h-screen px-4 py-4 md:px-6 md:py-6 lg:overflow-hidden">
-            <div className="kitchen-paper-sheet mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1600px] flex-col rounded-[32px] px-4 py-5 md:px-8 md:py-7 lg:h-[calc(100vh-3rem)] lg:max-h-[calc(100vh-3rem)] lg:overflow-hidden">
-                <header className="flex flex-col gap-6">
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(180px,0.65fr)_minmax(280px,0.9fr)] lg:items-start lg:gap-6">
-                        <dl className="grid w-full grid-cols-2 gap-x-8 gap-y-6 md:grid-cols-3">
-                            <Metric label="Live orders" value={metrics.liveOrdersCount} hint="Orders currently on the board" />
-                            <Metric label="Past" value={metrics.pastEvents} hint="Assignment history events" />
-                            <Metric label="Oldest" value={formatKitchenAge(metrics.oldestMinutes)} hint="Longest waiting current item" />
-                        </dl>
-
-                        <div className="flex flex-col gap-3 self-start text-center">
-                            <h1 className="font-serif text-2xl font-bold leading-[0.96] text-[var(--kitchen-ink)] md:text-3xl lg:text-4xl">
+        <div className="theme-page kitchen-paper-page min-h-screen">
+            {/* Standard Top Navigation Header */}
+            <header className="theme-nav border-b px-4 py-4 md:px-8">
+                <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-3">
+                        <Link
+                            to="/kitchen"
+                            className="theme-soft-button inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
+                        >
+                            <ArrowLeft size={16} />
+                            Kitchen Board
+                        </Link>
+                        <div>
+                            <p className="theme-muted text-xs uppercase tracking-[0.28em]">{restaurantName}</p>
+                            <h1 className="text-2xl font-bold flex items-center gap-2">
                                 {pageTitle}
-                            </h1>
-                            <div className="flex flex-wrap items-center justify-center gap-2">
                                 <span
-                                    className="kitchen-paper-chip"
+                                    className="kitchen-paper-chip text-xs font-normal"
                                     style={{
                                         backgroundColor: currentChef?.palette?.chipBg || "rgba(255,255,255,0.5)",
                                         borderColor: currentChef?.palette?.ring || "rgba(95, 61, 31, 0.18)",
@@ -518,67 +551,105 @@ export default function KitchenChefDetail() {
                                 >
                                     {pageDesignation}
                                 </span>
-                                {isSenior ? (
-                                    <span className="kitchen-paper-chip">Senior</span>
-                                ) : null}
-                                {currentChef?.id ? (
-                                    <Link
-                                        to={`/staff/profile/${encodeURIComponent(String(currentChef.id))}`}
-                                        className="kitchen-paper-chip"
-                                    >
-                                        Chef profile
-                                    </Link>
-                                ) : (
-                                    <span className="kitchen-paper-chip">{pageTitle ? "Chef profile" : "Chef"}</span>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col items-start gap-3 text-sm lg:items-end lg:text-right">
-                            <div className="flex flex-wrap gap-2 self-start lg:self-end">
-                                <button
-                                    type="button"
-                                    onClick={refreshBoard}
-                                    className="kitchen-paper-action"
-                                    disabled={refreshing || ordersLoading || staffLoading}
-                                >
-                                    {refreshing ? (
-                                        <span className="inline-flex items-center gap-2">
-                                            <LoaderCircle size={14} className="animate-spin" />
-                                            Refreshing
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-2">
-                                            <RefreshCw size={14} />
-                                            Refresh
-                                        </span>
-                                    )}
-                                </button>
-                            </div>
-
-                            <div className="space-y-1">
-                                <p className="font-semibold text-[var(--kitchen-ink)]">{restaurantName}</p>
-                                <p className="text-[var(--kitchen-muted)]">
-                                    {String(currentChef?.name || "Chef").trim() || "Chef"} -{" "}
-                                    {String(currentChef?.designation || effectiveRole || "Chef")
-                                        .replace(/_/g, " ")
-                                        .toLowerCase()
-                                        .replace(/\b\w/g, (char) => char.toUpperCase())}
-                                </p>
-                                <p className="inline-flex items-center gap-2 text-[var(--kitchen-muted)]">
-                                    <Sparkles size={14} />
-                                    {connected ? "Live socket connected" : "Live socket reconnecting"}
-                                    {socketError ? ` - ${socketError}` : ""}
-                                </p>
-                                {lastSyncAt ? (
-                                    <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--kitchen-muted)]">
-                                        Synced {lastSyncAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                    </p>
-                                ) : null}
-                            </div>
+                            </h1>
                         </div>
                     </div>
-                </header>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                        {/* Notification Symbol Bell & Sound Alert Toggle */}
+                        <button
+                            type="button"
+                            onClick={() => setSoundModalOpen(true)}
+                            className="theme-soft-button relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
+                            title="Order Notification Sound Alerts"
+                        >
+                            {soundMuted ? (
+                                <BellOff size={18} className="text-gray-400" />
+                            ) : (
+                                <Bell size={18} className="text-amber-500 animate-pulse" />
+                            )}
+                            <span>{soundMuted ? "Sound Muted" : "Order Alert On"}</span>
+                            <span className="flex h-2 w-2 rounded-full bg-amber-500" />
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={refreshBoard}
+                            className="theme-soft-button inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
+                            disabled={refreshing || ordersLoading || staffLoading}
+                        >
+                            {refreshing ? <LoaderCircle size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main className="mx-auto max-w-[1600px] px-4 py-6 md:px-6">
+                <div className="kitchen-paper-sheet mx-auto flex flex-col rounded-[32px] px-4 py-5 md:px-8 md:py-7">
+                    <header className="flex flex-col gap-6">
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(180px,0.65fr)_minmax(280px,0.9fr)] lg:items-start lg:gap-6">
+                            <dl className="grid w-full grid-cols-2 gap-x-8 gap-y-6 md:grid-cols-3">
+                                <Metric label="Live orders" value={metrics.liveOrdersCount} hint="Orders currently on the board" />
+                                <Metric label="Past" value={metrics.pastEvents} hint="Assignment history events" />
+                                <Metric label="Oldest" value={formatKitchenAge(metrics.oldestMinutes)} hint="Longest waiting current item" />
+                            </dl>
+
+                            <div className="flex flex-col gap-3 self-start text-center">
+                                <h2 className="font-serif text-2xl font-bold leading-[0.96] text-[var(--kitchen-ink)] md:text-3xl lg:text-4xl">
+                                    {pageTitle}
+                                </h2>
+                                <div className="flex flex-wrap items-center justify-center gap-2">
+                                    <span
+                                        className="kitchen-paper-chip"
+                                        style={{
+                                            backgroundColor: currentChef?.palette?.chipBg || "rgba(255,255,255,0.5)",
+                                            borderColor: currentChef?.palette?.ring || "rgba(95, 61, 31, 0.18)",
+                                            color: currentChef?.palette?.chipInk || "var(--kitchen-ink)",
+                                        }}
+                                    >
+                                        {pageDesignation}
+                                    </span>
+                                    {isSenior ? (
+                                        <span className="kitchen-paper-chip">Senior</span>
+                                    ) : null}
+                                    {currentChef?.id ? (
+                                        <Link
+                                            to={`/staff/profile/${encodeURIComponent(String(currentChef.id))}`}
+                                            className="kitchen-paper-chip"
+                                        >
+                                            Chef profile
+                                        </Link>
+                                    ) : (
+                                        <span className="kitchen-paper-chip">{pageTitle ? "Chef profile" : "Chef"}</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col items-start gap-3 text-sm lg:items-end lg:text-right">
+                                <div className="space-y-1">
+                                    <p className="font-semibold text-[var(--kitchen-ink)]">{restaurantName}</p>
+                                    <p className="text-[var(--kitchen-muted)]">
+                                        {String(currentChef?.name || "Chef").trim() || "Chef"} -{" "}
+                                        {String(currentChef?.designation || effectiveRole || "Chef")
+                                            .replace(/_/g, " ")
+                                            .toLowerCase()
+                                            .replace(/\b\w/g, (char) => char.toUpperCase())}
+                                    </p>
+                                    <p className="inline-flex items-center gap-2 text-[var(--kitchen-muted)]">
+                                        <Sparkles size={14} />
+                                        {connected ? "Live socket connected" : "Live socket reconnecting"}
+                                        {socketError ? ` - ${socketError}` : ""}
+                                    </p>
+                                    {lastSyncAt ? (
+                                        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--kitchen-muted)]">
+                                            Synced {lastSyncAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            </div>
+                        </div>
+                    </header>
 
                 <div className="kitchen-paper-rule my-6" />
 
@@ -766,7 +837,70 @@ export default function KitchenChefDetail() {
                         </div>
                     </div>
                 ) : null}
-            </div>
+
+                {soundModalOpen ? (
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(18,12,8,0.55)] px-4 py-6 backdrop-blur-sm"
+                        onClick={() => setSoundModalOpen(false)}
+                        role="presentation"
+                    >
+                        <div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="Notification Sound Settings"
+                            className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] border border-[rgba(95,61,31,0.16)] bg-[var(--app-surface-1)] shadow-2xl"
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <div className="flex shrink-0 items-center justify-between border-b border-[var(--app-border)] px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                                        <Bell size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold">Kitchen Order Alerts</h3>
+                                        <p className="theme-muted text-xs">Configure sound chime when new orders arrive</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setSoundModalOpen(false)}
+                                    className="theme-soft-button flex h-9 w-9 items-center justify-center rounded-xl"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4">
+                                {/* Sound Mute Toggle Bar */}
+                                <div className="flex items-center justify-between rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-4">
+                                    <div className="flex items-center gap-3">
+                                        {soundMuted ? <VolumeX size={20} className="text-gray-400" /> : <Volume2 size={20} className="text-amber-500" />}
+                                        <div>
+                                            <p className="text-sm font-bold">{soundMuted ? "Sound Alerts Muted" : "Sound Alerts Active"}</p>
+                                            <p className="theme-muted text-xs">Plays chime automatically when live tickets arrive</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={toggleSoundMute}
+                                        className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                                            soundMuted
+                                                ? "bg-amber-500 text-white"
+                                                : "bg-red-500/15 text-red-500 hover:bg-red-500/25"
+                                        }`}
+                                    >
+                                        {soundMuted ? "Unmute Sound" : "Mute Sound"}
+                                    </button>
+                                </div>
+
+                                {/* Sound Selector Component */}
+                                <NotificationSoundPicker />
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+                </div>
+            </main>
         </div>
     );
 }

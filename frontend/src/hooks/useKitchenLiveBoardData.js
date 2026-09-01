@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../utils/apiClient";
+import { playNotificationSound } from "../utils/soundPlayer";
 
 export default function useKitchenLiveBoardData(restaurantId, socket) {
     const [orders, setOrders] = useState([]);
@@ -82,6 +83,17 @@ export default function useKitchenLiveBoardData(restaurantId, socket) {
     useEffect(() => {
         if (!socket) return undefined;
 
+        const triggerOrderSound = () => {
+            try {
+                const isMuted = localStorage.getItem("tiffzy_kitchen_sound_muted") === "true";
+                if (!isMuted) {
+                    playNotificationSound();
+                }
+            } catch {
+                // ignore
+            }
+        };
+
         const onCreated = (order) => {
             setOrders((prev) => {
                 const list = Array.isArray(prev) ? prev.slice() : [];
@@ -93,6 +105,7 @@ export default function useKitchenLiveBoardData(restaurantId, socket) {
                 return list;
             });
             setLastSyncAt(new Date());
+            triggerOrderSound();
         };
 
         const onUpdated = (order) => {
