@@ -31,11 +31,19 @@ jobs:
             cd ~/cafe-system
             git fetch origin main
             git checkout main
-            git reset --hard origin/main
+            echo "=== Step 1.5: Ensuring Swap Space for EC2 RAM ==="
+            if ! sudo swapon --show | grep -q "/swapfile"; then
+              echo "Creating 1GB swapfile to prevent RAM OOM kills..."
+              sudo fallocate -l 1G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=1024
+              sudo chmod 600 /swapfile
+              sudo mkswap /swapfile
+              sudo swapon /swapfile
+            fi
 
             echo "=== Step 2: Installing Dependencies ==="
             cd ~/cafe-system/backend
-            npm ci
+            export NODE_OPTIONS="--max-old-space-size=512"
+            npm ci --prefer-offline --no-audit
 
             echo "=== Step 3: Generating Prisma Client & Syncing DB Schema ==="
             npx prisma generate
