@@ -5,13 +5,24 @@
 :root {
     --primary: #0f766e;
     --primary-dark: #065f5b;
-    --bg: #f6f3ef;
     --card: #ffffff;
     --border: #e5e7eb;
     --text: #111827;
     --muted: #6b7280;
     --app-bg: #07090d;
-    --app-bg-soft: #0f1118;
+}
+
+/* Fix Chrome Autofill contrast issue */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-text-fill-color: #ffffff !important;
+    -webkit-box-shadow: 0 0 0px 1000px #1a1d28 inset !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+:root {
     --app-surface: #15151a;
     --app-surface-1: #15151a;
     --app-surface-2: #201a12;

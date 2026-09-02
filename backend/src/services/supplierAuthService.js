@@ -24,7 +24,7 @@ export async function registerSupplier({ email, phone, password, businessName })
     if (!isValidEmail(cleanEmail)) {
         throw { statusCode: 400, message: "Invalid email format" };
     }
-    if (!isValidPhone(cleanPhone)) {
+    if (cleanPhone && !isValidPhone(cleanPhone)) {
         throw { statusCode: 400, message: "Invalid phone number format" };
     }
     if (!password || password.length < 6) {
@@ -39,9 +39,11 @@ export async function registerSupplier({ email, phone, password, businessName })
         throw { statusCode: 409, message: "A supplier with this email already exists" };
     }
 
-    const existingPhone = await prisma.supplier.findUnique({ where: { phone: cleanPhone } });
-    if (existingPhone) {
-        throw { statusCode: 409, message: "A supplier with this phone number already exists" };
+    if (cleanPhone) {
+        const existingPhone = await prisma.supplier.findUnique({ where: { phone: cleanPhone } });
+        if (existingPhone) {
+            throw { statusCode: 409, message: "A supplier with this phone number already exists" };
+        }
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
@@ -50,7 +52,7 @@ export async function registerSupplier({ email, phone, password, businessName })
         const createdSupplier = await tx.supplier.create({
             data: {
                 email: cleanEmail,
-                phone: cleanPhone,
+                phone: cleanPhone || `TEMP_${Date.now()}`,
                 passwordHash,
                 status: "PENDING",
                 isVerified: false,
@@ -70,9 +72,10 @@ export async function registerSupplier({ email, phone, password, businessName })
     const otpCode = generateNumericOtp();
     const otpHash = await bcrypt.hash(otpCode, SALT_ROUNDS);
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+    const otpKey = cleanPhone || cleanEmail;
 
     await prisma.authOtp.upsert({
-        where: { phone_actorType: { phone: cleanPhone, actorType: "SUPPLIER" } },
+        where: { phone_actorType: { phone: otpKey, actorType: "SUPPLIER" } },
         update: {
             otpHash,
             expiresAt,
@@ -80,7 +83,7 @@ export async function registerSupplier({ email, phone, password, businessName })
             lastSentAt: new Date(),
         },
         create: {
-            phone: cleanPhone,
+            phone: otpKey,
             actorType: "SUPPLIER",
             otpHash,
             expiresAt,
@@ -94,25 +97,45 @@ export async function registerSupplier({ email, phone, password, businessName })
         email: supplier.email,
         phone: supplier.phone,
         status: supplier.status,
-        message: "Registration successful. Please verify OTP.",
+        message: `OTP sent to email: ${supplier.email}`,
         otpDebug: process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test" ? otpCode : undefined,
     };
 }
 
-export async function verifySupplierOtp({ phone, otp }) {
+export async function verifySupplierOtp({ email, phone, otp }) {
+    const cleanEmail = String(email || "").trim().toLowerCase();
     const cleanPhone = String(phone || "").trim().replace(/[\s-]/g, "");
     const cleanOtp = String(otp || "").trim();
 
-    if (!cleanPhone || !cleanOtp) {
-        throw { statusCode: 400, message: "Phone number and OTP code are required" };
+    if ((!cleanPhone && !cleanEmail) || !cleanOtp) {
+        throw { statusCode: 400, message: "Email or phone number and OTP code are required" };
     }
 
-    const otpRecord = await prisma.authOtp.findUnique({
-        where: { phone_actorType: { phone: cleanPhone, actorType: "SUPPLIER" } },
+    const supplier = await prisma.supplier.findFirst({
+        where: {
+            OR: [
+                ...(cleanEmail ? [{ email: cleanEmail }] : []),
+                ...(cleanPhone ? [{ phone: cleanPhone }] : []),
+            ],
+        },
+    });
+
+    const searchKeys = [
+        ...(cleanEmail ? [cleanEmail] : []),
+        ...(cleanPhone ? [cleanPhone] : []),
+        ...(supplier?.email ? [supplier.email] : []),
+        ...(supplier?.phone ? [supplier.phone] : []),
+    ];
+
+    let otpRecord = await prisma.authOtp.findFirst({
+        where: {
+            actorType: "SUPPLIER",
+            phone: { in: searchKeys },
+        },
     });
 
     if (!otpRecord) {
-        throw { statusCode: 400, message: "No OTP session found for this phone number" };
+        throw { statusCode: 400, message: "No active OTP session found. Please request a new OTP." };
     }
 
     if (new Date() > otpRecord.expiresAt) {
@@ -131,10 +154,6 @@ export async function verifySupplierOtp({ phone, otp }) {
         });
         throw { statusCode: 400, message: "Invalid OTP code" };
     }
-
-    const supplier = await prisma.supplier.findUnique({
-        where: { phone: cleanPhone },
-    });
 
     if (!supplier) {
         throw { statusCode: 404, message: "Supplier account not found" };
@@ -203,27 +222,34 @@ export async function loginSupplier({ email, password }) {
     };
 }
 
-export async function forgotSupplierPassword({ phone }) {
+export async function forgotSupplierPassword({ email, phone }) {
+    const cleanEmail = String(email || "").trim().toLowerCase();
     const cleanPhone = String(phone || "").trim().replace(/[\s-]/g, "");
 
-    if (!cleanPhone) {
-        throw { statusCode: 400, message: "Phone number is required" };
+    if (!cleanEmail && !cleanPhone) {
+        throw { statusCode: 400, message: "Email or phone number is required" };
     }
 
-    const supplier = await prisma.supplier.findUnique({
-        where: { phone: cleanPhone },
+    const supplier = await prisma.supplier.findFirst({
+        where: {
+            OR: [
+                ...(cleanEmail ? [{ email: cleanEmail }] : []),
+                ...(cleanPhone ? [{ phone: cleanPhone }] : []),
+            ],
+        },
     });
 
     if (!supplier) {
-        throw { statusCode: 404, message: "No supplier found with this phone number" };
+        throw { statusCode: 404, message: "No supplier found with this email or phone number" };
     }
 
     const otpCode = generateNumericOtp();
     const otpHash = await bcrypt.hash(otpCode, SALT_ROUNDS);
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+    const otpKey = supplier.email || supplier.phone;
 
     await prisma.authOtp.upsert({
-        where: { phone_actorType: { phone: cleanPhone, actorType: "SUPPLIER" } },
+        where: { phone_actorType: { phone: otpKey, actorType: "SUPPLIER" } },
         update: {
             otpHash,
             expiresAt,
@@ -231,7 +257,7 @@ export async function forgotSupplierPassword({ phone }) {
             lastSentAt: new Date(),
         },
         create: {
-            phone: cleanPhone,
+            phone: otpKey,
             actorType: "SUPPLIER",
             otpHash,
             expiresAt,
@@ -241,30 +267,41 @@ export async function forgotSupplierPassword({ phone }) {
     });
 
     return {
-        message: "Password reset OTP sent successfully",
-        phone: cleanPhone,
+        message: `Password reset OTP sent to email: ${supplier.email}`,
+        email: supplier.email,
+        phone: supplier.phone,
         otpDebug: process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test" ? otpCode : undefined,
     };
 }
 
-export async function resetSupplierPassword({ phone, otp, newPassword }) {
+export async function resetSupplierPassword({ email, phone, otp, newPassword }) {
+    const cleanEmail = String(email || "").trim().toLowerCase();
     const cleanPhone = String(phone || "").trim().replace(/[\s-]/g, "");
     const cleanOtp = String(otp || "").trim();
 
-    if (!cleanPhone || !cleanOtp || !newPassword) {
-        throw { statusCode: 400, message: "Phone, OTP code, and new password are required" };
+    if ((!cleanEmail && !cleanPhone) || !cleanOtp || !newPassword) {
+        throw { statusCode: 400, message: "Email or phone, OTP code, and new password are required" };
     }
 
     if (newPassword.length < 6) {
         throw { statusCode: 400, message: "New password must be at least 6 characters long" };
     }
 
-    await verifySupplierOtp({ phone: cleanPhone, otp: cleanOtp });
+    await verifySupplierOtp({ email: cleanEmail, phone: cleanPhone, otp: cleanOtp });
 
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
 
-    const supplier = await prisma.supplier.update({
-        where: { phone: cleanPhone },
+    const supplier = await prisma.supplier.findFirst({
+        where: {
+            OR: [
+                ...(cleanEmail ? [{ email: cleanEmail }] : []),
+                ...(cleanPhone ? [{ phone: cleanPhone }] : []),
+            ],
+        },
+    });
+
+    const updated = await prisma.supplier.update({
+        where: { id: supplier.id },
         data: {
             passwordHash,
             sessionVersion: { increment: 1 },
@@ -273,7 +310,7 @@ export async function resetSupplierPassword({ phone, otp, newPassword }) {
 
     return {
         message: "Password reset successfully. Please log in with your new password.",
-        supplierId: supplier.id,
+        supplierId: updated.id,
     };
 }
 
