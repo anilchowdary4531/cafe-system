@@ -188,14 +188,15 @@ export default function OwnerSupplyMarketplace() {
                 </button>
             </div>
 
-            {/* Search & Category Filter Bar */}
+            {/* Search + Categories Bar */}
             {activeTab === "browse" && (
                 <div className="space-y-3">
+                    {/* Search Bar */}
                     <div className="relative">
-                        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <Search size={18} className="absolute left-4 top-3.5 text-slate-400" />
                         <input
                             type="text"
-                            placeholder="Search 20 supply categories (e.g. Chicken Breast, Dairy, Spices, Utensils, Packaging)..."
+                            placeholder="Search 20 supply categories (e.g. Chicken Breast, Dairy, Spices, Utensils, Packaging, Water Bottles)..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="w-full rounded-2xl border border-white/15 bg-[#12141c] pl-11 pr-4 py-3 text-sm text-white placeholder-slate-400 outline-none focus:border-amber-400 transition"
@@ -213,33 +214,94 @@ export default function OwnerSupplyMarketplace() {
                                     : "border border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
                             }`}
                         >
-                            ✨ All Categories (20)
+                            ✨ All Categories ({products.length})
                         </button>
-                        {SUPPLY_CATEGORIES.map((cat) => (
-                            <button
-                                key={cat.id}
-                                type="button"
-                                onClick={() => setSelectedCategory(cat.name)}
-                                className={`rounded-xl px-4 py-2 text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
-                                    selectedCategory === cat.name
-                                        ? "bg-amber-500 text-black shadow-md font-extrabold"
-                                        : "border border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
-                                }`}
-                            >
-                                <span>{cat.icon}</span>
-                                <span>{cat.name}</span>
-                            </button>
-                        ))}
+                        {SUPPLY_CATEGORIES.map((cat) => {
+                            const count = products.filter((p) => {
+                                const target = cat.name.trim().toLowerCase();
+                                const pCatName = String(p.category?.name || p.categoryName || "").trim().toLowerCase();
+                                return pCatName === target || (pCatName && (pCatName.includes(target) || target.includes(pCatName)));
+                            }).length;
+
+                            return (
+                                <button
+                                    key={cat.id}
+                                    type="button"
+                                    onClick={() => setSelectedCategory(cat.name)}
+                                    className={`rounded-xl px-4 py-2 text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                                        selectedCategory === cat.name
+                                            ? "bg-amber-500 text-black shadow-md font-extrabold"
+                                            : count > 0
+                                            ? "border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                                            : "border border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+                                    }`}
+                                >
+                                    <span>{cat.icon}</span>
+                                    <span>{cat.name}</span>
+                                    {count > 0 && (
+                                        <span className="ml-1 rounded-full bg-amber-500 text-black px-1.5 py-0.5 text-[10px] font-black">
+                                            {count}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             )}
 
             {/* Browse Grid */}
-            {activeTab === "browse" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {products
-                        .filter((p) => selectedCategory === "All Categories" || p.category?.name === selectedCategory || p.categoryName === selectedCategory)
-                        .map((p) => {
+            {activeTab === "browse" && (() => {
+                const filtered = products.filter((p) => {
+                    if (search.trim()) {
+                        const query = search.toLowerCase();
+                        const pName = String(p.name || "").toLowerCase();
+                        const pDesc = String(p.description || "").toLowerCase();
+                        const pSupplier = String(p.supplier?.profile?.businessName || "").toLowerCase();
+                        const pCat = String(p.category?.name || p.categoryName || "").toLowerCase();
+                        if (!pName.includes(query) && !pDesc.includes(query) && !pSupplier.includes(query) && !pCat.includes(query)) {
+                            return false;
+                        }
+                    }
+
+                    if (selectedCategory !== "All Categories") {
+                        const target = selectedCategory.trim().toLowerCase();
+                        const pCatName = String(p.category?.name || p.categoryName || "").trim().toLowerCase();
+                        const pCatSlug = String(p.category?.slug || "").trim().toLowerCase();
+                        if (pCatName !== target && pCatSlug !== target && !pCatName.includes(target) && !target.includes(pCatName)) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                });
+
+                if (filtered.length === 0) {
+                    return (
+                        <div className="rounded-3xl border border-white/15 bg-[#12141c] p-10 text-center space-y-4 shadow-xl my-4">
+                            <Package size={44} className="mx-auto text-amber-400 opacity-80" />
+                            <div>
+                                <h3 className="text-base font-bold text-white">No products listed under "{selectedCategory}"</h3>
+                                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                                    {selectedCategory === "All Categories"
+                                        ? "No supply products added to marketplace yet."
+                                        : `Currently no suppliers have listed products under "${selectedCategory}". Click below to show all available ingredients.`}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => { setSelectedCategory("All Categories"); setSearch(""); }}
+                                className="rounded-xl bg-amber-500 hover:bg-amber-400 text-black px-5 py-2.5 text-xs font-extrabold transition shadow-md cursor-pointer inline-flex items-center gap-1.5"
+                            >
+                                ✨ View All Supply Products ({products.length})
+                            </button>
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {filtered.map((p) => {
                             const imgUrl = p.images?.[0]?.imageUrl || p.imageUrl;
                             return (
                                 <div key={p.id} className="rounded-2xl border border-white/15 bg-[#12141c] p-4 space-y-3 shadow-lg">
@@ -286,8 +348,9 @@ export default function OwnerSupplyMarketplace() {
                                 </div>
                             );
                         })}
-                </div>
-            )}
+                    </div>
+                );
+            })()}
 
             {/* Orders Tab */}
             {activeTab === "orders" && (
