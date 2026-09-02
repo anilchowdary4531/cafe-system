@@ -298,6 +298,22 @@ body,
     border-color: var(--app-border);
 }
 
+.theme-input {
+    background: var(--app-input, #10121a);
+    color: var(--app-text, #fff8e7);
+    border: 1px solid var(--app-border, rgba(255, 255, 255, 0.12));
+}
+
+.theme-input::placeholder {
+    color: var(--app-muted, #b8ab91);
+    opacity: 0.7;
+}
+
+.theme-input:focus {
+    border-color: var(--app-primary, #f5b94e);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-primary, #f5b94e) 22%, transparent);
+}
+
 .theme-button,
 .theme-button-secondary,
 .theme-soft-button,

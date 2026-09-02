@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Truck, ArrowRight, Eye, EyeOff, ShieldCheck, Package, Building2, Mail } from "lucide-react";
+import { Eye, EyeOff, Truck, ArrowRight, Package, Building2, ShieldCheck } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
+import BrandLogo from "../../components/BrandLogo";
+import LanguageSelector from "../../components/LanguageSelector";
 
 export default function SupplierLogin() {
     const navigate = useNavigate();
@@ -10,6 +12,7 @@ export default function SupplierLogin() {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [registeredEmail, setRegisteredEmail] = useState("");
+    const [error, setError] = useState("");
 
     const [form, setForm] = useState({
         email: "",
@@ -25,6 +28,7 @@ export default function SupplierLogin() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setError("");
 
         try {
             if (subMode === "login") {
@@ -81,128 +85,142 @@ export default function SupplierLogin() {
                 setSubMode("login");
             }
         } catch (err) {
-            showToast(err?.response?.data?.error || err?.message || "Operation failed", { type: "error" });
+            const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || "Operation failed";
+            setError(msg);
+            showToast(msg, { type: "error" });
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="grid min-h-screen md:grid-cols-2 bg-[#08090d] text-white">
-            {/* LEFT SIDE BRANDING */}
-            <div className="hidden flex-col justify-center px-12 lg:px-16 md:flex border-r border-white/10 bg-gradient-to-br from-[#0c0e17] via-[#08090d] to-[#14120c]">
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-xl shadow-amber-500/10">
-                        <Truck size={32} />
+        <div className="theme-page grid min-h-screen md:grid-cols-2">
+            {/* LEFT SIDE BRANDING - MATCHING CUSTOMER PAGE */}
+            <div className="theme-login-brand hidden flex-col justify-center px-16 md:flex">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="theme-card flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl">
+                        <BrandLogo className="h-10 w-10" title="Brand logo" />
                     </div>
-                    <div>
-                        <h1 className="text-4xl font-extrabold tracking-tight text-white">Tiffzy Supply</h1>
-                        <p className="text-xs font-bold uppercase tracking-widest text-amber-400">Supplier Marketplace Portal</p>
-                    </div>
+                    <h1 className="text-5xl font-bold tracking-tight">Tiffzy</h1>
                 </div>
 
-                <p className="text-xl font-semibold max-w-md text-slate-200 leading-relaxed mb-8">
-                    Direct B2B procurement network connecting raw ingredient suppliers with active restaurants.
+                <p className="text-xl font-medium max-w-md leading-relaxed">
+                    Direct B2B Raw Ingredient Supply Marketplace & Procurement Operating System
                 </p>
 
-                <div className="space-y-4 text-sm font-medium text-slate-300">
-                    <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-3.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400">
-                            <Package size={18} />
-                        </div>
-                        <span>Manage Product Catalog, Pricing & Stock Availability</span>
-                    </div>
-
-                    <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-3.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400">
-                            <Building2 size={18} />
-                        </div>
-                        <span>Receive Direct Bulk Orders from Verified Restaurants</span>
-                    </div>
-
-                    <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-3.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400">
-                            <ShieldCheck size={18} />
-                        </div>
-                        <span>Instant Email OTP Verification & Secure Password Reset</span>
-                    </div>
+                <div className="mt-10 space-y-4 text-lg font-medium">
+                    <p>• Manage Product Catalog & Stock Availability</p>
+                    <p>• Direct Bulk Orders from Verified Restaurants</p>
+                    <p>• Instant Email OTP Verification & Secure Reset</p>
+                    <p>• Automated Payment Settlements & KYC Compliance</p>
                 </div>
 
-                <div className="mt-12 text-xs font-bold uppercase tracking-widest text-amber-400/80">
+                <div className="theme-muted-strong mt-12 text-sm font-semibold">
                     Built for growth • Built for speed
                 </div>
             </div>
 
-            {/* RIGHT SIDE FORM CARD */}
-            <div className="flex items-center justify-center p-4 sm:p-8 lg:p-12">
-                <div className="w-full max-w-md bg-[#12141c] border border-white/15 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/80 space-y-6">
-                    {/* Header */}
-                    <div className="text-center space-y-2">
-                        <div className="md:hidden inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 mb-1">
-                            <Truck size={24} />
-                        </div>
-                        <h2 className="text-2xl font-extrabold text-white tracking-tight">Supplier Account Access</h2>
-                        <p className="text-xs font-medium text-slate-300">
-                            {subMode === "login" && "Log in to manage raw material supply, stock & orders"}
-                            {subMode === "register" && "Register your business on Tiffzy Supply Marketplace"}
-                            {subMode === "verify-otp" && `Enter OTP verification code sent to ${registeredEmail || form.email}`}
-                            {subMode === "forgot" && "Reset your password via Email OTP verification"}
-                            {subMode === "reset-password" && "Enter OTP code and set your new password"}
-                        </p>
+            {/* RIGHT SIDE LOGIN - MATCHING CUSTOMER PAGE */}
+            <div className="login-shell flex items-center justify-center px-2 py-3 sm:px-4 sm:py-6 md:px-6 md:py-10">
+                <div className="login-card theme-panel relative w-[99%] max-w-[99vw] rounded-3xl p-5 backdrop-blur-2xl sm:w-full sm:max-w-md sm:p-8">
+                    {/* TOP RIGHT LANGUAGE SELECTOR */}
+                    <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+                        <LanguageSelector />
                     </div>
 
-                    {/* Submode Switcher Tabs */}
-                    <div className="grid grid-cols-3 gap-1 bg-[#090a0f] p-1.5 rounded-2xl text-xs font-bold border border-white/10">
+                    {/* TOP MODE TOGGLE SWITCHER */}
+                    <div className="mb-6 grid grid-cols-3 gap-1.5 pr-20 sm:pr-24">
                         <button
                             type="button"
-                            onClick={() => setSubMode("login")}
-                            className={`py-2 rounded-xl transition ${subMode === "login" ? "bg-amber-500 text-black font-extrabold shadow-md shadow-amber-500/20" : "text-slate-300 hover:text-white"}`}
+                            onClick={() => navigate("/login?mode=customer")}
+                            className="rounded-2xl px-2.5 py-2 text-xs sm:text-sm font-semibold theme-soft-button"
+                        >
+                            Customer
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => navigate("/login?mode=staff")}
+                            className="rounded-2xl px-2.5 py-2 text-xs sm:text-sm font-semibold theme-soft-button"
+                        >
+                            Staff
+                        </button>
+                        <button
+                            type="button"
+                            className="rounded-2xl px-2.5 py-2 text-xs sm:text-sm font-semibold theme-button"
+                        >
+                            Supplier
+                        </button>
+                    </div>
+
+                    {/* MOBILE LOGO */}
+                    <div className="login-mobile-brand md:hidden flex items-center justify-center gap-2 mb-6">
+                        <BrandLogo className="h-7 w-7" title="Brand logo" />
+                        <h1 className="text-3xl font-bold">Tiffzy</h1>
+                    </div>
+
+                    {/* SUPPLIER FORM HEADERS */}
+                    <h2 className="text-3xl font-bold mb-2">Supplier Portal</h2>
+                    <p className="theme-muted mb-6">
+                        {subMode === "login" && "Log in to manage raw material supply, stock & orders"}
+                        {subMode === "register" && "Register your business on Tiffzy Supply Marketplace"}
+                        {subMode === "verify-otp" && `Enter 6-digit OTP sent to ${registeredEmail || form.email}`}
+                        {subMode === "forgot" && "Reset your password via Email OTP verification"}
+                        {subMode === "reset-password" && "Enter OTP code and set your new password"}
+                    </p>
+
+                    {/* SUB-MODE PILLS */}
+                    <div className="mb-6 grid grid-cols-3 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => { setSubMode("login"); setError(""); }}
+                            className={`rounded-2xl px-3 py-2 text-xs font-semibold ${subMode === "login" ? "theme-button" : "theme-soft-button"}`}
                         >
                             Login
                         </button>
                         <button
                             type="button"
-                            onClick={() => setSubMode("register")}
-                            className={`py-2 rounded-xl transition ${subMode === "register" ? "bg-amber-500 text-black font-extrabold shadow-md shadow-amber-500/20" : "text-slate-300 hover:text-white"}`}
+                            onClick={() => { setSubMode("register"); setError(""); }}
+                            className={`rounded-2xl px-3 py-2 text-xs font-semibold ${subMode === "register" ? "theme-button" : "theme-soft-button"}`}
                         >
                             Register
                         </button>
                         <button
                             type="button"
-                            onClick={() => setSubMode("forgot")}
-                            className={`py-2 rounded-xl transition ${subMode === "forgot" ? "bg-amber-500 text-black font-extrabold shadow-md shadow-amber-500/20" : "text-slate-300 hover:text-white"}`}
+                            onClick={() => { setSubMode("forgot"); setError(""); }}
+                            className={`rounded-2xl px-3 py-2 text-xs font-semibold ${subMode === "forgot" || subMode === "reset-password" ? "theme-button" : "theme-soft-button"}`}
                         >
                             Forgot
                         </button>
                     </div>
 
-                    {/* Form */}
+                    {error && (
+                        <div className="mb-5 bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl text-sm">
+                            {error}
+                        </div>
+                    )}
+
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {subMode === "login" && (
                             <>
                                 <div>
-                                    <label className="text-xs font-bold text-slate-200 uppercase tracking-wider block mb-1.5">
-                                        Supplier Email Address
-                                    </label>
+                                    <label className="theme-muted mb-2 block text-sm">Supplier Email Address</label>
                                     <input
                                         type="email"
+                                        placeholder="supplier@abcfoods.com"
                                         value={form.email}
                                         onChange={(e) => updateForm("email", e.target.value)}
-                                        placeholder="supplier@abcfoods.com"
                                         required
-                                        className="w-full rounded-xl bg-[#1a1d28] border border-slate-700/80 px-4 py-3 text-sm text-white placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 transition"
+                                        className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
                                     />
                                 </div>
 
                                 <div>
-                                    <div className="flex justify-between items-center mb-1.5">
-                                        <label className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                                            Password
-                                        </label>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="theme-muted block text-sm">Password</label>
                                         <button
                                             type="button"
-                                            onClick={() => setSubMode("forgot")}
-                                            className="text-xs text-amber-400 hover:underline font-bold"
+                                            onClick={() => { setSubMode("forgot"); setError(""); }}
+                                            className="text-sm font-semibold theme-accent-text hover:underline"
                                         >
                                             Forgot Password?
                                         </button>
@@ -210,16 +228,16 @@ export default function SupplierLogin() {
                                     <div className="relative">
                                         <input
                                             type={showPassword ? "text" : "password"}
+                                            placeholder="Enter password"
                                             value={form.password}
                                             onChange={(e) => updateForm("password", e.target.value)}
-                                            placeholder="Enter password"
                                             required
-                                            className="w-full rounded-xl bg-[#1a1d28] border border-slate-700/80 px-4 py-3 pr-11 text-sm text-white placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 transition"
+                                            className="theme-input w-full rounded-xl px-4 py-3 pr-12 outline-none transition"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3.5 top-3.5 text-slate-400 hover:text-white"
+                                            className="theme-muted absolute right-4 top-3.5 hover:opacity-80"
                                         >
                                             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                         </button>
@@ -231,64 +249,56 @@ export default function SupplierLogin() {
                         {subMode === "register" && (
                             <>
                                 <div>
-                                    <label className="text-xs font-bold text-slate-200 uppercase tracking-wider block mb-1.5">
-                                        Business / Supplier Name
-                                    </label>
+                                    <label className="theme-muted mb-2 block text-sm">Business / Supplier Name *</label>
                                     <input
                                         type="text"
+                                        placeholder="ABC Foods & Poultry Supplies"
                                         value={form.businessName}
                                         onChange={(e) => updateForm("businessName", e.target.value)}
-                                        placeholder="ABC Foods & Poultry Supplies"
                                         required
-                                        className="w-full rounded-xl bg-[#1a1d28] border border-slate-700/80 px-4 py-3 text-sm text-white placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 transition"
+                                        className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="text-xs font-bold text-slate-200 uppercase tracking-wider block mb-1.5">
-                                        Email Address (For Email OTP Verification)
-                                    </label>
+                                    <label className="theme-muted mb-2 block text-sm">Email Address (For Email OTP) *</label>
                                     <input
                                         type="email"
+                                        placeholder="rameshnanda485@gmail.com"
                                         value={form.email}
                                         onChange={(e) => updateForm("email", e.target.value)}
-                                        placeholder="rameshnanda485@gmail.com"
                                         required
-                                        className="w-full rounded-xl bg-[#1a1d28] border border-slate-700/80 px-4 py-3 text-sm text-white placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 transition"
+                                        className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="text-xs font-bold text-slate-200 uppercase tracking-wider block mb-1.5">
-                                        Phone Number
-                                    </label>
+                                    <label className="theme-muted mb-2 block text-sm">Phone Number *</label>
                                     <input
                                         type="tel"
+                                        placeholder="9133222614"
                                         value={form.phone}
                                         onChange={(e) => updateForm("phone", e.target.value)}
-                                        placeholder="9133222614"
                                         required
-                                        className="w-full rounded-xl bg-[#1a1d28] border border-slate-700/80 px-4 py-3 text-sm text-white placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 transition"
+                                        className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="text-xs font-bold text-slate-200 uppercase tracking-wider block mb-1.5">
-                                        Password
-                                    </label>
+                                    <label className="theme-muted mb-2 block text-sm">Password *</label>
                                     <div className="relative">
                                         <input
                                             type={showPassword ? "text" : "password"}
+                                            placeholder="Min 6 characters"
                                             value={form.password}
                                             onChange={(e) => updateForm("password", e.target.value)}
-                                            placeholder="Min 6 characters"
                                             required
-                                            className="w-full rounded-xl bg-[#1a1d28] border border-slate-700/80 px-4 py-3 pr-11 text-sm text-white placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 transition"
+                                            className="theme-input w-full rounded-xl px-4 py-3 pr-12 outline-none transition"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3.5 top-3.5 text-slate-400 hover:text-white"
+                                            className="theme-muted absolute right-4 top-3.5 hover:opacity-80"
                                         >
                                             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                         </button>
@@ -299,32 +309,30 @@ export default function SupplierLogin() {
 
                         {subMode === "verify-otp" && (
                             <div>
-                                <label className="text-xs font-bold text-amber-400 uppercase tracking-wider block mb-2 text-center">
+                                <label className="theme-muted mb-2 block text-sm font-medium text-center">
                                     Enter 6-Digit OTP Sent to Email {registeredEmail || form.email}
                                 </label>
                                 <input
                                     type="text"
+                                    placeholder="123456"
                                     value={form.otp}
                                     onChange={(e) => updateForm("otp", e.target.value)}
-                                    placeholder="123456"
                                     required
-                                    className="w-full rounded-xl bg-[#1a1d28] border border-amber-500/50 px-4 py-3 text-center text-2xl font-black tracking-widest text-white outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
+                                    className="theme-input w-full rounded-xl px-4 py-3 text-center text-2xl font-bold tracking-widest outline-none transition"
                                 />
                             </div>
                         )}
 
                         {subMode === "forgot" && (
                             <div>
-                                <label className="text-xs font-bold text-slate-200 uppercase tracking-wider block mb-1.5">
-                                    Registered Email Address
-                                </label>
+                                <label className="theme-muted mb-2 block text-sm font-medium">Registered Email Address *</label>
                                 <input
                                     type="email"
+                                    placeholder="rameshnanda485@gmail.com"
                                     value={form.email}
                                     onChange={(e) => updateForm("email", e.target.value)}
-                                    placeholder="rameshnanda485@gmail.com"
                                     required
-                                    className="w-full rounded-xl bg-[#1a1d28] border border-slate-700/80 px-4 py-3 text-sm text-white placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 transition"
+                                    className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
                                 />
                             </div>
                         )}
@@ -332,29 +340,26 @@ export default function SupplierLogin() {
                         {subMode === "reset-password" && (
                             <>
                                 <div>
-                                    <label className="text-xs font-bold text-amber-400 uppercase tracking-wider block mb-1.5 text-center">
-                                        Enter 6-Digit Reset OTP Sent to Email
-                                    </label>
+                                    <label className="theme-muted mb-2 block text-sm font-medium text-center">Enter 6-Digit Reset OTP Code</label>
                                     <input
                                         type="text"
+                                        placeholder="123456"
                                         value={form.otp}
                                         onChange={(e) => updateForm("otp", e.target.value)}
-                                        placeholder="123456"
                                         required
-                                        className="w-full rounded-xl bg-[#1a1d28] border border-amber-500/50 px-4 py-3 text-center text-2xl font-black tracking-widest text-white outline-none focus:border-amber-400"
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-center text-2xl font-bold tracking-widest outline-none transition"
                                     />
                                 </div>
+
                                 <div>
-                                    <label className="text-xs font-bold text-slate-200 uppercase tracking-wider block mb-1.5">
-                                        New Password
-                                    </label>
+                                    <label className="theme-muted mb-2 block text-sm font-medium">New Password *</label>
                                     <input
                                         type="password"
+                                        placeholder="New password (min 6 chars)"
                                         value={form.newPassword}
                                         onChange={(e) => updateForm("newPassword", e.target.value)}
-                                        placeholder="New password (min 6 chars)"
                                         required
-                                        className="w-full rounded-xl bg-[#1a1d28] border border-slate-700/80 px-4 py-3 text-sm text-white placeholder-slate-400 outline-none focus:border-amber-400 transition"
+                                        className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
                                     />
                                 </div>
                             </>
@@ -363,7 +368,7 @@ export default function SupplierLogin() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 py-3.5 font-bold text-black transition flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 mt-2"
+                            className="theme-button w-full rounded-xl py-3 font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70 mt-2"
                         >
                             {loading
                                 ? "Processing..."
@@ -376,24 +381,26 @@ export default function SupplierLogin() {
                                 : subMode === "forgot"
                                 ? "Send Reset OTP to Email"
                                 : "Reset Password & Save"}
-                            <ArrowRight size={18} />
                         </button>
                     </form>
 
-                    <div className="text-center pt-3 border-t border-white/10 text-xs">
+                    <div className="mt-4 text-center">
                         {subMode === "login" ? (
-                            <button
-                                type="button"
-                                onClick={() => setSubMode("register")}
-                                className="text-amber-400 hover:underline font-bold"
-                            >
-                                Need a supplier account? Register here
-                            </button>
+                            <div>
+                                <span className="theme-muted text-sm">Need a supplier account? </span>
+                                <button
+                                    type="button"
+                                    onClick={() => { setSubMode("register"); setError(""); }}
+                                    className="text-sm font-semibold theme-accent-text hover:underline"
+                                >
+                                    Register here
+                                </button>
+                            </div>
                         ) : (
                             <button
                                 type="button"
-                                onClick={() => setSubMode("login")}
-                                className="text-amber-400 hover:underline font-bold"
+                                onClick={() => { setSubMode("login"); setError(""); }}
+                                className="text-sm font-semibold theme-accent-text hover:underline"
                             >
                                 Back to Supplier Login
                             </button>

@@ -21,7 +21,7 @@ export default function Login() {
 
     const initialMode = useMemo(() => {
         const mode = String(searchParams.get("mode") || "").trim().toLowerCase();
-        return mode === "staff" ? "staff" : mode === "register" ? "register" : "customer";
+        return mode === "supplier" ? "supplier" : mode === "staff" ? "staff" : mode === "register" ? "register" : "customer";
     }, [searchParams]);
 
     const [mode, setMode] = useState(initialMode);
