@@ -1,5 +1,6 @@
 import {
     registerSupplier,
+    resendSupplierOtp,
     verifySupplierOtp,
     loginSupplier,
     forgotSupplierPassword,
@@ -15,6 +16,15 @@ export default async function supplierAuthRoutes(app) {
             return reply.code(201).send(result);
         } catch (err) {
             return reply.code(err.statusCode || 500).send({ error: err.message || "Registration failed" });
+        }
+    };
+
+    const resendOtpHandler = async (req, reply) => {
+        try {
+            const result = await resendSupplierOtp(req.body || {});
+            return reply.code(200).send(result);
+        } catch (err) {
+            return reply.code(err.statusCode || 500).send({ error: err.message || "Failed to resend OTP" });
         }
     };
 
@@ -109,6 +119,8 @@ export default async function supplierAuthRoutes(app) {
     const endpoints = [
         { path: "/auth/supplier/register", handler: registerHandler },
         { path: "/api/v1/auth/supplier/register", handler: registerHandler },
+        { path: "/auth/supplier/resend-otp", handler: resendOtpHandler },
+        { path: "/api/v1/auth/supplier/resend-otp", handler: resendOtpHandler },
         { path: "/auth/supplier/verify-otp", handler: verifyOtpHandler },
         { path: "/api/v1/auth/supplier/verify-otp", handler: verifyOtpHandler },
         { path: "/auth/supplier/login", handler: loginHandler },

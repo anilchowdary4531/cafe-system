@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 import { appendOwnerNotification } from "../utils/ownerNotifications";
 
-const DEFAULT_DURATION_MS = 2600;
+const DEFAULT_DURATION_MS = 3200;
 
 const iconFor = (variant) => {
     const v = String(variant || "info").toLowerCase();
@@ -14,9 +14,9 @@ const iconFor = (variant) => {
 
 const classFor = (variant) => {
     const v = String(variant || "info").toLowerCase();
-    if (v === "success") return "border-emerald-500/30 bg-emerald-500/10";
-    if (v === "error") return "border-red-500/30 bg-red-500/10";
-    return "border-white/10 bg-black/20";
+    if (v === "success") return "border-emerald-500/50 bg-[#062419] text-emerald-100 shadow-emerald-950/40";
+    if (v === "error") return "border-red-500/50 bg-[#290c0c] text-red-100 shadow-red-950/40";
+    return "border-amber-500/50 bg-[#241a06] text-amber-100 shadow-amber-950/40";
 };
 
 export default function ToastHost() {
@@ -38,7 +38,7 @@ export default function ToastHost() {
                 durationMs,
             };
 
-            setToasts((prev) => [...prev.slice(-2), toast]); // keep max 3
+            setToasts((prev) => [...prev.slice(-2), toast]);
 
             const pathname = String(window.location?.pathname || "");
             if (pathname.startsWith("/owner")) {
@@ -66,21 +66,21 @@ export default function ToastHost() {
             return (
                 <motion.div
                     key={toast.id}
-                    initial={{ opacity: 0, y: -16, scale: 0.98 }}
+                    initial={{ opacity: 0, y: -20, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -12, scale: 0.98 }}
-                    transition={{ type: "spring", stiffness: 180, damping: 18 }}
-                    className={`theme-panel pointer-events-auto w-full max-w-md overflow-hidden rounded-2xl border px-4 py-3 shadow-2xl ${classFor(
+                    exit={{ opacity: 0, y: -16, scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 220, damping: 20 }}
+                    className={`pointer-events-auto w-full max-w-md overflow-hidden rounded-2xl border px-4.5 py-3.5 shadow-2xl backdrop-blur-xl ${classFor(
                         toast.variant
                     )}`}
                 >
                     <div className="flex items-start gap-3">
-                        <div className="mt-0.5 rounded-xl bg-black/20 p-2">
-                            <Icon size={18} className="theme-accent-text" />
+                        <div className="mt-0.5 rounded-xl bg-white/10 p-2 text-white flex-shrink-0">
+                            <Icon size={20} />
                         </div>
                         <div className="min-w-0 flex-1">
-                            {toast.title && <p className="text-sm font-semibold">{toast.title}</p>}
-                            {toast.message && <p className="theme-muted mt-0.5 text-sm">{toast.message}</p>}
+                            {toast.title && <p className="text-sm font-extrabold text-white leading-snug">{toast.title}</p>}
+                            {toast.message && <p className="mt-0.5 text-xs text-white/80 font-medium leading-relaxed">{toast.message}</p>}
                             {toast.actionLabel && toast.onAction && (
                                 <button
                                     type="button"
@@ -91,7 +91,7 @@ export default function ToastHost() {
                                             setToasts((prev) => prev.filter((t) => t.id !== toast.id));
                                         }
                                     }}
-                                    className="theme-button mt-2 inline-flex rounded-xl px-3 py-1.5 text-xs font-semibold"
+                                    className="mt-2 inline-flex rounded-xl bg-white text-black px-3 py-1.5 text-xs font-black hover:bg-amber-300 transition"
                                 >
                                     {toast.actionLabel}
                                 </button>
@@ -100,10 +100,10 @@ export default function ToastHost() {
                         <button
                             type="button"
                             onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
-                            className="theme-muted rounded-xl p-1.5 hover:opacity-80"
+                            className="rounded-xl p-1.5 text-white/70 hover:text-white hover:bg-white/10 transition cursor-pointer"
                             aria-label="Dismiss"
                         >
-                            <X size={16} />
+                            <X size={18} />
                         </button>
                     </div>
                 </motion.div>
@@ -113,8 +113,8 @@ export default function ToastHost() {
 
     return (
         <div
-            className="pointer-events-none fixed left-0 right-0 z-[90] flex flex-col items-center gap-3 px-4"
-            style={{ top: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
+            className="pointer-events-none fixed left-0 right-0 z-[100] flex flex-col items-center gap-3 px-4"
+            style={{ top: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
         >
             <AnimatePresence>{rendered}</AnimatePresence>
         </div>

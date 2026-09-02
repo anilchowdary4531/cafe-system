@@ -1,5 +1,3 @@
-export className = "";
-
 export const SUPPLY_CATEGORIES = [
     { id: 1, name: "Food ingredients", icon: "🌾", slug: "food-ingredients" },
     { id: 2, name: "Beverages", icon: "🥤", slug: "beverages" },

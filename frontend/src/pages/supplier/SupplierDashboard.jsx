@@ -93,7 +93,21 @@ export default function SupplierDashboard() {
         description: "Fresh premium quality raw supplies",
     });
 
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            navigate("/supplier/login", { replace: true });
+            return;
+        }
+        loadData();
+    }, []);
+
     const loadData = async () => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            navigate("/supplier/login", { replace: true });
+            return;
+        }
         setLoading(true);
         try {
             const [profileRes, productsRes, ordersRes, threadsRes] = await Promise.all([
@@ -814,12 +828,13 @@ export default function SupplierDashboard() {
                                                     ₹{p.prices?.[0]?.basePrice || 100} / {p.unit}
                                                 </span>
                                             </div>
-                                        <div className="text-xs space-y-1 theme-muted border-t theme-border pt-3">
-                                            <p>Stock: <span className="font-bold">{p.inventory?.availableStock || 0} {p.unit}</span> available</p>
-                                            <p>Discount: <span className="font-bold theme-accent-text">{p.discounts?.[0]?.value || 0}% OFF</span></p>
+                                            <div className="text-xs space-y-1 theme-muted border-t theme-border pt-3">
+                                                <p>Stock: <span className="font-bold">{p.inventory?.availableStock || 0} {p.unit}</span> available</p>
+                                                <p>Discount: <span className="font-bold theme-accent-text">{p.discounts?.[0]?.value || 0}% OFF</span></p>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

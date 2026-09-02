@@ -40,6 +40,7 @@ import Dashboard from "./pages/Dashboard";
 import AdminLayout from "./layouts/AdminLayout";
 import AuthProvider from "./context/AuthContext";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import SupplierProtectedRoute from "./routes/SupplierProtectedRoute";
 import { StaffSocketProvider } from "./context/StaffSocketContext.jsx";
 
 // ============================
@@ -471,7 +472,14 @@ export default function App() {
                     {/* ================================= */}
                     <Route path="/supplier/login" element={<SupplierLogin />} />
                     <Route path="/supplier/register" element={<SupplierLogin />} />
-                    <Route path="/supplier" element={<SupplierDashboard />} />
+                    <Route
+                        path="/supplier"
+                        element={
+                            <SupplierProtectedRoute>
+                                <SupplierDashboard />
+                            </SupplierProtectedRoute>
+                        }
+                    />
                     <Route
                         path="/super-admin/supply"
                         element={

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Truck, ArrowRight, Package, Building2, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Truck, ArrowRight, Package, Building2, ShieldCheck, RefreshCw } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import BrandLogo from "../../components/BrandLogo";
@@ -13,6 +13,32 @@ export default function SupplierLogin() {
     const [showPassword, setShowPassword] = useState(false);
     const [registeredEmail, setRegisteredEmail] = useState("");
     const [error, setError] = useState("");
+    const [resendCooldown, setResendCooldown] = useState(0);
+    const [devOtp, setDevOtp] = useState("");
+
+    useEffect(() => {
+        if (resendCooldown <= 0) return;
+        const timer = setInterval(() => {
+            setResendCooldown((prev) => Math.max(0, prev - 1));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [resendCooldown]);
+
+    const handleResendOtp = async () => {
+        if (resendCooldown > 0) return;
+        setError("");
+        try {
+            const targetEmail = registeredEmail || form.email;
+            const res = await api.post("/auth/supplier/resend-otp", { email: targetEmail });
+            showToast(res.data?.message || `New OTP code sent to ${targetEmail}`);
+            if (res.data?.otpDebug) {
+                setDevOtp(res.data.otpDebug);
+            }
+            setResendCooldown(30);
+        } catch (err) {
+            setError(err?.response?.data?.error || "Failed to resend OTP");
+        }
+    };
 
     const [form, setForm] = useState({
         email: "",
@@ -52,6 +78,7 @@ export default function SupplierLogin() {
                 setRegisteredEmail(form.email);
                 showToast(res.data?.message || `Registration successful! OTP sent to ${form.email}`);
                 if (res.data?.otpDebug) {
+                    setDevOtp(res.data.otpDebug);
                     showToast(`OTP Debug Code: ${res.data.otpDebug}`, { type: "info" });
                 }
                 setSubMode("verify-otp");
@@ -308,18 +335,41 @@ export default function SupplierLogin() {
                         )}
 
                         {subMode === "verify-otp" && (
-                            <div>
-                                <label className="theme-muted mb-2 block text-sm font-medium text-center">
-                                    Enter 6-Digit OTP Sent to Email {registeredEmail || form.email}
-                                </label>
-                                <input
-                                    type="text"
-                                    placeholder="123456"
-                                    value={form.otp}
-                                    onChange={(e) => updateForm("otp", e.target.value)}
-                                    required
-                                    className="theme-input w-full rounded-xl px-4 py-3 text-center text-2xl font-bold tracking-widest outline-none transition"
-                                />
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="theme-muted mb-2 block text-sm font-medium text-center">
+                                        Enter 6-Digit OTP Sent to Email <strong className="theme-accent-text">{registeredEmail || form.email}</strong>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="123456"
+                                        value={form.otp}
+                                        onChange={(e) => updateForm("otp", e.target.value)}
+                                        required
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-center text-2xl font-bold tracking-widest outline-none transition"
+                                    />
+                                </div>
+
+                                {devOtp && (
+                                    <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-xl text-xs text-center font-bold">
+                                        🔑 Dev Mode Debug OTP Code: <span className="text-white underline">{devOtp}</span>
+                                    </div>
+                                )}
+
+                                <div className="flex items-center justify-between text-xs pt-1">
+                                    <span className="theme-muted">Didn't receive email OTP?</span>
+                                    <button
+                                        type="button"
+                                        onClick={handleResendOtp}
+                                        disabled={resendCooldown > 0}
+                                        className={`font-bold transition flex items-center gap-1 cursor-pointer ${
+                                            resendCooldown > 0 ? "theme-muted opacity-50 cursor-not-allowed" : "theme-accent-text hover:underline"
+                                        }`}
+                                    >
+                                        <RefreshCw size={13} className={resendCooldown > 0 ? "animate-spin" : ""} />
+                                        {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : "Resend OTP Code"}
+                                    </button>
+                                </div>
                             </div>
                         )}
 
@@ -338,9 +388,11 @@ export default function SupplierLogin() {
                         )}
 
                         {subMode === "reset-password" && (
-                            <>
+                            <div className="space-y-3">
                                 <div>
-                                    <label className="theme-muted mb-2 block text-sm font-medium text-center">Enter 6-Digit Reset OTP Code</label>
+                                    <label className="theme-muted mb-2 block text-sm font-medium text-center">
+                                        Enter 6-Digit Reset OTP Code Sent to <strong className="theme-accent-text">{registeredEmail || form.email}</strong>
+                                    </label>
                                     <input
                                         type="text"
                                         placeholder="123456"
@@ -349,6 +401,27 @@ export default function SupplierLogin() {
                                         required
                                         className="theme-input w-full rounded-xl px-4 py-3 text-center text-2xl font-bold tracking-widest outline-none transition"
                                     />
+                                </div>
+
+                                {devOtp && (
+                                    <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-xl text-xs text-center font-bold">
+                                        🔑 Dev Mode Debug Reset OTP: <span className="text-white underline">{devOtp}</span>
+                                    </div>
+                                )}
+
+                                <div className="flex items-center justify-between text-xs pt-1">
+                                    <span className="theme-muted">Didn't receive email OTP?</span>
+                                    <button
+                                        type="button"
+                                        onClick={handleResendOtp}
+                                        disabled={resendCooldown > 0}
+                                        className={`font-bold transition flex items-center gap-1 cursor-pointer ${
+                                            resendCooldown > 0 ? "theme-muted opacity-50 cursor-not-allowed" : "theme-accent-text hover:underline"
+                                        }`}
+                                    >
+                                        <RefreshCw size={13} className={resendCooldown > 0 ? "animate-spin" : ""} />
+                                        {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : "Resend Reset OTP"}
+                                    </button>
                                 </div>
 
                                 <div>
@@ -362,7 +435,7 @@ export default function SupplierLogin() {
                                         className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
                                     />
                                 </div>
-                            </>
+                            </div>
                         )}
 
                         <button
