@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
     Truck,
     Package,
@@ -14,6 +14,14 @@ import {
     LogOut,
     RefreshCw,
     AlertTriangle,
+    BarChart3,
+    Users,
+    Building2,
+    ShieldCheck,
+    Menu,
+    X,
+    CreditCard,
+    Save,
 } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
@@ -21,12 +29,26 @@ import BrandLogo from "../../components/BrandLogo";
 
 export default function SupplierDashboard() {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState("products");
+    const [activeTab, setActiveTab] = useState("products"); // 'products' | 'orders' | 'sales' | 'customers' | 'profile'
     const [loading, setLoading] = useState(true);
-    const [profile, setProfile] = useState(null);
+    const [profileData, setProfileData] = useState(null);
     const [products, setProducts] = useState([]);
     const [orders, setOrders] = useState([]);
     const [showAddProductModal, setShowAddProductModal] = useState(false);
+    const [showMobileMenu, setShowMobileMenu] = useState(false);
+    const [savingProfile, setSavingProfile] = useState(false);
+
+    const [profileForm, setProfileForm] = useState({
+        businessName: "",
+        legalName: "",
+        gstin: "",
+        fssaiLicense: "",
+        description: "",
+        bankAccountNumber: "",
+        bankIfscCode: "",
+        bankAccountName: "",
+        bankName: "",
+    });
 
     const [newProduct, setNewProduct] = useState({
         name: "",
@@ -49,7 +71,21 @@ export default function SupplierDashboard() {
                 api.get("/supplier/orders").catch(() => null),
             ]);
 
-            if (profileRes?.data) setProfile(profileRes.data);
+            if (profileRes?.data) {
+                setProfileData(profileRes.data);
+                const p = profileRes.data.profile || {};
+                setProfileForm({
+                    businessName: p.businessName || "",
+                    legalName: p.legalName || "",
+                    gstin: p.gstin || "",
+                    fssaiLicense: p.fssaiLicense || "",
+                    description: p.description || "",
+                    bankAccountNumber: p.bankAccountNumber || "",
+                    bankIfscCode: p.bankIfscCode || "",
+                    bankAccountName: p.bankAccountName || "",
+                    bankName: p.bankName || "",
+                });
+            }
             if (productsRes?.data?.products) setProducts(productsRes.data.products);
             if (ordersRes?.data?.orders) setOrders(ordersRes.data.orders);
         } catch (err) {
@@ -85,60 +121,178 @@ export default function SupplierDashboard() {
         }
     };
 
+    const handleSaveProfile = async (e) => {
+        e.preventDefault();
+        setSavingProfile(true);
+        try {
+            await api.put("/suppliers/me", profileForm);
+            showToast("Supplier profile and KYC details updated successfully!");
+            loadData();
+        } catch (err) {
+            showToast(err?.response?.data?.error || "Failed to update profile", { type: "error" });
+        } finally {
+            setSavingProfile(false);
+        }
+    };
+
     const handleLogout = () => {
         localStorage.removeItem("token");
         localStorage.removeItem("supplier_refresh_token");
         navigate("/supplier/login");
     };
 
-    const totalSales = orders
-        .filter((o) => o.status !== "CANCELLED" && o.status !== "REJECTED")
-        .reduce((sum, o) => sum + o.totalAmount, 0);
+    // Sales Calculations
+    const validOrders = orders.filter((o) => o.status !== "CANCELLED" && o.status !== "REJECTED");
+    const totalSalesVolume = validOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const netPayout = Math.round(totalSalesVolume * 0.95);
+    const avgOrderValue = validOrders.length > 0 ? Math.round(totalSalesVolume / validOrders.length) : 0;
+
+    // Derived Customer Restaurants
+    const customerMap = {};
+    orders.forEach((o) => {
+        const rId = o.restaurantId || o.restaurant?.id || "unknown";
+        const name = o.restaurant?.name || "Tiffzy Restaurant Client";
+        if (!customerMap[rId]) {
+            customerMap[rId] = {
+                id: rId,
+                name,
+                orderCount: 0,
+                totalSpent: 0,
+                lastOrderDate: o.createdAt,
+            };
+        }
+        customerMap[rId].orderCount += 1;
+        if (o.status !== "CANCELLED" && o.status !== "REJECTED") {
+            customerMap[rId].totalSpent += o.totalAmount || 0;
+        }
+    });
+    const customers = Object.values(customerMap);
+
+    const navTabs = [
+        { id: "products", label: "Product Studio", icon: Package, count: products.length },
+        { id: "orders", label: "B2B Orders", icon: ShoppingBag, count: orders.length },
+        { id: "sales", label: "Sales & Revenue", icon: BarChart3 },
+        { id: "customers", label: "B2B Customers", icon: Users, count: customers.length },
+        { id: "profile", label: "Profile & KYC", icon: Building2 },
+    ];
 
     return (
         <div className="theme-page min-h-screen flex flex-col">
-            {/* Header Navigation - Matching Customer Theme */}
-            <header className="theme-nav sticky top-0 z-30 px-6 py-4 border-b">
+            {/* Header Navigation Bar */}
+            <header className="theme-nav sticky top-0 z-30 px-4 sm:px-6 py-4 border-b">
                 <div className="mx-auto flex max-w-7xl items-center justify-between">
                     <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setShowMobileMenu(!showMobileMenu)}
+                            className="theme-soft-button p-2 rounded-xl lg:hidden cursor-pointer"
+                        >
+                            {showMobileMenu ? <X size={20} /> : <Menu size={20} />}
+                        </button>
+
                         <div className="theme-card flex h-10 w-10 items-center justify-center rounded-2xl shadow-md">
                             <BrandLogo className="h-7 w-7" title="Brand logo" />
                         </div>
+
                         <div>
                             <h1 className="text-xl font-bold tracking-tight">
-                                {profile?.profile?.businessName || "Supplier Portal"}
+                                {profileData?.profile?.businessName || "Supplier Portal"}
                             </h1>
                             <p className="theme-muted text-xs font-medium">
                                 Tiffzy Supply Chain Marketplace • Status:{" "}
-                                <span className="theme-accent-text font-bold">{profile?.status || "ACTIVE"}</span>
+                                <span className="theme-accent-text font-bold">{profileData?.status || "ACTIVE"}</span>
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3">
                         <button
                             type="button"
                             onClick={loadData}
-                            className="theme-soft-button rounded-xl px-3.5 py-2 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                            className="theme-soft-button rounded-xl px-3 py-2 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                         >
                             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-                            Refresh
+                            <span className="hidden sm:inline">Refresh</span>
                         </button>
 
                         <button
                             type="button"
                             onClick={handleLogout}
-                            className="rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-xs font-bold text-red-400 hover:bg-red-500/20 transition flex items-center gap-1.5 cursor-pointer"
+                            className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-400 hover:bg-red-500/20 transition flex items-center gap-1.5 cursor-pointer"
                         >
                             <LogOut size={14} />
-                            Logout
+                            <span className="hidden sm:inline">Logout</span>
                         </button>
                     </div>
                 </div>
+
+                {/* Desktop Menu Tabs Navigation Bar */}
+                <div className="mx-auto max-w-7xl mt-4 hidden lg:flex items-center gap-2 border-t theme-border pt-3">
+                    {navTabs.map((tab) => {
+                        const Icon = tab.icon;
+                        const isActive = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                                    isActive
+                                        ? "theme-button font-extrabold shadow-md"
+                                        : "theme-soft-button"
+                                }`}
+                            >
+                                <Icon size={16} />
+                                <span>{tab.label}</span>
+                                {tab.count !== undefined && (
+                                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                                        isActive ? "bg-black/20 text-black" : "theme-card"
+                                    }`}>
+                                        {tab.count}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
             </header>
 
+            {/* Mobile Navigation Drawer Menu */}
+            {showMobileMenu && (
+                <div className="lg:hidden theme-panel border-b p-4 space-y-2">
+                    <p className="theme-muted text-xs font-bold uppercase tracking-wider px-2 mb-2">Navigation Menu</p>
+                    {navTabs.map((tab) => {
+                        const Icon = tab.icon;
+                        const isActive = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => {
+                                    setActiveTab(tab.id);
+                                    setShowMobileMenu(false);
+                                }}
+                                className={`w-full px-4 py-3 rounded-xl text-sm font-bold transition flex items-center justify-between cursor-pointer ${
+                                    isActive ? "theme-button" : "theme-soft-button"
+                                }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <Icon size={18} />
+                                    <span>{tab.label}</span>
+                                </div>
+                                {tab.count !== undefined && (
+                                    <span className="px-2 py-0.5 rounded-full text-xs font-bold theme-card">
+                                        {tab.count}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+
             {/* Main Content Area */}
-            <main className="mx-auto max-w-7xl w-full flex-1 p-6 space-y-6">
+            <main className="mx-auto max-w-7xl w-full flex-1 p-4 sm:p-6 space-y-6">
                 {/* Metric Summary Cards */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
@@ -153,7 +307,7 @@ export default function SupplierDashboard() {
 
                     <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
                         <p className="theme-muted text-xs font-bold uppercase tracking-wider">Total Sales Volume</p>
-                        <p className="text-3xl font-black theme-accent-text">₹{totalSales.toLocaleString()}</p>
+                        <p className="text-3xl font-black theme-accent-text">₹{totalSalesVolume.toLocaleString()}</p>
                     </div>
 
                     <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
@@ -164,33 +318,7 @@ export default function SupplierDashboard() {
                     </div>
                 </div>
 
-                {/* Tab Navigation Controls */}
-                <div className="flex border-b theme-border gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setActiveTab("products")}
-                        className={`px-6 py-3 text-sm font-bold rounded-t-xl transition cursor-pointer ${
-                            activeTab === "products"
-                                ? "theme-button font-extrabold shadow-md"
-                                : "theme-soft-button"
-                        }`}
-                    >
-                        Product Studio ({products.length})
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setActiveTab("orders")}
-                        className={`px-6 py-3 text-sm font-bold rounded-t-xl transition cursor-pointer ${
-                            activeTab === "orders"
-                                ? "theme-button font-extrabold shadow-md"
-                                : "theme-soft-button"
-                        }`}
-                    >
-                        Restaurant Orders ({orders.length})
-                    </button>
-                </div>
-
-                {/* Tab Content: Products */}
+                {/* TAB 1: PRODUCT STUDIO */}
                 {activeTab === "products" && (
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -237,10 +365,10 @@ export default function SupplierDashboard() {
                     </div>
                 )}
 
-                {/* Tab Content: Orders */}
+                {/* TAB 2: B2B ORDERS */}
                 {activeTab === "orders" && (
                     <div className="space-y-4">
-                        <h2 className="text-xl font-bold tracking-tight">Live B2B Orders</h2>
+                        <h2 className="text-xl font-bold tracking-tight">Live B2B Restaurant Orders</h2>
                         {orders.length === 0 ? (
                             <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
                                 <ShoppingBag size={40} className="mx-auto theme-accent-text" />
@@ -261,7 +389,7 @@ export default function SupplierDashboard() {
                                                 </span>
                                             </div>
                                             <p className="theme-muted text-xs">Restaurant: {o.restaurant?.name || "Tiffzy Cafe"}</p>
-                                            <p className="text-sm font-extrabold mt-1">Total: ₹{o.totalAmount}</p>
+                                            <p className="text-sm font-extrabold mt-1">Total Amount: ₹{o.totalAmount}</p>
                                         </div>
 
                                         <div className="flex items-center gap-2">
@@ -297,6 +425,206 @@ export default function SupplierDashboard() {
                                 ))}
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* TAB 3: SALES & REVENUE ANALYTICS */}
+                {activeTab === "sales" && (
+                    <div className="space-y-6">
+                        <h2 className="text-xl font-bold tracking-tight">Sales Analytics & Revenue Overview</h2>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="theme-panel rounded-2xl p-5 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Gross B2B Sales</p>
+                                <p className="text-3xl font-black theme-accent-text">₹{totalSalesVolume.toLocaleString()}</p>
+                            </div>
+                            <div className="theme-panel rounded-2xl p-5 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Estimated Net Payout (95%)</p>
+                                <p className="text-3xl font-black text-emerald-400">₹{netPayout.toLocaleString()}</p>
+                                <p className="theme-muted text-[11px]">5% Platform commission deducted</p>
+                            </div>
+                            <div className="theme-panel rounded-2xl p-5 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Average Order Value (AOV)</p>
+                                <p className="text-3xl font-black">₹{avgOrderValue.toLocaleString()}</p>
+                            </div>
+                        </div>
+
+                        <div className="theme-panel rounded-3xl p-6 border space-y-4">
+                            <h3 className="text-lg font-bold">Recent Order Sales Summary</h3>
+                            {validOrders.length === 0 ? (
+                                <p className="theme-muted text-sm">No completed sales orders recorded yet.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {validOrders.map((o) => (
+                                        <div key={o.id} className="flex items-center justify-between border-b theme-border pb-2 text-sm">
+                                            <div>
+                                                <p className="font-bold theme-accent-text">{o.orderNo}</p>
+                                                <p className="theme-muted text-xs">Client: {o.restaurant?.name || "Restaurant Client"}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-bold">₹{o.totalAmount}</p>
+                                                <p className="theme-muted text-xs">{o.status}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB 4: B2B RESTAURANT CUSTOMERS */}
+                {activeTab === "customers" && (
+                    <div className="space-y-4">
+                        <h2 className="text-xl font-bold tracking-tight">B2B Restaurant Customers</h2>
+                        <p className="theme-muted text-xs">Restaurants that have placed supply orders with your business</p>
+
+                        {customers.length === 0 ? (
+                            <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
+                                <Users size={40} className="mx-auto theme-accent-text" />
+                                <h3 className="text-lg font-bold">No restaurant clients yet</h3>
+                                <p className="theme-muted text-sm max-w-sm mx-auto">
+                                    When restaurant owners order raw materials from your catalog, their accounts will be listed here.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {customers.map((c) => (
+                                    <div key={c.id} className="theme-panel rounded-2xl p-5 border space-y-3 shadow-sm">
+                                        <div className="flex items-center gap-3">
+                                            <div className="theme-card flex h-10 w-10 items-center justify-center rounded-xl font-bold theme-accent-text">
+                                                <Building2 size={20} />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-base">{c.name}</h3>
+                                                <p className="theme-muted text-xs">{c.orderCount} Orders Placed</p>
+                                            </div>
+                                        </div>
+                                        <div className="border-t theme-border pt-3 flex items-center justify-between text-xs">
+                                            <span className="theme-muted">Total Spent:</span>
+                                            <span className="font-extrabold theme-accent-text text-sm">₹{c.totalSpent.toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* TAB 5: SUPPLIER PROFILE & KYC */}
+                {activeTab === "profile" && (
+                    <div className="space-y-6">
+                        <h2 className="text-xl font-bold tracking-tight">Supplier Profile & Business KYC Compliance</h2>
+
+                        <form onSubmit={handleSaveProfile} className="theme-panel rounded-3xl p-6 border space-y-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Business / Supplier Name *</label>
+                                    <input
+                                        type="text"
+                                        value={profileForm.businessName}
+                                        onChange={(e) => setProfileForm({ ...profileForm, businessName: e.target.value })}
+                                        required
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Legal Entity Name</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. ABC Foods Private Limited"
+                                        value={profileForm.legalName}
+                                        onChange={(e) => setProfileForm({ ...profileForm, legalName: e.target.value })}
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">GSTIN Registration Number</label>
+                                    <input
+                                        type="text"
+                                        placeholder="22AAAAA0000A1Z5"
+                                        value={profileForm.gstin}
+                                        onChange={(e) => setProfileForm({ ...profileForm, gstin: e.target.value.toUpperCase() })}
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none uppercase"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">FSSAI License Number</label>
+                                    <input
+                                        type="text"
+                                        placeholder="10020011000123"
+                                        value={profileForm.fssaiLicense}
+                                        onChange={(e) => setProfileForm({ ...profileForm, fssaiLicense: e.target.value })}
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="border-t theme-border pt-4 space-y-4">
+                                <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2 theme-accent-text">
+                                    <CreditCard size={18} />
+                                    Bank Settlement Details (For Automated Payouts)
+                                </h3>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Bank Account Number</label>
+                                        <input
+                                            type="text"
+                                            placeholder="91823091823091"
+                                            value={profileForm.bankAccountNumber}
+                                            onChange={(e) => setProfileForm({ ...profileForm, bankAccountNumber: e.target.value })}
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">IFSC Code</label>
+                                        <input
+                                            type="text"
+                                            placeholder="HDFC0001234"
+                                            value={profileForm.bankIfscCode}
+                                            onChange={(e) => setProfileForm({ ...profileForm, bankIfscCode: e.target.value.toUpperCase() })}
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none uppercase"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Account Holder Name</label>
+                                        <input
+                                            type="text"
+                                            placeholder="ABC Foods Pvt Ltd"
+                                            value={profileForm.bankAccountName}
+                                            onChange={(e) => setProfileForm({ ...profileForm, bankAccountName: e.target.value })}
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Bank Name</label>
+                                        <input
+                                            type="text"
+                                            placeholder="HDFC Bank"
+                                            value={profileForm.bankName}
+                                            onChange={(e) => setProfileForm({ ...profileForm, bankName: e.target.value })}
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={savingProfile}
+                                className="theme-button rounded-xl px-6 py-3 font-bold text-sm transition flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <Save size={18} />
+                                {savingProfile ? "Saving Profile..." : "Save Profile & KYC Details"}
+                            </button>
+                        </form>
                     </div>
                 )}
             </main>
