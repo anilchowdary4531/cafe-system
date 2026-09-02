@@ -11,6 +11,9 @@ import {
     ShoppingCart,
     Clock,
     X,
+    MessageSquare,
+    Tag,
+    Handshake,
 } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
@@ -23,6 +26,12 @@ export default function OwnerSupplyMarketplace() {
     const [activeTab, setActiveTab] = useState("browse");
     const [search, setSearch] = useState("");
     const [showCartModal, setShowCartModal] = useState(false);
+    const [showBargainModal, setShowBargainModal] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [bargainForm, setBargainForm] = useState({
+        quantity: 50,
+        offeredPrice: 200,
+    });
 
     const loadData = async () => {
         setLoading(true);
@@ -58,6 +67,41 @@ export default function OwnerSupplyMarketplace() {
             else loadData();
         } catch (err) {
             showToast(err?.response?.data?.error || "Failed to add item to cart", { type: "error" });
+        }
+    };
+
+    const handleOpenBargain = (product) => {
+        setSelectedProduct(product);
+        const base = product.prices?.[0]?.basePrice || 100;
+        setBargainForm({
+            quantity: product.moq || 10,
+            offeredPrice: Math.round(base * 0.9), // Default 10% lower bargain offer proposal
+        });
+        setShowBargainModal(true);
+    };
+
+    const handleSendBargainOffer = async (e) => {
+        e.preventDefault();
+        if (!selectedProduct) return;
+        try {
+            const basePrice = selectedProduct.prices?.[0]?.basePrice || 100;
+            await api.post("/supply-chat/messages", {
+                threadId: `thread_supp_${selectedProduct.supplierId}_rest_1`,
+                sender: "CLIENT",
+                senderName: "Restaurant Owner Client",
+                type: "BARGAIN_OFFER",
+                offer: {
+                    productName: selectedProduct.name,
+                    quantity: bargainForm.quantity,
+                    unit: selectedProduct.unit,
+                    originalPrice: basePrice,
+                    offeredPrice: bargainForm.offeredPrice,
+                },
+            });
+            showToast("Price bargain offer sent to supplier!");
+            setShowBargainModal(false);
+        } catch (err) {
+            showToast("Failed to send bargain offer", { type: "error" });
         }
     };
 
@@ -100,9 +144,9 @@ export default function OwnerSupplyMarketplace() {
                 <div>
                     <h2 className="text-2xl font-extrabold text-white flex items-center gap-2 tracking-tight">
                         <Truck className="text-amber-400" />
-                        Tiffzy Supply Marketplace
+                        Tiffzy Supply Marketplace & Price Bargaining
                     </h2>
-                    <p className="text-slate-300 text-xs mt-0.5">Direct raw ingredient procurement from verified suppliers</p>
+                    <p className="text-slate-300 text-xs mt-0.5">Direct raw ingredient procurement & live price negotiation with verified suppliers</p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -176,14 +220,25 @@ export default function OwnerSupplyMarketplace() {
                                 <p>Available Stock: <span className="font-bold text-emerald-400">{p.inventory?.availableStock || 0} {p.unit}</span></p>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={() => handleAddToCart(p, p.moq)}
-                                className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 text-black py-2.5 text-xs font-extrabold transition flex items-center justify-center gap-2 shadow-md cursor-pointer"
-                            >
-                                <Plus size={16} />
-                                Add {p.moq} {p.unit} to Cart
-                            </button>
+                            <div className="flex items-center gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => handleAddToCart(p, p.moq)}
+                                    className="flex-1 rounded-xl bg-amber-500 hover:bg-amber-400 text-black py-2.5 text-xs font-extrabold transition flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                                >
+                                    <Plus size={15} />
+                                    Add {p.moq} {p.unit}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleOpenBargain(p)}
+                                    className="rounded-xl border border-white/15 bg-white/10 hover:bg-white/20 text-white py-2.5 px-3 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                                    title="Negotiate Price with Supplier"
+                                >
+                                    <Handshake size={15} className="text-amber-400" />
+                                    Bargain Price
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -206,6 +261,65 @@ export default function OwnerSupplyMarketplace() {
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Price Bargaining Modal for Restaurant Owner */}
+            {showBargainModal && selectedProduct && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center theme-modal-backdrop p-4">
+                    <div className="theme-modal w-full max-w-lg rounded-3xl p-6 space-y-4 shadow-2xl">
+                        <div className="flex items-center justify-between border-b theme-border pb-3">
+                            <h3 className="text-lg font-bold flex items-center gap-2">
+                                <Handshake size={20} className="theme-accent-text" />
+                                Negotiate Bulk Price with Supplier
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => setShowBargainModal(false)}
+                                className="text-slate-400 hover:text-white"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSendBargainOffer} className="space-y-3">
+                            <div className="p-3 rounded-2xl theme-card border text-xs space-y-1">
+                                <p className="font-bold text-white text-sm">{selectedProduct.name}</p>
+                                <p className="theme-muted">Supplier: {selectedProduct.supplier?.profile?.businessName || "Verified Supplier"}</p>
+                                <p className="theme-muted">Catalog Listed Base Price: <strong className="text-white">₹{selectedProduct.prices?.[0]?.basePrice || 100} / {selectedProduct.unit}</strong></p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-200 uppercase tracking-wider block mb-1">Bulk Quantity ({selectedProduct.unit})</label>
+                                    <input
+                                        type="number"
+                                        value={bargainForm.quantity}
+                                        onChange={(e) => setBargainForm({ ...bargainForm, quantity: e.target.value })}
+                                        required
+                                        className="w-full rounded-xl theme-input px-4 py-2.5 text-sm outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-200 uppercase tracking-wider block mb-1">Your Offered Price / {selectedProduct.unit} (₹)</label>
+                                    <input
+                                        type="number"
+                                        value={bargainForm.offeredPrice}
+                                        onChange={(e) => setBargainForm({ ...bargainForm, offeredPrice: e.target.value })}
+                                        required
+                                        className="w-full rounded-xl theme-input px-4 py-2.5 text-sm outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 text-black py-3 text-xs font-extrabold transition cursor-pointer shadow-md mt-2"
+                            >
+                                Send Bargain Offer to Supplier
+                            </button>
+                        </form>
+                    </div>
                 </div>
             )}
 

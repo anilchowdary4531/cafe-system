@@ -15,6 +15,7 @@ import supplierProfileRoutes from "./supplierProfile.routes.js";
 import supplierProductRoutes from "./supplierProduct.routes.js";
 import supplyMarketplaceRoutes from "./supplyMarketplace.routes.js";
 import superAdminSupplyRoutes from "./superAdminSupply.routes.js";
+import supplyChatRoutes from "./supplyChat.routes.js";
 
 // Single route entrypoint to keep server.js simple.
 export default async function routes(app, deps) {
@@ -24,6 +25,7 @@ export default async function routes(app, deps) {
   await supplierProductRoutes(app, deps);
   await supplyMarketplaceRoutes(app, deps);
   await superAdminSupplyRoutes(app, deps);
+  await supplyChatRoutes(app, deps);
   await publicRoutes(app, deps);
   await authRoutes(app, deps);
   await customerRoutes(app, deps);

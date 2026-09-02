@@ -26,6 +26,10 @@ import {
     Lock,
     MapPin,
     Send,
+    MessageSquare,
+    Check,
+    Tag,
+    Handshake,
 } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
@@ -33,7 +37,7 @@ import BrandLogo from "../../components/BrandLogo";
 
 export default function SupplierDashboard() {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState("dashboard"); // 'dashboard' | 'products' | 'orders' | 'sales' | 'customers' | 'profile'
+    const [activeTab, setActiveTab] = useState("dashboard"); // 'dashboard' | 'products' | 'orders' | 'sales' | 'customers' | 'chat' | 'profile'
     const [loading, setLoading] = useState(true);
     const [profileData, setProfileData] = useState(null);
     const [products, setProducts] = useState([]);
@@ -41,6 +45,20 @@ export default function SupplierDashboard() {
     const [showAddProductModal, setShowAddProductModal] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [savingProfile, setSavingProfile] = useState(false);
+
+    // B2B Negotiation & Chat State
+    const [chatThreads, setChatThreads] = useState([]);
+    const [activeThreadId, setActiveThreadId] = useState(null);
+    const [chatMessages, setChatMessages] = useState([]);
+    const [chatText, setChatText] = useState("");
+    const [showBargainModal, setShowBargainModal] = useState(false);
+    const [bargainForm, setBargainForm] = useState({
+        productName: "",
+        quantity: 50,
+        unit: "KG",
+        originalPrice: 250,
+        offeredPrice: 220,
+    });
 
     const [profileForm, setProfileForm] = useState({
         businessName: "",
@@ -73,10 +91,11 @@ export default function SupplierDashboard() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [profileRes, productsRes, ordersRes] = await Promise.all([
+            const [profileRes, productsRes, ordersRes, threadsRes] = await Promise.all([
                 api.get("/suppliers/me").catch(() => null),
                 api.get("/supplier/products").catch(() => null),
                 api.get("/supplier/orders").catch(() => null),
+                api.get("/supply-chat/threads").catch(() => null),
             ]);
 
             if (profileRes?.data) {
@@ -99,13 +118,29 @@ export default function SupplierDashboard() {
                     pincode: addr.pincode || "",
                 });
 
-                // If account is not ACTIVE, force active tab to profile / KYC status view
                 if (profileRes.data.status !== "ACTIVE") {
                     setActiveTab("profile");
                 }
             }
-            if (productsRes?.data?.products) setProducts(productsRes.data.products);
+            if (productsRes?.data?.products) {
+                setProducts(productsRes.data.products);
+                if (productsRes.data.products.length > 0) {
+                    const firstP = productsRes.data.products[0];
+                    setBargainForm((prev) => ({
+                        ...prev,
+                        productName: firstP.name,
+                        unit: firstP.unit,
+                        originalPrice: firstP.prices?.[0]?.basePrice || 250,
+                    }));
+                }
+            }
             if (ordersRes?.data?.orders) setOrders(ordersRes.data.orders);
+            if (threadsRes?.data?.threads) {
+                setChatThreads(threadsRes.data.threads);
+                if (threadsRes.data.threads.length > 0 && !activeThreadId) {
+                    setActiveThreadId(threadsRes.data.threads[0].id);
+                }
+            }
         } catch (err) {
             showToast("Failed to load supplier data", { type: "error" });
         } finally {
@@ -113,11 +148,78 @@ export default function SupplierDashboard() {
         }
     };
 
+    const loadMessages = async (tId) => {
+        if (!tId) return;
+        try {
+            const res = await api.get(`/supply-chat/threads/${tId}/messages`);
+            if (res.data?.messages) setChatMessages(res.data.messages);
+        } catch (err) {
+            console.error("Failed to load messages", err);
+        }
+    };
+
     useEffect(() => {
         loadData();
     }, []);
 
+    useEffect(() => {
+        if (activeThreadId) {
+            loadMessages(activeThreadId);
+        }
+    }, [activeThreadId]);
+
     const isAccountActive = profileData?.status === "ACTIVE";
+
+    const handleSendMessage = async (e) => {
+        e.preventDefault();
+        if (!chatText.trim() || !activeThreadId) return;
+        try {
+            await api.post("/supply-chat/messages", {
+                threadId: activeThreadId,
+                text: chatText.trim(),
+                sender: "SUPPLIER",
+                senderName: profileData?.profile?.businessName || "Supplier",
+                type: "TEXT",
+            });
+            setChatText("");
+            loadMessages(activeThreadId);
+        } catch (err) {
+            showToast("Failed to send message", { type: "error" });
+        }
+    };
+
+    const handleSendBargainOffer = async (e) => {
+        e.preventDefault();
+        if (!activeThreadId) return;
+        try {
+            await api.post("/supply-chat/messages", {
+                threadId: activeThreadId,
+                sender: "SUPPLIER",
+                senderName: profileData?.profile?.businessName || "Supplier",
+                type: "BARGAIN_OFFER",
+                offer: bargainForm,
+            });
+            setShowBargainModal(false);
+            showToast("Bargain counter-offer sent to buyer!");
+            loadMessages(activeThreadId);
+        } catch (err) {
+            showToast("Failed to send bargain offer", { type: "error" });
+        }
+    };
+
+    const handleRespondToOffer = async (offerId, responseStatus) => {
+        if (!activeThreadId || !offerId) return;
+        try {
+            await api.post(`/supply-chat/offers/${offerId}/respond`, {
+                threadId: activeThreadId,
+                responseStatus,
+            });
+            showToast(`Offer ${responseStatus.toLowerCase()} successfully!`);
+            loadMessages(activeThreadId);
+        } catch (err) {
+            showToast("Failed to respond to offer", { type: "error" });
+        }
+    };
 
     const handleCreateProduct = async (e) => {
         e.preventDefault();
@@ -203,8 +305,11 @@ export default function SupplierDashboard() {
         { id: "orders", label: "B2B Orders", icon: ShoppingBag, count: orders.length, locked: !isAccountActive },
         { id: "sales", label: "Sales & Analytics", icon: BarChart3, locked: !isAccountActive },
         { id: "customers", label: "B2B Customers", icon: Users, count: customers.length, locked: !isAccountActive },
+        { id: "chat", label: "B2B Negotiation & Chat", icon: MessageSquare, count: chatThreads.length, locked: !isAccountActive },
         { id: "profile", label: isAccountActive ? "Profile & KYC" : "KYC Verification Form", icon: Building2, locked: false },
     ];
+
+    const activeThread = chatThreads.find((t) => t.id === activeThreadId);
 
     return (
         <div className="theme-page min-h-screen flex flex-col relative">
@@ -359,7 +464,6 @@ export default function SupplierDashboard() {
                 {/* IF ACCOUNT IS NOT ACTIVE — SHOW VERIFICATION PENDING BANNER & MANDATORY KYC FORM ONLY */}
                 {!isAccountActive && (
                     <div className="space-y-6">
-                        {/* STATUS BANNER */}
                         <div className="theme-panel rounded-3xl p-6 border border-amber-500/40 bg-amber-500/10 space-y-3">
                             <div className="flex items-center gap-3">
                                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400">
@@ -376,7 +480,6 @@ export default function SupplierDashboard() {
                             </div>
                         </div>
 
-                        {/* MANDATORY PROFILE & KYC DETAILS FORM */}
                         <form onSubmit={handleSaveProfile} className="theme-panel rounded-3xl p-6 border space-y-5">
                             <div className="flex items-center justify-between border-b theme-border pb-4">
                                 <h3 className="text-lg font-bold flex items-center gap-2">
@@ -437,7 +540,6 @@ export default function SupplierDashboard() {
                                 </div>
                             </div>
 
-                            {/* WAREHOUSE ADDRESS */}
                             <div className="border-t theme-border pt-4 space-y-3">
                                 <h4 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2 theme-accent-text">
                                     <MapPin size={18} />
@@ -491,7 +593,6 @@ export default function SupplierDashboard() {
                                 </div>
                             </div>
 
-                            {/* BANK DETAILS */}
                             <div className="border-t theme-border pt-4 space-y-4">
                                 <h4 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2 theme-accent-text">
                                     <CreditCard size={18} />
@@ -846,7 +947,180 @@ export default function SupplierDashboard() {
                     </div>
                 )}
 
-                {/* TAB 5: ACTIVE PROFILE VIEW FOR VERIFIED SUPPLIERS */}
+                {/* TAB 5: B2B NEGOTIATION & LIVE CHAT */}
+                {isAccountActive && activeTab === "chat" && (
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                                    <Handshake className="theme-accent-text" />
+                                    B2B Live Price Negotiation & Chat Hub
+                                </h2>
+                                <p className="theme-muted text-xs">Real-time price bargaining with restaurant owners & external bulk buyers</p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setShowBargainModal(true)}
+                                className="theme-button rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer"
+                            >
+                                <Tag size={16} />
+                                Send Bargain Counter-Offer
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-[500px]">
+                            {/* CHAT THREADS LIST */}
+                            <div className="theme-panel rounded-3xl p-4 border space-y-2 lg:col-span-1">
+                                <p className="theme-muted text-xs font-bold uppercase tracking-wider px-2 mb-2">Active Conversations</p>
+                                {chatThreads.length === 0 ? (
+                                    <p className="theme-muted text-xs p-4 text-center">No active chat conversations yet.</p>
+                                ) : (
+                                    chatThreads.map((thread) => {
+                                        const isSelected = thread.id === activeThreadId;
+                                        return (
+                                            <button
+                                                key={thread.id}
+                                                type="button"
+                                                onClick={() => setActiveThreadId(thread.id)}
+                                                className={`w-full p-3.5 rounded-2xl text-left transition cursor-pointer flex flex-col gap-1 border ${
+                                                    isSelected ? "theme-button border-amber-400 shadow-md" : "theme-card border-transparent hover:theme-panel"
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span className="font-bold text-sm truncate">{thread.clientName}</span>
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                                        thread.clientType === "RESTAURANT" ? "bg-blue-500/20 text-blue-400" : "bg-purple-500/20 text-purple-400"
+                                                    }`}>
+                                                        {thread.clientType === "RESTAURANT" ? "Restaurant" : "External"}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs truncate opacity-80">{thread.lastMessage}</p>
+                                            </button>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            {/* LIVE MESSAGES STREAM & BARGAIN TOOL */}
+                            <div className="theme-panel rounded-3xl p-5 border flex flex-col justify-between lg:col-span-2 space-y-4">
+                                {activeThread ? (
+                                    <>
+                                        {/* THREAD HEADER */}
+                                        <div className="flex items-center justify-between border-b theme-border pb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="theme-card h-10 w-10 rounded-2xl flex items-center justify-center font-bold">
+                                                    <User size={20} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-base">{activeThread.clientName}</h3>
+                                                    <p className="theme-muted text-xs">B2B Buyer • Active Negotiation Session</p>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowBargainModal(true)}
+                                                className="theme-soft-button rounded-xl px-3 py-1.5 text-xs font-bold flex items-center gap-1.5"
+                                            >
+                                                <Tag size={14} />
+                                                New Offer
+                                            </button>
+                                        </div>
+
+                                        {/* MESSAGES LIST */}
+                                        <div className="flex-1 space-y-3 overflow-y-auto max-h-[360px] p-2">
+                                            {chatMessages.map((msg) => {
+                                                const isMe = msg.sender === "SUPPLIER";
+                                                return (
+                                                    <div
+                                                        key={msg.id}
+                                                        className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+                                                    >
+                                                        <span className="theme-muted text-[10px] mb-1 font-bold">{msg.senderName}</span>
+                                                        <div
+                                                            className={`max-w-[85%] rounded-2xl p-4 shadow-sm text-xs space-y-2 ${
+                                                                isMe ? "theme-button" : "theme-card border"
+                                                            }`}
+                                                        >
+                                                            {msg.text && <p className="font-medium">{msg.text}</p>}
+
+                                                            {/* BARGAIN COUNTER OFFER CARD */}
+                                                            {msg.type === "BARGAIN_OFFER" && msg.offer && (
+                                                                <div className="rounded-xl border p-3 bg-black/20 space-y-2">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <span className="font-extrabold text-sm">{msg.offer.productName}</span>
+                                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                                                            msg.offer.status === "ACCEPTED" ? "bg-emerald-500 text-black" : msg.offer.status === "REJECTED" ? "bg-red-500 text-white" : "bg-amber-400 text-black"
+                                                                        }`}>
+                                                                            {msg.offer.status}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                                                        <div>Qty: <strong>{msg.offer.quantity} {msg.offer.unit}</strong></div>
+                                                                        <div>Catalog: <s>₹{msg.offer.originalPrice}</s></div>
+                                                                        <div className="col-span-2 font-black text-amber-300 text-sm">
+                                                                            Offered Bargain Rate: ₹{msg.offer.offeredPrice} / {msg.offer.unit}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* OFFER ACTION BUTTONS */}
+                                                                    {!isMe && msg.offer.status === "PENDING" && (
+                                                                        <div className="flex items-center gap-2 pt-2 border-t border-white/10">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRespondToOffer(msg.offer.id, "ACCEPTED")}
+                                                                                className="rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black px-3 py-1 font-bold text-[11px]"
+                                                                            >
+                                                                                Accept Rate (₹{msg.offer.offeredPrice})
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRespondToOffer(msg.offer.id, "REJECTED")}
+                                                                                className="rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 px-3 py-1 font-bold text-[11px]"
+                                                                            >
+                                                                                Reject
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* CHAT INPUT FORM */}
+                                        <form onSubmit={handleSendMessage} className="flex items-center gap-2 pt-2 border-t theme-border">
+                                            <input
+                                                type="text"
+                                                placeholder="Type your message or negotiate pricing..."
+                                                value={chatText}
+                                                onChange={(e) => setChatText(e.target.value)}
+                                                className="theme-input flex-1 rounded-xl px-4 py-3 text-xs outline-none"
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="theme-button rounded-xl px-4 py-3 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md"
+                                            >
+                                                <Send size={16} />
+                                                Send
+                                            </button>
+                                        </form>
+                                    </>
+                                ) : (
+                                    <div className="flex-1 flex flex-col items-center justify-center theme-muted text-sm space-y-2">
+                                        <MessageSquare size={36} />
+                                        <p>Select a B2B conversation to start price bargaining & live chat</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB 6: ACTIVE PROFILE VIEW FOR VERIFIED SUPPLIERS */}
                 {isAccountActive && activeTab === "profile" && (
                     <div className="space-y-6">
                         <h2 className="text-xl font-bold tracking-tight">Supplier Profile & Business KYC Compliance</h2>
@@ -963,6 +1237,103 @@ export default function SupplierDashboard() {
                     </div>
                 )}
             </main>
+
+            {/* BARGAIN COUNTER-OFFER MODAL */}
+            {showBargainModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center theme-modal-backdrop p-4">
+                    <div className="theme-modal w-full max-w-lg rounded-3xl p-6 space-y-4 shadow-2xl">
+                        <div className="flex items-center justify-between border-b theme-border pb-3">
+                            <h3 className="text-lg font-bold flex items-center gap-2">
+                                <Tag className="theme-accent-text" size={20} />
+                                Make Price Bargain Counter-Offer
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => setShowBargainModal(false)}
+                                className="theme-muted hover:text-white"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSendBargainOffer} className="space-y-3">
+                            <div>
+                                <label className="theme-muted mb-1 block text-xs font-bold uppercase">Product Name</label>
+                                <input
+                                    type="text"
+                                    placeholder="Fresh Premium Chicken Breast"
+                                    value={bargainForm.productName}
+                                    onChange={(e) => setBargainForm({ ...bargainForm, productName: e.target.value })}
+                                    required
+                                    className="theme-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="theme-muted mb-1 block text-xs font-bold uppercase">Quantity</label>
+                                    <input
+                                        type="number"
+                                        value={bargainForm.quantity}
+                                        onChange={(e) => setBargainForm({ ...bargainForm, quantity: e.target.value })}
+                                        required
+                                        className="theme-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="theme-muted mb-1 block text-xs font-bold uppercase">Unit</label>
+                                    <input
+                                        type="text"
+                                        value={bargainForm.unit}
+                                        onChange={(e) => setBargainForm({ ...bargainForm, unit: e.target.value })}
+                                        required
+                                        className="theme-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="theme-muted mb-1 block text-xs font-bold uppercase">Catalog Price (₹)</label>
+                                    <input
+                                        type="number"
+                                        value={bargainForm.originalPrice}
+                                        onChange={(e) => setBargainForm({ ...bargainForm, originalPrice: e.target.value })}
+                                        required
+                                        className="theme-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="theme-muted mb-1 block text-xs font-bold uppercase">Offered Price per Unit (₹)</label>
+                                    <input
+                                        type="number"
+                                        value={bargainForm.offeredPrice}
+                                        onChange={(e) => setBargainForm({ ...bargainForm, offeredPrice: e.target.value })}
+                                        required
+                                        className="theme-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowBargainModal(false)}
+                                    className="theme-soft-button rounded-xl px-4 py-2.5 text-xs font-bold cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="theme-button rounded-xl px-5 py-2.5 text-xs font-bold cursor-pointer"
+                                >
+                                    Send Counter Offer
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Add Product Modal */}
             {showAddProductModal && isAccountActive && (
