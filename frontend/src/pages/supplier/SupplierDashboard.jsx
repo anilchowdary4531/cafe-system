@@ -30,6 +30,8 @@ import {
     Check,
     Tag,
     Handshake,
+    Upload,
+    Image as ImageIcon,
 } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
@@ -220,6 +222,17 @@ export default function SupplierDashboard() {
         } catch (err) {
             showToast("Failed to respond to offer", { type: "error" });
         }
+    };
+
+    const handleImageFileUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setNewProduct((prev) => ({ ...prev, imageUrl: reader.result }));
+            showToast("Stock photo attached successfully!");
+        };
+        reader.readAsDataURL(file);
     };
 
     const handleCreateProduct = async (e) => {
@@ -1363,20 +1376,37 @@ export default function SupplierDashboard() {
                             </div>
 
                             {/* Stock Photo / Image Selector */}
-                            <div className="space-y-1.5 border-t border-b theme-border py-2.5">
+                            <div className="space-y-2 border-t border-b theme-border py-3">
                                 <div className="flex items-center justify-between">
-                                    <label className="theme-muted text-xs font-bold uppercase">Stock Photo / Product Image</label>
-                                    <span className="theme-accent-text text-[10px] font-bold">Photo URL or Quick Presets</span>
+                                    <label className="theme-muted text-xs font-bold uppercase flex items-center gap-1.5">
+                                        <ImageIcon size={14} className="theme-accent-text" />
+                                        Stock Photo / Product Image
+                                    </label>
+                                    <span className="theme-accent-text text-[10px] font-bold">Upload File or URL</span>
                                 </div>
 
-                                <div className="flex gap-2">
+                                <div className="flex flex-col sm:flex-row items-center gap-2">
+                                    {/* Device File Upload Button */}
+                                    <label className="theme-button rounded-xl px-3.5 py-2 text-xs font-extrabold flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-[1.02] transition whitespace-nowrap">
+                                        <Upload size={14} />
+                                        <span>Upload File</span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageFileUpload}
+                                            className="hidden"
+                                        />
+                                    </label>
+
+                                    {/* Image URL Input */}
                                     <input
                                         type="url"
-                                        placeholder="https://images.unsplash.com/photo-..."
+                                        placeholder="Or paste Image URL (https://...)"
                                         value={newProduct.imageUrl}
                                         onChange={(e) => setNewProduct({ ...newProduct, imageUrl: e.target.value })}
-                                        className="theme-input flex-1 rounded-xl px-4 py-2 text-xs outline-none"
+                                        className="theme-input flex-1 w-full rounded-xl px-3.5 py-2 text-xs outline-none"
                                     />
+
                                     {newProduct.imageUrl && (
                                         <div className="h-9 w-9 rounded-xl overflow-hidden border theme-border flex-shrink-0 bg-black/40 shadow-sm">
                                             <img src={newProduct.imageUrl} alt="Stock Preview" className="h-full w-full object-cover" />
@@ -1386,7 +1416,7 @@ export default function SupplierDashboard() {
 
                                 {/* Quick Stock Photo Presets */}
                                 <div className="space-y-1 pt-1">
-                                    <p className="theme-muted text-[10px] font-bold uppercase">Click to Select Sample Stock Photo:</p>
+                                    <p className="theme-muted text-[10px] font-bold uppercase">Or Choose Sample Stock Photo:</p>
                                     <div className="flex flex-wrap gap-1.5">
                                         {[
                                             { label: "🐔 Chicken", url: "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=400&auto=format&fit=crop" },
@@ -1399,7 +1429,7 @@ export default function SupplierDashboard() {
                                                 key={preset.label}
                                                 type="button"
                                                 onClick={() => setNewProduct({ ...newProduct, imageUrl: preset.url })}
-                                                className={`text-[11px] px-2.5 py-1 rounded-lg border font-bold cursor-pointer transition ${
+                                                className={`text-[11px] px-2 py-1 rounded-lg border font-bold cursor-pointer transition ${
                                                     newProduct.imageUrl === preset.url ? "theme-button border-amber-400" : "theme-card hover:theme-panel"
                                                 }`}
                                             >
