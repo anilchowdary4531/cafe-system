@@ -23,6 +23,9 @@ import {
     CreditCard,
     Save,
     LayoutDashboard,
+    Lock,
+    MapPin,
+    Send,
 } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
@@ -36,7 +39,7 @@ export default function SupplierDashboard() {
     const [products, setProducts] = useState([]);
     const [orders, setOrders] = useState([]);
     const [showAddProductModal, setShowAddProductModal] = useState(false);
-    const [sidebarOpen, setSidebarOpen] = useState(false); // Collapsible Menu state (hidden by default)
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [savingProfile, setSavingProfile] = useState(false);
 
     const [profileForm, setProfileForm] = useState({
@@ -49,6 +52,10 @@ export default function SupplierDashboard() {
         bankIfscCode: "",
         bankAccountName: "",
         bankName: "",
+        line1: "",
+        city: "",
+        state: "",
+        pincode: "",
     });
 
     const [newProduct, setNewProduct] = useState({
@@ -75,6 +82,7 @@ export default function SupplierDashboard() {
             if (profileRes?.data) {
                 setProfileData(profileRes.data);
                 const p = profileRes.data.profile || {};
+                const addr = profileRes.data.addresses?.[0] || {};
                 setProfileForm({
                     businessName: p.businessName || "",
                     legalName: p.legalName || "",
@@ -85,7 +93,16 @@ export default function SupplierDashboard() {
                     bankIfscCode: p.bankIfscCode || "",
                     bankAccountName: p.bankAccountName || "",
                     bankName: p.bankName || "",
+                    line1: addr.line1 || "",
+                    city: addr.city || "",
+                    state: addr.state || "",
+                    pincode: addr.pincode || "",
                 });
+
+                // If account is not ACTIVE, force active tab to profile / KYC status view
+                if (profileRes.data.status !== "ACTIVE") {
+                    setActiveTab("profile");
+                }
             }
             if (productsRes?.data?.products) setProducts(productsRes.data.products);
             if (ordersRes?.data?.orders) setOrders(ordersRes.data.orders);
@@ -99,6 +116,8 @@ export default function SupplierDashboard() {
     useEffect(() => {
         loadData();
     }, []);
+
+    const isAccountActive = profileData?.status === "ACTIVE";
 
     const handleCreateProduct = async (e) => {
         e.preventDefault();
@@ -127,10 +146,19 @@ export default function SupplierDashboard() {
         setSavingProfile(true);
         try {
             await api.put("/suppliers/me", profileForm);
-            showToast("Supplier profile & KYC details updated successfully!");
+            if (profileForm.line1 && profileForm.city && profileForm.state && profileForm.pincode) {
+                await api.post("/suppliers/me/address", {
+                    line1: profileForm.line1,
+                    city: profileForm.city,
+                    state: profileForm.state,
+                    pincode: profileForm.pincode,
+                    isPrimary: true,
+                }).catch(() => null);
+            }
+            showToast("KYC profile submitted to Super Admin for verification!");
             loadData();
         } catch (err) {
-            showToast(err?.response?.data?.error || "Failed to update profile", { type: "error" });
+            showToast(err?.response?.data?.error || "Failed to submit profile", { type: "error" });
         } finally {
             setSavingProfile(false);
         }
@@ -170,21 +198,20 @@ export default function SupplierDashboard() {
     const customers = Object.values(customerMap);
 
     const navTabs = [
-        { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { id: "products", label: "Catalog Products", icon: Package, count: products.length },
-        { id: "orders", label: "B2B Orders", icon: ShoppingBag, count: orders.length },
-        { id: "sales", label: "Sales & Analytics", icon: BarChart3 },
-        { id: "customers", label: "B2B Customers", icon: Users, count: customers.length },
-        { id: "profile", label: "Profile & KYC", icon: Building2 },
+        { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, locked: !isAccountActive },
+        { id: "products", label: "Catalog Products", icon: Package, count: products.length, locked: !isAccountActive },
+        { id: "orders", label: "B2B Orders", icon: ShoppingBag, count: orders.length, locked: !isAccountActive },
+        { id: "sales", label: "Sales & Analytics", icon: BarChart3, locked: !isAccountActive },
+        { id: "customers", label: "B2B Customers", icon: Users, count: customers.length, locked: !isAccountActive },
+        { id: "profile", label: isAccountActive ? "Profile & KYC" : "KYC Verification Form", icon: Building2, locked: false },
     ];
 
     return (
         <div className="theme-page min-h-screen flex flex-col relative">
-            {/* TOP HEADER BAR WITH MENU TOGGLE BUTTON */}
+            {/* TOP HEADER BAR */}
             <header className="theme-nav sticky top-0 z-40 px-4 sm:px-6 py-4 border-b shadow-sm">
                 <div className="mx-auto flex max-w-7xl items-center justify-between">
                     <div className="flex items-center gap-3">
-                        {/* TOGGLE MENU BUTTON (SHOW / HIDE SIDEBAR DRAWER) */}
                         <button
                             type="button"
                             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -203,8 +230,10 @@ export default function SupplierDashboard() {
                                     {profileData?.profile?.businessName || "Supplier Portal"}
                                 </h1>
                                 <p className="theme-muted text-xs font-medium hidden sm:block">
-                                    Tiffzy Supply Chain Marketplace • Status:{" "}
-                                    <span className="theme-accent-text font-bold">{profileData?.status || "ACTIVE"}</span>
+                                    Status:{" "}
+                                    <span className={`font-bold ${isAccountActive ? "text-emerald-400" : "text-amber-400"}`}>
+                                        {profileData?.status || "PENDING VERIFICATION"}
+                                    </span>
                                 </p>
                             </div>
                         </div>
@@ -232,16 +261,14 @@ export default function SupplierDashboard() {
                 </div>
             </header>
 
-            {/* COLLAPSIBLE SIDEBAR MENU DRAWER OVERLAY */}
+            {/* COLLAPSIBLE SIDEBAR MENU DRAWER */}
             {sidebarOpen && (
                 <div className="fixed inset-0 z-50 flex">
-                    {/* BACKDROP BLUR CLICK OUTSIDE TO CLOSE */}
                     <div
                         className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
                         onClick={() => setSidebarOpen(false)}
                     />
 
-                    {/* SIDEBAR DRAWER PANEL */}
                     <aside className="theme-sidebar relative z-10 w-72 max-w-[85vw] h-full p-4 flex flex-col justify-between shadow-2xl border-r theme-border animate-in slide-in-from-left duration-200">
                         <div>
                             <div className="flex items-center justify-between px-2 py-3 mb-4 border-b theme-border">
@@ -272,11 +299,17 @@ export default function SupplierDashboard() {
                                             key={tab.id}
                                             type="button"
                                             onClick={() => {
+                                                if (tab.locked) {
+                                                    showToast("Your account is pending Super Admin verification", { type: "info" });
+                                                    return;
+                                                }
                                                 setActiveTab(tab.id);
-                                                setSidebarOpen(false); // Close sidebar after selecting tab
+                                                setSidebarOpen(false);
                                             }}
                                             className={`w-full px-4 py-3 rounded-2xl text-sm font-bold transition flex items-center justify-between cursor-pointer ${
-                                                isActive
+                                                tab.locked
+                                                    ? "opacity-50 cursor-not-allowed theme-soft-button"
+                                                    : isActive
                                                     ? "theme-button font-extrabold shadow-lg shadow-amber-500/20"
                                                     : "theme-soft-button hover:theme-panel"
                                             }`}
@@ -285,13 +318,15 @@ export default function SupplierDashboard() {
                                                 <Icon size={18} />
                                                 <span>{tab.label}</span>
                                             </div>
-                                            {tab.count !== undefined && (
+                                            {tab.locked ? (
+                                                <Lock size={14} className="theme-muted" />
+                                            ) : tab.count !== undefined ? (
                                                 <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
                                                     isActive ? "bg-black/20 text-black" : "theme-card"
                                                 }`}>
                                                     {tab.count}
                                                 </span>
-                                            )}
+                                            ) : null}
                                         </button>
                                     );
                                 })}
@@ -302,7 +337,7 @@ export default function SupplierDashboard() {
                             <div className="flex items-center justify-between text-xs">
                                 <div className="truncate pr-2">
                                     <p className="font-bold truncate">{profileData?.profile?.businessName || "Supplier"}</p>
-                                    <p className="theme-muted text-[11px]">Status: <span className="theme-accent-text font-bold">{profileData?.status || "ACTIVE"}</span></p>
+                                    <p className="theme-muted text-[11px]">Status: <span className="theme-accent-text font-bold">{profileData?.status || "PENDING"}</span></p>
                                 </div>
                                 <button
                                     type="button"
@@ -318,10 +353,216 @@ export default function SupplierDashboard() {
                 </div>
             )}
 
-            {/* MAIN FULL-WIDTH CONTENT AREA */}
+            {/* MAIN CONTENT AREA */}
             <main className="mx-auto max-w-7xl w-full p-4 sm:p-6 space-y-6 flex-1">
-                {/* DASHBOARD OVERVIEW & METRICS */}
-                {activeTab === "dashboard" && (
+
+                {/* IF ACCOUNT IS NOT ACTIVE — SHOW VERIFICATION PENDING BANNER & MANDATORY KYC FORM ONLY */}
+                {!isAccountActive && (
+                    <div className="space-y-6">
+                        {/* STATUS BANNER */}
+                        <div className="theme-panel rounded-3xl p-6 border border-amber-500/40 bg-amber-500/10 space-y-3">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400">
+                                    <Clock size={24} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-amber-400">
+                                        KYC Verification Status: {profileData?.status || "PENDING"}
+                                    </h2>
+                                    <p className="theme-muted text-sm mt-0.5">
+                                        Your supplier profile & KYC details must be submitted to Super Admin for verification. Once approved by Super Admin, your account status will become ACTIVE and full portal features will unlock.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* MANDATORY PROFILE & KYC DETAILS FORM */}
+                        <form onSubmit={handleSaveProfile} className="theme-panel rounded-3xl p-6 border space-y-5">
+                            <div className="flex items-center justify-between border-b theme-border pb-4">
+                                <h3 className="text-lg font-bold flex items-center gap-2">
+                                    <Building2 className="theme-accent-text" />
+                                    Submit Supplier Profile & Business KYC Details
+                                </h3>
+                                <span className="theme-chip rounded-full px-3 py-1 text-xs font-bold">
+                                    Step 1 of 1: Verification Required
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Business / Supplier Name *</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. SocialSea Food Supplies"
+                                        value={profileForm.businessName}
+                                        onChange={(e) => setProfileForm({ ...profileForm, businessName: e.target.value })}
+                                        required
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Legal Entity Name</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. ABC Foods Private Limited"
+                                        value={profileForm.legalName}
+                                        onChange={(e) => setProfileForm({ ...profileForm, legalName: e.target.value })}
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">GSTIN Registration Number *</label>
+                                    <input
+                                        type="text"
+                                        placeholder="22AAAAA0000A1Z5"
+                                        value={profileForm.gstin}
+                                        onChange={(e) => setProfileForm({ ...profileForm, gstin: e.target.value.toUpperCase() })}
+                                        required
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none uppercase"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">FSSAI License Number *</label>
+                                    <input
+                                        type="text"
+                                        placeholder="10020011000123"
+                                        value={profileForm.fssaiLicense}
+                                        onChange={(e) => setProfileForm({ ...profileForm, fssaiLicense: e.target.value })}
+                                        required
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* WAREHOUSE ADDRESS */}
+                            <div className="border-t theme-border pt-4 space-y-3">
+                                <h4 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2 theme-accent-text">
+                                    <MapPin size={18} />
+                                    Primary Warehouse / Facility Address
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="md:col-span-3">
+                                        <label className="theme-muted mb-1 block text-xs font-bold uppercase">Address Line 1 *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Plot 42, Industrial Wholesale Market"
+                                            value={profileForm.line1}
+                                            onChange={(e) => setProfileForm({ ...profileForm, line1: e.target.value })}
+                                            required
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="theme-muted mb-1 block text-xs font-bold uppercase">City *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Hyderabad"
+                                            value={profileForm.city}
+                                            onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
+                                            required
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="theme-muted mb-1 block text-xs font-bold uppercase">State *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Telangana"
+                                            value={profileForm.state}
+                                            onChange={(e) => setProfileForm({ ...profileForm, state: e.target.value })}
+                                            required
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="theme-muted mb-1 block text-xs font-bold uppercase">Pincode *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="500001"
+                                            value={profileForm.pincode}
+                                            onChange={(e) => setProfileForm({ ...profileForm, pincode: e.target.value })}
+                                            required
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* BANK DETAILS */}
+                            <div className="border-t theme-border pt-4 space-y-4">
+                                <h4 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2 theme-accent-text">
+                                    <CreditCard size={18} />
+                                    Bank Settlement Details (For Automated Payouts)
+                                </h4>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Bank Account Number *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="91823091823091"
+                                            value={profileForm.bankAccountNumber}
+                                            onChange={(e) => setProfileForm({ ...profileForm, bankAccountNumber: e.target.value })}
+                                            required
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">IFSC Code *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="HDFC0001234"
+                                            value={profileForm.bankIfscCode}
+                                            onChange={(e) => setProfileForm({ ...profileForm, bankIfscCode: e.target.value.toUpperCase() })}
+                                            required
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none uppercase"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Account Holder Name *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="SocialSea Foods Pvt Ltd"
+                                            value={profileForm.bankAccountName}
+                                            onChange={(e) => setProfileForm({ ...profileForm, bankAccountName: e.target.value })}
+                                            required
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Bank Name *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="HDFC Bank"
+                                            value={profileForm.bankName}
+                                            onChange={(e) => setProfileForm({ ...profileForm, bankName: e.target.value })}
+                                            required
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={savingProfile}
+                                className="theme-button w-full rounded-xl py-4 font-extrabold text-base transition flex items-center justify-center gap-2 cursor-pointer shadow-lg mt-4"
+                            >
+                                <Send size={20} />
+                                {savingProfile ? "Submitting KYC Details..." : "Submit KYC Profile to Super Admin for Verification"}
+                            </button>
+                        </form>
+                    </div>
+                )}
+
+                {/* IF ACCOUNT IS ACTIVE — RENDER FULL PORTAL TABS */}
+                {isAccountActive && activeTab === "dashboard" && (
                     <div className="space-y-6">
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                             <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
@@ -413,7 +654,7 @@ export default function SupplierDashboard() {
                 )}
 
                 {/* TAB 1: CATALOG PRODUCTS */}
-                {activeTab === "products" && (
+                {isAccountActive && activeTab === "products" && (
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
                             <h2 className="text-xl font-bold tracking-tight">Catalog Products</h2>
@@ -460,7 +701,7 @@ export default function SupplierDashboard() {
                 )}
 
                 {/* TAB 2: B2B ORDERS */}
-                {activeTab === "orders" && (
+                {isAccountActive && activeTab === "orders" && (
                     <div className="space-y-4">
                         <h2 className="text-xl font-bold tracking-tight">Live B2B Restaurant Orders</h2>
                         {orders.length === 0 ? (
@@ -523,7 +764,7 @@ export default function SupplierDashboard() {
                 )}
 
                 {/* TAB 3: SALES & REVENUE ANALYTICS */}
-                {activeTab === "sales" && (
+                {isAccountActive && activeTab === "sales" && (
                     <div className="space-y-6">
                         <h2 className="text-xl font-bold tracking-tight">Sales Analytics & Revenue Overview</h2>
 
@@ -568,7 +809,7 @@ export default function SupplierDashboard() {
                 )}
 
                 {/* TAB 4: B2B RESTAURANT CUSTOMERS */}
-                {activeTab === "customers" && (
+                {isAccountActive && activeTab === "customers" && (
                     <div className="space-y-4">
                         <h2 className="text-xl font-bold tracking-tight">B2B Restaurant Customers</h2>
                         <p className="theme-muted text-xs">Restaurants that have placed supply orders with your business</p>
@@ -605,8 +846,8 @@ export default function SupplierDashboard() {
                     </div>
                 )}
 
-                {/* TAB 5: SUPPLIER PROFILE & KYC */}
-                {activeTab === "profile" && (
+                {/* TAB 5: ACTIVE PROFILE VIEW FOR VERIFIED SUPPLIERS */}
+                {isAccountActive && activeTab === "profile" && (
                     <div className="space-y-6">
                         <h2 className="text-xl font-bold tracking-tight">Supplier Profile & Business KYC Compliance</h2>
 
@@ -716,7 +957,7 @@ export default function SupplierDashboard() {
                                 className="theme-button rounded-xl px-6 py-3 font-bold text-sm transition flex items-center justify-center gap-2 cursor-pointer"
                             >
                                 <Save size={18} />
-                                {savingProfile ? "Saving Profile..." : "Save Profile & KYC Details"}
+                                {savingProfile ? "Saving Profile..." : "Update Profile & KYC Details"}
                             </button>
                         </form>
                     </div>
@@ -724,7 +965,7 @@ export default function SupplierDashboard() {
             </main>
 
             {/* Add Product Modal */}
-            {showAddProductModal && (
+            {showAddProductModal && isAccountActive && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
                     <div className="theme-panel w-full max-w-lg rounded-3xl p-6 space-y-4 border shadow-2xl">
                         <h3 className="text-xl font-bold">Add New Product to Marketplace</h3>
