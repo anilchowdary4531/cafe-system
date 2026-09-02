@@ -85,6 +85,7 @@ export default function SupplierDashboard() {
         discountType: "PERCENTAGE",
         discountValue: 8,
         initialStock: 500,
+        imageUrl: "",
         description: "Fresh premium quality raw supplies",
     });
 
@@ -779,17 +780,25 @@ export default function SupplierDashboard() {
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {products.map((p) => (
-                                    <div key={p.id} className="theme-panel rounded-2xl p-5 space-y-3 border shadow-sm">
-                                        <div className="flex items-start justify-between">
-                                            <div>
-                                                <h3 className="font-bold text-base">{p.name}</h3>
-                                                <p className="theme-muted text-xs">MOQ: {p.moq} {p.unit}</p>
+                                {products.map((p) => {
+                                    const imgUrl = p.images?.[0]?.imageUrl || p.imageUrl;
+                                    return (
+                                        <div key={p.id} className="theme-panel rounded-2xl p-4 space-y-3 border shadow-sm">
+                                            {imgUrl ? (
+                                                <div className="h-36 w-full rounded-xl overflow-hidden border theme-border bg-black/40 shadow-inner">
+                                                    <img src={imgUrl} alt={p.name} className="h-full w-full object-cover hover:scale-105 transition duration-300" />
+                                                </div>
+                                            ) : null}
+
+                                            <div className="flex items-start justify-between">
+                                                <div>
+                                                    <h3 className="font-bold text-base">{p.name}</h3>
+                                                    <p className="theme-muted text-xs">MOQ: {p.moq} {p.unit}</p>
+                                                </div>
+                                                <span className="theme-button-secondary rounded-full px-3 py-1 text-xs font-bold">
+                                                    ₹{p.prices?.[0]?.basePrice || 100} / {p.unit}
+                                                </span>
                                             </div>
-                                            <span className="theme-button-secondary rounded-full px-3 py-1 text-xs font-bold">
-                                                ₹{p.prices?.[0]?.basePrice || 100} / {p.unit}
-                                            </span>
-                                        </div>
                                         <div className="text-xs space-y-1 theme-muted border-t theme-border pt-3">
                                             <p>Stock: <span className="font-bold">{p.inventory?.availableStock || 0} {p.unit}</span> available</p>
                                             <p>Discount: <span className="font-bold theme-accent-text">{p.discounts?.[0]?.value || 0}% OFF</span></p>
@@ -1342,7 +1351,7 @@ export default function SupplierDashboard() {
                         <h3 className="text-xl font-bold">Add New Product to Marketplace</h3>
                         <form onSubmit={handleCreateProduct} className="space-y-3">
                             <div>
-                                <label className="theme-muted mb-1 block text-xs font-bold uppercase">Product Name</label>
+                                <label className="theme-muted mb-1 block text-xs font-bold uppercase">Product Name *</label>
                                 <input
                                     type="text"
                                     placeholder="e.g. Fresh Chicken Breast"
@@ -1351,6 +1360,54 @@ export default function SupplierDashboard() {
                                     required
                                     className="theme-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
                                 />
+                            </div>
+
+                            {/* Stock Photo / Image Selector */}
+                            <div className="space-y-1.5 border-t border-b theme-border py-2.5">
+                                <div className="flex items-center justify-between">
+                                    <label className="theme-muted text-xs font-bold uppercase">Stock Photo / Product Image</label>
+                                    <span className="theme-accent-text text-[10px] font-bold">Photo URL or Quick Presets</span>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <input
+                                        type="url"
+                                        placeholder="https://images.unsplash.com/photo-..."
+                                        value={newProduct.imageUrl}
+                                        onChange={(e) => setNewProduct({ ...newProduct, imageUrl: e.target.value })}
+                                        className="theme-input flex-1 rounded-xl px-4 py-2 text-xs outline-none"
+                                    />
+                                    {newProduct.imageUrl && (
+                                        <div className="h-9 w-9 rounded-xl overflow-hidden border theme-border flex-shrink-0 bg-black/40 shadow-sm">
+                                            <img src={newProduct.imageUrl} alt="Stock Preview" className="h-full w-full object-cover" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Quick Stock Photo Presets */}
+                                <div className="space-y-1 pt-1">
+                                    <p className="theme-muted text-[10px] font-bold uppercase">Click to Select Sample Stock Photo:</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {[
+                                            { label: "🐔 Chicken", url: "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=400&auto=format&fit=crop" },
+                                            { label: "🧈 Dairy Butter", url: "https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=400&auto=format&fit=crop" },
+                                            { label: "🥦 Vegetables", url: "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&auto=format&fit=crop" },
+                                            { label: "🌾 Grains & Rice", url: "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&auto=format&fit=crop" },
+                                            { label: "🌶️ Spices", url: "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&auto=format&fit=crop" },
+                                        ].map((preset) => (
+                                            <button
+                                                key={preset.label}
+                                                type="button"
+                                                onClick={() => setNewProduct({ ...newProduct, imageUrl: preset.url })}
+                                                className={`text-[11px] px-2.5 py-1 rounded-lg border font-bold cursor-pointer transition ${
+                                                    newProduct.imageUrl === preset.url ? "theme-button border-amber-400" : "theme-card hover:theme-panel"
+                                                }`}
+                                            >
+                                                {preset.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">

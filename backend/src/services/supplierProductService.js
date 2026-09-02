@@ -47,8 +47,13 @@ export async function createSupplierProduct(supplierId, data) {
         discountValue = 0,
         initialStock = 0,
         lowStockAlert = 10,
+        imageUrl,
         imageUrls = [],
     } = data || {};
+
+    const imagesList = Array.isArray(imageUrls) && imageUrls.length > 0
+        ? imageUrls
+        : (imageUrl ? [imageUrl] : []);
 
     const cleanName = String(name || "").trim();
     if (!cleanName) throw { statusCode: 400, message: "Product name is required" };
@@ -117,9 +122,9 @@ export async function createSupplierProduct(supplierId, data) {
             });
         }
 
-        if (Array.isArray(imageUrls) && imageUrls.length > 0) {
+        if (Array.isArray(imagesList) && imagesList.length > 0) {
             await tx.supplyProductImage.createMany({
-                data: imageUrls.map((url, idx) => ({
+                data: imagesList.map((url, idx) => ({
                     productId: createdProduct.id,
                     imageUrl: String(url).trim(),
                     priority: idx,
