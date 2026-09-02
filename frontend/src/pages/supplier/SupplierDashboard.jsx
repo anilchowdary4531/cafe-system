@@ -36,7 +36,7 @@ export default function SupplierDashboard() {
     const [products, setProducts] = useState([]);
     const [orders, setOrders] = useState([]);
     const [showAddProductModal, setShowAddProductModal] = useState(false);
-    const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false); // Collapsible Menu state (hidden by default)
     const [savingProfile, setSavingProfile] = useState(false);
 
     const [profileForm, setProfileForm] = useState({
@@ -179,93 +179,87 @@ export default function SupplierDashboard() {
     ];
 
     return (
-        <div className="theme-page min-h-screen flex flex-col md:flex-row">
-            {/* DESKTOP SIDEBAR NAVIGATION - MATCHING /owner SIDEBAR EXACTLY */}
-            <aside className="theme-sidebar w-64 flex-shrink-0 border-r theme-border hidden md:flex flex-col justify-between p-4 sticky top-0 h-screen">
-                <div>
-                    {/* BRAND LOGO HEADER */}
-                    <div className="flex items-center justify-between px-3 py-3 mb-6 border-b theme-border">
-                        <div className="flex items-center gap-3">
+        <div className="theme-page min-h-screen flex flex-col relative">
+            {/* TOP HEADER BAR WITH MENU TOGGLE BUTTON */}
+            <header className="theme-nav sticky top-0 z-40 px-4 sm:px-6 py-4 border-b shadow-sm">
+                <div className="mx-auto flex max-w-7xl items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        {/* TOGGLE MENU BUTTON (SHOW / HIDE SIDEBAR DRAWER) */}
+                        <button
+                            type="button"
+                            onClick={() => setSidebarOpen(!sidebarOpen)}
+                            className="theme-button px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 cursor-pointer shadow-md"
+                        >
+                            {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+                            <span>{sidebarOpen ? "Close Menu" : "Menu"}</span>
+                        </button>
+
+                        <div className="flex items-center gap-2.5">
                             <div className="theme-card flex h-10 w-10 items-center justify-center rounded-2xl shadow-md">
                                 <BrandLogo className="h-7 w-7" title="Brand logo" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold tracking-tight">Tiffzy</h1>
-                                <p className="theme-muted text-[11px] font-semibold">Supplier Portal</p>
+                                <h1 className="text-xl font-bold tracking-tight">
+                                    {profileData?.profile?.businessName || "Supplier Portal"}
+                                </h1>
+                                <p className="theme-muted text-xs font-medium hidden sm:block">
+                                    Tiffzy Supply Chain Marketplace • Status:{" "}
+                                    <span className="theme-accent-text font-bold">{profileData?.status || "ACTIVE"}</span>
+                                </p>
                             </div>
                         </div>
                     </div>
 
-                    {/* VERTICAL NAV LINKS */}
-                    <nav className="space-y-1.5">
-                        {navTabs.map((tab) => {
-                            const Icon = tab.icon;
-                            const isActive = activeTab === tab.id;
-                            return (
-                                <button
-                                    key={tab.id}
-                                    type="button"
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`w-full px-4 py-3 rounded-2xl text-sm font-bold transition flex items-center justify-between cursor-pointer ${
-                                        isActive
-                                            ? "theme-button font-extrabold shadow-lg"
-                                            : "theme-soft-button hover:theme-panel"
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <Icon size={18} />
-                                        <span>{tab.label}</span>
-                                    </div>
-                                    {tab.count !== undefined && (
-                                        <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
-                                            isActive ? "bg-black/20 text-black" : "theme-card"
-                                        }`}>
-                                            {tab.count}
-                                        </span>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </nav>
-                </div>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <button
+                            type="button"
+                            onClick={loadData}
+                            className="theme-soft-button rounded-xl px-3.5 py-2 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                        >
+                            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+                            <span className="hidden sm:inline">Refresh</span>
+                        </button>
 
-                {/* BOTTOM LOGOUT & USER INFO */}
-                <div className="border-t theme-border pt-4 px-2 space-y-3">
-                    <div className="flex items-center justify-between text-xs">
-                        <div className="truncate pr-2">
-                            <p className="font-bold truncate">{profileData?.profile?.businessName || "Supplier Business"}</p>
-                            <p className="theme-muted text-[11px]">Status: <span className="theme-accent-text font-bold">{profileData?.status || "ACTIVE"}</span></p>
-                        </div>
                         <button
                             type="button"
                             onClick={handleLogout}
-                            className="p-2 rounded-xl text-red-400 hover:bg-red-500/10 transition cursor-pointer"
-                            title="Logout"
+                            className="rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-xs font-bold text-red-400 hover:bg-red-500/20 transition flex items-center gap-1.5 cursor-pointer"
                         >
-                            <LogOut size={18} />
+                            <LogOut size={14} />
+                            <span className="hidden sm:inline">Logout</span>
                         </button>
                     </div>
                 </div>
-            </aside>
+            </header>
 
-            {/* MOBILE SIDEBAR DRAWER OVERLAY */}
-            {showMobileSidebar && (
-                <div className="fixed inset-0 z-50 flex md:hidden bg-black/80 backdrop-blur-sm">
-                    <div className="theme-sidebar w-72 max-w-[80vw] h-full p-4 flex flex-col justify-between shadow-2xl border-r theme-border">
+            {/* COLLAPSIBLE SIDEBAR MENU DRAWER OVERLAY */}
+            {sidebarOpen && (
+                <div className="fixed inset-0 z-50 flex">
+                    {/* BACKDROP BLUR CLICK OUTSIDE TO CLOSE */}
+                    <div
+                        className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+                        onClick={() => setSidebarOpen(false)}
+                    />
+
+                    {/* SIDEBAR DRAWER PANEL */}
+                    <aside className="theme-sidebar relative z-10 w-72 max-w-[85vw] h-full p-4 flex flex-col justify-between shadow-2xl border-r theme-border animate-in slide-in-from-left duration-200">
                         <div>
-                            <div className="flex items-center justify-between px-2 py-3 mb-6 border-b theme-border">
+                            <div className="flex items-center justify-between px-2 py-3 mb-4 border-b theme-border">
                                 <div className="flex items-center gap-3">
-                                    <div className="theme-card flex h-9 w-9 items-center justify-center rounded-xl">
-                                        <BrandLogo className="h-6 w-6" title="Brand logo" />
+                                    <div className="theme-card flex h-10 w-10 items-center justify-center rounded-2xl">
+                                        <BrandLogo className="h-7 w-7" title="Brand logo" />
                                     </div>
-                                    <h1 className="text-lg font-bold">Tiffzy Supply</h1>
+                                    <div>
+                                        <h1 className="text-lg font-bold">Tiffzy Supply</h1>
+                                        <p className="theme-muted text-[11px]">Navigation Menu</p>
+                                    </div>
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => setShowMobileSidebar(false)}
-                                    className="p-2 text-slate-400 hover:text-white"
+                                    onClick={() => setSidebarOpen(false)}
+                                    className="theme-soft-button p-2 rounded-xl"
                                 >
-                                    <X size={20} />
+                                    <X size={18} />
                                 </button>
                             </div>
 
@@ -279,10 +273,12 @@ export default function SupplierDashboard() {
                                             type="button"
                                             onClick={() => {
                                                 setActiveTab(tab.id);
-                                                setShowMobileSidebar(false);
+                                                setSidebarOpen(false); // Close sidebar after selecting tab
                                             }}
                                             className={`w-full px-4 py-3 rounded-2xl text-sm font-bold transition flex items-center justify-between cursor-pointer ${
-                                                isActive ? "theme-button" : "theme-soft-button"
+                                                isActive
+                                                    ? "theme-button font-extrabold shadow-lg shadow-amber-500/20"
+                                                    : "theme-soft-button hover:theme-panel"
                                             }`}
                                         >
                                             <div className="flex items-center gap-3">
@@ -290,7 +286,9 @@ export default function SupplierDashboard() {
                                                 <span>{tab.label}</span>
                                             </div>
                                             {tab.count !== undefined && (
-                                                <span className="px-2 py-0.5 rounded-full text-xs font-bold theme-card">
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
+                                                    isActive ? "bg-black/20 text-black" : "theme-card"
+                                                }`}>
                                                     {tab.count}
                                                 </span>
                                             )}
@@ -300,295 +298,106 @@ export default function SupplierDashboard() {
                             </nav>
                         </div>
 
-                        <div className="border-t theme-border pt-4">
-                            <button
-                                type="button"
-                                onClick={handleLogout}
-                                className="w-full flex items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 py-2.5 text-xs font-bold text-red-400"
-                            >
-                                <LogOut size={16} />
-                                Logout
-                            </button>
+                        <div className="border-t theme-border pt-4 px-1 space-y-3">
+                            <div className="flex items-center justify-between text-xs">
+                                <div className="truncate pr-2">
+                                    <p className="font-bold truncate">{profileData?.profile?.businessName || "Supplier"}</p>
+                                    <p className="theme-muted text-[11px]">Status: <span className="theme-accent-text font-bold">{profileData?.status || "ACTIVE"}</span></p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleLogout}
+                                    className="p-2 rounded-xl text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                                    title="Logout"
+                                >
+                                    <LogOut size={18} />
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    </aside>
                 </div>
             )}
 
-            {/* MAIN CONTENT AREA */}
-            <div className="flex-1 flex flex-col min-w-0">
-                {/* TOP HEADER BAR */}
-                <header className="theme-nav sticky top-0 z-30 px-4 sm:px-6 py-4 border-b">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setShowMobileSidebar(true)}
-                                className="theme-soft-button p-2 rounded-xl md:hidden cursor-pointer"
-                            >
-                                <Menu size={20} />
-                            </button>
-                            <h2 className="text-xl font-bold tracking-tight">
-                                {navTabs.find((t) => t.id === activeTab)?.label || "Dashboard"}
-                            </h2>
-                        </div>
-
-                        <div className="flex items-center gap-2 sm:gap-3">
-                            <button
-                                type="button"
-                                onClick={loadData}
-                                className="theme-soft-button rounded-xl px-3 py-2 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                            >
-                                <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-                                <span className="hidden sm:inline">Refresh</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleLogout}
-                                className="md:hidden rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-400"
-                            >
-                                <LogOut size={14} />
-                            </button>
-                        </div>
-                    </div>
-                </header>
-
-                {/* CONTENT SECTION */}
-                <main className="p-4 sm:p-6 space-y-6 flex-1">
-                    {/* DASHBOARD OVERVIEW & METRICS */}
-                    {activeTab === "dashboard" && (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
-                                    <p className="theme-muted text-xs font-bold uppercase tracking-wider">Active Products</p>
-                                    <p className="text-3xl font-black">{products.length}</p>
-                                </div>
-
-                                <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
-                                    <p className="theme-muted text-xs font-bold uppercase tracking-wider">B2B Restaurant Orders</p>
-                                    <p className="text-3xl font-black">{orders.length}</p>
-                                </div>
-
-                                <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
-                                    <p className="theme-muted text-xs font-bold uppercase tracking-wider">Total Sales Volume</p>
-                                    <p className="text-3xl font-black theme-accent-text">₹{totalSalesVolume.toLocaleString()}</p>
-                                </div>
-
-                                <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
-                                    <p className="theme-muted text-xs font-bold uppercase tracking-wider">Low Stock Alerts</p>
-                                    <p className="text-3xl font-black text-red-400">
-                                        {products.filter((p) => (p.inventory?.availableStock || 0) <= 10).length}
-                                    </p>
-                                </div>
+            {/* MAIN FULL-WIDTH CONTENT AREA */}
+            <main className="mx-auto max-w-7xl w-full p-4 sm:p-6 space-y-6 flex-1">
+                {/* DASHBOARD OVERVIEW & METRICS */}
+                {activeTab === "dashboard" && (
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
+                                <p className="theme-muted text-xs font-bold uppercase tracking-wider">Active Products</p>
+                                <p className="text-3xl font-black">{products.length}</p>
                             </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Recent Catalog Products */}
-                                <div className="theme-panel rounded-3xl p-6 border space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="font-bold text-lg">Catalog Products</h3>
-                                        <button
-                                            type="button"
-                                            onClick={() => setActiveTab("products")}
-                                            className="text-xs font-bold theme-accent-text hover:underline"
-                                        >
-                                            View All ({products.length})
-                                        </button>
-                                    </div>
-                                    {products.length === 0 ? (
-                                        <p className="theme-muted text-sm py-4 text-center">No products published yet.</p>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {products.slice(0, 4).map((p) => (
-                                                <div key={p.id} className="flex items-center justify-between border-b theme-border pb-3 text-sm">
-                                                    <div>
-                                                        <p className="font-bold">{p.name}</p>
-                                                        <p className="theme-muted text-xs">MOQ: {p.moq} {p.unit}</p>
-                                                    </div>
-                                                    <span className="font-bold theme-accent-text">₹{p.prices?.[0]?.basePrice || 100} / {p.unit}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                            <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
+                                <p className="theme-muted text-xs font-bold uppercase tracking-wider">B2B Restaurant Orders</p>
+                                <p className="text-3xl font-black">{orders.length}</p>
+                            </div>
 
-                                {/* Recent Live Orders */}
-                                <div className="theme-panel rounded-3xl p-6 border space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="font-bold text-lg">Recent B2B Orders</h3>
-                                        <button
-                                            type="button"
-                                            onClick={() => setActiveTab("orders")}
-                                            className="text-xs font-bold theme-accent-text hover:underline"
-                                        >
-                                            View All ({orders.length})
-                                        </button>
-                                    </div>
-                                    {orders.length === 0 ? (
-                                        <p className="theme-muted text-sm py-4 text-center">No incoming orders yet.</p>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {orders.slice(0, 4).map((o) => (
-                                                <div key={o.id} className="flex items-center justify-between border-b theme-border pb-3 text-sm">
-                                                    <div>
-                                                        <p className="font-bold theme-accent-text">{o.orderNo}</p>
-                                                        <p className="theme-muted text-xs">{o.restaurant?.name || "Tiffzy Cafe"}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="font-bold">₹{o.totalAmount}</p>
-                                                        <p className="theme-muted text-xs">{o.status}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                            <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
+                                <p className="theme-muted text-xs font-bold uppercase tracking-wider">Total Sales Volume</p>
+                                <p className="text-3xl font-black theme-accent-text">₹{totalSalesVolume.toLocaleString()}</p>
+                            </div>
+
+                            <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
+                                <p className="theme-muted text-xs font-bold uppercase tracking-wider">Low Stock Alerts</p>
+                                <p className="text-3xl font-black text-red-400">
+                                    {products.filter((p) => (p.inventory?.availableStock || 0) <= 10).length}
+                                </p>
                             </div>
                         </div>
-                    )}
 
-                    {/* TAB 1: CATALOG PRODUCTS */}
-                    {activeTab === "products" && (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-xl font-bold tracking-tight">Catalog Products</h2>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAddProductModal(true)}
-                                    className="theme-button rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer"
-                                >
-                                    <Plus size={16} />
-                                    Add Supply Product
-                                </button>
-                            </div>
-
-                            {products.length === 0 ? (
-                                <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
-                                    <Package size={40} className="mx-auto theme-accent-text" />
-                                    <h3 className="text-lg font-bold">No products added yet</h3>
-                                    <p className="theme-muted text-sm max-w-sm mx-auto">
-                                        Click "Add Supply Product" to publish raw ingredients, set pricing, MOQ, and inventory.
-                                    </p>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Recent Catalog Products */}
+                            <div className="theme-panel rounded-3xl p-6 border space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-bold text-lg">Catalog Products</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab("products")}
+                                        className="text-xs font-bold theme-accent-text hover:underline"
+                                    >
+                                        View All ({products.length})
+                                    </button>
                                 </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {products.map((p) => (
-                                        <div key={p.id} className="theme-panel rounded-2xl p-5 space-y-3 border shadow-sm">
-                                            <div className="flex items-start justify-between">
+                                {products.length === 0 ? (
+                                    <p className="theme-muted text-sm py-4 text-center">No products published yet.</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {products.slice(0, 4).map((p) => (
+                                            <div key={p.id} className="flex items-center justify-between border-b theme-border pb-3 text-sm">
                                                 <div>
-                                                    <h3 className="font-bold text-base">{p.name}</h3>
+                                                    <p className="font-bold">{p.name}</p>
                                                     <p className="theme-muted text-xs">MOQ: {p.moq} {p.unit}</p>
                                                 </div>
-                                                <span className="theme-button-secondary rounded-full px-3 py-1 text-xs font-bold">
-                                                    ₹{p.prices?.[0]?.basePrice || 100} / {p.unit}
-                                                </span>
+                                                <span className="font-bold theme-accent-text">₹{p.prices?.[0]?.basePrice || 100} / {p.unit}</span>
                                             </div>
-                                            <div className="text-xs space-y-1 theme-muted border-t theme-border pt-3">
-                                                <p>Stock: <span className="font-bold">{p.inventory?.availableStock || 0} {p.unit}</span> available</p>
-                                                <p>Discount: <span className="font-bold theme-accent-text">{p.discounts?.[0]?.value || 0}% OFF</span></p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* TAB 2: B2B ORDERS */}
-                    {activeTab === "orders" && (
-                        <div className="space-y-4">
-                            <h2 className="text-xl font-bold tracking-tight">Live B2B Restaurant Orders</h2>
-                            {orders.length === 0 ? (
-                                <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
-                                    <ShoppingBag size={40} className="mx-auto theme-accent-text" />
-                                    <h3 className="text-lg font-bold">No incoming B2B orders yet</h3>
-                                    <p className="theme-muted text-sm max-w-sm mx-auto">
-                                        Orders placed by restaurants from the Tiffzy Supply Marketplace will appear here for fulfillment.
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {orders.map((o) => (
-                                        <div key={o.id} className="theme-panel rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border shadow-sm">
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className="font-extrabold theme-accent-text">{o.orderNo}</span>
-                                                    <span className="theme-chip rounded-full px-3 py-0.5 text-xs font-bold">
-                                                        {o.status}
-                                                    </span>
-                                                </div>
-                                                <p className="theme-muted text-xs">Restaurant: {o.restaurant?.name || "Tiffzy Cafe"}</p>
-                                                <p className="text-sm font-extrabold mt-1">Total Amount: ₹{o.totalAmount}</p>
-                                            </div>
-
-                                            <div className="flex items-center gap-2">
-                                                {o.status === "PLACED" && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleUpdateOrderStatus(o.id, "accept")}
-                                                        className="theme-button rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer"
-                                                    >
-                                                        Accept Order
-                                                    </button>
-                                                )}
-                                                {o.status === "ACCEPTED" && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleUpdateOrderStatus(o.id, "dispatch")}
-                                                        className="theme-button-secondary rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer"
-                                                    >
-                                                        Dispatch Order
-                                                    </button>
-                                                )}
-                                                {o.status === "DISPATCHED" && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleUpdateOrderStatus(o.id, "complete")}
-                                                        className="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-4 py-2 text-xs transition cursor-pointer"
-                                                    >
-                                                        Mark Completed
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* TAB 3: SALES & REVENUE ANALYTICS */}
-                    {activeTab === "sales" && (
-                        <div className="space-y-6">
-                            <h2 className="text-xl font-bold tracking-tight">Sales Analytics & Revenue Overview</h2>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <div className="theme-panel rounded-2xl p-5 border space-y-1">
-                                    <p className="theme-muted text-xs font-bold uppercase">Gross B2B Sales</p>
-                                    <p className="text-3xl font-black theme-accent-text">₹{totalSalesVolume.toLocaleString()}</p>
-                                </div>
-                                <div className="theme-panel rounded-2xl p-5 border space-y-1">
-                                    <p className="theme-muted text-xs font-bold uppercase">Estimated Net Payout (95%)</p>
-                                    <p className="text-3xl font-black text-emerald-400">₹{netPayout.toLocaleString()}</p>
-                                    <p className="theme-muted text-[11px]">5% Platform commission deducted</p>
-                                </div>
-                                <div className="theme-panel rounded-2xl p-5 border space-y-1">
-                                    <p className="theme-muted text-xs font-bold uppercase">Average Order Value (AOV)</p>
-                                    <p className="text-3xl font-black">₹{avgOrderValue.toLocaleString()}</p>
-                                </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
+                            {/* Recent Live Orders */}
                             <div className="theme-panel rounded-3xl p-6 border space-y-4">
-                                <h3 className="text-lg font-bold">Recent Order Sales Summary</h3>
-                                {validOrders.length === 0 ? (
-                                    <p className="theme-muted text-sm">No completed sales orders recorded yet.</p>
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-bold text-lg">Recent B2B Orders</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab("orders")}
+                                        className="text-xs font-bold theme-accent-text hover:underline"
+                                    >
+                                        View All ({orders.length})
+                                    </button>
+                                </div>
+                                {orders.length === 0 ? (
+                                    <p className="theme-muted text-sm py-4 text-center">No incoming orders yet.</p>
                                 ) : (
-                                    <div className="space-y-2">
-                                        {validOrders.map((o) => (
-                                            <div key={o.id} className="flex items-center justify-between border-b theme-border pb-2 text-sm">
+                                    <div className="space-y-3">
+                                        {orders.slice(0, 4).map((o) => (
+                                            <div key={o.id} className="flex items-center justify-between border-b theme-border pb-3 text-sm">
                                                 <div>
                                                     <p className="font-bold theme-accent-text">{o.orderNo}</p>
-                                                    <p className="theme-muted text-xs">Client: {o.restaurant?.name || "Restaurant Client"}</p>
+                                                    <p className="theme-muted text-xs">{o.restaurant?.name || "Tiffzy Cafe"}</p>
                                                 </div>
                                                 <div className="text-right">
                                                     <p className="font-bold">₹{o.totalAmount}</p>
@@ -600,164 +409,319 @@ export default function SupplierDashboard() {
                                 )}
                             </div>
                         </div>
-                    )}
+                    </div>
+                )}
 
-                    {/* TAB 4: B2B RESTAURANT CUSTOMERS */}
-                    {activeTab === "customers" && (
-                        <div className="space-y-4">
-                            <h2 className="text-xl font-bold tracking-tight">B2B Restaurant Customers</h2>
-                            <p className="theme-muted text-xs">Restaurants that have placed supply orders with your business</p>
+                {/* TAB 1: CATALOG PRODUCTS */}
+                {activeTab === "products" && (
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-bold tracking-tight">Catalog Products</h2>
+                            <button
+                                type="button"
+                                onClick={() => setShowAddProductModal(true)}
+                                className="theme-button rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer"
+                            >
+                                <Plus size={16} />
+                                Add Supply Product
+                            </button>
+                        </div>
 
-                            {customers.length === 0 ? (
-                                <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
-                                    <Users size={40} className="mx-auto theme-accent-text" />
-                                    <h3 className="text-lg font-bold">No restaurant clients yet</h3>
-                                    <p className="theme-muted text-sm max-w-sm mx-auto">
-                                        When restaurant owners order raw materials from your catalog, their accounts will be listed here.
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {customers.map((c) => (
-                                        <div key={c.id} className="theme-panel rounded-2xl p-5 border space-y-3 shadow-sm">
-                                            <div className="flex items-center gap-3">
-                                                <div className="theme-card flex h-10 w-10 items-center justify-center rounded-xl font-bold theme-accent-text">
-                                                    <Building2 size={20} />
-                                                </div>
-                                                <div>
-                                                    <h3 className="font-bold text-base">{c.name}</h3>
-                                                    <p className="theme-muted text-xs">{c.orderCount} Orders Placed</p>
-                                                </div>
+                        {products.length === 0 ? (
+                            <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
+                                <Package size={40} className="mx-auto theme-accent-text" />
+                                <h3 className="text-lg font-bold">No products added yet</h3>
+                                <p className="theme-muted text-sm max-w-sm mx-auto">
+                                    Click "Add Supply Product" to publish raw ingredients, set pricing, MOQ, and inventory.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {products.map((p) => (
+                                    <div key={p.id} className="theme-panel rounded-2xl p-5 space-y-3 border shadow-sm">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <h3 className="font-bold text-base">{p.name}</h3>
+                                                <p className="theme-muted text-xs">MOQ: {p.moq} {p.unit}</p>
                                             </div>
-                                            <div className="border-t theme-border pt-3 flex items-center justify-between text-xs">
-                                                <span className="theme-muted">Total Spent:</span>
-                                                <span className="font-extrabold theme-accent-text text-sm">₹{c.totalSpent.toLocaleString()}</span>
+                                            <span className="theme-button-secondary rounded-full px-3 py-1 text-xs font-bold">
+                                                ₹{p.prices?.[0]?.basePrice || 100} / {p.unit}
+                                            </span>
+                                        </div>
+                                        <div className="text-xs space-y-1 theme-muted border-t theme-border pt-3">
+                                            <p>Stock: <span className="font-bold">{p.inventory?.availableStock || 0} {p.unit}</span> available</p>
+                                            <p>Discount: <span className="font-bold theme-accent-text">{p.discounts?.[0]?.value || 0}% OFF</span></p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* TAB 2: B2B ORDERS */}
+                {activeTab === "orders" && (
+                    <div className="space-y-4">
+                        <h2 className="text-xl font-bold tracking-tight">Live B2B Restaurant Orders</h2>
+                        {orders.length === 0 ? (
+                            <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
+                                <ShoppingBag size={40} className="mx-auto theme-accent-text" />
+                                <h3 className="text-lg font-bold">No incoming B2B orders yet</h3>
+                                <p className="theme-muted text-sm max-w-sm mx-auto">
+                                    Orders placed by restaurants from the Tiffzy Supply Marketplace will appear here for fulfillment.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {orders.map((o) => (
+                                    <div key={o.id} className="theme-panel rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border shadow-sm">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="font-extrabold theme-accent-text">{o.orderNo}</span>
+                                                <span className="theme-chip rounded-full px-3 py-0.5 text-xs font-bold">
+                                                    {o.status}
+                                                </span>
+                                            </div>
+                                            <p className="theme-muted text-xs">Restaurant: {o.restaurant?.name || "Tiffzy Cafe"}</p>
+                                            <p className="text-sm font-extrabold mt-1">Total Amount: ₹{o.totalAmount}</p>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            {o.status === "PLACED" && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateOrderStatus(o.id, "accept")}
+                                                    className="theme-button rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer"
+                                                >
+                                                    Accept Order
+                                                </button>
+                                            )}
+                                            {o.status === "ACCEPTED" && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateOrderStatus(o.id, "dispatch")}
+                                                    className="theme-button-secondary rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer"
+                                                >
+                                                    Dispatch Order
+                                                </button>
+                                            )}
+                                            {o.status === "DISPATCHED" && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateOrderStatus(o.id, "complete")}
+                                                    className="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-4 py-2 text-xs transition cursor-pointer"
+                                                >
+                                                    Mark Completed
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* TAB 3: SALES & REVENUE ANALYTICS */}
+                {activeTab === "sales" && (
+                    <div className="space-y-6">
+                        <h2 className="text-xl font-bold tracking-tight">Sales Analytics & Revenue Overview</h2>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="theme-panel rounded-2xl p-5 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Gross B2B Sales</p>
+                                <p className="text-3xl font-black theme-accent-text">₹{totalSalesVolume.toLocaleString()}</p>
+                            </div>
+                            <div className="theme-panel rounded-2xl p-5 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Estimated Net Payout (95%)</p>
+                                <p className="text-3xl font-black text-emerald-400">₹{netPayout.toLocaleString()}</p>
+                                <p className="theme-muted text-[11px]">5% Platform commission deducted</p>
+                            </div>
+                            <div className="theme-panel rounded-2xl p-5 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Average Order Value (AOV)</p>
+                                <p className="text-3xl font-black">₹{avgOrderValue.toLocaleString()}</p>
+                            </div>
+                        </div>
+
+                        <div className="theme-panel rounded-3xl p-6 border space-y-4">
+                            <h3 className="text-lg font-bold">Recent Order Sales Summary</h3>
+                            {validOrders.length === 0 ? (
+                                <p className="theme-muted text-sm">No completed sales orders recorded yet.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {validOrders.map((o) => (
+                                        <div key={o.id} className="flex items-center justify-between border-b theme-border pb-2 text-sm">
+                                            <div>
+                                                <p className="font-bold theme-accent-text">{o.orderNo}</p>
+                                                <p className="theme-muted text-xs">Client: {o.restaurant?.name || "Restaurant Client"}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-bold">₹{o.totalAmount}</p>
+                                                <p className="theme-muted text-xs">{o.status}</p>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </div>
-                    )}
+                    </div>
+                )}
 
-                    {/* TAB 5: SUPPLIER PROFILE & KYC */}
-                    {activeTab === "profile" && (
-                        <div className="space-y-6">
-                            <h2 className="text-xl font-bold tracking-tight">Supplier Profile & Business KYC Compliance</h2>
+                {/* TAB 4: B2B RESTAURANT CUSTOMERS */}
+                {activeTab === "customers" && (
+                    <div className="space-y-4">
+                        <h2 className="text-xl font-bold tracking-tight">B2B Restaurant Customers</h2>
+                        <p className="theme-muted text-xs">Restaurants that have placed supply orders with your business</p>
 
-                            <form onSubmit={handleSaveProfile} className="theme-panel rounded-3xl p-6 border space-y-5">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Business / Supplier Name *</label>
-                                        <input
-                                            type="text"
-                                            value={profileForm.businessName}
-                                            onChange={(e) => setProfileForm({ ...profileForm, businessName: e.target.value })}
-                                            required
-                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
-                                        />
+                        {customers.length === 0 ? (
+                            <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
+                                <Users size={40} className="mx-auto theme-accent-text" />
+                                <h3 className="text-lg font-bold">No restaurant clients yet</h3>
+                                <p className="theme-muted text-sm max-w-sm mx-auto">
+                                    When restaurant owners order raw materials from your catalog, their accounts will be listed here.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {customers.map((c) => (
+                                    <div key={c.id} className="theme-panel rounded-2xl p-5 border space-y-3 shadow-sm">
+                                        <div className="flex items-center gap-3">
+                                            <div className="theme-card flex h-10 w-10 items-center justify-center rounded-xl font-bold theme-accent-text">
+                                                <Building2 size={20} />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-base">{c.name}</h3>
+                                                <p className="theme-muted text-xs">{c.orderCount} Orders Placed</p>
+                                            </div>
+                                        </div>
+                                        <div className="border-t theme-border pt-3 flex items-center justify-between text-xs">
+                                            <span className="theme-muted">Total Spent:</span>
+                                            <span className="font-extrabold theme-accent-text text-sm">₹{c.totalSpent.toLocaleString()}</span>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Legal Entity Name</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. ABC Foods Private Limited"
-                                            value={profileForm.legalName}
-                                            onChange={(e) => setProfileForm({ ...profileForm, legalName: e.target.value })}
-                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
-                                        />
-                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* TAB 5: SUPPLIER PROFILE & KYC */}
+                {activeTab === "profile" && (
+                    <div className="space-y-6">
+                        <h2 className="text-xl font-bold tracking-tight">Supplier Profile & Business KYC Compliance</h2>
+
+                        <form onSubmit={handleSaveProfile} className="theme-panel rounded-3xl p-6 border space-y-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Business / Supplier Name *</label>
+                                    <input
+                                        type="text"
+                                        value={profileForm.businessName}
+                                        onChange={(e) => setProfileForm({ ...profileForm, businessName: e.target.value })}
+                                        required
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                    />
                                 </div>
+                                <div>
+                                    <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Legal Entity Name</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. ABC Foods Private Limited"
+                                        value={profileForm.legalName}
+                                        onChange={(e) => setProfileForm({ ...profileForm, legalName: e.target.value })}
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">GSTIN Registration Number</label>
+                                    <input
+                                        type="text"
+                                        placeholder="22AAAAA0000A1Z5"
+                                        value={profileForm.gstin}
+                                        onChange={(e) => setProfileForm({ ...profileForm, gstin: e.target.value.toUpperCase() })}
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none uppercase"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">FSSAI License Number</label>
+                                    <input
+                                        type="text"
+                                        placeholder="10020011000123"
+                                        value={profileForm.fssaiLicense}
+                                        onChange={(e) => setProfileForm({ ...profileForm, fssaiLicense: e.target.value })}
+                                        className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="border-t theme-border pt-4 space-y-4">
+                                <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2 theme-accent-text">
+                                    <CreditCard size={18} />
+                                    Bank Settlement Details (For Automated Payouts)
+                                </h3>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">GSTIN Registration Number</label>
+                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Bank Account Number</label>
                                         <input
                                             type="text"
-                                            placeholder="22AAAAA0000A1Z5"
-                                            value={profileForm.gstin}
-                                            onChange={(e) => setProfileForm({ ...profileForm, gstin: e.target.value.toUpperCase() })}
+                                            placeholder="91823091823091"
+                                            value={profileForm.bankAccountNumber}
+                                            onChange={(e) => setProfileForm({ ...profileForm, bankAccountNumber: e.target.value })}
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">IFSC Code</label>
+                                        <input
+                                            type="text"
+                                            placeholder="HDFC0001234"
+                                            value={profileForm.bankIfscCode}
+                                            onChange={(e) => setProfileForm({ ...profileForm, bankIfscCode: e.target.value.toUpperCase() })}
                                             className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none uppercase"
                                         />
                                     </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">FSSAI License Number</label>
+                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Account Holder Name</label>
                                         <input
                                             type="text"
-                                            placeholder="10020011000123"
-                                            value={profileForm.fssaiLicense}
-                                            onChange={(e) => setProfileForm({ ...profileForm, fssaiLicense: e.target.value })}
+                                            placeholder="ABC Foods Pvt Ltd"
+                                            value={profileForm.bankAccountName}
+                                            onChange={(e) => setProfileForm({ ...profileForm, bankAccountName: e.target.value })}
+                                            className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Bank Name</label>
+                                        <input
+                                            type="text"
+                                            placeholder="HDFC Bank"
+                                            value={profileForm.bankName}
+                                            onChange={(e) => setProfileForm({ ...profileForm, bankName: e.target.value })}
                                             className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
                                         />
                                     </div>
                                 </div>
+                            </div>
 
-                                <div className="border-t theme-border pt-4 space-y-4">
-                                    <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2 theme-accent-text">
-                                        <CreditCard size={18} />
-                                        Bank Settlement Details (For Automated Payouts)
-                                    </h3>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Bank Account Number</label>
-                                            <input
-                                                type="text"
-                                                placeholder="91823091823091"
-                                                value={profileForm.bankAccountNumber}
-                                                onChange={(e) => setProfileForm({ ...profileForm, bankAccountNumber: e.target.value })}
-                                                className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">IFSC Code</label>
-                                            <input
-                                                type="text"
-                                                placeholder="HDFC0001234"
-                                                value={profileForm.bankIfscCode}
-                                                onChange={(e) => setProfileForm({ ...profileForm, bankIfscCode: e.target.value.toUpperCase() })}
-                                                className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none uppercase"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Account Holder Name</label>
-                                            <input
-                                                type="text"
-                                                placeholder="ABC Foods Pvt Ltd"
-                                                value={profileForm.bankAccountName}
-                                                onChange={(e) => setProfileForm({ ...profileForm, bankAccountName: e.target.value })}
-                                                className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="theme-muted mb-1.5 block text-xs font-bold uppercase">Bank Name</label>
-                                            <input
-                                                type="text"
-                                                placeholder="HDFC Bank"
-                                                value={profileForm.bankName}
-                                                onChange={(e) => setProfileForm({ ...profileForm, bankName: e.target.value })}
-                                                className="theme-input w-full rounded-xl px-4 py-3 text-sm outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    disabled={savingProfile}
-                                    className="theme-button rounded-xl px-6 py-3 font-bold text-sm transition flex items-center justify-center gap-2 cursor-pointer"
-                                >
-                                    <Save size={18} />
-                                    {savingProfile ? "Saving Profile..." : "Save Profile & KYC Details"}
-                                </button>
-                            </form>
-                        </div>
-                    )}
-                </main>
-            </div>
+                            <button
+                                type="submit"
+                                disabled={savingProfile}
+                                className="theme-button rounded-xl px-6 py-3 font-bold text-sm transition flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <Save size={18} />
+                                {savingProfile ? "Saving Profile..." : "Save Profile & KYC Details"}
+                            </button>
+                        </form>
+                    </div>
+                )}
+            </main>
 
             {/* Add Product Modal */}
             {showAddProductModal && (
