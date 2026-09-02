@@ -211,8 +211,8 @@ export default function OwnerSupplyMarketplace() {
 
             {/* Cart Modal */}
             {showCartModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-                    <div className="w-full max-w-lg rounded-3xl border border-white/15 bg-[#12141c] p-6 space-y-4 shadow-2xl">
+                <div className="fixed inset-0 z-50 flex items-center justify-center theme-modal-backdrop p-4">
+                    <div className="theme-modal w-full max-w-lg rounded-3xl p-6 space-y-4 shadow-2xl">
                         <div className="flex items-center justify-between border-b border-white/10 pb-3">
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                 <ShoppingCart size={20} className="text-amber-400" />

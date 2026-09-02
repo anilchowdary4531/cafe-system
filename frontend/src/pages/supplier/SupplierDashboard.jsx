@@ -966,8 +966,8 @@ export default function SupplierDashboard() {
 
             {/* Add Product Modal */}
             {showAddProductModal && isAccountActive && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-                    <div className="theme-panel w-full max-w-lg rounded-3xl p-6 space-y-4 border shadow-2xl">
+                <div className="fixed inset-0 z-50 flex items-center justify-center theme-modal-backdrop p-4">
+                    <div className="theme-modal w-full max-w-lg rounded-3xl p-6 space-y-4 shadow-2xl">
                         <h3 className="text-xl font-bold">Add New Product to Marketplace</h3>
                         <form onSubmit={handleCreateProduct} className="space-y-3">
                             <div>

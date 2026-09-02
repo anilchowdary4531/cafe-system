@@ -298,6 +298,18 @@ body,
     border-color: var(--app-border);
 }
 
+.theme-modal {
+    background: var(--app-surface, #12141c);
+    color: var(--app-text, inherit);
+    border: 1px solid var(--app-border, rgba(255, 255, 255, 0.15));
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.theme-modal-backdrop {
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+}
+
 .theme-input {
     background: var(--app-input, #10121a);
     color: var(--app-text, #fff8e7);
