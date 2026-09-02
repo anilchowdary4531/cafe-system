@@ -13,9 +13,25 @@ import {
     CreditCard,
     MapPin,
     Clock,
+    BarChart3,
+    PieChart as PieIcon,
 } from "lucide-react";
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from "recharts";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
+
+const CHART_COLORS = ["#f5b94e", "#10b981", "#3b82f6", "#ef4444", "#8b5cf6"];
 
 export default function SuperAdminSupplyChain() {
     const [loading, setLoading] = useState(true);
@@ -83,9 +99,39 @@ export default function SuperAdminSupplyChain() {
     const pendingSuppliers = suppliers.filter((s) => s.status !== "ACTIVE");
     const activeSuppliers = suppliers.filter((s) => s.status === "ACTIVE");
 
+    // CHART DATA 1: B2B Revenue / Sales Volume by Supplier
+    const supplierSalesChartData = suppliers.map((s) => {
+        const name = s.profile?.businessName || `Supplier #${s.id}`;
+        const suppOrders = orders.filter((o) => o.supplierId === s.id && o.status !== "CANCELLED");
+        const salesVolume = suppOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+        return {
+            name: name.length > 14 ? `${name.slice(0, 13)}...` : name,
+            fullName: name,
+            salesVolume,
+            commission: Math.round(salesVolume * 0.05),
+        };
+    });
+
+    // CHART DATA 2: B2B Order Status Distribution Split
+    const statusCounts = {
+        PLACED: orders.filter((o) => o.status === "PLACED").length,
+        ACCEPTED: orders.filter((o) => o.status === "ACCEPTED").length,
+        DISPATCHED: orders.filter((o) => o.status === "DISPATCHED").length,
+        DELIVERED: orders.filter((o) => o.status === "DELIVERED" || o.status === "COMPLETED").length,
+        CANCELLED: orders.filter((o) => o.status === "CANCELLED" || o.status === "REJECTED").length,
+    };
+
+    const orderStatusChartData = [
+        { name: "Placed", value: statusCounts.PLACED || 1, color: "#f5b94e" },
+        { name: "Accepted", value: statusCounts.ACCEPTED || 0, color: "#3b82f6" },
+        { name: "Dispatched", value: statusCounts.DISPATCHED || 0, color: "#8b5cf6" },
+        { name: "Completed", value: statusCounts.DELIVERED || 0, color: "#10b981" },
+        { name: "Cancelled", value: statusCounts.CANCELLED || 0, color: "#ef4444" },
+    ].filter((d) => d.value > 0);
+
     return (
         <section className="space-y-6">
-            {/* Header - Matching Super Admin Theme */}
+            {/* Header */}
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b theme-border pb-5">
                 <div>
                     <h2 className="text-2xl font-extrabold tracking-tight flex items-center gap-2">
@@ -105,7 +151,7 @@ export default function SuperAdminSupplyChain() {
                 </button>
             </div>
 
-            {/* Compact Metric Summary Row - Half Page Width, Clean Borderless Text Metrics */}
+            {/* Compact Metric Summary Row */}
             <div className="max-w-3xl grid grid-cols-2 sm:grid-cols-4 gap-6 py-2 border-b theme-border pb-5">
                 <div>
                     <p className="theme-muted text-[11px] font-bold uppercase tracking-wider">Pending KYC</p>
@@ -132,8 +178,79 @@ export default function SuperAdminSupplyChain() {
                 </div>
             </div>
 
+            {/* ANALYTICS GRAPHS SECTION */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* GRAPH 1: B2B Sales GMV Volume by Supplier */}
+                <div className="theme-panel rounded-3xl p-6 border shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="font-bold text-base flex items-center gap-2">
+                                <BarChart3 className="theme-accent-text" size={18} />
+                                B2B Sales GMV Volume by Supplier
+                            </h3>
+                            <p className="theme-muted text-xs">Gross raw ingredient procurement volume in ₹</p>
+                        </div>
+                    </div>
+
+                    <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={supplierSalesChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "currentColor" }} />
+                                <YAxis tick={{ fontSize: 11, fill: "currentColor" }} />
+                                <Tooltip
+                                    contentStyle={{ background: "#151722", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "12px", color: "#fff" }}
+                                    formatter={(val) => [`₹${val.toLocaleString()}`, "GMV Volume"]}
+                                />
+                                <Bar dataKey="salesVolume" radius={[8, 8, 0, 0]}>
+                                    {supplierSalesChartData.map((_, index) => (
+                                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* GRAPH 2: B2B Order Status Distribution */}
+                <div className="theme-panel rounded-3xl p-6 border shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="font-bold text-base flex items-center gap-2">
+                                <PieIcon className="theme-accent-text" size={18} />
+                                B2B Supply Order Status Share
+                            </h3>
+                            <p className="theme-muted text-xs">Distribution of placed, accepted, completed & cancelled orders</p>
+                        </div>
+                    </div>
+
+                    <div className="h-64 w-full flex items-center justify-center">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={orderStatusChartData}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={55}
+                                    outerRadius={85}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                >
+                                    {orderStatusChartData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    contentStyle={{ background: "#151722", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "12px", color: "#fff" }}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
+
             {/* Tab Navigation Controls */}
-            <div className="flex border-b theme-border gap-2">
+            <div className="flex border-b theme-border gap-2 pt-2">
                 <button
                     type="button"
                     onClick={() => setActiveTab("suppliers")}
