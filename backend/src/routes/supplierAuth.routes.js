@@ -115,22 +115,37 @@ export default async function supplierAuthRoutes(app) {
         }
     };
 
-    // Attach routes under both legacy /auth/supplier/* and API v1 /api/v1/auth/supplier/*
+    // Attach routes under /supplier/*, /auth/supplier/* and API v1 /api/v1/auth/supplier/*
     const endpoints = [
+        { path: "/supplier/register", handler: registerHandler },
         { path: "/auth/supplier/register", handler: registerHandler },
         { path: "/api/v1/auth/supplier/register", handler: registerHandler },
+
+        { path: "/supplier/resend-otp", handler: resendOtpHandler },
         { path: "/auth/supplier/resend-otp", handler: resendOtpHandler },
         { path: "/api/v1/auth/supplier/resend-otp", handler: resendOtpHandler },
+
+        { path: "/supplier/verify-otp", handler: verifyOtpHandler },
         { path: "/auth/supplier/verify-otp", handler: verifyOtpHandler },
         { path: "/api/v1/auth/supplier/verify-otp", handler: verifyOtpHandler },
+
+        { path: "/supplier/login", handler: loginHandler },
         { path: "/auth/supplier/login", handler: loginHandler },
         { path: "/api/v1/auth/supplier/login", handler: loginHandler },
+
+        { path: "/supplier/refresh", handler: refreshHandler },
         { path: "/auth/supplier/refresh", handler: refreshHandler },
         { path: "/api/v1/auth/supplier/refresh", handler: refreshHandler },
+
+        { path: "/supplier/forgot-password", handler: forgotPasswordHandler },
         { path: "/auth/supplier/forgot-password", handler: forgotPasswordHandler },
         { path: "/api/v1/auth/supplier/forgot-password", handler: forgotPasswordHandler },
+
+        { path: "/supplier/reset-password", handler: resetPasswordHandler },
         { path: "/auth/supplier/reset-password", handler: resetPasswordHandler },
         { path: "/api/v1/auth/supplier/reset-password", handler: resetPasswordHandler },
+
+        { path: "/supplier/logout", handler: logoutHandler },
         { path: "/auth/supplier/logout", handler: logoutHandler },
         { path: "/api/v1/auth/supplier/logout", handler: logoutHandler },
     ];

@@ -91,23 +91,24 @@ export default function SupplierLogin() {
                 showToast(res.data?.message || "Account verified successfully! Please log in.");
                 setSubMode("login");
             } else if (subMode === "forgot") {
-                const res = await api.post("/auth/supplier/forgot-password", {
-                    email: form.email,
-                    phone: form.phone,
-                });
+                const payload = { email: form.email };
+                if (form.phone) payload.phone = form.phone;
+                const res = await api.post("/auth/supplier/forgot-password", payload);
                 setRegisteredEmail(form.email);
                 showToast(res.data?.message || `Password reset OTP sent to ${form.email}!`);
                 if (res.data?.otpDebug) {
+                    setDevOtp(res.data.otpDebug);
                     showToast(`OTP Debug Code: ${res.data.otpDebug}`, { type: "info" });
                 }
                 setSubMode("reset-password");
             } else if (subMode === "reset-password") {
-                const res = await api.post("/auth/supplier/reset-password", {
+                const payload = {
                     email: registeredEmail || form.email,
-                    phone: form.phone,
                     otp: form.otp,
                     newPassword: form.newPassword,
-                });
+                };
+                if (form.phone) payload.phone = form.phone;
+                const res = await api.post("/auth/supplier/reset-password", payload);
                 showToast(res.data?.message || "Password reset successfully! Please log in.");
                 setSubMode("login");
             }
