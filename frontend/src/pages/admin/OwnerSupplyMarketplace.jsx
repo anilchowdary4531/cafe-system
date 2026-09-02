@@ -14,6 +14,7 @@ import {
     MessageSquare,
     Tag,
     Handshake,
+    Package,
 } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
