@@ -105,30 +105,30 @@ export default function SuperAdminSupplyChain() {
                 </button>
             </div>
 
-            {/* Metrics Overview Cards */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
-                    <p className="theme-muted text-xs font-bold uppercase tracking-wider">Pending KYC Verification</p>
-                    <p className="text-3xl font-black theme-accent-text">{pendingSuppliers.length}</p>
-                    <p className="theme-muted text-xs font-semibold">Requires Super Admin Review</p>
+            {/* Compact Metric Summary Row - Half Page Width, Clean Borderless Text Metrics */}
+            <div className="max-w-3xl grid grid-cols-2 sm:grid-cols-4 gap-6 py-2 border-b theme-border pb-5">
+                <div>
+                    <p className="theme-muted text-[11px] font-bold uppercase tracking-wider">Pending KYC</p>
+                    <p className="text-2xl font-black theme-accent-text">{pendingSuppliers.length}</p>
+                    <p className="theme-muted text-[11px]">Requires Review</p>
                 </div>
 
-                <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
-                    <p className="theme-muted text-xs font-bold uppercase tracking-wider">Active Approved Suppliers</p>
-                    <p className="text-3xl font-black text-emerald-500">{activeSuppliers.length}</p>
-                    <p className="theme-muted text-xs font-semibold">{suppliers.length} Total Registered</p>
+                <div>
+                    <p className="theme-muted text-[11px] font-bold uppercase tracking-wider">Active Suppliers</p>
+                    <p className="text-2xl font-black text-emerald-500">{activeSuppliers.length}</p>
+                    <p className="theme-muted text-[11px]">{suppliers.length} Total Registered</p>
                 </div>
 
-                <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
-                    <p className="theme-muted text-xs font-bold uppercase tracking-wider">Gross B2B GMV</p>
-                    <p className="text-3xl font-black theme-accent-text">₹{(dashboard?.orders?.totalVolume || 0).toLocaleString()}</p>
-                    <p className="theme-muted text-xs font-semibold">{dashboard?.orders?.totalCount || 0} Total Orders Placed</p>
+                <div>
+                    <p className="theme-muted text-[11px] font-bold uppercase tracking-wider">Gross B2B GMV</p>
+                    <p className="text-2xl font-black theme-accent-text">₹{(dashboard?.orders?.totalVolume || 0).toLocaleString()}</p>
+                    <p className="theme-muted text-[11px]">{dashboard?.orders?.totalCount || 0} Orders Placed</p>
                 </div>
 
-                <div className="theme-panel rounded-2xl p-5 space-y-1.5 border shadow-sm">
-                    <p className="theme-muted text-xs font-bold uppercase tracking-wider">Net Platform Revenue</p>
-                    <p className="text-3xl font-black text-emerald-500">₹{(dashboard?.settlements?.netRevenue || 0).toLocaleString()}</p>
-                    <p className="theme-muted text-xs font-semibold">5% Platform Commission</p>
+                <div>
+                    <p className="theme-muted text-[11px] font-bold uppercase tracking-wider">Net Revenue</p>
+                    <p className="text-2xl font-black text-emerald-500">₹{(dashboard?.settlements?.netRevenue || 0).toLocaleString()}</p>
+                    <p className="theme-muted text-[11px]">5% Platform Fee</p>
                 </div>
             </div>
 
