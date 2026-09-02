@@ -60,14 +60,18 @@ export default async function supplyChatRoutes(app) {
     };
 
     app.get("/supply-chat/threads", { preHandler: [authSupplierOrOwner] }, getThreadsHandler);
+    app.get("/api/supply-chat/threads", { preHandler: [authSupplierOrOwner] }, getThreadsHandler);
     app.get("/api/v1/supply-chat/threads", { preHandler: [authSupplierOrOwner] }, getThreadsHandler);
 
     app.get("/supply-chat/threads/:threadId/messages", { preHandler: [authSupplierOrOwner] }, getMessagesHandler);
+    app.get("/api/supply-chat/threads/:threadId/messages", { preHandler: [authSupplierOrOwner] }, getMessagesHandler);
     app.get("/api/v1/supply-chat/threads/:threadId/messages", { preHandler: [authSupplierOrOwner] }, getMessagesHandler);
 
     app.post("/supply-chat/messages", { preHandler: [authSupplierOrOwner] }, sendMessageHandler);
+    app.post("/api/supply-chat/messages", { preHandler: [authSupplierOrOwner] }, sendMessageHandler);
     app.post("/api/v1/supply-chat/messages", { preHandler: [authSupplierOrOwner] }, sendMessageHandler);
 
     app.post("/supply-chat/offers/:offerId/respond", { preHandler: [authSupplierOrOwner] }, respondOfferHandler);
+    app.post("/api/supply-chat/offers/:offerId/respond", { preHandler: [authSupplierOrOwner] }, respondOfferHandler);
     app.post("/api/v1/supply-chat/offers/:offerId/respond", { preHandler: [authSupplierOrOwner] }, respondOfferHandler);
 }

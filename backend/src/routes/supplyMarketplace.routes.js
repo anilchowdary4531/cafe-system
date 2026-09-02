@@ -103,21 +103,27 @@ export default async function supplyMarketplaceRoutes(app) {
     };
 
     app.get("/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
+    app.get("/api/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
     app.get("/api/v1/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
 
     app.get("/supply-cart", { preHandler: [authUser] }, getCartHandler);
+    app.get("/api/supply-cart", { preHandler: [authUser] }, getCartHandler);
     app.get("/api/v1/supply-cart", { preHandler: [authUser] }, getCartHandler);
 
     app.post("/supply-cart/items", { preHandler: [authUser] }, updateCartItemHandler);
+    app.post("/api/supply-cart/items", { preHandler: [authUser] }, updateCartItemHandler);
     app.post("/api/v1/supply-cart/items", { preHandler: [authUser] }, updateCartItemHandler);
 
     app.post("/supply-orders", { preHandler: [authUser] }, placeOrderHandler);
+    app.post("/api/supply-orders", { preHandler: [authUser] }, placeOrderHandler);
     app.post("/api/v1/supply-orders", { preHandler: [authUser] }, placeOrderHandler);
 
     app.get("/supply-orders", { preHandler: [authUser] }, listRestaurantOrdersHandler);
+    app.get("/api/supply-orders", { preHandler: [authUser] }, listRestaurantOrdersHandler);
     app.get("/api/v1/supply-orders", { preHandler: [authUser] }, listRestaurantOrdersHandler);
 
     app.get("/supplier/orders", { preHandler: [authSupplier] }, listSupplierOrdersHandler);
+    app.get("/api/supplier/orders", { preHandler: [authSupplier] }, listSupplierOrdersHandler);
     app.get("/api/v1/supplier/orders", { preHandler: [authSupplier] }, listSupplierOrdersHandler);
 
     app.post("/supplier/orders/:id/accept", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "ACCEPTED"));
