@@ -237,52 +237,55 @@ export default function OwnerSupplyMarketplace() {
             {/* Browse Grid */}
             {activeTab === "browse" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {products.map((p) => {
-                        const imgUrl = p.images?.[0]?.imageUrl || p.imageUrl;
-                        return (
-                            <div key={p.id} className="rounded-2xl border border-white/15 bg-[#12141c] p-4 space-y-3 shadow-lg">
-                                {imgUrl ? (
-                                    <div className="h-36 w-full rounded-xl overflow-hidden border border-white/10 bg-black/40 shadow-inner">
-                                        <img src={imgUrl} alt={p.name} className="h-full w-full object-cover hover:scale-105 transition duration-300" />
-                                    </div>
-                                ) : null}
+                    {products
+                        .filter((p) => selectedCategory === "All Categories" || p.category?.name === selectedCategory || p.categoryName === selectedCategory)
+                        .map((p) => {
+                            const imgUrl = p.images?.[0]?.imageUrl || p.imageUrl;
+                            return (
+                                <div key={p.id} className="rounded-2xl border border-white/15 bg-[#12141c] p-4 space-y-3 shadow-lg">
+                                    {imgUrl ? (
+                                        <div className="h-36 w-full rounded-xl overflow-hidden border border-white/10 bg-black/40 shadow-inner">
+                                            <img src={imgUrl} alt={p.name} className="h-full w-full object-cover hover:scale-105 transition duration-300" />
+                                        </div>
+                                    ) : null}
 
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <h3 className="font-bold text-white text-base">{p.name}</h3>
-                                        <p className="text-xs text-slate-300 mt-0.5">Supplier: {p.supplier?.profile?.businessName || "Verified Supplier"}</p>
+                                    <div className="flex items-start justify-between">
+                                        <div>
+                                            <h3 className="font-bold text-white text-base">{p.name}</h3>
+                                            <p className="text-xs text-slate-300 mt-0.5">Supplier: {p.supplier?.profile?.businessName || "Verified Supplier"}</p>
+                                        </div>
+                                        <span className="rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1 text-xs font-bold">
+                                            ₹{p.prices?.[0]?.basePrice || 100} / {p.unit}
+                                        </span>
                                     </div>
-                                    <span className="rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1 text-xs font-bold">
-                                        ₹{p.prices?.[0]?.basePrice || 100} / {p.unit}
-                                    </span>
+
+                                    <div className="text-xs space-y-1 text-slate-300 border-t border-white/10 pt-3">
+                                        <p>Min Order Qty (MOQ): <span className="font-bold text-white">{p.moq} {p.unit}</span></p>
+                                        <p>Available Stock: <span className="font-bold text-emerald-400">{p.inventory?.availableStock || 0} {p.unit}</span></p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAddToCart(p, p.moq)}
+                                            className="flex-1 rounded-xl bg-amber-500 hover:bg-amber-400 text-black py-2.5 text-xs font-extrabold transition flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                                        >
+                                            <Plus size={15} />
+                                            Add {p.moq} {p.unit}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleOpenBargain(p)}
+                                            className="rounded-xl border border-white/15 bg-white/10 hover:bg-white/20 text-white py-2.5 px-3 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                                            title="Negotiate Price with Supplier"
+                                        >
+                                            <Handshake size={15} className="text-amber-400" />
+                                            Bargain Price
+                                        </button>
+                                    </div>
                                 </div>
-
-                            <div className="text-xs space-y-1 text-slate-300 border-t border-white/10 pt-3">
-                                <p>Min Order Qty (MOQ): <span className="font-bold text-white">{p.moq} {p.unit}</span></p>
-                                <p>Available Stock: <span className="font-bold text-emerald-400">{p.inventory?.availableStock || 0} {p.unit}</span></p>
-                            </div>
-
-                            <div className="flex items-center gap-2 pt-1">
-                                <button
-                                    type="button"
-                                    onClick={() => handleAddToCart(p, p.moq)}
-                                    className="flex-1 rounded-xl bg-amber-500 hover:bg-amber-400 text-black py-2.5 text-xs font-extrabold transition flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
-                                >
-                                    <Plus size={15} />
-                                    Add {p.moq} {p.unit}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleOpenBargain(p)}
-                                    className="rounded-xl border border-white/15 bg-white/10 hover:bg-white/20 text-white py-2.5 px-3 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                                    title="Negotiate Price with Supplier"
-                                >
-                                    <Handshake size={15} className="text-amber-400" />
-                                    Bargain Price
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+                            );
+                        })}
                 </div>
             )}
 
