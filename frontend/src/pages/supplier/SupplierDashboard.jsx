@@ -810,14 +810,44 @@ export default function SupplierDashboard() {
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {products.map((p) => {
-                                    const imgUrl = p.images?.[0]?.imageUrl || p.imageUrl;
+                                    const getImgUrl = (item) => {
+                                        if (!item) return "";
+                                        if (typeof item.primaryImage === "string" && item.primaryImage.trim()) return item.primaryImage.trim();
+                                        if (typeof item.imageUrl === "string" && item.imageUrl.trim()) return item.imageUrl.trim();
+                                        if (typeof item.image === "string" && item.image.trim()) return item.image.trim();
+                                        if (Array.isArray(item.images) && item.images.length > 0) {
+                                            const first = item.images[0];
+                                            if (typeof first === "string" && first.trim()) return first.trim();
+                                            if (first && typeof first.imageUrl === "string" && first.imageUrl.trim()) return first.imageUrl.trim();
+                                            if (first && typeof first.url === "string" && first.url.trim()) return first.url.trim();
+                                        }
+                                        return "";
+                                    };
+                                    const imgUrl = getImgUrl(p);
+
                                     return (
                                         <div key={p.id} className="theme-panel rounded-2xl p-4 space-y-3 border shadow-sm">
-                                            {imgUrl ? (
-                                                <div className="h-36 w-full rounded-xl overflow-hidden border theme-border bg-black/40 shadow-inner">
-                                                    <img src={imgUrl} alt={p.name} className="h-full w-full object-cover hover:scale-105 transition duration-300" />
+                                            <div className="h-40 w-full rounded-xl overflow-hidden border theme-border bg-black/10 shadow-inner relative flex items-center justify-center">
+                                                {imgUrl ? (
+                                                    <img
+                                                        src={imgUrl}
+                                                        alt={p.name}
+                                                        className="h-full w-full object-cover hover:scale-105 transition duration-300"
+                                                        onError={(e) => {
+                                                            e.target.onerror = null;
+                                                            e.target.style.display = 'none';
+                                                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                                        }}
+                                                    />
+                                                ) : null}
+                                                <div
+                                                    className="h-full w-full flex flex-col items-center justify-center p-4 text-center bg-amber-500/10 theme-muted"
+                                                    style={{ display: imgUrl ? 'none' : 'flex' }}
+                                                >
+                                                    <Package size={36} className="theme-accent-text mb-1 opacity-80" />
+                                                    <span className="text-[11px] font-bold uppercase tracking-wider">{p.category?.name || p.category || "Raw Supply"}</span>
                                                 </div>
-                                            ) : null}
+                                            </div>
 
                                             <div className="flex items-start justify-between">
                                                 <div>
