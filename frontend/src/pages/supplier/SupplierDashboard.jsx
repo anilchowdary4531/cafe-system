@@ -36,6 +36,7 @@ import {
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import BrandLogo from "../../components/BrandLogo";
+import { SUPPLY_CATEGORIES } from "../../utils/supplyCategories";
 
 export default function SupplierDashboard() {
     const navigate = useNavigate();
@@ -80,6 +81,7 @@ export default function SupplierDashboard() {
 
     const [newProduct, setNewProduct] = useState({
         name: "",
+        categoryName: "Food ingredients",
         unit: "KG",
         moq: 10,
         basePrice: 250,
@@ -1373,6 +1375,23 @@ export default function SupplierDashboard() {
                                     required
                                     className="theme-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
                                 />
+                            </div>
+
+                            {/* Supply Category Dropdown (20 B2B Restaurant Categories) */}
+                            <div>
+                                <label className="theme-muted mb-1 block text-xs font-bold uppercase">Supply Category *</label>
+                                <select
+                                    value={newProduct.categoryName}
+                                    onChange={(e) => setNewProduct({ ...newProduct, categoryName: e.target.value })}
+                                    required
+                                    className="theme-input w-full rounded-xl px-4 py-2.5 text-sm outline-none cursor-pointer"
+                                >
+                                    {SUPPLY_CATEGORIES.map((cat) => (
+                                        <option key={cat.id} value={cat.name}>
+                                            {cat.icon} {cat.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
 
                             {/* Stock Photo / Image Selector */}

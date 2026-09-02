@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
+import { SUPPLY_CATEGORIES } from "../../utils/supplyCategories";
 
 export default function OwnerSupplyMarketplace() {
     const [products, setProducts] = useState([]);
@@ -25,6 +26,7 @@ export default function OwnerSupplyMarketplace() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("browse");
     const [search, setSearch] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState("All Categories");
     const [showCartModal, setShowCartModal] = useState(false);
     const [showBargainModal, setShowBargainModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -186,17 +188,49 @@ export default function OwnerSupplyMarketplace() {
                 </button>
             </div>
 
-            {/* Search Bar */}
+            {/* Search & Category Filter Bar */}
             {activeTab === "browse" && (
-                <div className="relative">
-                    <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Search ingredients (e.g. Chicken Breast, Dairy, Spices)..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full rounded-2xl border border-white/15 bg-[#12141c] pl-11 pr-4 py-3 text-sm text-white placeholder-slate-400 outline-none focus:border-amber-400 transition"
-                    />
+                <div className="space-y-3">
+                    <div className="relative">
+                        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Search 20 supply categories (e.g. Chicken Breast, Dairy, Spices, Utensils, Packaging)..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full rounded-2xl border border-white/15 bg-[#12141c] pl-11 pr-4 py-3 text-sm text-white placeholder-slate-400 outline-none focus:border-amber-400 transition"
+                        />
+                    </div>
+
+                    {/* 20 Restaurant Supply Categories Scrollable Bar */}
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                        <button
+                            type="button"
+                            onClick={() => setSelectedCategory("All Categories")}
+                            className={`rounded-xl px-4 py-2 text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                                selectedCategory === "All Categories"
+                                    ? "bg-amber-500 text-black shadow-md font-extrabold"
+                                    : "border border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+                            }`}
+                        >
+                            ✨ All Categories (20)
+                        </button>
+                        {SUPPLY_CATEGORIES.map((cat) => (
+                            <button
+                                key={cat.id}
+                                type="button"
+                                onClick={() => setSelectedCategory(cat.name)}
+                                className={`rounded-xl px-4 py-2 text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                                    selectedCategory === cat.name
+                                        ? "bg-amber-500 text-black shadow-md font-extrabold"
+                                        : "border border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+                                }`}
+                            >
+                                <span>{cat.icon}</span>
+                                <span>{cat.name}</span>
+                            </button>
+                        ))}
+                    </div>
                 </div>
             )}
 
