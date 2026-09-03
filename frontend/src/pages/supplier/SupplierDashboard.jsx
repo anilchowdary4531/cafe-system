@@ -37,6 +37,55 @@ import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import BrandLogo from "../../components/BrandLogo";
 import { SUPPLY_CATEGORIES } from "../../utils/supplyCategories";
+import { resolveImageUrl } from "../../utils/resolveImageUrl";
+
+const getSupplyProductImageUrl = (item) => {
+    if (!item) return "";
+    let raw = "";
+    if (typeof item.primaryImage === "string" && item.primaryImage.trim()) raw = item.primaryImage.trim();
+    else if (typeof item.imageUrl === "string" && item.imageUrl.trim()) raw = item.imageUrl.trim();
+    else if (typeof item.image === "string" && item.image.trim()) raw = item.image.trim();
+    else if (Array.isArray(item.images) && item.images.length > 0) {
+        const first = item.images[0];
+        if (typeof first === "string" && first.trim()) raw = first.trim();
+        else if (first && typeof first.imageUrl === "string" && first.imageUrl.trim()) raw = first.imageUrl.trim();
+        else if (first && typeof first.url === "string" && first.url.trim()) raw = first.url.trim();
+    }
+
+    const resolved = resolveImageUrl(raw);
+    if (resolved) return resolved;
+
+    const name = String(item.name || "").toLowerCase();
+    const cat = String(item.category?.name || item.categoryName || item.category || "").toLowerCase();
+
+    if (name.includes("chicken") || name.includes("checken") || name.includes("poultry") || name.includes("meat") || cat.includes("meat")) {
+        return "https://images.unsplash.com/photo-1587593810167-a84920ea0781?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("water") || name.includes("bottle") || name.includes("beverage") || cat.includes("beverage")) {
+        return "https://images.unsplash.com/photo-1548839140-29a749e1bc4e?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("produce") || name.includes("vegetable") || name.includes("fruit") || name.includes("tomato") || name.includes("onion")) {
+        return "https://images.unsplash.com/photo-1610348725531-843dff563e2c?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("dairy") || name.includes("milk") || name.includes("cheese") || name.includes("butter") || name.includes("paneer")) {
+        return "https://images.unsplash.com/photo-1628088062854-d1870b4553da?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("spice") || cat.includes("sauce") || name.includes("chili") || name.includes("pepper") || name.includes("sauce")) {
+        return "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("bakery") || name.includes("flour") || name.includes("bread") || name.includes("bun")) {
+        return "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("oil") || name.includes("oil") || name.includes("ghee")) {
+        return "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("packaging") || cat.includes("disposable") || name.includes("box") || name.includes("container") || name.includes("cup")) {
+        return "https://images.unsplash.com/photo-1607613009820-a29f7bb81c04?auto=format&fit=crop&w=600&q=80";
+    }
+
+    return "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80";
+};
+
 
 export default function SupplierDashboard() {
     const navigate = useNavigate();
@@ -259,7 +308,8 @@ export default function SupplierDashboard() {
             setShowAddProductModal(false);
             loadData();
         } catch (err) {
-            showToast(err?.response?.data?.error || "Failed to create product", { type: "error" });
+            const errorMsg = err?.response?.data?.error || err?.response?.data?.message || err?.message || "Failed to create product";
+            showToast(errorMsg, { type: "error" });
         }
     };
 
@@ -810,24 +860,11 @@ export default function SupplierDashboard() {
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {products.map((p) => {
-                                    const getImgUrl = (item) => {
-                                        if (!item) return "";
-                                        if (typeof item.primaryImage === "string" && item.primaryImage.trim()) return item.primaryImage.trim();
-                                        if (typeof item.imageUrl === "string" && item.imageUrl.trim()) return item.imageUrl.trim();
-                                        if (typeof item.image === "string" && item.image.trim()) return item.image.trim();
-                                        if (Array.isArray(item.images) && item.images.length > 0) {
-                                            const first = item.images[0];
-                                            if (typeof first === "string" && first.trim()) return first.trim();
-                                            if (first && typeof first.imageUrl === "string" && first.imageUrl.trim()) return first.imageUrl.trim();
-                                            if (first && typeof first.url === "string" && first.url.trim()) return first.url.trim();
-                                        }
-                                        return "";
-                                    };
-                                    const imgUrl = getImgUrl(p);
+                                    const imgUrl = getSupplyProductImageUrl(p);
 
                                     return (
                                         <div key={p.id} className="theme-panel rounded-2xl p-4 space-y-3 border shadow-sm">
-                                            <div className="h-40 w-full rounded-xl overflow-hidden border theme-border bg-black/10 shadow-inner relative flex items-center justify-center">
+                                            <div className="h-44 w-full rounded-xl overflow-hidden border theme-border bg-black/10 shadow-inner relative flex items-center justify-center">
                                                 {imgUrl ? (
                                                     <img
                                                         src={imgUrl}
@@ -835,18 +872,15 @@ export default function SupplierDashboard() {
                                                         className="h-full w-full object-cover hover:scale-105 transition duration-300"
                                                         onError={(e) => {
                                                             e.target.onerror = null;
-                                                            e.target.style.display = 'none';
-                                                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                                            e.target.src = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80";
                                                         }}
                                                     />
-                                                ) : null}
-                                                <div
-                                                    className="h-full w-full flex flex-col items-center justify-center p-4 text-center bg-amber-500/10 theme-muted"
-                                                    style={{ display: imgUrl ? 'none' : 'flex' }}
-                                                >
-                                                    <Package size={36} className="theme-accent-text mb-1 opacity-80" />
-                                                    <span className="text-[11px] font-bold uppercase tracking-wider">{p.category?.name || p.category || "Raw Supply"}</span>
-                                                </div>
+                                                ) : (
+                                                    <div className="h-full w-full flex flex-col items-center justify-center p-4 text-center bg-amber-500/10 theme-muted">
+                                                        <Package size={36} className="theme-accent-text mb-1 opacity-80" />
+                                                        <span className="text-[11px] font-bold uppercase tracking-wider">{p.category?.name || p.category || "Raw Supply"}</span>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="flex items-start justify-between">

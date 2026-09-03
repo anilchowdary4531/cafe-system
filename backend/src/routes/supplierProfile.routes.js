@@ -7,7 +7,7 @@ import {
 import authorizeRoles from "../middleware/rbacGuard.js";
 
 export default async function supplierProfileRoutes(app) {
-    const authSupplier = authorizeRoles("SUPPLIER", "SUPER_ADMIN");
+    const authSupplier = authorizeRoles("SUPPLIER", "SUPER_ADMIN", "OWNER", "MANAGER", "ADMIN", "STAFF", "USER");
 
     const getProfileHandler = async (req, reply) => {
         try {

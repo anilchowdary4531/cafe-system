@@ -56,6 +56,11 @@ export function resolveImageUrl(raw) {
     if (value.startsWith("uploads/")) return joinUrl(uploadBase || API, `/${value}`);
     if (value.startsWith("public/") || value.startsWith("private/")) return joinUrl(uploadBase || API, `/uploads/${value}`);
 
-    // Fallback: treat as relative and let the browser resolve it.
+    // Fallback: if uploadBase or API is defined and path is relative, join it
+    if (uploadBase || API) {
+        return joinUrl(uploadBase || API, value);
+    }
+
     return value;
 }
+

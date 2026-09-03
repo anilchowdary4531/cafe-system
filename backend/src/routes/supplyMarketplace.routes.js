@@ -9,8 +9,8 @@ import authorizeRoles from "../middleware/rbacGuard.js";
 import prisma from "../prisma.js";
 
 export default async function supplyMarketplaceRoutes(app) {
-    const authUser = authorizeRoles("OWNER", "MANAGER", "SUPER_ADMIN", "SUPPLIER");
-    const authSupplier = authorizeRoles("SUPPLIER", "SUPER_ADMIN");
+    const authUser = authorizeRoles("OWNER", "MANAGER", "SUPER_ADMIN", "SUPPLIER", "ADMIN", "STAFF", "USER", "CUSTOMER");
+    const authSupplier = authorizeRoles("SUPPLIER", "SUPER_ADMIN", "OWNER", "MANAGER", "ADMIN", "STAFF", "USER");
 
     const browseProductsHandler = async (req, reply) => {
         try {

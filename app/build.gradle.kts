@@ -14,16 +14,19 @@ android {
 
     val keystorePropertiesFile = rootProject.file("keystore.properties")
     val keystoreProperties = Properties()
-    if (keystorePropertiesFile.exists()) {
+    val hasKeystoreProperties = keystorePropertiesFile.exists()
+    if (hasKeystoreProperties) {
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
     }
 
     signingConfigs {
         create("release") {
-            storeFile = keystoreProperties["storeFile"]?.let { file(it) }
-            storePassword = keystoreProperties["storePassword"] as String?
-            keyAlias = keystoreProperties["keyAlias"] as String?
-            keyPassword = keystoreProperties["keyPassword"] as String?
+            if (hasKeystoreProperties) {
+                storeFile = keystoreProperties["storeFile"]?.let { file(it) }
+                storePassword = keystoreProperties["storePassword"] as String?
+                keyAlias = keystoreProperties["keyAlias"] as String?
+                keyPassword = keystoreProperties["keyPassword"] as String?
+            }
         }
     }
 
@@ -34,8 +37,8 @@ android {
         minSdk = 24
         targetSdk = 36
 
-        versionCode = 18
-        versionName = "1.0.17"
+        versionCode = 25
+        versionName = "1.0.24"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -46,7 +49,11 @@ android {
             manifestPlaceholders["usesCleartextTraffic"] = "false"
         }
         release {
-            signingConfig = signingConfigs.getByName("release")
+            if (hasKeystoreProperties) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             buildConfigField("String", "BASE_URL", "\"https://api.tiffzy.com/\"")
