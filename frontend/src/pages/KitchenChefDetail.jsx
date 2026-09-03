@@ -6,6 +6,8 @@ import {
     BellOff,
     CheckCircle2,
     ChefHat,
+    Clock,
+    Flame,
     History,
     LoaderCircle,
     RefreshCw,
@@ -14,6 +16,8 @@ import {
     Volume2,
     VolumeX,
     X,
+    User,
+    Check,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
@@ -38,48 +42,17 @@ import {
 import { showToast } from "../utils/toast";
 
 const CHEF_PALETTES = [
-    { avatar: "#f4d3a8", avatarInk: "#6f3e17", chipBg: "rgba(201, 108, 29, 0.14)", chipInk: "#7a4115", ring: "rgba(201, 108, 29, 0.34)" },
-    { avatar: "#edd6b8", avatarInk: "#6b4020", chipBg: "rgba(176, 112, 62, 0.14)", chipInk: "#74431d", ring: "rgba(176, 112, 62, 0.34)" },
-    { avatar: "#f0c6a1", avatarInk: "#7a4118", chipBg: "rgba(194, 85, 24, 0.14)", chipInk: "#803d12", ring: "rgba(194, 85, 24, 0.34)" },
-    { avatar: "#f7dfb8", avatarInk: "#6d4518", chipBg: "rgba(141, 102, 42, 0.14)", chipInk: "#744b1d", ring: "rgba(141, 102, 42, 0.34)" },
-    { avatar: "#ebd0a0", avatarInk: "#6a3f11", chipBg: "rgba(169, 113, 48, 0.14)", chipInk: "#744315", ring: "rgba(169, 113, 48, 0.34)" },
-    { avatar: "#f3dcbc", avatarInk: "#69421b", chipBg: "rgba(214, 164, 55, 0.16)", chipInk: "#795514", ring: "rgba(214, 164, 55, 0.34)" },
+    { avatarBg: "from-amber-500 to-orange-600", avatarText: "text-white", glow: "shadow-amber-500/20", ring: "border-amber-500/30" },
+    { avatarBg: "from-orange-500 to-amber-600", avatarText: "text-white", glow: "shadow-orange-500/20", ring: "border-orange-500/30" },
+    { avatarBg: "from-yellow-500 to-amber-600", avatarText: "text-black", glow: "shadow-yellow-500/20", ring: "border-yellow-500/30" },
+    { avatarBg: "from-amber-600 to-red-600", avatarText: "text-white", glow: "shadow-red-500/20", ring: "border-red-500/30" },
 ];
 
-const ACTION_STYLES = {
-    ASSIGNED: {
-        backgroundColor: "rgba(34, 197, 94, 0.14)",
-        borderColor: "rgba(34, 197, 94, 0.24)",
-        color: "#27623c",
-    },
-    REASSIGNED: {
-        backgroundColor: "rgba(249, 115, 22, 0.14)",
-        borderColor: "rgba(249, 115, 22, 0.24)",
-        color: "#7d4212",
-    },
-    UNASSIGNED: {
-        backgroundColor: "rgba(148, 163, 184, 0.16)",
-        borderColor: "rgba(148, 163, 184, 0.26)",
-        color: "#475569",
-    },
-    COMPLETED: {
-        backgroundColor: "rgba(16, 185, 129, 0.14)",
-        borderColor: "rgba(16, 185, 129, 0.28)",
-        color: "#0f766e",
-    },
-};
-
-const getActionLabel = (entry) => {
-    const action = String(entry?.action || "ASSIGNED").toUpperCase();
-    if (action === "REASSIGNED") return "Reassigned";
-    if (action === "UNASSIGNED") return "Unassigned";
-    if (action === "COMPLETED") return "Completed";
-    return "Assigned";
-};
-
-const getActionStyle = (entry) => {
-    const action = String(entry?.action || "ASSIGNED").toUpperCase();
-    return ACTION_STYLES[action] || ACTION_STYLES.ASSIGNED;
+const ACTION_BADGES = {
+    ASSIGNED: { bg: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", label: "Assigned" },
+    REASSIGNED: { bg: "bg-amber-500/10 text-amber-400 border-amber-500/20", label: "Reassigned" },
+    UNASSIGNED: { bg: "bg-zinc-800 text-zinc-400 border-zinc-700", label: "Unassigned" },
+    COMPLETED: { bg: "bg-teal-500/10 text-teal-300 border-teal-500/20", label: "Completed" },
 };
 
 const getTimeLabel = (value) => {
@@ -99,140 +72,132 @@ const getRelativeLabel = (timestamp) => {
     return age === "just now" ? age : `${age} ago`;
 };
 
-function Metric({ label, value, hint }) {
+function MetricCard({ icon: Icon, label, value, hint, accentColor = "amber" }) {
     return (
-        <div className="min-w-0 text-left">
-            <dt className="text-[10px] font-bold uppercase tracking-[0.28em] text-[var(--kitchen-muted)]">
-                {label}
-            </dt>
-            <dd className="mt-1 font-serif text-2xl font-bold leading-none text-[var(--kitchen-ink)]">
-                {value}
-            </dd>
-            {hint ? <p className="mt-1 text-xs text-[var(--kitchen-muted)]">{hint}</p> : null}
+        <div className="relative overflow-hidden rounded-2xl border border-zinc-800/80 bg-gradient-to-b from-zinc-900/90 to-zinc-950/90 p-4 shadow-xl backdrop-blur-xl transition hover:border-zinc-700">
+            <div className="flex items-center gap-3.5">
+                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-${accentColor}-500/10 text-${accentColor}-400 border border-${accentColor}-500/20 shadow-inner`}>
+                    <Icon size={20} />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-extrabold uppercase tracking-widest text-zinc-400">{label}</p>
+                    <p className="mt-0.5 text-2xl font-black tracking-tight text-white">{value}</p>
+                    {hint ? <p className="text-[11px] font-medium text-zinc-400 truncate mt-0.5">{hint}</p> : null}
+                </div>
+            </div>
         </div>
     );
 }
 
-function TicketCard({
+function ModernTicketCard({
     ticket,
     chef,
     chefLabel,
     onAction,
     actionLabel = "Complete",
-    actionIcon = <CheckCircle2 size={14} />,
-    actionStyle,
-    actionDisabled = false,
-    actionTitle,
+    actionIcon = <CheckCircle2 size={16} />,
+    isPickAction = false,
 }) {
-    const assignedStyle = chef?.palette
-        ? {
-              backgroundColor: chef.palette.chipBg,
-              borderColor: chef.palette.ring,
-              color: chef.palette.chipInk,
-          }
-        : {
-              backgroundColor: "rgba(255,255,255,0.5)",
-              borderColor: "rgba(95, 61, 31, 0.16)",
-              color: "var(--kitchen-muted)",
-          };
-
     return (
-        <article className="rounded-[24px] border border-[rgba(95,61,31,0.12)] bg-[rgba(255,255,255,0.34)] p-4 shadow-[0_10px_22px_rgba(74,43,19,0.04)]">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <p className="truncate text-[15px] font-semibold leading-tight text-[var(--kitchen-ink)]">
-                        {ticket.itemName}
-                    </p>
-                    <p className="mt-1 text-[12px] text-[var(--kitchen-muted)]">
-                        {ticket.qty} plate{ticket.qty === 1 ? "" : "s"} - {ticket.orderRef} - {ticket.ageText}
-                    </p>
-                    <p className="mt-1 text-[11px] uppercase tracking-[0.22em] text-[var(--kitchen-muted)]">
-                        {ticket.orderLabel || "Kitchen ticket"} -{" "}
-                        {String(ticket.orderStatus || "").replace(/_/g, " ")}
+        <article className="group relative overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/70 p-4.5 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-amber-500/40 hover:shadow-amber-500/5">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-xs font-black text-amber-400">
+                            {ticket.qty}x
+                        </span>
+                        <h4 className="font-extrabold text-base text-white truncate tracking-tight group-hover:text-amber-300 transition duration-200">
+                            {ticket.itemName}
+                        </h4>
+                    </div>
+
+                    <div className="mt-2 flex items-center gap-2 text-xs flex-wrap">
+                        <span className="rounded-md bg-zinc-800 px-2 py-0.5 text-[11px] font-bold text-zinc-300 border border-zinc-700/50">
+                            {ticket.orderRef}
+                        </span>
+                        {ticket.tableNo && (
+                            <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-300 border border-amber-500/20">
+                                Table {ticket.tableNo}
+                            </span>
+                        )}
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-400">
+                            <Clock size={12} />
+                            {ticket.ageText}
+                        </span>
+                    </div>
+
+                    <p className="mt-1.5 text-[10px] font-extrabold uppercase tracking-widest text-zinc-400">
+                        {ticket.orderLabel || "KITCHEN TICKET"} • <span className="text-emerald-400">{String(ticket.orderStatus || "").replace(/_/g, " ")}</span>
                     </p>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2">
-                    <span className="kitchen-paper-chip" style={assignedStyle}>
-                        {chefLabel || chef?.name || "Chef"}
+                <div className="text-right shrink-0">
+                    <p className="text-base font-black text-amber-400 tabular-nums">
+                        {formatKitchenMoney(ticket.lineTotal)}
+                    </p>
+                    <span className="mt-1 inline-block rounded-full bg-zinc-800/80 px-2.5 py-0.5 text-[10px] font-bold text-zinc-300 border border-zinc-700/50">
+                        {chefLabel || chef?.name || "Unassigned"}
                     </span>
                 </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm font-semibold tabular-nums text-[var(--kitchen-ink)]">
-                    {formatKitchenMoney(ticket.lineTotal)}
-                </p>
+            {ticket.notes ? (
+                <div className="mt-3 rounded-xl bg-amber-500/5 border border-amber-500/15 p-2.5 text-xs italic text-amber-200/90 flex items-start gap-1.5">
+                    <Sparkles size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                    <span>"{ticket.notes}"</span>
+                </div>
+            ) : null}
 
+            <div className="mt-4 border-t border-zinc-800/80 pt-3 flex items-center justify-end">
                 <button
                     type="button"
                     onClick={() => onAction?.(ticket.itemKey)}
-                    disabled={actionDisabled}
-                    className="kitchen-paper-action"
-                    style={
-                        actionStyle || {
-                            backgroundColor: "rgba(16, 185, 129, 0.12)",
-                            borderColor: "rgba(16, 185, 129, 0.24)",
-                            color: "#0f766e",
-                        }
-                    }
-                    title={actionTitle}
+                    className={`rounded-xl px-4 py-2 text-xs font-black transition flex items-center gap-1.5 shadow-md cursor-pointer ${
+                        isPickAction
+                            ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black shadow-amber-500/20"
+                            : "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-emerald-500/20"
+                    }`}
                 >
                     {actionIcon}
                     {actionLabel}
                 </button>
             </div>
-
-            {ticket.notes ? <p className="mt-2 text-sm italic text-[var(--kitchen-muted)]">{ticket.notes}</p> : null}
         </article>
     );
 }
 
-function HistoryCard({ entry, chef }) {
-    const actionStyle = getActionStyle(entry);
-    const actionLabel = getActionLabel(entry);
+function ModernHistoryCard({ entry, chef }) {
+    const badge = ACTION_BADGES[String(entry?.action || "ASSIGNED").toUpperCase()] || ACTION_BADGES.ASSIGNED;
 
     return (
-        <article className="rounded-[24px] border border-[rgba(95,61,31,0.12)] bg-[rgba(255,255,255,0.34)] p-4 shadow-[0_10px_22px_rgba(74,43,19,0.04)]">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <p className="font-serif text-xl font-bold text-[var(--kitchen-ink)]">
+        <article className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4 shadow-md backdrop-blur-md">
+            <div className="flex items-start justify-between gap-3">
+                <div>
+                    <h5 className="font-extrabold text-sm text-white tracking-tight">
                         {entry.itemName || "Item"}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--kitchen-muted)]">
-                        {entry.orderRef || "Order"}
-                        {entry.orderLabel ? ` - ${entry.orderLabel}` : ""}
-                        {entry.qty ? ` - ${entry.qty} plate${Number(entry.qty) === 1 ? "" : "s"}` : ""}
+                    </h5>
+                    <p className="mt-0.5 text-xs text-zinc-400">
+                        {entry.orderRef || "Order"} {entry.orderLabel ? `• ${entry.orderLabel}` : ""} {entry.qty ? `(${entry.qty}x)` : ""}
                     </p>
                 </div>
 
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    <span className="kitchen-paper-chip" style={actionStyle}>
-                        {actionLabel}
+                <div className="flex items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase border ${badge.bg}`}>
+                        {badge.label}
                     </span>
-                    <span className="kitchen-paper-chip">{entry.chefName || chef?.name || "Chef"}</span>
+                    <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-[10px] font-bold text-zinc-300 border border-zinc-700">
+                        {entry.chefName || chef?.name || "Chef"}
+                    </span>
                 </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-[var(--kitchen-muted)]">
+            <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-zinc-400">
                 <span>{getTimeLabel(entry.timestamp)}</span>
-                <span>-</span>
-                <span>{getRelativeLabel(entry.timestamp)}</span>
-                {entry.orderStatus ? (
-                    <>
-                        <span>-</span>
-                        <span>{String(entry.orderStatus).replace(/_/g, " ")}</span>
-                    </>
-                ) : null}
+                <span>•</span>
+                <span className="text-amber-400/90">{getRelativeLabel(entry.timestamp)}</span>
             </div>
 
-            {entry.previousChefName ? (
-                <p className="mt-3 text-sm text-[var(--kitchen-muted)]">
-                    Previous chef: {entry.previousChefName}
-                </p>
-            ) : null}
-
-            {entry.note ? <p className="mt-2 text-sm italic text-[var(--kitchen-muted)]">{entry.note}</p> : null}
+            {entry.note ? <p className="mt-2 text-xs italic text-zinc-400">Note: {entry.note}</p> : null}
         </article>
     );
 }
@@ -381,12 +346,12 @@ export default function KitchenChefDetail() {
         const next = {};
         ticketRows.forEach((ticket) => {
             const chefId = String(assignments?.[ticket.itemKey] || "").trim();
-            if (chefId && chefById.has(chefId)) {
+            if (chefId && (chefById.has(chefId) || chefId === targetChefId)) {
                 next[ticket.itemKey] = chefId;
             }
         });
         return next;
-    }, [assignments, chefById, ticketRows]);
+    }, [assignments, chefById, targetChefId, ticketRows]);
 
     useEffect(() => {
         if (!assignmentsReady || ordersLoading || staffLoading) return;
@@ -515,7 +480,6 @@ export default function KitchenChefDetail() {
 
     const pageTitle = currentChef?.name || "Chef";
     const pageDesignation = String(currentChef?.designation || "Chef").trim() || "Chef";
-    const isSenior = /SENIOR/i.test(pageDesignation);
 
     useEffect(() => {
         if (!historyOpen && !soundModalOpen) return undefined;
@@ -541,431 +505,332 @@ export default function KitchenChefDetail() {
         };
     }, [historyOpen, soundModalOpen]);
 
-    if (!restaurantId) {
-        return (
-            <div className="theme-page kitchen-paper-page min-h-screen px-4 py-4 md:px-6 md:py-6">
-                <div className="kitchen-paper-sheet mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1600px] flex-col rounded-[32px] px-4 py-5 md:px-8 md:py-7">
-                    <p className="text-sm text-[var(--kitchen-muted)]">Kitchen context is missing.</p>
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <div className="theme-page kitchen-paper-page min-h-screen">
-            {/* Standard Top Navigation Header */}
-            <header className="theme-nav border-b px-4 py-4 md:px-8">
-                <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="min-h-screen bg-[#090a0f] text-zinc-100 selection:bg-amber-500 selection:text-black font-sans relative overflow-x-hidden">
+            {/* Ambient Background Gradient Glows */}
+            <div className="pointer-events-none fixed -top-40 -left-40 h-96 w-96 rounded-full bg-amber-500/10 blur-[120px]" />
+            <div className="pointer-events-none fixed top-1/3 -right-40 h-96 w-96 rounded-full bg-orange-600/10 blur-[140px]" />
+
+            {/* TOP GLASS NAVIGATION BAR */}
+            <header className="sticky top-0 z-40 backdrop-blur-xl bg-zinc-950/80 border-b border-zinc-800/80 px-4 py-3.5 sm:px-6 md:px-8">
+                <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <Link
                             to="/kitchen"
-                            className="theme-soft-button inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
+                            className="rounded-xl border border-zinc-800 bg-zinc-900/80 px-3.5 py-2 text-xs font-black text-zinc-200 transition hover:border-zinc-700 hover:bg-zinc-800 flex items-center gap-2 shadow-md cursor-pointer"
                         >
                             <ArrowLeft size={16} />
-                            Kitchen Board
+                            <span>Kitchen Board</span>
                         </Link>
                         <div>
-                            <p className="theme-muted text-xs uppercase tracking-[0.28em]">{restaurantName}</p>
-                            <h1 className="text-2xl font-bold flex items-center gap-2">
+                            <p className="text-[10px] font-extrabold uppercase tracking-[0.25em] text-amber-500/90">{restaurantName}</p>
+                            <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
                                 {pageTitle}
-                                <span
-                                    className="kitchen-paper-chip text-xs font-normal"
-                                    style={{
-                                        backgroundColor: currentChef?.palette?.chipBg || "rgba(255,255,255,0.5)",
-                                        borderColor: currentChef?.palette?.ring || "rgba(95, 61, 31, 0.18)",
-                                        color: currentChef?.palette?.chipInk || "var(--kitchen-ink)",
-                                    }}
-                                >
-                                    {pageDesignation}
-                                </span>
                             </h1>
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        {/* Notification Symbol Bell & Sound Alert Toggle */}
+                    <div className="flex items-center gap-2.5">
+                        {/* Live Socket Status */}
+                        <div className="hidden sm:flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-xs font-bold text-zinc-400">
+                            <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                            <span>{connected ? "Socket Live" : "Reconnecting"}</span>
+                        </div>
+
+                        {/* Order Sound Alert Trigger */}
                         <button
                             type="button"
                             onClick={() => setSoundModalOpen(true)}
-                            className="theme-soft-button relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
-                            title="Order Notification Sound Alerts"
+                            className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs font-black text-amber-400 hover:bg-amber-500/20 transition flex items-center gap-2 shadow-md cursor-pointer"
                         >
-                            {soundMuted ? (
-                                <BellOff size={18} className="text-gray-400" />
-                            ) : (
-                                <Bell size={18} className="text-amber-500 animate-pulse" />
-                            )}
-                            <span>{soundMuted ? "Sound Muted" : "Order Alert On"}</span>
-                            <span className="flex h-2 w-2 rounded-full bg-amber-500" />
+                            {soundMuted ? <BellOff size={16} className="text-zinc-400" /> : <Bell size={16} className="animate-pulse" />}
+                            <span className="hidden sm:inline">{soundMuted ? "Muted" : "Alerts On"}</span>
                         </button>
 
                         <button
                             type="button"
                             onClick={refreshBoard}
-                            className="theme-soft-button inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
                             disabled={refreshing || ordersLoading || staffLoading}
+                            className="rounded-xl border border-zinc-800 bg-zinc-900/80 p-2 text-zinc-300 hover:bg-zinc-800 transition cursor-pointer"
+                            title="Refresh Board"
                         >
-                            {refreshing ? <LoaderCircle size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                            Refresh
+                            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
                         </button>
                     </div>
                 </div>
             </header>
 
-            <main className="mx-auto max-w-[1600px] px-4 py-6 md:px-6">
-                <div className="kitchen-paper-sheet mx-auto flex flex-col rounded-[32px] px-4 py-5 md:px-8 md:py-7">
-                    <header className="flex flex-col gap-6">
-                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(180px,0.65fr)_minmax(280px,0.9fr)] lg:items-start lg:gap-6">
-                            <dl className="grid w-full grid-cols-2 gap-x-8 gap-y-6 md:grid-cols-3">
-                                <Metric label="Live orders" value={metrics.liveOrdersCount} hint="Orders currently on the board" />
-                                <Metric label="Past" value={metrics.pastEvents} hint="Assignment history events" />
-                                <Metric label="Oldest" value={formatKitchenAge(metrics.oldestMinutes)} hint="Longest waiting current item" />
-                            </dl>
+            {/* MAIN DASHBOARD CONTENT */}
+            <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:px-8 space-y-6">
 
-                            <div className="flex flex-col gap-3 self-start text-center">
-                                <h2 className="font-serif text-2xl font-bold leading-[0.96] text-[var(--kitchen-ink)] md:text-3xl lg:text-4xl">
-                                    {pageTitle}
-                                </h2>
-                                <div className="flex flex-wrap items-center justify-center gap-2">
-                                    <span
-                                        className="kitchen-paper-chip"
-                                        style={{
-                                            backgroundColor: currentChef?.palette?.chipBg || "rgba(255,255,255,0.5)",
-                                            borderColor: currentChef?.palette?.ring || "rgba(95, 61, 31, 0.18)",
-                                            color: currentChef?.palette?.chipInk || "var(--kitchen-ink)",
-                                        }}
-                                    >
-                                        {pageDesignation}
-                                    </span>
-                                    {isSenior ? (
-                                        <span className="kitchen-paper-chip">Senior</span>
-                                    ) : null}
-                                    {currentChef?.id ? (
-                                        <Link
-                                            to={`/staff/profile/${encodeURIComponent(String(currentChef.id))}`}
-                                            className="kitchen-paper-chip"
-                                        >
-                                            Chef profile
-                                        </Link>
-                                    ) : (
-                                        <span className="kitchen-paper-chip">{pageTitle ? "Chef profile" : "Chef"}</span>
-                                    )}
+                {/* CHEF HERO IDENTITY & METRICS HEADER */}
+                <div className="rounded-3xl border border-zinc-800/80 bg-gradient-to-r from-zinc-900/90 via-zinc-950/90 to-zinc-900/90 p-6 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+                        
+                        {/* Chef Profile Badge */}
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-black font-black text-xl shadow-xl shadow-amber-500/20 border-2 border-amber-400/40">
+                                    <ChefHat size={32} />
                                 </div>
-                            </div>
-
-                            <div className="flex flex-col items-start gap-3 text-sm lg:items-end lg:text-right">
-                                <div className="space-y-1">
-                                    <p className="font-semibold text-[var(--kitchen-ink)]">{restaurantName}</p>
-                                    <p className="text-[var(--kitchen-muted)]">
-                                        {String(currentChef?.name || "Chef").trim() || "Chef"} -{" "}
-                                        {String(currentChef?.designation || effectiveRole || "Chef")
-                                            .replace(/_/g, " ")
-                                            .toLowerCase()
-                                            .replace(/\b\w/g, (char) => char.toUpperCase())}
-                                    </p>
-                                    <p className="inline-flex items-center gap-2 text-[var(--kitchen-muted)]">
-                                        <Sparkles size={14} />
-                                        {connected ? "Live socket connected" : "Live socket reconnecting"}
-                                        {socketError ? ` - ${socketError}` : ""}
-                                    </p>
-                                    {lastSyncAt ? (
-                                        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--kitchen-muted)]">
-                                            Synced {lastSyncAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                        </p>
-                                    ) : null}
-                                </div>
-                            </div>
-                        </div>
-                    </header>
-
-                <div className="kitchen-paper-rule my-6" />
-
-                {(ordersError || staffError) && (
-                    <div className="mb-5 space-y-2 text-sm text-[#9a4e16]">
-                        {ordersError ? <p>{ordersError}</p> : null}
-                        {staffError ? <p>{staffError}</p> : null}
-                    </div>
-                )}
-
-                <div className="grid min-h-0 gap-8 lg:flex-1 lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
-                    <section className="min-h-0 lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
-                        <div className="flex h-full min-h-0 flex-col rounded-[28px] border border-[rgba(95,61,31,0.12)] bg-[rgba(255,255,255,0.34)] p-4 shadow-[0_10px_22px_rgba(74,43,19,0.04)]">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--kitchen-muted)]">
-                                        Live orders to pick
-                                    </p>
-                                    <h3 className="mt-2 font-serif text-2xl font-bold text-[var(--kitchen-ink)]">
-                                        Pick from pass
-                                    </h3>
-                                </div>
-                                <span className="kitchen-paper-chip">
-                                    {availableTickets.length} open
+                                <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-black border-2 border-zinc-900">
+                                    <Check size={12} strokeWidth={3} />
                                 </span>
                             </div>
 
-                            <p className="mt-2 text-[12px] leading-5 text-[var(--kitchen-muted)]">
-                                Tap Pick to claim an open ticket. It will move into your live load and appear in your history.
-                            </p>
-
-                            <div className="mt-4 min-h-0 space-y-3 lg:flex-1 lg:overflow-y-auto lg:pr-2">
-                                {!historyReady || ordersLoading || staffLoading ? (
-                                    <div className="flex items-center gap-3 text-sm text-[var(--kitchen-muted)]">
-                                        <LoaderCircle size={16} className="animate-spin" />
-                                        Loading live orders...
-                                    </div>
-                                ) : !currentChef ? (
-                                    <div className="flex items-center gap-3 text-sm text-[var(--kitchen-muted)]">
-                                        <ChefHat size={16} />
-                                        Chef not found. Open a chef from the kitchen board.
-                                    </div>
-                                ) : availableTickets.length === 0 ? (
-                                    <div className="flex items-center gap-3 text-sm text-[var(--kitchen-muted)]">
-                                        <UtensilsCrossed size={16} />
-                                        No open tickets are waiting to be picked.
-                                    </div>
-                                ) : (
-                                    availableTickets.map((ticket) => (
-                                        <TicketCard
-                                            key={ticket.itemKey}
-                                            ticket={ticket}
-                                            chef={null}
-                                            chefLabel="Unassigned"
-                                            onAction={handlePickTicket}
-                                            actionLabel="Pick"
-                                            actionIcon={<ChefHat size={14} />}
-                                            actionStyle={{
-                                                backgroundColor: "rgba(249, 115, 22, 0.12)",
-                                                borderColor: "rgba(249, 115, 22, 0.24)",
-                                                color: "#7d4212",
-                                            }}
-                                            actionTitle={`Pick ${ticket.itemName}`}
-                                        />
-                                    ))
-                                )}
-                            </div>
-                        </div>
-
-                    </section>
-
-                    <aside className="min-h-0 lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
-                        <div className="flex shrink-0 items-end justify-between gap-3">
                             <div>
-                                <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--kitchen-muted)]">
-                                    Current assigned items
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">{pageTitle}</h2>
+                                    <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-0.5 text-xs font-black text-amber-400">
+                                        {pageDesignation}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-zinc-400 mt-1 flex items-center gap-2">
+                                    <span>{restaurantName} Kitchen Station</span>
+                                    <span>•</span>
+                                    <span className="text-emerald-400 font-semibold">Active Dispatch Station</span>
                                 </p>
-                                <h2 className="mt-2 font-serif text-3xl font-bold text-[var(--kitchen-ink)]">
-                                    Live load
-                                </h2>
                             </div>
-
-                            <p className="text-right text-xs uppercase tracking-[0.22em] text-[var(--kitchen-muted)]">
-                                {currentTickets.length} item{currentTickets.length === 1 ? "" : "s"}
-                            </p>
                         </div>
 
-                        <div className="mt-5 min-h-0 space-y-3 lg:flex-1 lg:overflow-y-auto lg:pr-2">
-                            {!historyReady || ordersLoading || staffLoading ? (
-                                <div className="flex items-center gap-3 text-sm text-[var(--kitchen-muted)]">
-                                    <LoaderCircle size={16} className="animate-spin" />
-                                    Loading assigned items...
+                        {/* Quick Action Controls */}
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setHistoryOpen(true)}
+                                className="rounded-xl border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-white px-4 py-2.5 text-xs font-black transition flex items-center gap-2 shadow-lg cursor-pointer"
+                            >
+                                <History size={16} className="text-amber-400" />
+                                <span>Activity History ({relevantHistory.length})</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Metric Cards Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-zinc-800/80">
+                        <MetricCard
+                            icon={Flame}
+                            label="Live Orders"
+                            value={metrics.liveOrdersCount}
+                            hint="Orders currently active on pass"
+                            accentColor="amber"
+                        />
+                        <MetricCard
+                            icon={CheckCircle2}
+                            label="Past Completed"
+                            value={metrics.pastEvents}
+                            hint="Completed item assignments"
+                            accentColor="emerald"
+                        />
+                        <MetricCard
+                            icon={Clock}
+                            label="Oldest Ticket Wait"
+                            value={formatKitchenAge(metrics.oldestMinutes)}
+                            hint="Longest waiting item on board"
+                            accentColor="orange"
+                        />
+                    </div>
+                </div>
+
+                {/* BOARD COLUMNS: PASS (PICK) VS LIVE LOAD (ASSIGNED) */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                    {/* LEFT COLUMN: LIVE ORDERS TO PICK FROM PASS */}
+                    <section className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                                    <Flame size={18} />
                                 </div>
-                            ) : !currentChef ? (
-                                <div className="flex items-center gap-3 text-sm text-[var(--kitchen-muted)]">
-                                    <ChefHat size={16} />
-                                    Chef not found. Open a chef from the kitchen board.
+                                <div>
+                                    <h3 className="text-lg font-black tracking-tight text-white">Pick from Pass</h3>
+                                    <p className="text-xs text-zinc-400">Claim an open ticket to add to your live cooking queue</p>
                                 </div>
-                            ) : currentTickets.length === 0 ? (
-                                <div className="flex items-center gap-3 text-sm text-[var(--kitchen-muted)]">
-                                    <UtensilsCrossed size={16} />
-                                    No items are assigned to this chef right now.
+                            </div>
+                            <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-black text-amber-400">
+                                {availableTickets.length} Open
+                            </span>
+                        </div>
+
+                        <div className="space-y-3.5 min-h-[300px]">
+                            {ordersLoading || staffLoading ? (
+                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl border border-zinc-800/80 bg-zinc-900/40 text-zinc-400 space-y-3">
+                                    <LoaderCircle size={28} className="animate-spin text-amber-500" />
+                                    <p className="text-xs font-bold uppercase tracking-wider">Syncing Pass Tickets...</p>
+                                </div>
+                            ) : availableTickets.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl border border-zinc-800/80 bg-zinc-900/40 text-center p-6 space-y-3">
+                                    <UtensilsCrossed size={36} className="text-zinc-600 opacity-60" />
+                                    <h4 className="text-sm font-bold text-zinc-300">Pass is Clear!</h4>
+                                    <p className="text-xs text-zinc-500 max-w-xs">No unassigned tickets waiting on the pass right now.</p>
                                 </div>
                             ) : (
-                                currentTickets.map((ticket) => (
-                                    <TicketCard
+                                availableTickets.map((ticket) => (
+                                    <ModernTicketCard
                                         key={ticket.itemKey}
                                         ticket={ticket}
-                                        chef={currentChef}
-                                        onAction={handleCompleteTicket}
+                                        chef={null}
+                                        chefLabel="Unassigned"
+                                        onAction={handlePickTicket}
+                                        actionLabel="Pick Ticket"
+                                        actionIcon={<ChefHat size={16} />}
+                                        isPickAction={true}
                                     />
                                 ))
                             )}
                         </div>
+                    </section>
 
-                        <button
-                            type="button"
-                            onClick={() => setHistoryOpen(true)}
-                            className="kitchen-paper-action mt-4 w-full justify-center lg:w-auto lg:self-end"
-                        >
-                            <History size={14} />
-                            History
-                        </button>
-                    </aside>
-                </div>
-
-                {historyOpen ? (
-                    <div
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(18,12,8,0.48)] px-4 py-6 backdrop-blur-sm"
-                        onClick={() => setHistoryOpen(false)}
-                        role="presentation"
-                    >
-                        <div
-                            role="dialog"
-                            aria-modal="true"
-                            aria-label="Past assigned items history"
-                            className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-[32px] border border-[rgba(95,61,31,0.16)] bg-[rgba(255,248,239,0.98)] shadow-[0_30px_90px_rgba(74,43,19,0.28)]"
-                            onClick={(event) => event.stopPropagation()}
-                        >
-                            <div className="flex shrink-0 flex-wrap items-start justify-between gap-4 border-b border-[rgba(95,61,31,0.1)] px-5 py-4">
-                                <div>
-                                    <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--kitchen-muted)]">
-                                        Past assigned items
-                                    </p>
-                                    <h3 className="mt-2 font-serif text-2xl font-bold text-[var(--kitchen-ink)]">
-                                        History trail
-                                    </h3>
+                    {/* RIGHT COLUMN: CHEF'S LIVE LOAD (ASSIGNED TO THIS CHEF) */}
+                    <section className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                    <ChefHat size={18} />
                                 </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setHistoryOpen(false)}
-                                    className="kitchen-paper-action"
-                                >
-                                    Close
-                                </button>
+                                <div>
+                                    <h3 className="text-lg font-black tracking-tight text-white">My Live Cooking Load</h3>
+                                    <p className="text-xs text-zinc-400">Tickets currently assigned to {pageTitle}</p>
+                                </div>
                             </div>
-
-                            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-5 pr-3">
-                                {!historyReady || ordersLoading || staffLoading ? (
-                                    <div className="flex items-center gap-3 text-sm text-[var(--kitchen-muted)]">
-                                        <LoaderCircle size={16} className="animate-spin" />
-                                        Loading history...
-                                    </div>
-                                ) : !currentChef ? (
-                                    <div className="flex items-center gap-3 text-sm text-[var(--kitchen-muted)]">
-                                        <History size={16} />
-                                        Chef not found. Open a chef from the kitchen board.
-                                    </div>
-                                ) : relevantHistory.length === 0 ? (
-                                    <div className="flex items-center gap-3 text-sm text-[var(--kitchen-muted)]">
-                                        <History size={16} />
-                                        No history found for this chef yet.
-                                    </div>
-                                ) : (
-                                    relevantHistory.map((entry) => (
-                                        <HistoryCard
-                                            key={entry.id || `${entry.timestamp}-${entry.itemKey}`}
-                                            entry={entry}
-                                            chef={currentChef}
-                                        />
-                                    ))
-                                )}
-                            </div>
+                            <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-xs font-black text-emerald-400">
+                                {currentTickets.length} Active
+                            </span>
                         </div>
-                    </div>
-                ) : null}
+
+                        <div className="space-y-3.5 min-h-[300px]">
+                            {ordersLoading || staffLoading ? (
+                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl border border-zinc-800/80 bg-zinc-900/40 text-zinc-400 space-y-3">
+                                    <LoaderCircle size={28} className="animate-spin text-emerald-500" />
+                                    <p className="text-xs font-bold uppercase tracking-wider">Syncing Live Load...</p>
+                                </div>
+                            ) : currentTickets.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl border border-zinc-800/80 bg-zinc-900/40 text-center p-6 space-y-3">
+                                    <ChefHat size={36} className="text-zinc-600 opacity-60" />
+                                    <h4 className="text-sm font-bold text-zinc-300">No Active Load</h4>
+                                    <p className="text-xs text-zinc-500 max-w-xs">Pick orders from the left column to start cooking.</p>
+                                </div>
+                            ) : (
+                                currentTickets.map((ticket) => (
+                                    <ModernTicketCard
+                                        key={ticket.itemKey}
+                                        ticket={ticket}
+                                        chef={currentChef}
+                                        onAction={handleCompleteTicket}
+                                        actionLabel="Mark Complete"
+                                        actionIcon={<CheckCircle2 size={16} />}
+                                        isPickAction={false}
+                                    />
+                                ))
+                            )}
+                        </div>
+                    </section>
+
                 </div>
             </main>
 
-            {soundModalOpen ? (
+            {/* ACTIVITY HISTORY MODAL */}
+            {historyOpen && (
                 <div
-                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-md"
-                    onClick={() => setSoundModalOpen(false)}
-                    role="presentation"
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+                    onClick={() => setHistoryOpen(false)}
                 >
                     <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="Notification Sound Settings"
-                        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] border border-[rgba(217,200,175,0.25)] bg-[#181410] text-[#fff8e7] shadow-2xl"
-                        onClick={(event) => event.stopPropagation()}
+                        className="w-full max-w-3xl rounded-3xl border border-zinc-800 bg-zinc-950 p-6 space-y-5 shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex shrink-0 items-center justify-between border-b border-[rgba(255,255,255,0.1)] px-6 py-4">
+                        <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400">
-                                    <Bell size={20} className="animate-pulse" />
+                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                    <History size={20} />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-white">Kitchen Order Alerts & Sound</h3>
-                                    <p className="text-xs text-amber-200/70">Configure sound chime and view live ticket notifications</p>
+                                    <h3 className="text-lg font-black text-white">Activity Trail — {pageTitle}</h3>
+                                    <p className="text-xs text-zinc-400">Past item assignments and completion logs</p>
                                 </div>
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setSoundModalOpen(false)}
-                                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 transition"
+                                onClick={() => setHistoryOpen(false)}
+                                className="rounded-xl border border-zinc-800 p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
                             >
                                 <X size={18} />
                             </button>
                         </div>
 
-                        <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-5">
-                            {/* Sound Mute Toggle Bar */}
-                            <div className="flex items-center justify-between rounded-2xl border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] p-4">
+                        <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-1">
+                            {relevantHistory.length === 0 ? (
+                                <p className="text-center text-xs text-zinc-500 py-10">No activity trail recorded for this chef yet.</p>
+                            ) : (
+                                relevantHistory.map((entry) => (
+                                    <ModernHistoryCard
+                                        key={entry.id || `${entry.timestamp}-${entry.itemKey}`}
+                                        entry={entry}
+                                        chef={currentChef}
+                                    />
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* SOUND SETTINGS MODAL */}
+            {soundModalOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+                    onClick={() => setSoundModalOpen(false)}
+                >
+                    <div
+                        className="w-full max-w-2xl rounded-3xl border border-zinc-800 bg-zinc-950 p-6 space-y-5 shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                    <Bell size={20} className="animate-pulse" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-white">Kitchen Order Chime & Alerts</h3>
+                                    <p className="text-xs text-zinc-400">Configure real-time ticket arrival audio alerts</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSoundModalOpen(false)}
+                                className="rounded-xl border border-zinc-800 p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
                                 <div className="flex items-center gap-3">
-                                    {soundMuted ? <VolumeX size={20} className="text-gray-400" /> : <Volume2 size={20} className="text-amber-400" />}
+                                    {soundMuted ? <VolumeX size={20} className="text-zinc-500" /> : <Volume2 size={20} className="text-amber-400" />}
                                     <div>
                                         <p className="text-sm font-bold text-white">{soundMuted ? "Sound Alerts Muted" : "Sound Alerts Active"}</p>
-                                        <p className="text-xs text-amber-200/70">Plays chime automatically when live tickets arrive</p>
+                                        <p className="text-xs text-zinc-400">Plays notification sound when new orders arrive</p>
                                     </div>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={toggleSoundMute}
-                                    className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                                    className={`rounded-xl px-4 py-2 text-xs font-black transition cursor-pointer ${
                                         soundMuted
                                             ? "bg-amber-500 text-black hover:bg-amber-400"
-                                            : "bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                                            : "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30"
                                     }`}
                                 >
                                     {soundMuted ? "Unmute Sound" : "Mute Sound"}
                                 </button>
                             </div>
 
-                            {/* Sound Selector Component */}
                             <NotificationSoundPicker />
-
-                            {/* Live Tickets Notification List */}
-                            <div className="rounded-2xl border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] p-4 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-bold text-amber-400 uppercase tracking-wider">Live Ticket Alerts</h4>
-                                    <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs text-amber-300 font-semibold">
-                                        {ticketRows.length} Active
-                                    </span>
-                                </div>
-
-                                {ticketRows.length === 0 ? (
-                                    <p className="text-xs text-amber-100/60">No active ticket notifications currently.</p>
-                                ) : (
-                                    <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
-                                        {ticketRows.slice(0, 10).map((ticket) => (
-                                            <div key={ticket.itemKey} className="flex items-center justify-between rounded-xl bg-black/30 p-3 text-xs border border-white/5">
-                                                <div>
-                                                    <p className="font-bold text-white">{ticket.itemName} ({ticket.qty}x)</p>
-                                                    <p className="text-[11px] text-amber-200/70">{ticket.orderRef} • {ticket.orderLabel}</p>
-                                                </div>
-                                                <span className="rounded-full bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-300 border border-amber-500/20">
-                                                    {ticket.ageText}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex justify-end">
-                                <Link
-                                    to="/owner/notifications"
-                                    onClick={() => setSoundModalOpen(false)}
-                                    className="inline-flex items-center gap-2 text-xs font-bold text-amber-400 hover:text-amber-300 underline"
-                                >
-                                    Open Full Owner Notifications Page →
-                                </Link>
-                            </div>
                         </div>
                     </div>
                 </div>
-            ) : null}
+            )}
         </div>
     );
 }
