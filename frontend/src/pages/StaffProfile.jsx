@@ -216,7 +216,15 @@ export default function StaffProfile() {
     const { user } = useAuth();
     const { socket, connected, error: socketError } = useStaffSocket();
 
-    const restaurantId = Number(user?.restaurantId || 0);
+    const restaurantId = Number(
+        user?.restaurantId ||
+        user?.restaurant?.id ||
+        user?.restaurant_id ||
+        localStorage.getItem("restaurantId") ||
+        localStorage.getItem("selectedRestaurantId") ||
+        localStorage.getItem("owner_restaurant_id") ||
+        1
+    );
     const restaurantName = String(user?.restaurant?.name || user?.restaurantName || "Restaurant").trim() || "Restaurant";
 
     const { orders, staffUsers, ordersLoading, staffLoading, refreshing, ordersError, staffError, lastSyncAt, refreshBoard } =

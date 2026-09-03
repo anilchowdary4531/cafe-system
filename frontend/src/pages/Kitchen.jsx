@@ -399,7 +399,15 @@ export default function Kitchen() {
     const { user, logout } = useAuth();
     const { socket, connected, error: socketError } = useStaffSocket();
 
-    const restaurantId = Number(user?.restaurantId || 0);
+    const restaurantId = Number(
+        user?.restaurantId ||
+        user?.restaurant?.id ||
+        user?.restaurant_id ||
+        localStorage.getItem("restaurantId") ||
+        localStorage.getItem("selectedRestaurantId") ||
+        localStorage.getItem("owner_restaurant_id") ||
+        1
+    );
     const restaurantName = String(user?.restaurant?.name || "Restaurant").trim() || "Restaurant";
     const currentUserId = String(user?.id || "");
     const effectiveRole = resolveEffectiveStaffRole(user?.role, user?.designation);

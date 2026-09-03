@@ -243,7 +243,15 @@ export default function KitchenChefDetail() {
     const { user } = useAuth();
     const { socket, connected, error: socketError } = useStaffSocket();
 
-    const restaurantId = Number(user?.restaurantId || 0);
+    const restaurantId = Number(
+        user?.restaurantId ||
+        user?.restaurant?.id ||
+        user?.restaurant_id ||
+        localStorage.getItem("restaurantId") ||
+        localStorage.getItem("selectedRestaurantId") ||
+        localStorage.getItem("owner_restaurant_id") ||
+        1
+    );
     const restaurantName = String(user?.restaurant?.name || "Restaurant").trim() || "Restaurant";
     const effectiveRole = resolveEffectiveStaffRole(user?.role, user?.designation);
 
@@ -346,7 +354,26 @@ export default function KitchenChefDetail() {
         return map;
     }, [chefs]);
 
-    const currentChef = chefById.get(targetChefId) || null;
+    const currentChef = useMemo(() => {
+        if (!targetChefId) return null;
+        if (chefById.has(targetChefId)) return chefById.get(targetChefId);
+
+        const rawStaff = Array.isArray(staffUsers) ? staffUsers.find((s) => String(s.id) === targetChefId) : null;
+        if (rawStaff) {
+            return {
+                ...rawStaff,
+                id: String(rawStaff.id),
+                palette: CHEF_PALETTES[0],
+            };
+        }
+
+        return {
+            id: targetChefId,
+            name: `Chef #${targetChefId}`,
+            designation: "Chef",
+            palette: CHEF_PALETTES[0],
+        };
+    }, [chefById, staffUsers, targetChefId]);
 
     const ticketRows = useMemo(() => buildKitchenTicketRows(activeOrders), [activeOrders]);
 
