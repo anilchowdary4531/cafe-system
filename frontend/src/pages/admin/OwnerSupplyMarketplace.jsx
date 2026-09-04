@@ -15,6 +15,9 @@ import {
     Tag,
     Handshake,
     Package,
+    Filter,
+    SlidersHorizontal,
+    Building2,
 } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
@@ -77,6 +80,8 @@ export default function OwnerSupplyMarketplace() {
     const [activeTab, setActiveTab] = useState("browse");
     const [search, setSearch] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All Categories");
+    const [selectedSupplier, setSelectedSupplier] = useState("All Suppliers");
+    const [sortBy, setSortBy] = useState("default");
     const [showCartModal, setShowCartModal] = useState(false);
     const [showBargainModal, setShowBargainModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -239,112 +244,227 @@ export default function OwnerSupplyMarketplace() {
                 </button>
             </div>
 
-            {/* Search + Categories Bar */}
+            {/* Search + Categories Bar + Filter Controls */}
             {activeTab === "browse" && (
-                <div className="space-y-3">
-                    {/* Search Bar */}
-                    <div className="relative">
-                        <Search size={18} className="absolute left-4 top-3.5 theme-muted" />
-                        <input
-                            type="text"
-                            placeholder="Search 20 supply categories (e.g. Chicken Breast, Dairy, Spices, Utensils, Packaging, Water Bottles)..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="w-full rounded-2xl theme-input pl-11 pr-4 py-3 text-sm outline-none transition"
-                        />
+                <div className="theme-panel rounded-3xl p-5 border shadow-sm space-y-4">
+                    <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+                        {/* Search Input Bar */}
+                        <div className="relative flex-1">
+                            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 theme-muted" />
+                            <input
+                                type="text"
+                                placeholder="Search products, suppliers (e.g. SocialSea), categories..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="w-full rounded-2xl theme-input pl-11 pr-10 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#f5b94e]"
+                            />
+                            {search && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearch("")}
+                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 theme-muted hover:text-white cursor-pointer"
+                                >
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3">
+                            {/* SELECT CATEGORY OPTION SELECTOR DROPDOWN */}
+                            <div className="flex items-center gap-2">
+                                <Tag size={16} className="theme-accent-text" />
+                                <select
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                    className="theme-input rounded-2xl px-4 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#f5b94e] cursor-pointer"
+                                >
+                                    <option value="All Categories">📦 Select Category (All Categories - {products.length})</option>
+                                    {SUPPLY_CATEGORIES.map((cat) => {
+                                        const count = products.filter((p) => {
+                                            const target = cat.name.trim().toLowerCase();
+                                            const pCatName = String(p.category?.name || p.categoryName || p.category || "").trim().toLowerCase();
+                                            return pCatName === target || (pCatName && (pCatName.includes(target) || target.includes(pCatName)));
+                                        }).length;
+                                        return (
+                                            <option key={cat.id} value={cat.name}>
+                                                {cat.name} ({count})
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            </div>
+
+                            {/* FILTER BY SUPPLIER DROPDOWN */}
+                            <div className="flex items-center gap-2">
+                                <Building2 size={16} className="theme-muted" />
+                                <select
+                                    value={selectedSupplier}
+                                    onChange={(e) => setSelectedSupplier(e.target.value)}
+                                    className="theme-input rounded-2xl px-4 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#f5b94e] cursor-pointer"
+                                >
+                                    <option value="All Suppliers">🏢 All Suppliers</option>
+                                    {Array.from(
+                                        new Set(
+                                            products
+                                                .map((p) => p.supplierName || p.supplier?.profile?.businessName || p.supplier?.businessName)
+                                                .filter(Boolean)
+                                        )
+                                    ).map((sName) => (
+                                        <option key={sName} value={sName}>
+                                            {sName}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* SORT BY DROPDOWN */}
+                            <div className="flex items-center gap-2">
+                                <Filter size={16} className="theme-muted" />
+                                <select
+                                    value={sortBy}
+                                    onChange={(e) => setSortBy(e.target.value)}
+                                    className="theme-input rounded-2xl px-4 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#f5b94e] cursor-pointer"
+                                >
+                                    <option value="default">Sort: Recommended</option>
+                                    <option value="price_low_high">Price: Low to High</option>
+                                    <option value="price_high_low">Price: High to Low</option>
+                                    <option value="name_asc">Name: A to Z</option>
+                                </select>
+                            </div>
+
+                            {/* Reset Filters Button */}
+                            {(search || selectedCategory !== "All Categories" || selectedSupplier !== "All Suppliers" || sortBy !== "default") && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSearch("");
+                                        setSelectedCategory("All Categories");
+                                        setSelectedSupplier("All Suppliers");
+                                        setSortBy("default");
+                                    }}
+                                    className="rounded-2xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 px-3.5 py-2.5 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                                >
+                                    <X size={14} /> Clear Filters
+                                </button>
+                            )}
+                        </div>
                     </div>
 
-                    {/* 20 Restaurant Supply Categories Scrollable Bar */}
-                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
-                        <button
-                            type="button"
-                            onClick={() => setSelectedCategory("All Categories")}
-                            className={`rounded-xl px-4 py-2 text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-                                selectedCategory === "All Categories"
-                                    ? "theme-button shadow-md font-extrabold"
-                                    : "theme-button-secondary"
-                            }`}
-                        >
-                            ✨ All Categories ({products.length})
-                        </button>
-                        {SUPPLY_CATEGORIES.map((cat) => {
-                            const count = products.filter((p) => {
-                                const target = cat.name.trim().toLowerCase();
-                                const pCatName = String(p.category?.name || p.categoryName || "").trim().toLowerCase();
-                                return pCatName === target || (pCatName && (pCatName.includes(target) || target.includes(pCatName)));
-                            }).length;
+                    {/* CATEGORY SELECTOR PILLS BAR */}
+                    <div className="pt-2 border-t theme-border">
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                            <span className="text-[11px] font-extrabold theme-muted uppercase tracking-wider whitespace-nowrap mr-1 flex items-center gap-1">
+                                <SlidersHorizontal size={13} /> Select Category:
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedCategory("All Categories")}
+                                className={`rounded-xl px-4 py-1.5 text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                                    selectedCategory === "All Categories"
+                                        ? "theme-button shadow-md font-extrabold"
+                                        : "theme-button-secondary"
+                                }`}
+                            >
+                                ✨ All ({products.length})
+                            </button>
+                            {SUPPLY_CATEGORIES.map((cat) => {
+                                const count = products.filter((p) => {
+                                    const target = cat.name.trim().toLowerCase();
+                                    const pCatName = String(p.category?.name || p.categoryName || p.category || "").trim().toLowerCase();
+                                    return pCatName === target || (pCatName && (pCatName.includes(target) || target.includes(pCatName)));
+                                }).length;
 
-                            return (
-                                <button
-                                    key={cat.id}
-                                    type="button"
-                                    onClick={() => setSelectedCategory(cat.name)}
-                                    className={`rounded-xl px-4 py-2 text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
-                                        selectedCategory === cat.name
-                                            ? "theme-button shadow-md font-extrabold"
-                                            : count > 0
-                                            ? "border theme-border theme-soft-button theme-accent-text"
-                                            : "theme-button-secondary"
-                                    }`}
-                                >
-                                    <span>{cat.icon}</span>
-                                    <span>{cat.name}</span>
-                                    {count > 0 && (
-                                        <span className="ml-1 rounded-full bg-amber-500 text-black px-1.5 py-0.5 text-[10px] font-black">
-                                            {count}
-                                        </span>
-                                    )}
-                                </button>
-                            );
-                        })}
+                                const isSelected = selectedCategory === cat.name;
+
+                                return (
+                                    <button
+                                        key={cat.id}
+                                        type="button"
+                                        onClick={() => setSelectedCategory(cat.name)}
+                                        className={`rounded-xl px-3.5 py-1.5 text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                                            isSelected
+                                                ? "theme-button shadow-md font-extrabold"
+                                                : count > 0
+                                                ? "border theme-border theme-soft-button theme-accent-text"
+                                                : "theme-button-secondary"
+                                        }`}
+                                    >
+                                        <span>{cat.icon}</span>
+                                        <span>{cat.name}</span>
+                                        {count > 0 && (
+                                            <span className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-black ${isSelected ? "bg-black/30 text-white" : "bg-amber-500 text-black"}`}>
+                                                {count}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
             )}
 
             {/* Browse Grid */}
             {activeTab === "browse" && (() => {
-                const filtered = products.filter((p) => {
-                    if (search.trim()) {
-                        const query = search.toLowerCase();
-                        const pName = String(p.name || "").toLowerCase();
-                        const pDesc = String(p.description || "").toLowerCase();
-                        const pSupplier = String(p.supplier?.profile?.businessName || "").toLowerCase();
-                        const pCat = String(p.category?.name || p.categoryName || "").toLowerCase();
-                        if (!pName.includes(query) && !pDesc.includes(query) && !pSupplier.includes(query) && !pCat.includes(query)) {
-                            return false;
+                const filtered = products
+                    .filter((p) => {
+                        if (search.trim()) {
+                            const query = search.toLowerCase();
+                            const pName = String(p.name || "").toLowerCase();
+                            const pDesc = String(p.description || "").toLowerCase();
+                            const pSupplier = String(p.supplierName || p.supplier?.profile?.businessName || p.supplier?.businessName || "").toLowerCase();
+                            const pCat = String(p.category?.name || p.categoryName || p.category || "").toLowerCase();
+                            if (!pName.includes(query) && !pDesc.includes(query) && !pSupplier.includes(query) && !pCat.includes(query)) {
+                                return false;
+                            }
                         }
-                    }
 
-                    if (selectedCategory !== "All Categories") {
-                        const target = selectedCategory.trim().toLowerCase();
-                        const pCatName = String(p.category?.name || p.categoryName || "").trim().toLowerCase();
-                        const pCatSlug = String(p.category?.slug || "").trim().toLowerCase();
-                        if (pCatName !== target && pCatSlug !== target && !pCatName.includes(target) && !target.includes(pCatName)) {
-                            return false;
+                        if (selectedCategory !== "All Categories") {
+                            const target = selectedCategory.trim().toLowerCase();
+                            const pCatName = String(p.category?.name || p.categoryName || p.category || "").trim().toLowerCase();
+                            const pCatSlug = String(p.category?.slug || "").trim().toLowerCase();
+                            if (pCatName !== target && pCatSlug !== target && !pCatName.includes(target) && !target.includes(pCatName)) {
+                                return false;
+                            }
                         }
-                    }
 
-                    return true;
-                });
+                        if (selectedSupplier !== "All Suppliers") {
+                            const targetSupp = selectedSupplier.trim().toLowerCase();
+                            const pSuppName = String(p.supplierName || p.supplier?.profile?.businessName || p.supplier?.businessName || "").trim().toLowerCase();
+                            if (pSuppName !== targetSupp && !pSuppName.includes(targetSupp)) {
+                                return false;
+                            }
+                        }
+
+                        return true;
+                    })
+                    .sort((a, b) => {
+                        const priceA = Number(a.prices?.[0]?.basePrice || a.basePrice || a.finalPrice || 0);
+                        const priceB = Number(b.prices?.[0]?.basePrice || b.basePrice || b.finalPrice || 0);
+                        if (sortBy === "price_low_high") return priceA - priceB;
+                        if (sortBy === "price_high_low") return priceB - priceA;
+                        if (sortBy === "name_asc") return String(a.name || "").localeCompare(String(b.name || ""));
+                        return 0;
+                    });
 
                 if (filtered.length === 0) {
                     return (
                         <div className="theme-panel rounded-3xl border p-10 text-center space-y-4 shadow-xl my-4">
                             <Package size={44} className="mx-auto theme-accent-text opacity-80" />
                             <div>
-                                <h3 className="text-base font-bold">No products listed under "{selectedCategory}"</h3>
+                                <h3 className="text-base font-bold">No products match your filters</h3>
                                 <p className="theme-muted text-xs mt-1 max-w-md mx-auto">
-                                    {selectedCategory === "All Categories"
-                                        ? "No supply products added to marketplace yet."
-                                        : `Currently no suppliers have listed products under "${selectedCategory}". Click below to show all available ingredients.`}
+                                    {selectedCategory === "All Categories" && selectedSupplier === "All Suppliers"
+                                        ? "No supply products found matching your search term."
+                                        : `No products found under category "${selectedCategory}" for supplier "${selectedSupplier}". Click below to reset.`}
                                 </p>
                             </div>
                             <button
                                 type="button"
-                                onClick={() => { setSelectedCategory("All Categories"); setSearch(""); }}
+                                onClick={() => { setSelectedCategory("All Categories"); setSelectedSupplier("All Suppliers"); setSearch(""); setSortBy("default"); }}
                                 className="theme-button rounded-xl px-5 py-2.5 text-xs font-extrabold transition shadow-md cursor-pointer inline-flex items-center gap-1.5"
                             >
-                                ✨ View All Supply Products ({products.length})
+                                ✨ Reset All Filters ({products.length} Products Available)
                             </button>
                         </div>
                     );
@@ -354,9 +474,11 @@ export default function OwnerSupplyMarketplace() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         {filtered.map((p) => {
                             const imgUrl = getSupplyProductImageUrl(p);
+                            const displaySupplierName = p.supplierName || p.supplier?.profile?.businessName || p.supplier?.businessName || "SocialSea";
+                            const displayPrice = p.prices?.[0]?.basePrice || p.basePrice || p.finalPrice || 100;
 
                             return (
-                                <div key={p.id} className="theme-panel rounded-2xl border p-4 space-y-3 shadow-md">
+                                <div key={p.id} className="theme-panel rounded-2xl border p-4 space-y-3 shadow-md hover:border-[#f5b94e]/40 transition">
                                     <div className="h-44 w-full rounded-xl overflow-hidden border theme-border bg-black/10 shadow-inner relative flex items-center justify-center">
                                         {imgUrl ? (
                                             <img
@@ -376,19 +498,25 @@ export default function OwnerSupplyMarketplace() {
                                         )}
                                     </div>
 
-                                    <div className="flex items-start justify-between">
+                                    <div className="flex items-start justify-between gap-2">
                                         <div>
-                                            <h3 className="font-bold text-base">{p.name}</h3>
-                                            <p className="theme-muted text-xs mt-0.5">Supplier: {p.supplier?.profile?.businessName || "Verified Supplier"}</p>
+                                            <h3 className="font-bold text-base leading-snug">{p.name}</h3>
+                                            <p className="text-xs mt-1.5 flex items-center gap-1.5 flex-wrap">
+                                                <span className="theme-muted font-medium">Supplier:</span>
+                                                <span className="font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20 inline-flex items-center gap-1 text-[11px]">
+                                                    <Building2 size={12} />
+                                                    {displaySupplierName}
+                                                </span>
+                                            </p>
                                         </div>
-                                        <span className="theme-button-secondary rounded-full px-3 py-1 text-xs font-bold">
-                                            ₹{p.prices?.[0]?.basePrice || 100} / {p.unit}
+                                        <span className="theme-button-secondary rounded-full px-3 py-1 text-xs font-black whitespace-nowrap">
+                                            ₹{displayPrice} / {p.unit}
                                         </span>
                                     </div>
 
                                     <div className="text-xs space-y-1 theme-muted border-t theme-border pt-3">
-                                        <p>Min Order Qty (MOQ): <span className="font-bold">{p.moq} {p.unit}</span></p>
-                                        <p>Available Stock: <span className="font-bold theme-accent-text">{p.inventory?.availableStock || 0} {p.unit}</span></p>
+                                        <p>Min Order Qty (MOQ): <span className="font-bold text-white">{p.moq} {p.unit}</span></p>
+                                        <p>Available Stock: <span className="font-bold theme-accent-text">{p.inventory?.availableStock || p.availableStock || 250} {p.unit}</span></p>
                                     </div>
 
                                     <div className="flex items-center gap-2 pt-1">
