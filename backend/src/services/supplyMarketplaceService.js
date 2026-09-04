@@ -1,7 +1,10 @@
 import prisma from "../prisma.js";
 import { calculateFinalPrice, getSupplierProductById } from "./supplierProductService.js";
+import { ensureSupplyMarketplaceSeeded } from "./seedSupplyMarketplaceService.js";
 
 export async function browseMarketplaceProducts(query = {}) {
+    await ensureSupplyMarketplaceSeeded();
+
     const {
         search = "",
         categoryId,

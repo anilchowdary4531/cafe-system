@@ -45,7 +45,7 @@ export async function createSupplierProduct(supplierId, data) {
         taxPercent = 5.0,
         discountType,
         discountValue = 0,
-        initialStock = 0,
+        initialStock = 100,
         lowStockAlert = 10,
         imageUrl,
         imageUrls = [],
@@ -98,7 +98,7 @@ export async function createSupplierProduct(supplierId, data) {
             });
         }
 
-        const stockQty = Math.max(0, Number(initialStock || 0));
+        const stockQty = Math.max(1, Number(initialStock ?? 100));
         const inventory = await tx.supplyInventory.create({
             data: {
                 productId: createdProduct.id,
