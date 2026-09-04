@@ -3,8 +3,8 @@
  * Separated to allow easy swapping of tile providers / styles for production.
  */
 export const MAP_CONFIG = {
-    // OpenFreeMap Bright Vector Style (Free, full OSM streets & building data, no API key required)
-    styleUrl: "https://tiles.openfreemap.org/styles/bright",
+    // CartoDB Positron GL Vector Style (Free, OpenStreetMap vector tiles, roads/labels/buildings, no API key)
+    styleUrl: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
     
     // Default Map Center (Bengaluru, India: lat=12.9716, lng=77.5946)
     defaultCenter: {
