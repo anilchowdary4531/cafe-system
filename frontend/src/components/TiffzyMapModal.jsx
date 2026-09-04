@@ -106,76 +106,102 @@ export default function TiffzyMapModal({ isOpen, onClose, restaurants = [] }) {
     useEffect(() => {
         if (!isOpen || !mapContainerRef.current) return;
 
-        console.log("[TiffzyMap] Initializing MapLibre GL JS Map...");
+        console.log("[TiffzyMap] Map initialization started");
+        console.log("[TiffzyMap] Style URL:", MAP_CONFIG.styleUrl);
+        console.log("[TiffzyMap] Center:", [MAP_CONFIG.defaultCenter.lng, MAP_CONFIG.defaultCenter.lat]);
+        console.log("[TiffzyMap] Zoom:", MAP_CONFIG.defaultCenter.zoom);
 
-        const map = new maplibregl.Map({
-            container: mapContainerRef.current,
-            style: MAP_CONFIG.styleUrl,
-            center: [MAP_CONFIG.defaultCenter.lng, MAP_CONFIG.defaultCenter.lat],
-            zoom: MAP_CONFIG.defaultCenter.zoom,
-            attributionControl: true,
-        });
-
-        mapRef.current = map;
-
-        // Navigation controls (Zoom / Rotate)
-        map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
-
-        map.on("load", () => {
-            console.log("[TiffzyMap] OpenStreetMap tile style loaded successfully");
-
-            // 1. Add Step 4 Temporary Test Marker
-            if (MAP_CONFIG.testMarker && MAP_CONFIG.testMarker.enabled) {
-                const testMarkerEl = document.createElement("div");
-                testMarkerEl.className = "tiffzy-test-marker";
-                testMarkerEl.innerHTML = `
-                    <div style="background: linear-[#fe5102]; background-color: #fe5102; color: white; padding: 6px 12px; border-radius: 20px; font-weight: 800; font-size: 11px; box-shadow: 0 4px 12px rgba(254,81,2,0.4); display: flex; align-items: center; gap: 4px; border: 2px solid white; cursor: pointer;">
-                        <span>📍</span>
-                        <span>${MAP_CONFIG.testMarker.name}</span>
-                    </div>
-                `;
-
-                const testPopup = new maplibregl.Popup({ offset: 25 }).setHTML(`
-                    <div style="padding: 8px; font-family: system-ui, sans-serif;">
-                        <h4 style="margin:0; font-weight: 800; color: #fe5102;">${MAP_CONFIG.testMarker.name}</h4>
-                        <p style="margin:4px 0 0 0; font-size: 11px; color: #666;">TEST MARKER (Not saved in DB)</p>
-                        <p style="margin:2px 0 0 0; font-size: 10px; color: #888;">Lat: ${MAP_CONFIG.testMarker.lat}, Lng: ${MAP_CONFIG.testMarker.lng}</p>
-                    </div>
-                `);
-
-                new maplibregl.Marker({ element: testMarkerEl })
-                    .setLngLat([MAP_CONFIG.testMarker.lng, MAP_CONFIG.testMarker.lat])
-                    .setPopup(testPopup)
-                    .addTo(map);
-
-                console.log("[TiffzyMap] Added in-memory test restaurant marker at Bengaluru (12.9716, 77.5946)");
-            }
-
-            // 2. Add Real Restaurant Markers
-            validRestaurants.forEach((restaurant) => {
-                const el = document.createElement("div");
-                el.className = "tiffzy-restaurant-marker";
-                el.innerHTML = `
-                    <div style="background: #111827; color: #fe5102; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.35); border: 2px solid #fe5102; cursor: pointer; transition: transform 0.2s;">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
-                    </div>
-                `;
-
-                el.addEventListener("click", () => {
-                    setSelectedRestaurant(restaurant);
-                });
-
-                new maplibregl.Marker({ element: el })
-                    .setLngLat([restaurant.lng, restaurant.lat])
-                    .addTo(map);
+        try {
+            const map = new maplibregl.Map({
+                container: mapContainerRef.current,
+                style: MAP_CONFIG.styleUrl,
+                center: [MAP_CONFIG.defaultCenter.lng, MAP_CONFIG.defaultCenter.lat],
+                zoom: MAP_CONFIG.defaultCenter.zoom,
+                attributionControl: true,
             });
 
-            console.log(`[TiffzyMap] Plotted ${validRestaurants.length} valid real restaurant markers on map.`);
-        });
+            mapRef.current = map;
+
+            // MapLibre runtime error listener
+            map.on("error", (event) => {
+                console.error("[TiffzyMap] MapLibre error:", event);
+            });
+
+            // Navigation controls (Zoom / Rotate)
+            map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
+
+            map.on("load", () => {
+                console.log("[TiffzyMap] Map load event fired");
+                console.log("[TiffzyMap] Style loaded");
+                const style = map.getStyle();
+                console.log("[TiffzyMap] Source count:", Object.keys(style?.sources || {}).length);
+                console.log("[TiffzyMap] Layer count:", style?.layers?.length || 0);
+
+                // Ensure container layout calculation
+                map.resize();
+
+                let markerCount = 0;
+
+                // 1. Add Step 4 Temporary Test Marker
+                if (MAP_CONFIG.testMarker && MAP_CONFIG.testMarker.enabled) {
+                    const testMarkerEl = document.createElement("div");
+                    testMarkerEl.className = "tiffzy-test-marker";
+                    testMarkerEl.innerHTML = `
+                        <div style="background: #fe5102; color: white; padding: 6px 12px; border-radius: 20px; font-weight: 800; font-size: 11px; box-shadow: 0 4px 12px rgba(254,81,2,0.4); display: flex; align-items: center; gap: 4px; border: 2px solid white; cursor: pointer;">
+                            <span>📍</span>
+                            <span>${MAP_CONFIG.testMarker.name}</span>
+                        </div>
+                    `;
+
+                    const testPopup = new maplibregl.Popup({ offset: 25 }).setHTML(`
+                        <div style="padding: 8px; font-family: system-ui, sans-serif;">
+                            <h4 style="margin:0; font-weight: 800; color: #fe5102;">${MAP_CONFIG.testMarker.name}</h4>
+                            <p style="margin:4px 0 0 0; font-size: 11px; color: #666;">TEST MARKER (Not saved in DB)</p>
+                            <p style="margin:2px 0 0 0; font-size: 10px; color: #888;">Lat: ${MAP_CONFIG.testMarker.lat}, Lng: ${MAP_CONFIG.testMarker.lng}</p>
+                        </div>
+                    `);
+
+                    new maplibregl.Marker({ element: testMarkerEl })
+                        .setLngLat([MAP_CONFIG.testMarker.lng, MAP_CONFIG.testMarker.lat])
+                        .setPopup(testPopup)
+                        .addTo(map);
+
+                    markerCount++;
+                    console.log("[TiffzyMap] Added in-memory test restaurant marker at Bengaluru (12.9716, 77.5946)");
+                }
+
+                // 2. Add Real Restaurant Markers
+                validRestaurants.forEach((restaurant) => {
+                    const el = document.createElement("div");
+                    el.className = "tiffzy-restaurant-marker";
+                    el.innerHTML = `
+                        <div style="background: #111827; color: #fe5102; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.35); border: 2px solid #fe5102; cursor: pointer; transition: transform 0.2s;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
+                        </div>
+                    `;
+
+                    el.addEventListener("click", () => {
+                        setSelectedRestaurant(restaurant);
+                    });
+
+                    new maplibregl.Marker({ element: el })
+                        .setLngLat([restaurant.lng, restaurant.lat])
+                        .addTo(map);
+
+                    markerCount++;
+                });
+
+                console.log(`[TiffzyMap] Marker count: ${markerCount}`);
+            });
+        } catch (err) {
+            console.error("[TiffzyMap] Map initialization error:", err);
+        }
 
         return () => {
             console.log("[TiffzyMap] Cleaning up MapLibre map instance.");
-            map.remove();
+            if (mapRef.current) {
+                mapRef.current.remove();
+            }
         };
     }, [isOpen]);
 

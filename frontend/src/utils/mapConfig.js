@@ -3,10 +3,10 @@
  * Separated to allow easy swapping of tile providers / styles for production.
  */
 export const MAP_CONFIG = {
-    // OpenStreetMap-compatible vector tile style URL (Free, no API key required)
-    styleUrl: "https://demotiles.maplibre.org/style.json",
+    // OpenFreeMap Bright Vector Style (Free, full OSM streets & building data, no API key required)
+    styleUrl: "https://tiles.openfreemap.org/styles/bright",
     
-    // Default Map Center (Bengaluru, India as per Step 4 requirements)
+    // Default Map Center (Bengaluru, India: lat=12.9716, lng=77.5946)
     defaultCenter: {
         lat: 12.9716,
         lng: 77.5946,
