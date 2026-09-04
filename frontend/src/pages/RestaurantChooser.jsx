@@ -1,6 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, Dot, Navigation, Search, UserCircle2 } from "lucide-react";
+import { ChevronRight, Dot, Map as MapIcon, Navigation, Search, UserCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
@@ -14,6 +14,7 @@ import CustomerNotificationBell from "../components/CustomerNotificationBell";
 import Footer from "../components/Footer";
 import PromoBannerSlider from "../components/PromoBannerSlider";
 import PopularCategories, { normalizeCategoryName } from "../components/PopularCategories";
+import TiffzyMapModal from "../components/TiffzyMapModal";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 import { isVegModeItem } from "./restaurant/RestaurantMenu";
 
@@ -32,14 +33,32 @@ const haversineKm = (lat1, lon1, lat2, lon2) => {
 const hasCoords = (restaurant) => Number.isFinite(Number(restaurant?.latitude)) && Number.isFinite(Number(restaurant?.longitude));
 
 const pickNearestRestaurant = (restaurants, lat, lon) => {
-    const candidates = (restaurants || []).filter(hasCoords);
+    const candidates = (restaurants || []).map((r) => {
+        if (!hasCoords(r)) return null;
+        const rLat = Number(r.latitude);
+        const rLon = Number(r.longitude);
+
+        if (!Number.isFinite(rLat) || !Number.isFinite(rLon)) return null;
+        if (rLat < -90 || rLat > 90 || rLon < -180 || rLon > 180) {
+            console.warn(`[Tiffzy] Invalid coordinate bounds for ${r.name}: lat ${rLat}, lon ${rLon}. Skipping...`);
+            return null;
+        }
+        return { ...r, latitude: rLat, longitude: rLon };
+    }).filter(Boolean);
+
     if (!candidates.length) return null;
+
+    console.log("=== TIFFZY NEAREST RESTAURANT DEBUG ===");
+    console.log("User latitude:", lat);
+    console.log("User longitude:", lon);
 
     let best = candidates[0];
     let bestKm = haversineKm(lat, lon, Number(best.latitude), Number(best.longitude));
+    console.log(`Restaurant '${best.name}' lat:${best.latitude} lon:${best.longitude} dist:${bestKm.toFixed(1)}km`);
 
     for (const r of candidates.slice(1)) {
         const km = haversineKm(lat, lon, Number(r.latitude), Number(r.longitude));
+        console.log(`Restaurant '${r.name}' lat:${r.latitude} lon:${r.longitude} dist:${km.toFixed(1)}km`);
         if (km < bestKm) {
             best = r;
             bestKm = km;
@@ -90,6 +109,7 @@ export default function RestaurantChooser() {
     const [popupAnchor, setPopupAnchor] = useState(null);
     const [cartOpen, setCartOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState("");
+    const [isMapOpen, setIsMapOpen] = useState(false);
     const vegModeEnabled = Boolean(restaurantContext?.vegOnly);
     const profilePath = customer ? "/profile/overview?scope=customer" : "/login?mode=customer";
     const profileLabel = customer ? "Profile" : "Login";
@@ -304,6 +324,15 @@ export default function RestaurantChooser() {
                                     <Navigation size={16} />
                                     {detecting ? "Detecting..." : "Use my location"}
                                 </button>
+
+                                <button
+                                    onClick={() => setIsMapOpen(true)}
+                                    style={{ border: "none", boxShadow: "none" }}
+                                    className="chooser-chip theme-soft-button inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-[#fe5102]/10 px-3 py-2 text-[11px] font-bold text-[#fe5102] hover:bg-[#fe5102]/20 sm:px-4 sm:py-3 sm:text-sm"
+                                >
+                                    <MapIcon size={16} />
+                                    View Map 🗺️
+                                </button>
                             </div>
 
                             <div className="relative w-full max-w-[520px] self-end">
@@ -449,6 +478,12 @@ export default function RestaurantChooser() {
             ) : null}
 
             <CartDrawer open={cartOpen} setOpen={setCartOpen} />
+
+            <TiffzyMapModal
+                isOpen={isMapOpen}
+                onClose={() => setIsMapOpen(false)}
+                restaurants={browseRestaurants}
+            />
 
             <Footer />
         </div>

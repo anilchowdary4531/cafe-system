@@ -18,6 +18,7 @@ import { API } from "../../config";
 import ThemeSelector from "../../components/ThemeSelector";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { uploadToS3Presigned } from "../../utils/s3Upload";
+import MapLocationPicker from "../../components/MapLocationPicker";
 
 const emptyForm = {
     name: "",
@@ -30,6 +31,8 @@ const emptyForm = {
     state: "",
     country: "India",
     pincode: "",
+    latitude: null,
+    longitude: null,
     gstNumber: "",
     logo: "",
     timezone: "Asia/Kolkata",
@@ -468,6 +471,16 @@ export default function OwnerSettings() {
                                     onChange={setField("gstNumber")}
                                 />
                             </Field>
+                        </div>
+
+                        <div className="mt-4 border-t border-white/10 pt-4">
+                            <MapLocationPicker
+                                latitude={form.latitude}
+                                longitude={form.longitude}
+                                onSelectLocation={({ lat, lng }) => {
+                                    setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }));
+                                }}
+                            />
                         </div>
                     </article>
 

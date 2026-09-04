@@ -16,6 +16,10 @@ class TiffzyApplication : Application() {
             // Initialize Retrofit with DataStore
             RetrofitClient.init(AuthDataStore(this))
             
+            // Initialize MapLibre SDK
+            org.maplibre.android.MapLibre.getInstance(this)
+            Log.d("TiffzyApp", "MapLibre SDK initialized successfully")
+            
             // Setup notification channel
             createNotificationChannel()
         } catch (e: Exception) {

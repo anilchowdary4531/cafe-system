@@ -116,6 +116,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.socketio)
     implementation(libs.cashfree)
+    implementation(libs.maplibre.android.sdk)
 
     // Firebase AI temporarily disabled.
     // We will enable this later after Firebase configuration.

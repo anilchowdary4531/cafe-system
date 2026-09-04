@@ -417,6 +417,29 @@ export default async function superAdminRoutes(app, deps) {
         return reply.code(409).send({ message: "Owner email already exists" });
       }
 
+      // Validate optional geographic coordinates
+      // Coordinate Convention:
+      // Database / Backend: latitude = lat (-90 to +90), longitude = lng (-180 to +180)
+      // MapLibre / GeoJSON: [longitude, latitude]
+      let parsedLatitude = null;
+      let parsedLongitude = null;
+
+      if (body.latitude !== undefined && body.latitude !== null && body.latitude !== "") {
+        const latNum = Number(body.latitude);
+        if (!Number.isFinite(latNum) || latNum < -90 || latNum > 90) {
+          return reply.code(400).send({ message: "Invalid latitude. Must be a finite number between -90 and +90 or null." });
+        }
+        parsedLatitude = latNum;
+      }
+
+      if (body.longitude !== undefined && body.longitude !== null && body.longitude !== "") {
+        const lngNum = Number(body.longitude);
+        if (!Number.isFinite(lngNum) || lngNum < -180 || lngNum > 180) {
+          return reply.code(400).send({ message: "Invalid longitude. Must be a finite number between -180 and +180 or null." });
+        }
+        parsedLongitude = lngNum;
+      }
+
       const access = fullOwnerAccess(STAFF_ACCESS_MODULES);
       const result = await prisma.$transaction(async (tx) => {
         const restaurant = await tx.restaurant.create({
@@ -432,6 +455,8 @@ export default async function superAdminRoutes(app, deps) {
             state: body.state ? String(body.state).trim() : null,
             country: body.country ? String(body.country).trim() : "India",
             pincode: body.pincode ? String(body.pincode).trim() : null,
+            latitude: parsedLatitude,
+            longitude: parsedLongitude,
             gstNumber: body.gstNumber ? String(body.gstNumber).trim() : null,
             timezone: body.timezone ? String(body.timezone).trim() : "Asia/Kolkata",
             currency: body.currency ? String(body.currency).trim().toUpperCase() : "INR",

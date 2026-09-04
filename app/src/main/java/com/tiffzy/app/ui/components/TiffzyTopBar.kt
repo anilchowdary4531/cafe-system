@@ -16,6 +16,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.outlined.Map
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TiffzyTopBar(
@@ -24,6 +27,7 @@ fun TiffzyTopBar(
     onSubtitleClick: (() -> Unit)? = null,
     onBackClick: (() -> Unit)? = null,
     onNotificationsClick: (() -> Unit)? = null,
+    onMapClick: (() -> Unit)? = null,
     hasNotification: Boolean = true,
     navigationIcon: @Composable () -> Unit = {
         if (onBackClick != null) {
@@ -37,6 +41,15 @@ fun TiffzyTopBar(
         }
     },
     actions: @Composable RowScope.() -> Unit = {
+        if (onMapClick != null) {
+            IconButton(onClick = onMapClick) {
+                Icon(
+                    imageVector = Icons.Default.Map,
+                    contentDescription = "Map View",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
         if (onNotificationsClick != null) {
             Box {
                 IconButton(onClick = onNotificationsClick) {

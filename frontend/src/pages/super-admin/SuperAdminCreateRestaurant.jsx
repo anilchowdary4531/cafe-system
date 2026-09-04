@@ -18,6 +18,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/apiClient";
 import tiffzyLogo from "../../assets/tiffzy-logo.png";
+import MapLocationPicker from "../../components/MapLocationPicker";
 
 const initialForm = {
     name: "",
@@ -35,6 +36,8 @@ const initialForm = {
     gstNumber: "",
     invoicePrefix: "",
     defaultTaxPercent: 5,
+    latitude: null,
+    longitude: null,
 };
 
 const slugify = (value) =>
@@ -209,6 +212,16 @@ export default function SuperAdminCreateRestaurant() {
                         <div className="grid gap-3 md:grid-cols-2">
                             <Input label="Invoice Prefix" value={form.invoicePrefix} onChange={(value) => updateForm("invoicePrefix", value)} />
                             <Input label="Tax %" type="number" value={form.defaultTaxPercent} onChange={(value) => updateForm("defaultTaxPercent", value)} />
+                        </div>
+
+                        <div className="my-2 border-t border-white/10 pt-3">
+                            <MapLocationPicker
+                                latitude={form.latitude}
+                                longitude={form.longitude}
+                                onSelectLocation={({ lat, lng }) => {
+                                    setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }));
+                                }}
+                            />
                         </div>
 
                         <button

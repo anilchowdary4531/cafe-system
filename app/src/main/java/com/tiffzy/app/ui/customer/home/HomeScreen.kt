@@ -75,6 +75,7 @@ fun HomeScreen(
     onViewProfile: () -> Unit,
     onNotificationsClick: () -> Unit,
     onScanClick: () -> Unit,
+    onMapClick: () -> Unit = {},
     onDeleteAccount: () -> Unit = {},
     onNavigateToWeb: (String, String) -> Unit = { _, _ -> },
     locationName: String? = null,
@@ -96,7 +97,8 @@ fun HomeScreen(
                 title = "Tiffzy",
                 subtitle = locationName ?: "Set Location",
                 onSubtitleClick = onChangeLocation,
-                onNotificationsClick = onNotificationsClick
+                onNotificationsClick = onNotificationsClick,
+                onMapClick = onMapClick
             ) 
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -163,8 +165,8 @@ fun HomeScreen(
                             item {
                                 SectionHeader(
                                     title = "Top Restaurants",
-                                    actionText = "See all",
-                                    onActionClick = { /* See all */ },
+                                    actionText = "Map View 🗺️",
+                                    onActionClick = onMapClick,
                                     modifier = Modifier.padding(horizontal = Dimens.PaddingMedium)
                                 )
                                 LazyRow(

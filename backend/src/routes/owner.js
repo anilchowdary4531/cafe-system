@@ -963,7 +963,9 @@ export default async function ownerRoutes(app, deps) {
           select: {
             id: true, name: true, legalName: true, slug: true, ownerName: true, email: true, phone: true, upiId: true,
             bankAccountNumber: true, bankIfscCode: true, bankAccountName: true, bankName: true,
-            addressLine1: true, city: true, state: true, country: true, pincode: true, gstNumber: true, logoUrl: true,
+            addressLine1: true, city: true, state: true, country: true, pincode: true,
+            latitude: true, longitude: true,
+            gstNumber: true, logoUrl: true,
             bannerUrl: true, brandColor: true, faviconUrl: true,
             timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
             serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
@@ -976,7 +978,9 @@ export default async function ownerRoutes(app, deps) {
           where: { id: restaurantId },
           select: {
             id: true, name: true, legalName: true, slug: true, ownerName: true, email: true, phone: true,
-            addressLine1: true, city: true, state: true, country: true, pincode: true, gstNumber: true, logoUrl: true,
+            addressLine1: true, city: true, state: true, country: true, pincode: true,
+            latitude: true, longitude: true,
+            gstNumber: true, logoUrl: true,
             bannerUrl: true, brandColor: true, faviconUrl: true,
             timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
             serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
@@ -998,10 +1002,29 @@ export default async function ownerRoutes(app, deps) {
       const restaurantId = Number(req.params.restaurantId);
       const body = req.body || {};
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
+
+      // Coordinate Validation Rules:
+      // Database / Backend: latitude = lat (-90 to +90), longitude = lng (-180 to +180)
+      // MapLibre / GeoJSON: [longitude, latitude]
+      if (body.latitude !== undefined && body.latitude !== null && body.latitude !== "") {
+        const latNum = Number(body.latitude);
+        if (!Number.isFinite(latNum) || latNum < -90 || latNum > 90) {
+          return reply.code(400).send({ message: "Invalid latitude. Must be a finite number between -90 and +90 or null." });
+        }
+      }
+      if (body.longitude !== undefined && body.longitude !== null && body.longitude !== "") {
+        const lngNum = Number(body.longitude);
+        if (!Number.isFinite(lngNum) || lngNum < -180 || lngNum > 180) {
+          return reply.code(400).send({ message: "Invalid longitude. Must be a finite number between -180 and +180 or null." });
+        }
+      }
+
       const updates = {
         name: body.name, legalName: body.legalName, ownerName: body.ownerName, email: body.email, phone: body.phone, upiId: body.upiId,
         bankAccountNumber: body.bankAccountNumber, bankIfscCode: body.bankIfscCode, bankAccountName: body.bankAccountName, bankName: body.bankName,
         addressLine1: body.addressLine1, city: body.city, state: body.state, country: body.country, pincode: body.pincode,
+        latitude: body.latitude === null || body.latitude === "" ? null : (body.latitude !== undefined ? Number(body.latitude) : undefined),
+        longitude: body.longitude === null || body.longitude === "" ? null : (body.longitude !== undefined ? Number(body.longitude) : undefined),
         gstNumber: body.gstNumber, logoUrl: body.logo, bannerUrl: body.bannerUrl, brandColor: body.brandColor, faviconUrl: body.faviconUrl,
         timezone: body.timezone, currency: body.currency, taxEnabled: body.taxEnabled,
         taxType: body.taxType, defaultTaxPercent: body.defaultTaxPercent, serviceChargeEnabled: body.serviceChargeEnabled,
@@ -1042,7 +1065,9 @@ export default async function ownerRoutes(app, deps) {
           data: filteredData,
           select: {
             id: true, name: true, legalName: true, slug: true, ownerName: true, email: true, phone: true, upiId: true,
-            addressLine1: true, city: true, state: true, country: true, pincode: true, gstNumber: true, logoUrl: true,
+            addressLine1: true, city: true, state: true, country: true, pincode: true,
+            latitude: true, longitude: true,
+            gstNumber: true, logoUrl: true,
             bannerUrl: true, brandColor: true, faviconUrl: true,
             timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
             serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,

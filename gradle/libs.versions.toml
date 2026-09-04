@@ -24,6 +24,7 @@ camerax = "1.4.1"
 socket-io = "2.1.0"
 core-splashscreen = "1.2.0"
 cashfree = "2.1.8"
+maplibre-android = "11.5.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -63,6 +64,7 @@ androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycl
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 socketio = { group = "io.socket", name = "socket.io-client", version.ref = "socket-io" }
 cashfree = { group = "com.cashfree.pg", name = "api", version.ref = "cashfree" }
+maplibre-android-sdk = { group = "org.maplibre.gl", name = "android-sdk", version.ref = "maplibre-android" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

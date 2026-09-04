@@ -85,6 +85,7 @@ object Routes {
     const val Register = "register"
     const val Otp = "otp"
     const val Location = "location"
+    const val Map = "map"
     const val Home = "home"
     const val Search = "search"
     const val RestaurantDetail = "restaurant/{slug}"
@@ -336,7 +337,20 @@ fun NavGraph(
                     navController.navigate(Routes.Home) {
                         popUpTo(Routes.Location) { inclusive = true }
                     }
+                },
+                onOpenMap = {
+                    navController.navigate(Routes.Map)
                 }
+            )
+        }
+
+        composable(Routes.Map) {
+            MapScreen(
+                onBack = { navController.popBackStack() },
+                onRestaurantClick = { slug ->
+                    navController.navigate(Routes.menu(slug))
+                },
+                homeViewModel = homeViewModel
             )
         }
 
@@ -360,6 +374,9 @@ fun NavGraph(
                 locationName = locationName,
                 onChangeLocation = {
                     navController.navigate(Routes.Location)
+                },
+                onMapClick = {
+                    navController.navigate(Routes.Map)
                 },
                 onRestaurantClick = { slug ->
                     navController.navigate(Routes.menu(slug))

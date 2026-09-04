@@ -24,6 +24,7 @@ import com.tiffzy.app.ui.theme.Dimens
 @Composable
 fun LocationSelectorScreen(
     onLocationSelected: (Double, Double) -> Unit,
+    onOpenMap: () -> Unit = {},
     viewModel: LocationViewModel = viewModel()
 ) {
     val locationState by viewModel.locationState.collectAsState()
@@ -52,7 +53,7 @@ fun LocationSelectorScreen(
     }
 
     Scaffold(
-        topBar = { TiffzyTopBar(title = "Select Location") },
+        topBar = { TiffzyTopBar(title = "Select Location", onMapClick = onOpenMap) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
@@ -70,18 +71,26 @@ fun LocationSelectorScreen(
 
             Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
-            TiffzySecondaryButton(
-                text = "Use Current Location",
-                onClick = {
-                    permissionLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TiffzySecondaryButton(
+                    text = "Use Location",
+                    onClick = {
+                        permissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
                         )
-                    )
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+
+                TiffzyPrimaryButton(
+                    text = "View Map",
+                    onClick = onOpenMap,
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
             Spacer(modifier = Modifier.height(Dimens.SpacingLarge))
 
