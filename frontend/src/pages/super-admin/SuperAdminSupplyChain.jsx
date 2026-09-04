@@ -16,6 +16,11 @@ import {
     BarChart3,
     PieChart as PieIcon,
     Menu,
+    Search,
+    Filter,
+    Tag,
+    SlidersHorizontal,
+    X,
 } from "lucide-react";
 import {
     Bar,
@@ -45,22 +50,30 @@ export default function SuperAdminSupplyChain() {
     const [suppliers, setSuppliers] = useState([]);
     const [products, setProducts] = useState([]);
     const [orders, setOrders] = useState([]);
-    const [activeTab, setActiveTab] = useState("suppliers");
+    const [categories, setCategories] = useState([]);
+    const [activeTab, setActiveTab] = useState("products");
+
+    // Filter states
+    const [searchQuery, setSearchQuery] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState("ALL");
+    const [selectedStatus, setSelectedStatus] = useState("ALL");
 
     const loadData = async () => {
         setLoading(true);
         try {
-            const [dashRes, suppRes, prodRes, ordRes] = await Promise.all([
+            const [dashRes, suppRes, prodRes, ordRes, catRes] = await Promise.all([
                 api.get("/super-admin/supply/dashboard").catch(() => null),
                 api.get("/super-admin/supply/suppliers").catch(() => null),
                 api.get("/super-admin/supply/products").catch(() => null),
                 api.get("/super-admin/supply/orders").catch(() => null),
+                api.get("/super-admin/supply/categories").catch(() => null),
             ]);
 
             if (dashRes?.data) setDashboard(dashRes.data);
             if (suppRes?.data?.suppliers) setSuppliers(suppRes.data.suppliers);
             if (prodRes?.data?.products) setProducts(prodRes.data.products);
             if (ordRes?.data?.orders) setOrders(ordRes.data.orders);
+            if (catRes?.data?.categories) setCategories(catRes.data.categories);
         } catch (err) {
             showToast("Failed to load Super Admin supply data", { type: "error" });
         } finally {
@@ -104,6 +117,72 @@ export default function SuperAdminSupplyChain() {
 
     const pendingSuppliers = suppliers.filter((s) => s.status !== "ACTIVE");
     const activeSuppliers = suppliers.filter((s) => s.status === "ACTIVE");
+
+    // Extract unique categories from loaded categories or products
+    const availableCategories = categories.length > 0
+        ? categories
+        : Array.from(
+            new Map(
+                products
+                    .map((p) => p.category)
+                    .filter(Boolean)
+                    .map((c) => [c.id || c.name, c])
+            ).values()
+        );
+
+    // FILTERED PRODUCTS
+    const filteredProducts = products.filter((p) => {
+        // Category Filter
+        if (selectedCategory !== "ALL") {
+            const catMatch =
+                p.categoryId === selectedCategory ||
+                p.category?.id === selectedCategory ||
+                p.category?.slug === selectedCategory ||
+                p.category?.name === selectedCategory;
+            if (!catMatch) return false;
+        }
+        // Status Filter
+        if (selectedStatus !== "ALL") {
+            if (p.status !== selectedStatus) return false;
+        }
+        // Search Query
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const pName = (p.name || "").toLowerCase();
+            const sName = (p.supplier?.profile?.businessName || "").toLowerCase();
+            const cName = (p.category?.name || "").toLowerCase();
+            const desc = (p.description || "").toLowerCase();
+            return pName.includes(q) || sName.includes(q) || cName.includes(q) || desc.includes(q);
+        }
+        return true;
+    });
+
+    // FILTERED SUPPLIERS
+    const filteredSuppliers = suppliers.filter((s) => {
+        if (selectedStatus !== "ALL" && s.status !== selectedStatus) return false;
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const bName = (s.profile?.businessName || "").toLowerCase();
+            const email = (s.email || "").toLowerCase();
+            const phone = (s.phone || "").toLowerCase();
+            const gstin = (s.profile?.gstin || "").toLowerCase();
+            return bName.includes(q) || email.includes(q) || phone.includes(q) || gstin.includes(q);
+        }
+        return true;
+    });
+
+    // FILTERED ORDERS
+    const filteredOrders = orders.filter((o) => {
+        if (selectedStatus !== "ALL" && o.status !== selectedStatus) return false;
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const orderNo = (o.orderNo || "").toLowerCase();
+            const sName = (o.supplier?.profile?.businessName || "").toLowerCase();
+            const rName = (o.restaurant?.name || "").toLowerCase();
+            return orderNo.includes(q) || sName.includes(q) || rName.includes(q);
+        }
+        return true;
+    });
 
     // CHART DATA 1: B2B Revenue / Sales Volume by Supplier
     const supplierSalesChartData = suppliers.map((s) => {
@@ -292,17 +371,137 @@ export default function SuperAdminSupplyChain() {
                         </div>
                     </div>
 
+                    {/* FILTER & CATEGORY SELECTOR TOOLBAR */}
+                    <div className="theme-panel rounded-3xl p-5 border shadow-sm space-y-4">
+                        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+                            {/* Search Input */}
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 theme-muted" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Search products, suppliers, categories, orders..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full theme-input rounded-2xl pl-10 pr-10 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#f5b94e]"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchQuery("")}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 theme-muted hover:text-white cursor-pointer"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3">
+                                {/* Category Selector Dropdown */}
+                                <div className="flex items-center gap-2">
+                                    <Tag size={16} className="theme-accent-text" />
+                                    <select
+                                        value={selectedCategory}
+                                        onChange={(e) => setSelectedCategory(e.target.value)}
+                                        className="theme-input rounded-2xl px-4 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#f5b94e] cursor-pointer"
+                                    >
+                                        <option value="ALL">📦 All Categories ({products.length})</option>
+                                        {availableCategories.map((c) => {
+                                            const catProdCount = products.filter(
+                                                (p) => p.categoryId === c.id || p.category?.id === c.id || p.category?.name === c.name
+                                            ).length;
+                                            return (
+                                                <option key={c.id || c.slug || c.name} value={c.id || c.slug || c.name}>
+                                                    {c.name} ({catProdCount})
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                </div>
+
+                                {/* Status Filter Dropdown */}
+                                <div className="flex items-center gap-2">
+                                    <Filter size={16} className="theme-muted" />
+                                    <select
+                                        value={selectedStatus}
+                                        onChange={(e) => setSelectedStatus(e.target.value)}
+                                        className="theme-input rounded-2xl px-4 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#f5b94e] cursor-pointer"
+                                    >
+                                        <option value="ALL">All Statuses</option>
+                                        <option value="ACTIVE">Active / Approved</option>
+                                        <option value="PENDING">Pending Review</option>
+                                        <option value="REJECTED">Rejected</option>
+                                        <option value="SUSPENDED">Suspended</option>
+                                    </select>
+                                </div>
+
+                                {/* Reset Filters Button */}
+                                {(searchQuery || selectedCategory !== "ALL" || selectedStatus !== "ALL") && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSearchQuery("");
+                                            setSelectedCategory("ALL");
+                                            setSelectedStatus("ALL");
+                                        }}
+                                        className="rounded-2xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 px-3.5 py-2.5 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                                    >
+                                        <X size={14} /> Clear Filters
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* CATEGORY SELECTOR PILLS BAR */}
+                        {availableCategories.length > 0 && (
+                            <div className="pt-2 border-t theme-border">
+                                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                                    <span className="text-[11px] font-extrabold theme-muted uppercase tracking-wider whitespace-nowrap mr-1 flex items-center gap-1">
+                                        <SlidersHorizontal size={13} /> Select Category:
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedCategory("ALL")}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition cursor-pointer ${
+                                            selectedCategory === "ALL"
+                                                ? "theme-button shadow-sm"
+                                                : "theme-soft-button hover:bg-white/10"
+                                        }`}
+                                    >
+                                        All ({products.length})
+                                    </button>
+                                    {availableCategories.map((cat) => {
+                                        const isSelected =
+                                            selectedCategory === cat.id ||
+                                            selectedCategory === cat.slug ||
+                                            selectedCategory === cat.name;
+                                        const catCount = products.filter(
+                                            (p) => p.categoryId === cat.id || p.category?.id === cat.id || p.category?.name === cat.name
+                                        ).length;
+                                        return (
+                                            <button
+                                                key={cat.id || cat.slug || cat.name}
+                                                type="button"
+                                                onClick={() => setSelectedCategory(cat.id || cat.slug || cat.name)}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                                                    isSelected
+                                                        ? "theme-button shadow-sm"
+                                                        : "theme-soft-button hover:bg-white/10"
+                                                }`}
+                                            >
+                                                <span>{cat.name}</span>
+                                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? "bg-black/30 text-white font-extrabold" : "theme-chip"}`}>
+                                                    {catCount}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Tab Navigation Controls */}
                     <div className="flex border-b theme-border gap-2 pt-2">
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab("suppliers")}
-                            className={`px-5 py-2.5 text-xs font-extrabold rounded-t-xl transition cursor-pointer ${
-                                activeTab === "suppliers" ? "theme-button shadow-md" : "theme-soft-button"
-                            }`}
-                        >
-                            Supplier Accounts & KYC Verification ({suppliers.length})
-                        </button>
                         <button
                             type="button"
                             onClick={() => setActiveTab("products")}
@@ -310,7 +509,16 @@ export default function SuperAdminSupplyChain() {
                                 activeTab === "products" ? "theme-button shadow-md" : "theme-soft-button"
                             }`}
                         >
-                            Product Moderation ({products.length})
+                            Product Moderation ({filteredProducts.length})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab("suppliers")}
+                            className={`px-5 py-2.5 text-xs font-extrabold rounded-t-xl transition cursor-pointer ${
+                                activeTab === "suppliers" ? "theme-button shadow-md" : "theme-soft-button"
+                            }`}
+                        >
+                            Supplier Accounts ({filteredSuppliers.length})
                         </button>
                         <button
                             type="button"
@@ -319,11 +527,78 @@ export default function SuperAdminSupplyChain() {
                                 activeTab === "orders" ? "theme-button shadow-md" : "theme-soft-button"
                             }`}
                         >
-                            Marketplace Orders ({orders.length})
+                            Marketplace Orders ({filteredOrders.length})
                         </button>
                     </div>
 
-                    {/* Tab 1: Supplier Verification & KYC Review */}
+                    {/* Tab 1: Product Moderation */}
+                    {activeTab === "products" && (
+                        <div className="space-y-4">
+                            {filteredProducts.length === 0 ? (
+                                <div className="theme-panel rounded-3xl p-10 text-center border space-y-2">
+                                    <Package size={40} className="mx-auto theme-muted opacity-40" />
+                                    <h4 className="text-base font-bold">No Products Found</h4>
+                                    <p className="theme-muted text-xs">No products match your selected category or filter criteria.</p>
+                                    {(searchQuery || selectedCategory !== "ALL" || selectedStatus !== "ALL") && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSearchQuery("");
+                                                setSelectedCategory("ALL");
+                                                setSelectedStatus("ALL");
+                                            }}
+                                            className="theme-button rounded-xl px-4 py-2 text-xs font-bold mt-2 cursor-pointer inline-flex items-center gap-1.5"
+                                        >
+                                            Reset All Filters
+                                        </button>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {filteredProducts.map((p) => (
+                                        <div key={p.id} className="theme-panel rounded-2xl p-5 space-y-3 border shadow-sm hover:border-[#f5b94e]/40 transition">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div>
+                                                    <span className="theme-chip rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider mb-1.5 inline-block">
+                                                        {p.category?.name || "General Raw Ingredient"}
+                                                    </span>
+                                                    <h3 className="font-bold text-base leading-snug">{p.name}</h3>
+                                                    <p className="theme-muted text-xs mt-0.5">Supplier: <strong className="font-semibold text-white">{p.supplier?.profile?.businessName || "Unknown"}</strong></p>
+                                                </div>
+                                                <span className={`rounded-full px-3 py-0.5 text-xs font-bold ${
+                                                    p.status === "ACTIVE" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "theme-chip"
+                                                }`}>
+                                                    {p.status}
+                                                </span>
+                                            </div>
+                                            <div className="text-xs space-y-1 theme-muted border-t theme-border pt-3">
+                                                <p>Base Price: <span className="font-black text-white text-sm">₹{p.prices?.[0]?.basePrice || 100}</span> / {p.unit}</p>
+                                                <p>MOQ: <span className="font-bold text-white">{p.moq} {p.unit}</span> • Stock: <span className="font-bold text-emerald-400">{p.inventory?.availableQuantity || 500} {p.unit}</span></p>
+                                            </div>
+                                            <div className="flex items-center gap-2 pt-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateProductStatus(p.id, "ACTIVE")}
+                                                    className="flex-1 theme-button py-2 text-xs font-extrabold cursor-pointer transition shadow-sm rounded-xl"
+                                                >
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateProductStatus(p.id, "REJECTED")}
+                                                    className="flex-1 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 py-2 text-xs font-bold cursor-pointer transition"
+                                                >
+                                                    Reject
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Tab 2: Supplier Verification & KYC Review */}
                     {activeTab === "suppliers" && (
                         <div className="space-y-6">
                             {/* PENDING KYC VERIFICATION APPLICATIONS */}
@@ -407,11 +682,11 @@ export default function SuperAdminSupplyChain() {
 
                             {/* ACTIVE SUPPLIERS */}
                             <div className="space-y-3">
-                                <h3 className="text-lg font-bold">Active Approved Suppliers ({activeSuppliers.length})</h3>
-                                {activeSuppliers.length === 0 ? (
-                                    <p className="theme-muted text-sm py-4">No active suppliers approved yet.</p>
+                                <h3 className="text-lg font-bold">Active Approved Suppliers ({filteredSuppliers.filter(s => s.status === "ACTIVE").length})</h3>
+                                {filteredSuppliers.filter(s => s.status === "ACTIVE").length === 0 ? (
+                                    <p className="theme-muted text-sm py-4">No active suppliers matching filters.</p>
                                 ) : (
-                                    activeSuppliers.map((s) => (
+                                    filteredSuppliers.filter(s => s.status === "ACTIVE").map((s) => (
                                         <div key={s.id} className="theme-panel rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border shadow-sm">
                                             <div>
                                                 <div className="flex items-center gap-2 mb-1">
@@ -447,60 +722,27 @@ export default function SuperAdminSupplyChain() {
                         </div>
                     )}
 
-                    {/* Tab 2: Product Moderation */}
-                    {activeTab === "products" && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {products.map((p) => (
-                                <div key={p.id} className="theme-panel rounded-2xl p-5 space-y-3 border shadow-sm">
-                                    <div className="flex items-start justify-between">
-                                        <div>
-                                            <h3 className="font-bold text-base">{p.name}</h3>
-                                            <p className="theme-muted text-xs">Supplier: {p.supplier?.profile?.businessName || "Unknown"}</p>
-                                        </div>
-                                        <span className="theme-chip rounded-full px-3 py-0.5 text-xs font-bold">
-                                            {p.status}
-                                        </span>
-                                    </div>
-                                    <div className="text-xs space-y-1 theme-muted border-t theme-border pt-3">
-                                        <p>Base Price: <span className="font-bold">₹{p.prices?.[0]?.basePrice || 100}</span> / {p.unit}</p>
-                                        <p>MOQ: <span className="font-bold">{p.moq} {p.unit}</span></p>
-                                    </div>
-                                    <div className="flex items-center gap-2 pt-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleUpdateProductStatus(p.id, "ACTIVE")}
-                                            className="flex-1 theme-button py-2 text-xs font-extrabold cursor-pointer transition shadow-sm rounded-xl"
-                                        >
-                                            Approve
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleUpdateProductStatus(p.id, "REJECTED")}
-                                            className="flex-1 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 py-2 text-xs font-bold cursor-pointer transition"
-                                        >
-                                            Reject
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
                     {/* Tab 3: Marketplace Orders Audit */}
                     {activeTab === "orders" && (
                         <div className="space-y-3">
-                            {orders.map((o) => (
-                                <div key={o.id} className="theme-panel rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border shadow-sm">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-extrabold theme-accent-text">{o.orderNo}</span>
-                                            <span className="theme-chip rounded-full px-3 py-0.5 text-xs font-bold">{o.status}</span>
-                                        </div>
-                                        <p className="theme-muted text-xs">Supplier: {o.supplier?.profile?.businessName || "Unknown"} • Restaurant: {o.restaurant?.name || "Tiffzy Cafe"}</p>
-                                        <p className="text-sm font-extrabold mt-1">Order Amount: ₹{o.totalAmount}</p>
-                                    </div>
+                            {filteredOrders.length === 0 ? (
+                                <div className="theme-panel rounded-3xl p-8 text-center border">
+                                    <p className="theme-muted text-sm">No marketplace orders match the current filter selection.</p>
                                 </div>
-                            ))}
+                            ) : (
+                                filteredOrders.map((o) => (
+                                    <div key={o.id} className="theme-panel rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border shadow-sm">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="font-extrabold theme-accent-text">{o.orderNo}</span>
+                                                <span className="theme-chip rounded-full px-3 py-0.5 text-xs font-bold">{o.status}</span>
+                                            </div>
+                                            <p className="theme-muted text-xs">Supplier: {o.supplier?.profile?.businessName || "Unknown"} • Restaurant: {o.restaurant?.name || "Tiffzy Cafe"}</p>
+                                            <p className="text-sm font-extrabold mt-1">Order Amount: ₹{o.totalAmount}</p>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     )}
                 </section>

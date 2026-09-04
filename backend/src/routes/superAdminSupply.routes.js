@@ -46,6 +46,18 @@ export default async function superAdminSupplyRoutes(app) {
         }
     };
 
+    const listCategoriesHandler = async (req, reply) => {
+        try {
+            const categories = await prisma.supplyCategory.findMany({
+                where: { isActive: true },
+                orderBy: { priority: "asc" },
+            });
+            return reply.code(200).send({ categories });
+        } catch (err) {
+            return reply.code(500).send({ error: "Failed to fetch categories" });
+        }
+    };
+
     const listProductsHandler = async (req, reply) => {
         try {
             const products = await prisma.supplyProduct.findMany({
@@ -110,6 +122,9 @@ export default async function superAdminSupplyRoutes(app) {
 
     app.post("/super-admin/supply/suppliers/:id/status", { preHandler: [authAdmin] }, supplierStatusHandler);
     app.post("/api/v1/super-admin/supply/suppliers/:id/status", { preHandler: [authAdmin] }, supplierStatusHandler);
+
+    app.get("/super-admin/supply/categories", { preHandler: [authAdmin] }, listCategoriesHandler);
+    app.get("/api/v1/super-admin/supply/categories", { preHandler: [authAdmin] }, listCategoriesHandler);
 
     app.get("/super-admin/supply/products", { preHandler: [authAdmin] }, listProductsHandler);
     app.get("/api/v1/super-admin/supply/products", { preHandler: [authAdmin] }, listProductsHandler);
