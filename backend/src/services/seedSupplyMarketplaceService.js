@@ -123,20 +123,21 @@ const DEFAULT_PRODUCTS = [
 
 export async function ensureSupplyMarketplaceSeeded() {
     try {
-        const existingCount = await prisma.supplyProduct.count({ where: { isDeleted: false } });
-        if (existingCount > 0) {
-            return { seeded: false, count: existingCount };
+        // 1. Ensure Categories exist
+        const categoryMap = new Map();
+        for (const cat of DEFAULT_CATEGORIES) {
+            const createdCat = await prisma.supplyCategory.upsert({
+                where: { slug: cat.slug },
+                update: { name: cat.name, imageUrl: cat.imageUrl, priority: cat.priority },
+                create: { name: cat.name, slug: cat.slug, imageUrl: cat.imageUrl, priority: cat.priority, isActive: true },
+            });
+            categoryMap.set(cat.slug, createdCat.id);
         }
 
-        console.log("[SupplyMarketplaceSeeder] Seeding initial verified supply categories and products...");
-
-        // 1. Ensure Verified Active Supplier exists
-        let supplier = await prisma.supplier.findFirst({
-            where: { isVerified: true, status: "ACTIVE" },
-        });
-
-        if (!supplier) {
-            supplier = await prisma.supplier.create({
+        // 2. Fetch or create at least one active supplier
+        let suppliers = await prisma.supplier.findMany();
+        if (suppliers.length === 0) {
+            const supplier = await prisma.supplier.create({
                 data: {
                     email: "verified_supplier@tiffzy.com",
                     phone: "9876543210",
@@ -160,94 +161,92 @@ export async function ensureSupplyMarketplaceSeeded() {
                     },
                 },
             });
+            suppliers = [supplier];
         }
 
-        // 2. Ensure Categories exist
-        const categoryMap = new Map();
-        for (const cat of DEFAULT_CATEGORIES) {
-            const createdCat = await prisma.supplyCategory.upsert({
-                where: { slug: cat.slug },
-                update: { name: cat.name, imageUrl: cat.imageUrl, priority: cat.priority },
-                create: { name: cat.name, slug: cat.slug, imageUrl: cat.imageUrl, priority: cat.priority, isActive: true },
-            });
-            categoryMap.set(cat.slug, createdCat.id);
-        }
-
-        // 3. Create Products
         let createdCount = 0;
-        for (const prodData of DEFAULT_PRODUCTS) {
-            const catId = categoryMap.get(prodData.categorySlug) || null;
-            const slug = `${prodData.categorySlug}-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
 
-            const pricing = calculateFinalPrice(
-                prodData.basePrice,
-                prodData.taxPercent,
-                prodData.discountType,
-                prodData.discountValue
-            );
-
-            await prisma.$transaction(async (tx) => {
-                const product = await tx.supplyProduct.create({
-                    data: {
-                        supplierId: supplier.id,
-                        categoryId: catId,
-                        name: prodData.name,
-                        slug,
-                        description: prodData.description,
-                        unit: prodData.unit,
-                        moq: prodData.moq,
-                        availability: true,
-                        status: "APPROVED",
-                    },
+        // 3. For each supplier, seed default products if missing
+        for (const supplier of suppliers) {
+            for (const prodData of DEFAULT_PRODUCTS) {
+                const existing = await prisma.supplyProduct.findFirst({
+                    where: { supplierId: supplier.id, name: prodData.name, isDeleted: false },
                 });
 
-                await tx.supplyPrice.create({
-                    data: {
-                        productId: product.id,
-                        basePrice: pricing.basePrice,
-                        taxPercent: pricing.taxPercent,
-                        isActive: true,
-                    },
-                });
+                if (existing) continue;
 
-                if (prodData.discountType && prodData.discountValue > 0) {
-                    await tx.supplyDiscount.create({
+                const catId = categoryMap.get(prodData.categorySlug) || null;
+                const slug = `${prodData.categorySlug}-${supplier.id}-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+
+                const pricing = calculateFinalPrice(
+                    prodData.basePrice,
+                    prodData.taxPercent,
+                    prodData.discountType,
+                    prodData.discountValue
+                );
+
+                await prisma.$transaction(async (tx) => {
+                    const product = await tx.supplyProduct.create({
+                        data: {
+                            supplierId: supplier.id,
+                            categoryId: catId,
+                            name: prodData.name,
+                            slug,
+                            description: prodData.description,
+                            unit: prodData.unit,
+                            moq: prodData.moq,
+                            availability: true,
+                            status: "APPROVED",
+                        },
+                    });
+
+                    await tx.supplyPrice.create({
                         data: {
                             productId: product.id,
-                            type: prodData.discountType,
-                            value: prodData.discountValue,
+                            basePrice: pricing.basePrice,
+                            taxPercent: pricing.taxPercent,
                             isActive: true,
                         },
                     });
-                }
 
-                await tx.supplyInventory.create({
-                    data: {
-                        productId: product.id,
-                        totalStock: prodData.initialStock,
-                        reservedStock: 0,
-                        availableStock: prodData.initialStock,
-                        lowStockAlert: 10,
-                    },
-                });
+                    if (prodData.discountType && prodData.discountValue > 0) {
+                        await tx.supplyDiscount.create({
+                            data: {
+                                productId: product.id,
+                                type: prodData.discountType,
+                                value: prodData.discountValue,
+                                isActive: true,
+                            },
+                        });
+                    }
 
-                if (prodData.imageUrl) {
-                    await tx.supplyProductImage.create({
+                    await tx.supplyInventory.create({
                         data: {
                             productId: product.id,
-                            imageUrl: prodData.imageUrl,
-                            priority: 0,
-                            isPrimary: true,
+                            totalStock: prodData.initialStock,
+                            reservedStock: 0,
+                            availableStock: prodData.initialStock,
+                            lowStockAlert: 10,
                         },
                     });
-                }
-            });
 
-            createdCount++;
+                    if (prodData.imageUrl) {
+                        await tx.supplyProductImage.create({
+                            data: {
+                                productId: product.id,
+                                imageUrl: prodData.imageUrl,
+                                priority: 0,
+                                isPrimary: true,
+                            },
+                        });
+                    }
+                });
+
+                createdCount++;
+            }
         }
 
-        console.log(`[SupplyMarketplaceSeeder] Successfully seeded ${createdCount} verified supply products!`);
-        return { seeded: true, count: createdCount };
+        return { seeded: createdCount > 0, count: createdCount };
     } catch (err) {
         console.error("[SupplyMarketplaceSeeder] Error seeding products:", err);
         return { seeded: false, error: err.message };
