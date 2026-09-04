@@ -324,12 +324,12 @@ export default function TiffzyMapModal({ isOpen, onClose, restaurants = [] }) {
                 </header>
 
                 {/* Main Content Area */}
-                <div className="relative flex-1 min-h-[450px] w-full">
+                <div className="relative h-[500px] sm:h-[550px] md:h-[600px] w-full flex-1 overflow-hidden">
                     {/* Maplibre container */}
                     <div
                         ref={mapContainerRef}
-                        style={{ width: "100%", height: "100%", minHeight: "450px" }}
-                        className="absolute inset-0 h-full w-full overflow-hidden"
+                        style={{ width: "100%", height: "100%" }}
+                        className="h-full w-full"
                     />
 
                     {/* Non-blocking Location Warning Banner */}
