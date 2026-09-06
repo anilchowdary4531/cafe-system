@@ -32,7 +32,7 @@ export default function Footer() {
                         <h3 className="mb-6 text-sm font-bold uppercase tracking-widest text-[color:var(--app-text)]">Company &amp; People</h3>
                         <ul className="space-y-3 text-[14px] text-[color:var(--app-muted)]">
                             <li><Link to="/about-us" className="hover:text-[color:var(--app-text)] transition font-medium">About Us</Link></li>
-                            <li><Link to="/about/jekka-ramesh" className="hover:text-[color:var(--app-text)] transition text-xs font-semibold">Jekka Ramesh – Founder &amp; Developer</Link></li>
+                            <li><Link to="/about/jekka-ramesh" className="hover:text-[color:var(--app-text)] transition text-xs font-semibold">Jekka Ramesh – Founder</Link></li>
                             <li><Link to="/about/thamineni-anil-kumar" className="hover:text-[color:var(--app-text)] transition text-xs font-semibold">Thamineni Anil Kumar – Proprietor</Link></li>
                             <li><Link to="/legal-disclosure" className="text-[#f59e0b] font-bold hover:underline">Legal &amp; Business Info</Link></li>
                             <li><Link to="/contact-us" className="hover:text-[color:var(--app-text)] transition">Contact Us</Link></li>
@@ -97,7 +97,7 @@ export default function Footer() {
                     <div className="text-xs text-[color:var(--app-muted)] text-center md:text-left space-y-1">
                         <p>© 2026 <strong>SURVETRA SERVICES</strong>. All Rights Reserved.</p>
                         <p className="opacity-90">
-                            Tiffzy | Operated by <strong>SURVETRA SERVICES</strong> | Founder &amp; Developer: <strong>Jekka Ramesh</strong> | Proprietor: <strong>Thamineni Anil Kumar</strong>
+                            Tiffzy | Operated by <strong>SURVETRA SERVICES</strong> | Founder: <strong>Jekka Ramesh</strong> | Proprietor: <strong>Thamineni Anil Kumar</strong>
                         </p>
                     </div>
 

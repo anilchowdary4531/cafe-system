@@ -6,8 +6,8 @@ import SeoHead from "../components/SeoHead";
 import { Building2, ShieldCheck, CheckCircle2, Utensils, Smartphone, Code2, UserCheck, ArrowRight } from "lucide-react";
 
 export default function AboutUs() {
-    const pageTitle = "About Tiffzy | Founder, Developer & SURVETRA SERVICES";
-    const pageDescription = "Learn about Tiffzy, operated by SURVETRA SERVICES. Founded & developed by Jekka Ramesh, with Thamineni Anil Kumar as Proprietor.";
+    const pageTitle = "About Tiffzy | Founder, Proprietor & SURVETRA SERVICES";
+    const pageDescription = "Learn about Tiffzy, operated by SURVETRA SERVICES. Founded by Jekka Ramesh, with Thamineni Anil Kumar as Proprietor.";
 
     const jsonLd = {
         "@context": "https://schema.org",
@@ -25,7 +25,7 @@ export default function AboutUs() {
                     "@type": "Person",
                     "@id": "https://www.tiffzy.com/about/jekka-ramesh#person",
                     "name": "Jekka Ramesh",
-                    "jobTitle": "Founder & Developer"
+                    "jobTitle": "Founder"
                 },
                 "employee": {
                     "@type": "Person",
@@ -49,7 +49,7 @@ export default function AboutUs() {
             <SeoHead
                 title={pageTitle}
                 description={pageDescription}
-                keywords="Tiffzy, SURVETRA SERVICES, Jekka Ramesh, Founder & Developer, Thamineni Anil Kumar, Proprietor, Food Business Platform, QR Ordering"
+                keywords="Tiffzy, SURVETRA SERVICES, Jekka Ramesh, Founder, Thamineni Anil Kumar, Proprietor, Food Business Platform, QR Ordering"
                 canonical="https://www.tiffzy.com/about-us"
                 jsonLd={jsonLd}
             />
@@ -82,7 +82,7 @@ export default function AboutUs() {
                     </p>
                 </div>
 
-                {/* Our Leadership Section (Task 1 Requirement) */}
+                {/* Our Leadership Section */}
                 <section className="my-10 space-y-6">
                     <div className="space-y-2">
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-500/20">
@@ -97,7 +97,7 @@ export default function AboutUs() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Jekka Ramesh - Founder & Developer */}
+                        {/* Jekka Ramesh - Founder */}
                         <div className="rounded-3xl border border-[var(--app-border,rgba(0,0,0,0.1))] bg-white dark:bg-slate-900 p-6 sm:p-8 space-y-4 shadow-sm flex flex-col justify-between">
                             <div className="space-y-3">
                                 <div className="flex items-center gap-3">
@@ -109,12 +109,12 @@ export default function AboutUs() {
                                             Jekka Ramesh
                                         </h3>
                                         <p className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                                            Founder &amp; Developer
+                                            Founder
                                         </p>
                                     </div>
                                 </div>
                                 <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed italic border-l-2 border-amber-500/50 pl-3 py-1">
-                                    &quot;Jekka Ramesh is the Founder and Developer of Tiffzy. He is responsible for the product vision, software development, technology architecture, and development of the Tiffzy platform.&quot;
+                                    &quot;Jekka Ramesh is the Founder of Tiffzy. He is responsible for the product vision, software development, technology architecture, and development of the Tiffzy platform.&quot;
                                 </p>
                             </div>
                             <div className="pt-3 border-t border-[var(--app-border,rgba(0,0,0,0.08))]">
@@ -122,7 +122,7 @@ export default function AboutUs() {
                                     to="/about/jekka-ramesh"
                                     className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline"
                                 >
-                                    <span>Jekka Ramesh – Founder &amp; Developer Profile</span>
+                                    <span>Jekka Ramesh – Founder Profile</span>
                                     <ArrowRight size={13} />
                                 </Link>
                             </div>
@@ -217,7 +217,7 @@ export default function AboutUs() {
                             <p><strong className="text-gray-900 dark:text-gray-200">GSTIN:</strong> 37FJMPS3S3117Q1ZB</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Registered Address:</strong> 13/640, Sasthri Nagar, Tadipatri, Andhra Pradesh, India</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Brand Name:</strong> Tiffzy</p>
-                            <p><strong className="text-gray-900 dark:text-gray-200">Founder &amp; Developer:</strong> Jekka Ramesh</p>
+                            <p><strong className="text-gray-900 dark:text-gray-200">Founder:</strong> Jekka Ramesh</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Proprietor:</strong> Thamineni Anil Kumar</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Official Email:</strong> jekkaramesh@survetra.com</p>
                             <p><strong className="text-gray-900 dark:text-gray-200">Official Phone:</strong> +91 91777 64632</p>
