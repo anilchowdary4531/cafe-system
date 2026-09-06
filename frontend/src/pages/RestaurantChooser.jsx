@@ -319,9 +319,7 @@ export default function RestaurantChooser() {
                                     </p>
                                 </div>
                             </div>
-                            <p className="theme-muted text-sm sm:text-base leading-relaxed max-w-xl">
-                                Tiffzy is a connected Food Business Platform powering online ordering, restaurant operations, QR table ordering, live kitchen orders, billing &amp; payments, analytics, and supply chain management.
-                            </p>
+
 
                         </div>
 
