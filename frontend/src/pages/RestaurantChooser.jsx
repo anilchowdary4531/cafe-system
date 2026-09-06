@@ -308,13 +308,16 @@ export default function RestaurantChooser() {
                                     <h1 className="bg-gradient-to-r from-[#ff8a1f] via-[#ea580c] to-[#9a3412] bg-clip-text text-3xl font-black tracking-tight text-transparent sm:text-4xl">
                                         Tiffzy
                                     </h1>
-                                    <p className="text-xs font-bold uppercase tracking-widest text-[#d97706]">
+                                    <p className="text-xs font-extrabold uppercase tracking-wider text-[#d97706] sm:text-sm">
+                                        Food Business Platform
+                                    </p>
+                                    <p className="text-[11px] font-semibold text-[color:var(--app-muted)]">
                                         All-in-one platform for restaurants and food businesses
                                     </p>
                                 </div>
                             </div>
                             <p className="theme-muted text-sm sm:text-base leading-relaxed max-w-xl">
-                                Manage online ordering, restaurant operations, billing, live orders, analytics, and supply chain from one connected platform.
+                                Tiffzy is a connected Food Business Platform powering online ordering, restaurant operations, QR table ordering, live kitchen orders, billing &amp; payments, analytics, and supply chain management.
                             </p>
                             <div className="flex flex-wrap items-center gap-1.5 pt-1">
                                 <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Online Ordering</span>
@@ -323,7 +326,7 @@ export default function RestaurantChooser() {
                                 <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Live Kitchen Orders</span>
                                 <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Billing &amp; Payments</span>
                                 <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Analytics</span>
-                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Supply Chain</span>
+                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Supply Chain Management</span>
                             </div>
                         </div>
 
@@ -789,13 +792,13 @@ function PlatformCapabilitiesSection() {
         <section className="mt-12 rounded-[24px] border border-[var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_92%,#000_8%)] p-6 sm:p-8">
             <div className="max-w-3xl">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/30 px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-[#ff8a1f]">
-                    Platform Capabilities
+                    Food Business Platform
                 </span>
                 <h2 className="mt-3 text-2xl font-black tracking-tight text-[color:var(--app-text)] sm:text-3xl">
-                    About Tiffzy
+                    Tiffzy - Food Business Platform
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-[color:var(--app-muted)] sm:text-base">
-                    <strong>Tiffzy</strong> is an all-in-one connected platform designed for restaurants, cafes, and food businesses. From front-of-house customer ordering to back-of-house kitchen workflows, live POS billing, and B2B supply chain management, Tiffzy connects every aspect of your food business.
+                    <strong>Tiffzy</strong> is a comprehensive Food Business Platform designed for restaurants, cafes, cloud kitchens, and food businesses. From front-of-house customer online ordering to back-of-house restaurant operations, QR table ordering, live kitchen orders, POS billing &amp; payments, real-time analytics, and B2B supply chain management, Tiffzy connects every aspect of your food business.
                 </p>
             </div>
 

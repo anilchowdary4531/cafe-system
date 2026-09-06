@@ -15,7 +15,7 @@ export default function Footer() {
                             </h1>
                         </div>
                         <p className="mt-6 text-[15px] leading-relaxed text-[color:var(--app-muted)]">
-                            Tiffzy is an all-in-one platform for restaurants and food businesses, providing online ordering, restaurant operations, billing, live orders, analytics, and supply chain management.
+                            Tiffzy is a Food Business Platform providing online ordering, restaurant operations, QR table ordering, live kitchen orders, billing &amp; payments, analytics, and supply chain management.
                         </p>
 
                         <div className="mt-8 p-5 rounded-2xl bg-[color:color-mix(in_srgb,var(--app-text)_5%,transparent)] border border-[color:var(--app-border)]">
@@ -93,7 +93,7 @@ export default function Footer() {
                 <div className="mt-20 pt-8 border-t border-[color:var(--app-border)] flex flex-col md:flex-row justify-between items-center gap-6">
                     <div className="text-sm text-[color:var(--app-muted)]">
                         <p>© 2026 <strong>SURVETRA SERVICES</strong>. All Rights Reserved.</p>
-                        <p className="mt-1">Brand: Tiffzy | Operated by SURVETRA SERVICES</p>
+                        <p className="mt-1">Brand: Tiffzy (Food Business Platform) | Operated by SURVETRA SERVICES</p>
                     </div>
 
                     <div className="flex flex-wrap justify-center gap-6 text-xs font-medium text-[color:var(--app-muted)] uppercase tracking-widest">
