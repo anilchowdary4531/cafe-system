@@ -15,24 +15,32 @@ export default function Footer() {
                             </h1>
                         </div>
                         <p className="mt-6 text-[15px] leading-relaxed text-[color:var(--app-muted)]">
-                            Tiffzy is a Food Business Platform providing online ordering, restaurant operations, QR table ordering, live kitchen orders, billing &amp; payments, analytics, and supply chain management.
+                            Tiffzy is a Smart QR Restaurant Ordering System and Food Business Platform providing online ordering, restaurant operations, live kitchen orders, POS billing &amp; payments, analytics, and supply chain management.
                         </p>
 
-                        <div className="mt-8 p-5 rounded-2xl bg-[color:color-mix(in_srgb,var(--app-text)_5%,transparent)] border border-[color:var(--app-border)]">
-                            <p className="text-xs font-bold text-[#f59e0b] uppercase mb-1">Legal Entity Notice</p>
-                            <p className="text-sm font-medium text-[color:var(--app-text)]">
-                                Tiffzy is owned & operated by <br/><strong>SURVETRA SERVICES</strong>.
+                        <div className="mt-6 p-4 rounded-2xl bg-[color:color-mix(in_srgb,var(--app-text)_5%,transparent)] border border-[color:var(--app-border)] space-y-1 text-xs">
+                            <p className="font-bold text-[#f59e0b] uppercase tracking-wider">Business &amp; Leadership</p>
+                            <p className="text-[color:var(--app-text)] font-semibold">
+                                Operated by <strong>SURVETRA SERVICES</strong>
+                            </p>
+                            <p className="text-[color:var(--app-muted)]">
+                                Founder &amp; Developer: <Link to="/about/jekka-ramesh" className="text-[#f59e0b] font-bold hover:underline">Jekka Ramesh</Link>
+                            </p>
+                            <p className="text-[color:var(--app-muted)]">
+                                Proprietor: <Link to="/about/thamineni-anil-kumar" className="text-[#f59e0b] font-bold hover:underline">Thamineni Anil Kumar</Link>
                             </p>
                         </div>
                     </div>
 
                     {/* Company Column */}
                     <div>
-                        <h3 className="mb-6 text-sm font-bold uppercase tracking-widest text-[color:var(--app-text)]">Company</h3>
-                        <ul className="space-y-4 text-[15px] text-[color:var(--app-muted)]">
-                            <li><Link to="/about-us" className="hover:text-[color:var(--app-text)] transition">About Us</Link></li>
+                        <h3 className="mb-6 text-sm font-bold uppercase tracking-widest text-[color:var(--app-text)]">Company &amp; People</h3>
+                        <ul className="space-y-3 text-[14px] text-[color:var(--app-muted)]">
+                            <li><Link to="/about-us" className="hover:text-[color:var(--app-text)] transition font-medium">About Us</Link></li>
+                            <li><Link to="/about/jekka-ramesh" className="hover:text-[color:var(--app-text)] transition text-xs font-semibold">Jekka Ramesh – Founder &amp; Developer</Link></li>
+                            <li><Link to="/about/thamineni-anil-kumar" className="hover:text-[color:var(--app-text)] transition text-xs font-semibold">Thamineni Anil Kumar – Proprietor</Link></li>
+                            <li><Link to="/legal-disclosure" className="text-[#f59e0b] font-bold hover:underline">Legal &amp; Business Info</Link></li>
                             <li><Link to="/contact-us" className="hover:text-[color:var(--app-text)] transition">Contact Us</Link></li>
-                            <li><Link to="/legal-disclosure" className="text-[#f59e0b] font-bold hover:underline">Legal & Business Info</Link></li>
                             <li><Link to="/pricing" className="hover:text-[color:var(--app-text)] transition">Pricing</Link></li>
                         </ul>
                     </div>
@@ -40,7 +48,7 @@ export default function Footer() {
                     {/* Features Column */}
                     <div>
                         <h3 className="mb-6 text-sm font-bold uppercase tracking-widest text-[color:var(--app-text)]">Product Features</h3>
-                        <ul className="space-y-4 text-[15px] text-[color:var(--app-muted)]">
+                        <ul className="space-y-3 text-[14px] text-[color:var(--app-muted)]">
                             <li><Link to="/qr-ordering" className="hover:text-[color:var(--app-text)] transition">QR Ordering</Link></li>
                             <li><Link to="/pos-dashboard" className="hover:text-[color:var(--app-text)] transition">POS Dashboard</Link></li>
                             <li><Link to="/analytics" className="hover:text-[color:var(--app-text)] transition">Analytics</Link></li>
@@ -50,13 +58,13 @@ export default function Footer() {
 
                     {/* Policies Column */}
                     <div>
-                        <h3 className="mb-6 text-sm font-bold uppercase tracking-widest text-[color:var(--app-text)]">Policies & Support</h3>
-                        <ul className="space-y-4 text-[15px] text-[color:var(--app-muted)]">
+                        <h3 className="mb-6 text-sm font-bold uppercase tracking-widest text-[color:var(--app-text)]">Policies &amp; Support</h3>
+                        <ul className="space-y-3 text-[14px] text-[color:var(--app-muted)]">
                             <li><Link to="/privacy" className="hover:text-[color:var(--app-text)] transition">Privacy Policy</Link></li>
-                            <li><Link to="/terms" className="hover:text-[color:var(--app-text)] transition">Terms & Conditions</Link></li>
-                            <li><Link to="/refund-policy" className="hover:text-[color:var(--app-text)] transition">Refund & Cancellation</Link></li>
-                            <li><Link to="/shipping-policy" className="hover:text-[color:var(--app-text)] transition">Shipping & Delivery</Link></li>
-                            <li><Link to="/help-center" className="hover:text-[color:var(--app-text)] transition">Support & Help Center</Link></li>
+                            <li><Link to="/terms" className="hover:text-[color:var(--app-text)] transition">Terms &amp; Conditions</Link></li>
+                            <li><Link to="/refund-policy" className="hover:text-[color:var(--app-text)] transition">Refund &amp; Cancellation</Link></li>
+                            <li><Link to="/shipping-policy" className="hover:text-[color:var(--app-text)] transition">Shipping &amp; Delivery</Link></li>
+                            <li><Link to="/help-center" className="hover:text-[color:var(--app-text)] transition">Support &amp; Help Center</Link></li>
                             <li><Link to="/delete-account" className="text-red-500 font-semibold hover:underline transition">Delete Account</Link></li>
                         </ul>
                     </div>
@@ -64,7 +72,7 @@ export default function Footer() {
                     {/* App & Developer Column */}
                     <div>
                         <h3 className="mb-6 text-sm font-bold uppercase tracking-widest text-[color:var(--app-text)]">Get Our App</h3>
-                        <div className="space-y-3 mb-8">
+                        <div className="space-y-3 mb-6">
                             <a
                                 href="https://play.google.com/apps/testing/com.tiffzy.app"
                                 target="_blank"
@@ -81,29 +89,33 @@ export default function Footer() {
                             </button>
                         </div>
 
-                        <h3 className="mb-4 text-xs font-bold uppercase tracking-widest text-[color:var(--app-muted)] opacity-80">Developer Info</h3>
-                        <div className="space-y-2 text-[13px] text-[color:var(--app-muted)]">
-                            <p>support@tiffzy.com</p>
-                            <p>+91 91779 39713</p>
+                        <h3 className="mb-3 text-xs font-bold uppercase tracking-widest text-[color:var(--app-muted)] opacity-80">Support Contact</h3>
+                        <div className="space-y-1 text-[13px] text-[color:var(--app-muted)]">
+                            <p>jekkaramesh@survetra.com</p>
+                            <p>+91 91777 64632</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Bottom Bar */}
-                <div className="mt-20 pt-8 border-t border-[color:var(--app-border)] flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div className="text-sm text-[color:var(--app-muted)]">
+                <div className="mt-16 pt-8 border-t border-[color:var(--app-border)] flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="text-xs text-[color:var(--app-muted)] text-center md:text-left space-y-1">
                         <p>© 2026 <strong>SURVETRA SERVICES</strong>. All Rights Reserved.</p>
-                        <p className="mt-1">Brand: Tiffzy (Food Business Platform) | Operated by SURVETRA SERVICES</p>
+                        <p className="opacity-90">
+                            Tiffzy | Operated by <strong>SURVETRA SERVICES</strong> | Founder &amp; Developer: <strong>Jekka Ramesh</strong> | Proprietor: <strong>Thamineni Anil Kumar</strong>
+                        </p>
                     </div>
 
-                    <div className="flex flex-wrap justify-center gap-6 text-xs font-medium text-[color:var(--app-muted)] uppercase tracking-widest">
-                        <Link to="/privacy" className="hover:text-[color:var(--app-text)] transition">Privacy Policy</Link>
+                    <div className="flex flex-wrap justify-center gap-4 text-xs font-medium text-[color:var(--app-muted)] uppercase tracking-widest">
+                        <Link to="/about-us" className="hover:text-[color:var(--app-text)] transition">About</Link>
+                        <span className="opacity-30">•</span>
+                        <Link to="/privacy" className="hover:text-[color:var(--app-text)] transition">Privacy</Link>
                         <span className="opacity-30">•</span>
                         <Link to="/terms" className="hover:text-[color:var(--app-text)] transition">Terms</Link>
                         <span className="opacity-30">•</span>
-                        <Link to="/legal-disclosure" className="hover:text-[color:var(--app-text)] transition">Legal Disclosure</Link>
+                        <Link to="/legal-disclosure" className="hover:text-[color:var(--app-text)] transition">Legal</Link>
                         <span className="opacity-30">•</span>
-                        <Link to="/contact-us" className="hover:text-[color:var(--app-text)] transition">Contact Us</Link>
+                        <Link to="/contact-us" className="hover:text-[color:var(--app-text)] transition">Contact</Link>
                     </div>
                 </div>
             </div>

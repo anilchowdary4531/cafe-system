@@ -30,6 +30,7 @@ import Footer from "../components/Footer";
 import PromoBannerSlider from "../components/PromoBannerSlider";
 import PopularCategories, { normalizeCategoryName } from "../components/PopularCategories";
 import TiffzyMapModal from "../components/TiffzyMapModal";
+import SeoHead from "../components/SeoHead";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 import { isVegModeItem } from "./restaurant/RestaurantMenu";
 
@@ -789,33 +790,66 @@ function PlatformCapabilitiesSection() {
     ];
 
     return (
-        <section className="mt-12 rounded-[24px] border border-[var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_92%,#000_8%)] p-6 sm:p-8">
-            <div className="max-w-3xl">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/30 px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-[#ff8a1f]">
-                    Food Business Platform
-                </span>
-                <h2 className="mt-3 text-2xl font-black tracking-tight text-[color:var(--app-text)] sm:text-3xl">
-                    Tiffzy - Food Business Platform
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-[color:var(--app-muted)] sm:text-base">
-                    <strong>Tiffzy</strong> is a comprehensive Food Business Platform designed for restaurants, cafes, cloud kitchens, and food businesses. From front-of-house customer online ordering to back-of-house restaurant operations, QR table ordering, live kitchen orders, POS billing &amp; payments, real-time analytics, and B2B supply chain management, Tiffzy connects every aspect of your food business.
-                </p>
-            </div>
+        <section className="mt-12 space-y-6">
+            <div className="rounded-[24px] border border-[var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_92%,#000_8%)] p-6 sm:p-8">
+                <div className="max-w-3xl">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/30 px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-[#ff8a1f]">
+                        Smart QR Restaurant Ordering System
+                    </span>
+                    <h2 className="mt-3 text-2xl font-black tracking-tight text-[color:var(--app-text)] sm:text-3xl">
+                        Tiffzy — Smart QR Restaurant Ordering System &amp; Food Business Platform
+                    </h2>
+                    <p className="mt-2 text-sm leading-relaxed text-[color:var(--app-muted)] sm:text-base">
+                        <strong>Tiffzy</strong> is a comprehensive Smart QR Restaurant Ordering System and Food Business Platform operated by <strong>SURVETRA SERVICES</strong>. From front-of-house customer online ordering to back-of-house restaurant operations, QR table ordering, live kitchen orders, POS billing &amp; payments, real-time analytics, and B2B supply chain management, Tiffzy connects every aspect of your food business.
+                    </p>
+                </div>
 
-            <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {capabilities.map((cap) => (
-                    <div
-                        key={cap.title}
-                        className="rounded-2xl border border-[var(--app-border)] bg-[color:var(--app-surface)] p-5 shadow-sm transition hover:border-[#ff8a1f]/40"
-                    >
-                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#ff8a1f]/10">
-                            {cap.icon}
-                        </div>
-                        <h3 className="mt-4 text-base font-bold text-[color:var(--app-text)]">{cap.title}</h3>
-                        <p className="mt-1.5 text-xs leading-relaxed text-[color:var(--app-muted)]">{cap.description}</p>
+                {/* Operating Business & Leadership Notice */}
+                <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[color:var(--app-surface)] p-5 shadow-sm space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--app-border)] pb-3">
+                        <span className="text-xs font-extrabold uppercase tracking-widest text-[#ff8a1f]">
+                            Operating Entity &amp; Leadership
+                        </span>
+                        <Link to="/about-us" className="text-xs font-bold text-[#ff8a1f] hover:underline">
+                            Learn more on About Us →
+                        </Link>
                     </div>
-                ))}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs sm:text-sm">
+                        <div>
+                            <p className="text-[11px] font-bold uppercase text-[color:var(--app-muted)]">Operated By</p>
+                            <p className="font-extrabold text-[color:var(--app-text)]">SURVETRA SERVICES</p>
+                        </div>
+                        <div>
+                            <p className="text-[11px] font-bold uppercase text-[color:var(--app-muted)]">Founder &amp; Developer</p>
+                            <Link to="/about/jekka-ramesh" className="font-extrabold text-[#ff8a1f] hover:underline block">
+                                Jekka Ramesh – Founder &amp; Developer
+                            </Link>
+                        </div>
+                        <div>
+                            <p className="text-[11px] font-bold uppercase text-[color:var(--app-muted)]">Proprietor</p>
+                            <Link to="/about/thamineni-anil-kumar" className="font-extrabold text-[#ff8a1f] hover:underline block">
+                                Thamineni Anil Kumar – Proprietor
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {capabilities.map((cap) => (
+                        <div
+                            key={cap.title}
+                            className="rounded-2xl border border-[var(--app-border)] bg-[color:var(--app-surface)] p-5 shadow-sm transition hover:border-[#ff8a1f]/40"
+                        >
+                            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#ff8a1f]/10">
+                                {cap.icon}
+                            </div>
+                            <h3 className="mt-4 text-base font-bold text-[color:var(--app-text)]">{cap.title}</h3>
+                            <p className="mt-1.5 text-xs leading-relaxed text-[color:var(--app-muted)]">{cap.description}</p>
+                        </div>
+                    ))}
+                </div>
             </div>
         </section>
     );
 }
+

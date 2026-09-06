@@ -20,6 +20,8 @@ import InventoryPage from "./pages/InventoryPage";
 import ShippingPolicy from "./pages/ShippingPolicy";
 import LegalDisclosure from "./pages/LegalDisclosure";
 import DeleteAccount from "./pages/DeleteAccount";
+import JekkaRameshProfile from "./pages/JekkaRameshProfile";
+import ThamineniAnilKumarProfile from "./pages/ThamineniAnilKumarProfile";
 
 import Cart from "./pages/Cart";
 import Login from "./pages/Login";
@@ -106,7 +108,10 @@ export default function App() {
                     <Route path="/refund-policy" element={<RefundPolicy />} />
                     <Route path="/shipping-policy" element={<ShippingPolicy />} />
                     <Route path="/contact-us" element={<ContactUs />} />
+                    <Route path="/about" element={<Navigate to="/about-us" replace />} />
                     <Route path="/about-us" element={<AboutUs />} />
+                    <Route path="/about/jekka-ramesh" element={<JekkaRameshProfile />} />
+                    <Route path="/about/thamineni-anil-kumar" element={<ThamineniAnilKumarProfile />} />
                     <Route path="/help-center" element={<HelpCenter />} />
                     <Route path="/delete-account" element={<DeleteAccount />} />
                     <Route path="/pricing" element={<Pricing />} />
