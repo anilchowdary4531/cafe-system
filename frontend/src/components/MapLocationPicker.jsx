@@ -1,15 +1,13 @@
-import { useEffect, useRef } from "react";
-import * as maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
+import { useEffect, useRef, useState } from "react";
 import { MAP_CONFIG } from "../utils/mapConfig";
+import { loadGoogleMaps, getGoogleMapsApiKey } from "../utils/googleMapsLoader";
 
 /**
- * MapLocationPicker - Interactive MapLibre Location Selector Component
+ * MapLocationPicker - Interactive Google Maps Location Selector Component
  * Used in Owner Settings and SuperAdmin Create Restaurant pages.
  * 
  * Explicit Coordinate Convention:
- * Human / DB: latitude = lat (-90 to +90), longitude = lng (-180 to +180)
- * MapLibre / GeoJSON: [longitude, latitude] -> [lng, lat]
+ * Human / DB / Google Maps: { lat: latitude, lng: longitude }
  */
 export default function MapLocationPicker({
     latitude,
@@ -20,6 +18,7 @@ export default function MapLocationPicker({
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
     const markerRef = useRef(null);
+    const [mapError, setMapError] = useState(null);
 
     const hasValidCoords =
         Number.isFinite(Number(latitude)) &&
@@ -33,73 +32,90 @@ export default function MapLocationPicker({
     const centerLat = hasValidCoords ? Number(latitude) : MAP_CONFIG.defaultCenter.lat;
 
     useEffect(() => {
-        if (!mapContainerRef.current) return;
+        let isSubscribed = true;
 
-        console.log("[MapLocationPicker] Initializing map picker...");
+        if (!getGoogleMapsApiKey()) {
+            setMapError("Google Maps API key is not configured.");
+            return;
+        }
 
-        try {
-            const map = new maplibregl.Map({
-                container: mapContainerRef.current,
-                style: MAP_CONFIG.styleUrl,
-                center: [centerLng, centerLat], // MapLibre takes [lng, lat]
-                zoom: hasValidCoords ? 14 : 11,
-                attributionControl: true,
-            });
+        setMapError(null);
 
-            mapRef.current = map;
-            map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+        loadGoogleMaps(["places", "marker"])
+            .then((google) => {
+                if (!isSubscribed || !mapContainerRef.current) return;
 
-            map.on("load", () => {
-                // Create draggable marker
-                const marker = new maplibregl.Marker({
+                console.log("[MapLocationPicker] Initializing Google Maps location picker...");
+
+                const mapPos = { lat: centerLat, lng: centerLng };
+                const map = new google.maps.Map(mapContainerRef.current, {
+                    center: mapPos,
+                    zoom: hasValidCoords ? 14 : 11,
+                    mapTypeId: google.maps.MapTypeId.ROADMAP,
+                    zoomControl: true,
+                    mapTypeControl: false,
+                    streetViewControl: false,
+                    fullscreenControl: false,
+                });
+
+                mapRef.current = map;
+
+                const marker = new google.maps.Marker({
+                    position: mapPos,
+                    map,
                     draggable: true,
-                    color: "#fe5102",
-                })
-                    .setLngLat([centerLng, centerLat])
-                    .addTo(map);
+                    title: "Drag to set location",
+                });
 
                 markerRef.current = marker;
 
-                // Handle marker drag event
-                marker.on("dragend", () => {
-                    const lngLat = marker.getLngLat();
-                    // Explicitly extract latitude and longitude without swapping
-                    const nextLat = Math.round(lngLat.lat * 1000000) / 1000000;
-                    const nextLng = Math.round(lngLat.lng * 1000000) / 1000000;
+                // Handle marker dragend event
+                marker.addListener("dragend", () => {
+                    const pos = marker.getPosition();
+                    if (!pos) return;
+                    const nextLat = Math.round(pos.lat() * 1000000) / 1000000;
+                    const nextLng = Math.round(pos.lng() * 1000000) / 1000000;
 
                     console.log(`[MapLocationPicker] Marker dragged to: lat=${nextLat}, lng=${nextLng}`);
                     onSelectLocation?.({ lat: nextLat, lng: nextLng });
                 });
 
                 // Handle map click event
-                map.on("click", (e) => {
-                    const nextLat = Math.round(e.lngLat.lat * 1000000) / 1000000;
-                    const nextLng = Math.round(e.lngLat.lng * 1000000) / 1000000;
+                map.addListener("click", (e) => {
+                    if (!e.latLng) return;
+                    const nextLat = Math.round(e.latLng.lat() * 1000000) / 1000000;
+                    const nextLng = Math.round(e.latLng.lng() * 1000000) / 1000000;
 
                     console.log(`[MapLocationPicker] Map clicked at: lat=${nextLat}, lng=${nextLng}`);
-                    marker.setLngLat([nextLng, nextLat]);
+                    marker.setPosition({ lat: nextLat, lng: nextLng });
                     onSelectLocation?.({ lat: nextLat, lng: nextLng });
                 });
+            })
+            .catch((err) => {
+                if (!isSubscribed) return;
+                console.warn("[MapLocationPicker] Google Maps loading error:", err?.message || err);
+                setMapError(err?.message || "Failed to load map.");
             });
-        } catch (err) {
-            console.warn("[MapLocationPicker] WebGL initialization warning:", err?.message || err);
-        }
 
         return () => {
-            if (mapRef.current) {
-                mapRef.current.remove();
+            isSubscribed = false;
+            if (markerRef.current) {
+                markerRef.current.setMap(null);
+                markerRef.current = null;
             }
+            mapRef.current = null;
         };
     }, []);
 
     // Update marker position if props change externally
     useEffect(() => {
-        if (!mapRef.current || !markerRef.current) return;
+        if (!mapRef.current || !markerRef.current || !window.google) return;
         if (hasValidCoords) {
             const nextLat = Number(latitude);
             const nextLng = Number(longitude);
-            markerRef.current.setLngLat([nextLng, nextLat]);
-            mapRef.current.flyTo({ center: [nextLng, nextLat], zoom: 14 });
+            const pos = { lat: nextLat, lng: nextLng };
+            markerRef.current.setPosition(pos);
+            mapRef.current.panTo(pos);
         }
     }, [latitude, longitude]);
 
@@ -127,8 +143,14 @@ export default function MapLocationPicker({
             <div
                 ref={mapContainerRef}
                 style={{ height }}
-                className="relative overflow-hidden rounded-2xl border border-white/10 shadow-inner"
-            />
+                className="relative overflow-hidden rounded-2xl border border-white/10 shadow-inner bg-gray-900 flex items-center justify-center"
+            >
+                {mapError && (
+                    <div className="p-4 text-center text-xs text-amber-400">
+                        <p className="font-semibold">{mapError}</p>
+                    </div>
+                )}
+            </div>
 
             <div className="flex items-center justify-between text-xs text-gray-400">
                 <p>Click map or drag pin to select restaurant outlet location.</p>

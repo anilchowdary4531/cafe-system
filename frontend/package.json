@@ -12,13 +12,13 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@googlemaps/js-api-loader": "^2.1.1",
     "axios": "^1.15.1",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "framer-motion": "^12.38.0",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.8.0",
-    "maplibre-gl": "^6.7.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.14.1",
