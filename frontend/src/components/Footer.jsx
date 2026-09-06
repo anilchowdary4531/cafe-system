@@ -15,7 +15,7 @@ export default function Footer() {
                             </h1>
                         </div>
                         <p className="mt-6 text-[15px] leading-relaxed text-[color:var(--app-muted)]">
-                            Smart QR ordering & restaurant management platform for cafes, restaurants, and food courts.
+                            Tiffzy is an all-in-one platform for restaurants and food businesses, providing online ordering, restaurant operations, billing, live orders, analytics, and supply chain management.
                         </p>
 
                         <div className="mt-8 p-5 rounded-2xl bg-[color:color-mix(in_srgb,var(--app-text)_5%,transparent)] border border-[color:var(--app-border)]">

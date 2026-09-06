@@ -1,6 +1,21 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, Dot, Map as MapIcon, Navigation, Search, UserCircle2 } from "lucide-react";
+import {
+    BarChart3,
+    ChefHat,
+    ChevronRight,
+    Dot,
+    Map as MapIcon,
+    Navigation,
+    QrCode,
+    Receipt,
+    Search,
+    ShoppingBag,
+    Store,
+    Truck,
+    UserCircle2,
+    UtensilsCrossed,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useRestaurantContext } from "../context/RestaurantContext";
@@ -283,19 +298,36 @@ export default function RestaurantChooser() {
                     <div className="pointer-events-none absolute -right-10 top-0 h-40 w-40 rounded-full bg-[color:var(--app-accent)]/10 blur-3xl" />
                     <div className="pointer-events-none absolute -left-12 bottom-0 h-52 w-52 rounded-full bg-[#c78f4a]/10 blur-3xl" />
 
-                    <header className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="flex w-full items-start gap-3 sm:items-center sm:gap-4 lg:max-w-[58%]">
-                            <div className="chooser-logo-shell theme-card flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:h-14 sm:w-14">
-                                <BrandLogo className="h-8 w-8 sm:h-9 sm:w-9" title="Brand logo" />
+                    <header className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="flex w-full flex-col items-start gap-3 lg:max-w-[55%]">
+                            <div className="flex items-center gap-3.5">
+                                <div className="chooser-logo-shell theme-card flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl sm:h-16 sm:w-16 shadow-lg">
+                                    <BrandLogo className="h-9 w-9 sm:h-11 sm:w-11" title="Tiffzy Logo" />
+                                </div>
+                                <div>
+                                    <h1 className="bg-gradient-to-r from-[#ff8a1f] via-[#ea580c] to-[#9a3412] bg-clip-text text-3xl font-black tracking-tight text-transparent sm:text-4xl">
+                                        Tiffzy
+                                    </h1>
+                                    <p className="text-xs font-bold uppercase tracking-widest text-[#d97706]">
+                                        All-in-one platform for restaurants and food businesses
+                                    </p>
+                                </div>
                             </div>
-                            <div className="min-w-0">
-                                <span className="inline-flex bg-gradient-to-r from-[#ff8a1f] via-[#d97706] to-[#8a4b11] bg-clip-text text-[12px] font-black uppercase tracking-[0.5em] text-transparent drop-shadow-[0_1px_0_rgba(255,255,255,0.45)] sm:text-[13px]">
-                                    Tiffzy
-                                </span>
+                            <p className="theme-muted text-sm sm:text-base leading-relaxed max-w-xl">
+                                Manage online ordering, restaurant operations, billing, live orders, analytics, and supply chain from one connected platform.
+                            </p>
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Online Ordering</span>
+                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Restaurant Operations</span>
+                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">QR Table Ordering</span>
+                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Live Kitchen Orders</span>
+                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Billing &amp; Payments</span>
+                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Analytics</span>
+                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Supply Chain</span>
                             </div>
                         </div>
 
-                        <div className="relative z-10 flex w-full flex-col items-stretch gap-3 lg:max-w-[680px] lg:items-end">
+                        <div className="relative z-10 flex w-full flex-col items-stretch gap-3 lg:max-w-[500px] lg:items-end">
                             <div className="flex w-full items-center justify-end gap-2 overflow-x-auto rounded-none border-0 bg-transparent p-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-3 lg:w-fit lg:overflow-visible">
                                 <VegModeToggle
                                     enabled={vegModeEnabled}
@@ -340,7 +372,7 @@ export default function RestaurantChooser() {
                                 <input
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Search dishes..."
+                                    placeholder="Search dishes across restaurants..."
                                     className="chooser-input theme-input w-full rounded-full border border-[var(--app-border)] bg-white/70 py-2.5 pl-11 pr-4 text-sm shadow-[0_10px_24px_rgba(104,70,37,0.08)] outline-none placeholder:text-[color:var(--app-muted)] sm:py-3"
                                 />
                             </div>
@@ -454,6 +486,7 @@ export default function RestaurantChooser() {
                                 </div>
                             </>
                         )}
+                        <PlatformCapabilitiesSection />
                     </div>
                 </section>
             </div>
@@ -710,5 +743,76 @@ function InitialBrowseLoadingCard() {
                 </div>
             </div>
         </div>
+    );
+}
+
+function PlatformCapabilitiesSection() {
+    const capabilities = [
+        {
+            icon: <ShoppingBag className="h-6 w-6 text-[#ff8a1f]" />,
+            title: "Online Ordering",
+            description: "Seamless customer food ordering experience for takeaway, delivery, and online digital menus.",
+        },
+        {
+            icon: <Store className="h-6 w-6 text-[#ff8a1f]" />,
+            title: "Restaurant Operations",
+            description: "Complete back-office management, staff role permissions, and restaurant configuration.",
+        },
+        {
+            icon: <QrCode className="h-6 w-6 text-[#ff8a1f]" />,
+            title: "QR Table Ordering",
+            description: "Instant, contactless ordering from dining tables with table-specific digital menus.",
+        },
+        {
+            icon: <ChefHat className="h-6 w-6 text-[#ff8a1f]" />,
+            title: "Live Kitchen Orders",
+            description: "Real-time kitchen order tickets (KOT), status dispatch, and chef boards for fast execution.",
+        },
+        {
+            icon: <Receipt className="h-6 w-6 text-[#ff8a1f]" />,
+            title: "Billing & Payments",
+            description: "Integrated POS billing desk with digital payment gateways and automated settlements.",
+        },
+        {
+            icon: <BarChart3 className="h-6 w-6 text-[#ff8a1f]" />,
+            title: "Analytics & Insights",
+            description: "Real-time sales reporting, revenue metrics, dish popularities, and performance tracking.",
+        },
+        {
+            icon: <Truck className="h-6 w-6 text-[#ff8a1f]" />,
+            title: "Supply Chain Management",
+            description: "B2B ingredient marketplace, supplier connectivity, and automated stock & inventory controls.",
+        },
+    ];
+
+    return (
+        <section className="mt-12 rounded-[24px] border border-[var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_92%,#000_8%)] p-6 sm:p-8">
+            <div className="max-w-3xl">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/30 px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-[#ff8a1f]">
+                    Platform Capabilities
+                </span>
+                <h2 className="mt-3 text-2xl font-black tracking-tight text-[color:var(--app-text)] sm:text-3xl">
+                    About Tiffzy
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-[color:var(--app-muted)] sm:text-base">
+                    <strong>Tiffzy</strong> is an all-in-one connected platform designed for restaurants, cafes, and food businesses. From front-of-house customer ordering to back-of-house kitchen workflows, live POS billing, and B2B supply chain management, Tiffzy connects every aspect of your food business.
+                </p>
+            </div>
+
+            <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {capabilities.map((cap) => (
+                    <div
+                        key={cap.title}
+                        className="rounded-2xl border border-[var(--app-border)] bg-[color:var(--app-surface)] p-5 shadow-sm transition hover:border-[#ff8a1f]/40"
+                    >
+                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#ff8a1f]/10">
+                            {cap.icon}
+                        </div>
+                        <h3 className="mt-4 text-base font-bold text-[color:var(--app-text)]">{cap.title}</h3>
+                        <p className="mt-1.5 text-xs leading-relaxed text-[color:var(--app-muted)]">{cap.description}</p>
+                    </div>
+                ))}
+            </div>
+        </section>
     );
 }
