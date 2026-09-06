@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 import {
     BarChart3,
     ChefHat,
+    ChevronDown,
     ChevronRight,
+    ChevronUp,
     Dot,
     Map as MapIcon,
     Navigation,
@@ -743,6 +745,8 @@ function InitialBrowseLoadingCard() {
 }
 
 function PlatformCapabilitiesSection() {
+    const [showFeatures, setShowFeatures] = useState(false);
+
     const capabilities = [
         {
             icon: <ShoppingBag className="h-6 w-6 text-[#ff8a1f]" />,
@@ -792,25 +796,44 @@ function PlatformCapabilitiesSection() {
                         Tiffzy — Smart QR Restaurant Ordering System &amp; Food Business Platform
                     </h2>
                     <p className="mt-2 text-sm leading-relaxed text-[color:var(--app-muted)] sm:text-base">
-                        <strong>Tiffzy</strong> is a comprehensive Smart QR Restaurant Ordering System and Food Business Platform operated by <strong>SURVETRA SERVICES</strong>. From front-of-house customer online ordering to back-of-house restaurant operations, QR table ordering, live kitchen orders, POS billing &amp; payments, real-time analytics, and B2B supply chain management, Tiffzy connects every aspect of your food business.
+                        Tiffzy is a connected Food Business Platform powering online ordering, restaurant operations, QR table ordering, live kitchen orders, billing &amp; payments, analytics, and supply chain management.
                     </p>
-                </div>
-
-
-                <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {capabilities.map((cap) => (
-                        <div
-                            key={cap.title}
-                            className="rounded-2xl border border-[var(--app-border)] bg-[color:var(--app-surface)] p-5 shadow-sm transition hover:border-[#ff8a1f]/40"
+                    <div className="mt-4">
+                        <button
+                            onClick={() => setShowFeatures(!showFeatures)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-[#ff8a1f]/10 border border-[#ff8a1f]/30 px-4 py-2 text-xs font-bold text-[#ff8a1f] hover:bg-[#ff8a1f]/20 transition"
                         >
-                            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#ff8a1f]/10">
-                                {cap.icon}
-                            </div>
-                            <h3 className="mt-4 text-base font-bold text-[color:var(--app-text)]">{cap.title}</h3>
-                            <p className="mt-1.5 text-xs leading-relaxed text-[color:var(--app-muted)]">{cap.description}</p>
-                        </div>
-                    ))}
+                            {showFeatures ? (
+                                <>
+                                    <span>Hide Features</span>
+                                    <ChevronUp size={16} />
+                                </>
+                            ) : (
+                                <>
+                                    <span>See More Features</span>
+                                    <ChevronDown size={16} />
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
+
+                {showFeatures && (
+                    <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {capabilities.map((cap) => (
+                            <div
+                                key={cap.title}
+                                className="rounded-2xl border border-[var(--app-border)] bg-[color:var(--app-surface)] p-5 shadow-sm transition hover:border-[#ff8a1f]/40"
+                            >
+                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#ff8a1f]/10">
+                                    {cap.icon}
+                                </div>
+                                <h3 className="mt-4 text-base font-bold text-[color:var(--app-text)]">{cap.title}</h3>
+                                <p className="mt-1.5 text-xs leading-relaxed text-[color:var(--app-muted)]">{cap.description}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </section>
     );
