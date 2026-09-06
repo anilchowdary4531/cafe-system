@@ -265,8 +265,8 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
     }
 
     return (
-        <div className="theme-page min-h-screen px-4 py-10 md:px-8">
-            <div className="mx-auto w-full max-w-6xl space-y-6">
+        <div className="theme-page min-h-screen px-3 py-6 sm:px-6 md:px-10 lg:px-12">
+            <div className="mx-auto w-full max-w-7xl space-y-6">
                 <header className="flex items-center gap-3 px-1">
                     <NavLink
                         to={buildProfilePath("/profile/overview")}
