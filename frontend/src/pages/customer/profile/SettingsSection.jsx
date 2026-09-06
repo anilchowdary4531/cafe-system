@@ -166,100 +166,125 @@ export default function SettingsSection({ profile, customerToken, loading, savin
     );
 
     return (
-        <div className="space-y-4">
-            <div className="space-y-2 px-1">
-                <p className="theme-accent-text text-[11px] font-semibold uppercase tracking-[0.28em]">Settings</p>
-                <h1 className="text-2xl font-bold tracking-tight md:text-[2rem]">Preferences & security</h1>
-                <p className="theme-muted text-xs md:text-sm">Manage profile, privacy, and device settings.</p>
+        <div className="mx-auto max-w-3xl space-y-6">
+            <div className="space-y-1">
+                <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">Settings</h1>
+                <p className="theme-muted text-sm">Account details, app preferences, and security settings.</p>
             </div>
 
             {(error || addressError) && (
-                <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-300">
                     {error || addressError}
                 </div>
             )}
 
-            <section className="space-y-3 px-1 py-2">
-                <div className="flex flex-wrap items-start justify-between gap-3">
+            {/* Profile Details Card */}
+            <section className="rounded-3xl border border-black/5 bg-white/40 p-5 sm:p-6 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <p className="theme-muted text-[11px] font-semibold uppercase tracking-[0.16em]">Profile</p>
-                        <h2 className="mt-1 text-lg font-semibold">Customer details</h2>
-                        <p className="theme-muted mt-1 text-xs">Phone is mandatory and locked. Email is optional.</p>
+                        <h2 className="text-lg font-bold">Profile Details</h2>
+                        <p className="theme-muted text-xs">Phone is locked to your active session.</p>
                     </div>
                     <button
                         type="button"
                         onClick={saveProfile}
                         disabled={saving || loading}
-                        className="theme-button inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+                        className="theme-button inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-2 text-xs font-bold shadow-sm transition hover:scale-[1.02] disabled:opacity-60"
                     >
                         <Save size={14} />
-                        {saving ? "Saving..." : "Save"}
+                        {saving ? "Saving..." : "Save Changes"}
                     </button>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                    <div className="md:col-span-2">
-                        <label className="theme-muted mb-1 block text-xs">Name</label>
+                <div className="space-y-3.5">
+                    <div>
+                        <label className="theme-muted mb-1 block text-xs font-semibold">Name</label>
                         <div className="relative">
-                            <UserCircle2 size={16} className="theme-muted absolute left-3 top-2.5" />
+                            <UserCircle2 size={18} className="theme-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
                             <input
                                 value={name}
                                 onChange={(e) => {
                                     setError("");
                                     setName(e.target.value);
                                 }}
-                                className="theme-input w-full rounded-xl px-9 py-2.5 text-sm outline-none"
+                                className="w-full rounded-2xl border border-black/5 bg-black/5 px-10 py-3 text-sm font-medium outline-none transition focus:border-amber-500/50 dark:border-white/5 dark:bg-white/5"
                                 placeholder="Your name"
                             />
                         </div>
                     </div>
-                    <div className="md:col-span-2">
-                        <label className="theme-muted mb-1 block text-xs">Email (optional)</label>
-                        <div className="relative">
-                            <Mail size={16} className="theme-muted absolute left-3 top-2.5" />
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => {
-                                    setError("");
-                                    setEmail(e.target.value);
-                                }}
-                                className="theme-input w-full rounded-xl px-9 py-2.5 text-sm outline-none"
-                                placeholder="you@example.com"
-                            />
+
+                    <div className="grid gap-3.5 sm:grid-cols-2">
+                        <div>
+                            <label className="theme-muted mb-1 block text-xs font-semibold">Email (optional)</label>
+                            <div className="relative">
+                                <Mail size={18} className="theme-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => {
+                                        setError("");
+                                        setEmail(e.target.value);
+                                    }}
+                                    className="w-full rounded-2xl border border-black/5 bg-black/5 px-10 py-3 text-sm font-medium outline-none transition focus:border-amber-500/50 dark:border-white/5 dark:bg-white/5"
+                                    placeholder="you@example.com"
+                                />
+                            </div>
                         </div>
-                    </div>
-                    <div className="md:col-span-2">
-                        <label className="theme-muted mb-1 block text-xs">Phone</label>
-                        <div className="relative">
-                            <Phone size={16} className="theme-muted absolute left-3 top-2.5" />
-                            <input
-                                value={phone}
-                                readOnly
-                                className="theme-input w-full cursor-not-allowed rounded-xl px-9 py-2.5 text-sm outline-none opacity-80"
-                            />
+
+                        <div>
+                            <label className="theme-muted mb-1 block text-xs font-semibold">Phone</label>
+                            <div className="relative">
+                                <Phone size={18} className="theme-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+                                <input
+                                    value={phone}
+                                    readOnly
+                                    className="w-full cursor-not-allowed rounded-2xl border border-transparent bg-black/5 px-10 py-3 text-sm font-medium outline-none opacity-60 dark:bg-white/5"
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <section className="space-y-2 px-1 py-2">
-                <p className="theme-muted text-[11px] font-semibold uppercase tracking-[0.16em]">UI</p>
-                <h2 className="text-lg font-semibold">Theme</h2>
-                <p className="theme-muted text-xs">Your theme selection applies across pages.</p>
-                <div className="pt-1">
-                    <ThemeSelector />
+            {/* Appearance & Sound Card */}
+            <section className="rounded-3xl border border-black/5 bg-white/40 p-5 sm:p-6 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-4">
+                <div>
+                    <h2 className="text-lg font-bold">Appearance & Audio</h2>
+                    <p className="theme-muted text-xs">Customize app theme, audio tones, and language.</p>
+                </div>
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="theme-muted mb-2 block text-xs font-semibold uppercase tracking-wider">UI Theme</label>
+                        <ThemeSelector />
+                    </div>
+
+                    <div>
+                        <label className="theme-muted mb-2 block text-xs font-semibold uppercase tracking-wider">Notification Tone</label>
+                        <NotificationSoundPicker />
+                    </div>
+
+                    <div>
+                        <label className="theme-muted mb-2 block text-xs font-semibold uppercase tracking-wider">App Language</label>
+                        <div className="rounded-2xl border border-black/5 bg-black/5 overflow-hidden dark:border-white/5 dark:bg-white/5">
+                            <LanguageSelector variant="menu-item" />
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            <section className="space-y-2 px-1 py-2">
-                <p className="theme-muted text-[11px] font-semibold uppercase tracking-[0.16em]">Privacy</p>
-                <h2 className="text-lg font-semibold">Device settings</h2>
-                <div className="pt-1">
+            {/* Privacy & Device Settings Card */}
+            <section className="rounded-3xl border border-black/5 bg-white/40 p-5 sm:p-6 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-3">
+                <div>
+                    <h2 className="text-lg font-bold">Privacy & Device Controls</h2>
+                    <p className="theme-muted text-xs">Manage device permissions and session preferences.</p>
+                </div>
+
+                <div className="divide-y divide-black/5 dark:divide-white/5">
                     <SettingToggle
-                        icon={<Lock size={16} />}
-                        title="Remember my login on this device"
-                        description="Keeps you logged in for faster checkout next time."
+                        icon={<Lock size={18} />}
+                        title="Remember session on this device"
+                        description="Keeps you logged in for faster checkout."
                         checked={settings.rememberSession !== false}
                         onChange={(nextValue) => {
                             updateSettings({ rememberSession: nextValue });
@@ -267,243 +292,212 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                                 showToast({ title: "Disabled", message: "You'll be logged out on this device.", variant: "info", durationMs: 2500 });
                                 logoutCustomer();
                             } else {
-                                showToast({ title: "Enabled", message: "Your next OTP login will stay logged in.", variant: "success" });
+                                showToast({ title: "Enabled", message: "Your session will stay logged in.", variant: "success" });
                             }
                         }}
                     />
 
                     <SettingToggle
-                        icon={<MapPin size={16} />}
-                        title="Auto-select nearest restaurant"
-                        description="Uses device location on home page to pick the closest restaurant."
+                        icon={<MapPin size={18} />}
+                        title="Auto-detect nearest restaurant"
+                        description="Uses device location on home screen to pick nearest restaurant."
                         checked={settings.autoDetectNearestRestaurant !== false}
                         onChange={(nextValue) => updateSettings({ autoDetectNearestRestaurant: nextValue })}
                     />
 
                     <SettingToggle
-                        icon={<Bell size={16} />}
+                        icon={<Bell size={18} />}
                         title="Order update notifications"
-                        description="Show order status updates on this device."
+                        description="Show live order status updates on this device."
                         checked={settings.orderUpdateNotifications !== false}
                         onChange={(nextValue) => updateSettings({ orderUpdateNotifications: nextValue })}
                     />
                 </div>
-
-                <div className="pt-3">
-                    <NotificationSoundPicker />
-                </div>
             </section>
 
-            <section id="addresses" className="scroll-mt-24 space-y-2 px-1 py-2">
-                <p className="theme-muted text-[11px] font-semibold uppercase tracking-[0.16em]">Address</p>
-                <h2 className="text-lg font-semibold">Saved address</h2>
-                <p className="theme-muted text-xs">Stored in your account (requires OTP session token). Add the exact house / flat and landmark details for delivery.</p>
+            {/* Delivery Addresses Card */}
+            <section id="addresses" className="scroll-mt-24 rounded-3xl border border-black/5 bg-white/40 p-5 sm:p-6 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-4">
+                <div>
+                    <h2 className="text-lg font-bold">Delivery Addresses</h2>
+                    <p className="theme-muted text-xs">Manage saved locations for fast delivery checkout.</p>
+                </div>
 
                 {!canUseProfileApi ? (
-                    <div className="mt-3 rounded-xl border border-white/10 bg-black/10 px-3 py-2 text-xs">
-                        <p className="font-semibold">Login required</p>
-                        <p className="theme-muted mt-1">Enable "Remember login" and login again to save addresses.</p>
+                    <div className="rounded-2xl bg-amber-500/10 p-4 text-xs text-amber-800 dark:text-amber-200">
+                        <p className="font-bold">Login session required</p>
+                        <p className="mt-0.5">Please log in to save and manage delivery addresses.</p>
                     </div>
                 ) : (
                     <>
-                        <div className="mt-3 grid gap-3 md:grid-cols-2">
-                            <div className="md:col-span-2">
-                                <label className="theme-muted mb-1 block text-xs">House / Flat / Building</label>
+                        <div className="grid gap-3.5 sm:grid-cols-2">
+                            <div className="sm:col-span-2">
                                 <input
                                     value={addressDraft.line1}
                                     onChange={(e) => setAddressDraft((d) => ({ ...d, line1: e.target.value }))}
-                                    className="theme-input w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                                    placeholder="House no / Flat no / Building name"
+                                    className="w-full rounded-2xl border border-black/5 bg-black/5 px-4 py-3 text-sm font-medium outline-none focus:border-amber-500/50 dark:border-white/5 dark:bg-white/5"
+                                    placeholder="Flat / Building / House No. *"
                                 />
                             </div>
-                            <div className="md:col-span-2">
-                                <label className="theme-muted mb-1 block text-xs">Street / Area (optional)</label>
+                            <div className="sm:col-span-2">
                                 <input
                                     value={addressDraft.line2}
                                     onChange={(e) => setAddressDraft((d) => ({ ...d, line2: e.target.value }))}
-                                    className="theme-input w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                                    placeholder="Street, society, locality"
+                                    className="w-full rounded-2xl border border-black/5 bg-black/5 px-4 py-3 text-sm font-medium outline-none focus:border-amber-500/50 dark:border-white/5 dark:bg-white/5"
+                                    placeholder="Street / Area / Locality"
                                 />
                             </div>
-                            <div className="md:col-span-2">
-                                <label className="theme-muted mb-1 block text-xs">Landmark / delivery instructions (optional)</label>
+                            <div className="sm:col-span-2">
                                 <textarea
                                     value={addressDraft.notes}
                                     onChange={(e) => setAddressDraft((d) => ({ ...d, notes: e.target.value }))}
-                                    className="theme-input w-full rounded-2xl px-3 py-2.5 text-sm outline-none"
-                                    rows={3}
-                                    placeholder="Gate code, nearby shop, floor number, delivery directions..."
+                                    className="w-full rounded-2xl border border-black/5 bg-black/5 px-4 py-3 text-sm font-medium outline-none focus:border-amber-500/50 dark:border-white/5 dark:bg-white/5"
+                                    rows={2}
+                                    placeholder="Delivery instructions / Landmark (e.g. Near HDFC Bank)"
                                 />
                             </div>
                             <div>
-                                <label className="theme-muted mb-1 block text-xs">City</label>
                                 <input
                                     value={addressDraft.city}
                                     onChange={(e) => setAddressDraft((d) => ({ ...d, city: e.target.value }))}
-                                    className="theme-input w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                                    className="w-full rounded-2xl border border-black/5 bg-black/5 px-4 py-3 text-sm font-medium outline-none focus:border-amber-500/50 dark:border-white/5 dark:bg-white/5"
+                                    placeholder="City *"
                                 />
                             </div>
                             <div>
-                                <label className="theme-muted mb-1 block text-xs">Mandal / Area</label>
                                 <input
                                     value={addressDraft.mandal}
                                     onChange={(e) => setAddressDraft((d) => ({ ...d, mandal: e.target.value }))}
-                                    className="theme-input w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                                    className="w-full rounded-2xl border border-black/5 bg-black/5 px-4 py-3 text-sm font-medium outline-none focus:border-amber-500/50 dark:border-white/5 dark:bg-white/5"
+                                    placeholder="Mandal / Area *"
                                 />
                             </div>
                             <div>
-                                <label className="theme-muted mb-1 block text-xs">Latitude</label>
                                 <input
                                     type="number"
                                     step="any"
                                     value={addressDraft.latitude ?? ""}
                                     onChange={(e) => setAddressDraft((d) => ({ ...d, latitude: e.target.value }))}
-                                    className="theme-input w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                                    placeholder="GPS latitude"
+                                    className="w-full rounded-2xl border border-black/5 bg-black/5 px-4 py-3 text-sm font-medium outline-none focus:border-amber-500/50 dark:border-white/5 dark:bg-white/5"
+                                    placeholder="Latitude (GPS optional)"
                                 />
                             </div>
                             <div>
-                                <label className="theme-muted mb-1 block text-xs">Longitude</label>
                                 <input
                                     type="number"
                                     step="any"
                                     value={addressDraft.longitude ?? ""}
                                     onChange={(e) => setAddressDraft((d) => ({ ...d, longitude: e.target.value }))}
-                                    className="theme-input w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                                    placeholder="GPS longitude"
+                                    className="w-full rounded-2xl border border-black/5 bg-black/5 px-4 py-3 text-sm font-medium outline-none focus:border-amber-500/50 dark:border-white/5 dark:bg-white/5"
+                                    placeholder="Longitude (GPS optional)"
                                 />
                             </div>
                             <div>
-                                <label className="theme-muted mb-1 block text-xs">Postal code</label>
                                 <input
                                     value={addressDraft.postalCode}
                                     onChange={(e) => setAddressDraft((d) => ({ ...d, postalCode: e.target.value }))}
-                                    className="theme-input w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                                    className="w-full rounded-2xl border border-black/5 bg-black/5 px-4 py-3 text-sm font-medium outline-none focus:border-amber-500/50 dark:border-white/5 dark:bg-white/5"
+                                    placeholder="Postal Code"
                                 />
                             </div>
-                            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/10 px-3 py-2.5 text-xs">
+                            <div className="flex items-center gap-2 rounded-2xl border border-black/5 bg-black/5 px-4 py-3 text-xs font-medium dark:border-white/5 dark:bg-white/5">
                                 <input
                                     id="defaultAddr"
                                     type="checkbox"
                                     checked={Boolean(addressDraft.isDefault)}
                                     onChange={(e) => setAddressDraft((d) => ({ ...d, isDefault: e.target.checked }))}
+                                    className="h-4 w-4 rounded border-gray-300 accent-amber-500"
                                 />
-                                <label htmlFor="defaultAddr" className="font-semibold">
-                                    Make default
+                                <label htmlFor="defaultAddr" className="cursor-pointer font-semibold">
+                                    Set as default address
                                 </label>
                             </div>
-                            <div className="md:col-span-2">
+                            <div className="sm:col-span-2 pt-1">
                                 <button
                                     type="button"
                                     onClick={createAddress}
                                     disabled={addressSaving}
-                                    className="theme-button w-full rounded-xl py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+                                    className="theme-button w-full rounded-2xl py-3 text-xs font-bold uppercase tracking-wider shadow-sm transition hover:scale-[1.01] disabled:opacity-60"
                                 >
-                                    {addressSaving ? "Saving..." : "Add Address"}
+                                    {addressSaving ? "Saving Address..." : "Add New Address"}
                                 </button>
                             </div>
                         </div>
 
-                        <div className="mt-4 space-y-0">
+                        <div className="space-y-2 pt-2">
                             {addressLoading ? (
                                 <div className="theme-muted py-2 text-xs">Loading addresses...</div>
                             ) : addresses.length ? (
                                 addresses.map((addr) => (
-                                    <div key={addr.id} className="flex items-start justify-between gap-3 border-b border-[var(--app-border)] py-3 last:border-b-0">
+                                    <div key={addr.id} className="flex items-center justify-between gap-3 rounded-2xl border border-black/5 bg-black/5 p-4 dark:border-white/5 dark:bg-white/5">
                                         <div className="min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <p className="text-sm font-semibold">
-                                                    {addr.label}
-                                                    {addr.isDefault ? " (Default)" : ""}
-                                                </p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-bold">{addr.label}</p>
+                                                {addr.isDefault ? (
+                                                    <span className="rounded-full bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                                                        Default
+                                                    </span>
+                                                ) : null}
                                             </div>
-                                            <p className="theme-muted mt-0.5 whitespace-pre-line text-xs">{[addr.line1, addr.line2].filter(Boolean).join("\n")}</p>
-                                            {addr.notes && <p className="theme-muted mt-0.5 text-[11px]">{addr.notes}</p>}
-                                            {(addr.city || addr.mandal || addr.state || addr.postalCode) && (
+                                            <p className="theme-muted mt-1 text-xs">{[addr.line1, addr.line2].filter(Boolean).join(", ")}</p>
+                                            {(addr.city || addr.mandal || addr.postalCode) && (
                                                 <p className="theme-muted mt-0.5 text-[11px]">
-                                                    {[addr.city, addr.mandal || addr.state, addr.postalCode].filter(Boolean).join(", ")}
-                                                </p>
-                                            )}
-                                            {(normalizeCoordinate(addr.latitude) != null || normalizeCoordinate(addr.longitude) != null) && (
-                                                <p className="theme-muted mt-0.5 text-[11px]">
-                                                    Lat, Lng:{" "}
-                                                    {[normalizeCoordinate(addr.latitude), normalizeCoordinate(addr.longitude)]
-                                                        .map((value) => (value == null ? "" : value.toFixed(5)))
-                                                        .filter(Boolean)
-                                                        .join(", ")}
+                                                    {[addr.city, addr.mandal, addr.postalCode].filter(Boolean).join(", ")}
                                                 </p>
                                             )}
                                         </div>
                                         <button
                                             type="button"
                                             onClick={() => deleteAddress(addr.id)}
-                                            className="theme-soft-button inline-flex h-8 w-8 items-center justify-center rounded-lg"
-                                            aria-label="Delete"
+                                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition"
+                                            aria-label="Delete Address"
                                         >
-                                            <Trash2 size={14} />
+                                            <Trash2 size={15} />
                                         </button>
                                     </div>
                                 ))
                             ) : (
-                                <div className="theme-muted py-2 text-xs">No addresses saved.</div>
+                                <div className="theme-muted py-2 text-xs">No saved addresses yet.</div>
                             )}
                         </div>
                     </>
                 )}
             </section>
 
-            <section className="space-y-2 px-1 py-2">
-                <p className="theme-muted text-[11px] font-semibold uppercase tracking-[0.16em]">Preferences</p>
-                <h2 className="text-lg font-semibold">App Language</h2>
-                <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-1)] overflow-hidden">
-                    <LanguageSelector variant="menu-item" />
+            {/* System & Account Actions Card */}
+            <section className="rounded-3xl border border-black/5 bg-white/40 p-5 sm:p-6 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-4">
+                <div>
+                    <h2 className="text-lg font-bold">System & Account</h2>
+                    <p className="theme-muted text-xs">Manage system cache and account session.</p>
                 </div>
-            </section>
 
-            <section className="space-y-2 px-1 py-2">
-                <p className="theme-muted text-[11px] font-semibold uppercase tracking-[0.16em]">Maintenance</p>
-                <h2 className="text-lg font-semibold">Cache</h2>
-                <div className="pt-1">
+                <div className="space-y-3">
                     <SettingAction
-                        icon={<Trash2 size={16} />}
+                        icon={<Trash2 size={18} />}
                         title="Clear cached data"
-                        description="Fixes stale screens and reload issues on this device."
-                        actionLabel="Clear"
+                        description="Fixes stale screens and reloads fresh data on this device."
+                        actionLabel="Clear Cache"
                         onAction={() => {
                             clearAllCache();
                             invalidateGetCache({ urlStartsWith: "/customer" });
                             showToast({ title: "Cache cleared", message: "Fresh data will load next time.", variant: "success" });
                         }}
                     />
-                </div>
-            </section>
 
-            <section className="space-y-2 px-1 py-2">
-                <p className="theme-muted text-[11px] font-semibold uppercase tracking-[0.16em]">Security</p>
-                <h2 className="text-lg font-semibold">Logout</h2>
-                <p className="theme-muted text-xs">Signs you out on this device and clears cached data.</p>
-                <div className="pt-1">
-                    <button
-                        type="button"
-                        onClick={() => logoutCustomer()}
-                        className="w-full rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold"
-                    >
-                        Logout
-                    </button>
-                </div>
-            </section>
-
-            <section className="space-y-2 px-1 py-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-500">Danger Zone</p>
-                <h2 className="text-lg font-semibold text-red-500">{t("deleteAccount")}</h2>
-                <p className="theme-muted text-xs">{t("deleteAccountDesc")}</p>
-                <div className="pt-2">
-                    <Link
-                        to="/profile/delete-account"
-                        className="block w-full text-center rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-500 transition hover:bg-red-500/20"
-                    >
-                        {t("deleteAccount")}
-                    </Link>
+                    <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                        <button
+                            type="button"
+                            onClick={() => logoutCustomer()}
+                            className="flex-1 rounded-2xl bg-red-500/10 border border-red-500/20 py-3 text-xs font-bold text-red-500 hover:bg-red-500/20 transition"
+                        >
+                            Log Out
+                        </button>
+                        <Link
+                            to="/profile/delete-account"
+                            className="flex-1 text-center rounded-2xl bg-red-500/5 border border-red-500/15 py-3 text-xs font-bold text-red-400 hover:bg-red-500/10 transition"
+                        >
+                            {t("deleteAccount")}
+                        </Link>
+                    </div>
                 </div>
             </section>
 
