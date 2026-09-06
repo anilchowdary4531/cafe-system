@@ -1,6 +1,7 @@
-import { Loader } from "@googlemaps/js-api-loader";
+import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 
 let googleMapsPromise = null;
+let isOptionsSet = false;
 
 /**
  * Get configured Google Maps API Key from environment variables.
@@ -14,26 +15,33 @@ export const getGoogleMapsApiKey = () => {
 };
 
 /**
- * Loads Google Maps JavaScript API libraries dynamically and returns the google object.
- * Caches the loading promise to ensure script tag is appended only once.
+ * Loads Google Maps JavaScript API libraries dynamically and returns window.google.
+ * Caches the loading promise to ensure API is loaded only once.
  * 
- * @param {string[]} libraries List of additional libraries to load (e.g. ['places', 'marker'])
+ * @param {string[]} libraries List of additional libraries to load (e.g. ['maps', 'places', 'marker'])
  * @returns {Promise<typeof google>}
  */
-export const loadGoogleMaps = (libraries = ["places", "marker"]) => {
+export const loadGoogleMaps = (libraries = ["maps", "places", "marker"]) => {
     const apiKey = getGoogleMapsApiKey();
     if (!apiKey) {
         return Promise.reject(new Error("Google Maps API key is not configured."));
     }
 
     if (!googleMapsPromise) {
-        const loader = new Loader({
-            apiKey,
-            version: "weekly",
-            libraries,
-        });
+        googleMapsPromise = (async () => {
+            if (!isOptionsSet) {
+                setOptions({
+                    key: apiKey,
+                    v: "weekly",
+                });
+                isOptionsSet = true;
+            }
 
-        googleMapsPromise = loader.load().then(() => window.google);
+            // Load requested libraries in parallel using modern importLibrary API
+            await Promise.all(libraries.map((lib) => importLibrary(lib)));
+
+            return window.google;
+        })();
     }
 
     return googleMapsPromise;
