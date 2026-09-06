@@ -320,15 +320,7 @@ export default function RestaurantChooser() {
                             <p className="theme-muted text-sm sm:text-base leading-relaxed max-w-xl">
                                 Tiffzy is a connected Food Business Platform powering online ordering, restaurant operations, QR table ordering, live kitchen orders, billing &amp; payments, analytics, and supply chain management.
                             </p>
-                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Online Ordering</span>
-                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Restaurant Operations</span>
-                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">QR Table Ordering</span>
-                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Live Kitchen Orders</span>
-                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Billing &amp; Payments</span>
-                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Analytics</span>
-                                <span className="rounded-full bg-[#ff8a1f]/10 border border-[#ff8a1f]/20 px-3 py-1 text-[11px] font-semibold text-[#ff8a1f]">Supply Chain Management</span>
-                            </div>
+
                         </div>
 
                         <div className="relative z-10 flex w-full flex-col items-stretch gap-3 lg:max-w-[500px] lg:items-end">
