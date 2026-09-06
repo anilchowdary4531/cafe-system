@@ -19,17 +19,12 @@ export default function Footer() {
                         </p>
 
                         <div className="mt-6 p-4 rounded-2xl bg-[color:color-mix(in_srgb,var(--app-text)_5%,transparent)] border border-[color:var(--app-border)] space-y-1 text-xs">
-                            <p className="font-bold text-[#f59e0b] uppercase tracking-wider">Business &amp; Leadership</p>
+                            <p className="font-bold text-[#f59e0b] uppercase tracking-wider">Business Notice</p>
                             <p className="text-[color:var(--app-text)] font-semibold">
                                 Operated by <strong>SURVETRA SERVICES</strong>
                             </p>
-                            <p className="text-[color:var(--app-muted)]">
-                                Founder &amp; Developer: <Link to="/about/jekka-ramesh" className="text-[#f59e0b] font-bold hover:underline">Jekka Ramesh</Link>
-                            </p>
-                            <p className="text-[color:var(--app-muted)]">
-                                Proprietor: <Link to="/about/thamineni-anil-kumar" className="text-[#f59e0b] font-bold hover:underline">Thamineni Anil Kumar</Link>
-                            </p>
                         </div>
+
                     </div>
 
                     {/* Company Column */}
