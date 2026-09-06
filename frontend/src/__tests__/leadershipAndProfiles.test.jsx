@@ -14,7 +14,7 @@ describe("Leadership & Brand Entity Profiles Audit", () => {
         );
 
         expect(screen.getAllByText("Jekka Ramesh").length).toBeGreaterThan(0);
-        expect(screen.getAllByText(/Founder/i).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/Founder & Developer/i).length).toBeGreaterThan(0);
         expect(screen.getAllByText(/SURVETRA SERVICES/i).length).toBeGreaterThan(0);
     });
 
@@ -40,7 +40,7 @@ describe("Leadership & Brand Entity Profiles Audit", () => {
         expect(screen.getByText("Our Leadership")).toBeInTheDocument();
         expect(screen.getAllByText("Jekka Ramesh").length).toBeGreaterThan(0);
         expect(screen.getAllByText("Thamineni Anil Kumar").length).toBeGreaterThan(0);
-        expect(screen.getAllByText(/Founder/i).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/Founder & Developer/i).length).toBeGreaterThan(0);
         expect(screen.getAllByText(/Proprietor – SURVETRA SERVICES/i).length).toBeGreaterThan(0);
     });
 });

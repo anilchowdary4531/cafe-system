@@ -92,7 +92,7 @@ export default function ThamineniAnilKumarProfile() {
                             <span>Business Operating Entity</span>
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                            SURVETRA SERVICES is the registered sole proprietorship operating Tiffzy. The software platform product vision and technology development are led by Founder <Link to="/about/jekka-ramesh" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">Jekka Ramesh</Link>.
+                            SURVETRA SERVICES is the registered sole proprietorship operating Tiffzy. The software platform product vision and technology development are led by Founder &amp; Developer <Link to="/about/jekka-ramesh" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">Jekka Ramesh</Link>.
                         </p>
                     </div>
 
@@ -102,7 +102,7 @@ export default function ThamineniAnilKumarProfile() {
                             About Tiffzy &amp; Leadership →
                         </Link>
                         <Link to="/about/jekka-ramesh" className="text-gray-600 dark:text-gray-400 hover:underline">
-                            Jekka Ramesh – Founder Profile →
+                            Jekka Ramesh – Founder &amp; Developer Profile →
                         </Link>
                         <Link to="/" className="text-gray-500 hover:underline">
                             Return to Homepage

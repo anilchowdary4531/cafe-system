@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import {
     BarChart3,
     ChefHat,
-    ChevronDown,
     ChevronRight,
     Dot,
     Map as MapIcon,
@@ -752,8 +751,6 @@ function InitialBrowseLoadingCard() {
 }
 
 function PlatformCapabilitiesSection() {
-    const [showAllFeatures, setShowAllFeatures] = useState(false);
-
     const capabilities = [
         {
             icon: <ShoppingBag className="h-6 w-6 text-[#ff8a1f]" />,
@@ -803,7 +800,7 @@ function PlatformCapabilitiesSection() {
                         Tiffzy — Smart QR Restaurant Ordering System &amp; Food Business Platform
                     </h2>
                     <p className="mt-2 text-sm leading-relaxed text-[color:var(--app-muted)] sm:text-base">
-                        <strong>Tiffzy</strong> is a connected Food Business Platform powering online ordering, restaurant operations, QR table ordering, live kitchen orders, billing &amp; payments, analytics, and supply chain management.
+                        <strong>Tiffzy</strong> is a comprehensive Smart QR Restaurant Ordering System and Food Business Platform operated by <strong>SURVETRA SERVICES</strong>. From front-of-house customer online ordering to back-of-house restaurant operations, QR table ordering, live kitchen orders, POS billing &amp; payments, real-time analytics, and B2B supply chain management, Tiffzy connects every aspect of your food business.
                     </p>
                 </div>
 
@@ -823,9 +820,9 @@ function PlatformCapabilitiesSection() {
                             <p className="font-extrabold text-[color:var(--app-text)]">SURVETRA SERVICES</p>
                         </div>
                         <div>
-                            <p className="text-[11px] font-bold uppercase text-[color:var(--app-muted)]">Founder</p>
+                            <p className="text-[11px] font-bold uppercase text-[color:var(--app-muted)]">Founder &amp; Developer</p>
                             <Link to="/about/jekka-ramesh" className="font-extrabold text-[#ff8a1f] hover:underline block">
-                                Jekka Ramesh – Founder
+                                Jekka Ramesh – Founder &amp; Developer
                             </Link>
                         </div>
                         <div>
@@ -837,38 +834,22 @@ function PlatformCapabilitiesSection() {
                     </div>
                 </div>
 
-                {/* See More Toggle Button */}
-                <div className="mt-6 flex items-center justify-between">
-                    <button
-                        type="button"
-                        onClick={() => setShowAllFeatures(!showAllFeatures)}
-                        className="inline-flex items-center gap-2 rounded-full border border-[#ff8a1f]/30 bg-[#ff8a1f]/10 px-5 py-2.5 text-xs font-bold text-[#ff8a1f] transition hover:bg-[#ff8a1f]/20 shadow-sm"
-                    >
-                        <span>{showAllFeatures ? "Hide Features" : "See More Features"}</span>
-                        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAllFeatures ? "rotate-180" : ""}`} />
-                    </button>
-                </div>
-
-                {/* Expandable Platform Capabilities Grid */}
-                {showAllFeatures && (
-                    <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 animate-fadeIn">
-                        {capabilities.map((cap) => (
-                            <div
-                                key={cap.title}
-                                className="rounded-2xl border border-[var(--app-border)] bg-[color:var(--app-surface)] p-5 shadow-sm transition hover:border-[#ff8a1f]/40"
-                            >
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#ff8a1f]/10">
-                                    {cap.icon}
-                                </div>
-                                <h3 className="mt-4 text-base font-bold text-[color:var(--app-text)]">{cap.title}</h3>
-                                <p className="mt-1.5 text-xs leading-relaxed text-[color:var(--app-muted)]">{cap.description}</p>
+                <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {capabilities.map((cap) => (
+                        <div
+                            key={cap.title}
+                            className="rounded-2xl border border-[var(--app-border)] bg-[color:var(--app-surface)] p-5 shadow-sm transition hover:border-[#ff8a1f]/40"
+                        >
+                            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#ff8a1f]/10">
+                                {cap.icon}
                             </div>
-                        ))}
-                    </div>
-                )}
+                            <h3 className="mt-4 text-base font-bold text-[color:var(--app-text)]">{cap.title}</h3>
+                            <p className="mt-1.5 text-xs leading-relaxed text-[color:var(--app-muted)]">{cap.description}</p>
+                        </div>
+                    ))}
+                </div>
             </div>
         </section>
     );
 }
-
 

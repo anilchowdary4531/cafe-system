@@ -5,16 +5,16 @@ import SeoHead from "../components/SeoHead";
 import { User, Code2, Building2, ChevronRight, ArrowLeft } from "lucide-react";
 
 export default function JekkaRameshProfile() {
-    const pageTitle = "Jekka Ramesh – Founder | Tiffzy";
-    const pageDescription = "Jekka Ramesh is the Founder of Tiffzy, a smart QR restaurant ordering and food technology platform operated by SURVETRA SERVICES.";
+    const pageTitle = "Jekka Ramesh – Founder & Developer | Tiffzy";
+    const pageDescription = "Jekka Ramesh is the Founder and Developer of Tiffzy, a smart QR restaurant ordering and food technology platform operated by SURVETRA SERVICES.";
 
     const jsonLd = {
         "@context": "https://schema.org",
         "@type": "Person",
         "@id": "https://www.tiffzy.com/about/jekka-ramesh#person",
         "name": "Jekka Ramesh",
-        "jobTitle": "Founder",
-        "description": "Jekka Ramesh is the Founder of Tiffzy, a smart QR restaurant ordering and food technology platform.",
+        "jobTitle": "Founder & Developer",
+        "description": "Jekka Ramesh is the Founder and Developer of Tiffzy, a smart QR restaurant ordering and food technology platform.",
         "worksFor": {
             "@type": "Organization",
             "name": "SURVETRA SERVICES",
@@ -67,7 +67,7 @@ export default function JekkaRameshProfile() {
                                 Jekka Ramesh
                             </h1>
                             <p className="text-lg font-bold text-amber-600 dark:text-amber-400 mt-1">
-                                Founder
+                                Founder &amp; Developer
                             </p>
                         </div>
                     </div>
@@ -78,10 +78,10 @@ export default function JekkaRameshProfile() {
                     <div className="space-y-4 text-base text-gray-700 dark:text-gray-300 leading-relaxed">
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Biography &amp; Role</h2>
                         <p className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-gray-800 dark:text-gray-200 font-medium">
-                            &quot;Jekka Ramesh is the Founder of Tiffzy, a smart QR restaurant ordering and food technology platform. He leads the technology, software architecture, product development, and engineering of the Tiffzy platform.&quot;
+                            &quot;Jekka Ramesh is the Founder and Developer of Tiffzy, a smart QR restaurant ordering and food technology platform. He leads the technology, software architecture, product development, and engineering of the Tiffzy platform.&quot;
                         </p>
                         <p>
-                            As Founder, Jekka Ramesh conceived the technical architecture and product vision behind Tiffzy. He oversees full-stack development, mobile user experiences, cloud integrations, QR ordering systems, live kitchen dispatches, and point-of-sale infrastructure for food businesses.
+                            As Founder &amp; Developer, Jekka Ramesh conceived the technical architecture and product vision behind Tiffzy. He oversees full-stack development, mobile user experiences, cloud integrations, QR ordering systems, live kitchen dispatches, and point-of-sale infrastructure for food businesses.
                         </p>
                     </div>
 
@@ -92,7 +92,7 @@ export default function JekkaRameshProfile() {
                             <span>Operating Entity Relation</span>
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                            Tiffzy is owned and operated by <strong>SURVETRA SERVICES</strong> (Proprietor: <Link to="/about/thamineni-anil-kumar" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">Thamineni Anil Kumar</Link>). Jekka Ramesh serves as the Founder leading the software platform.
+                            Tiffzy is owned and operated by <strong>SURVETRA SERVICES</strong> (Proprietor: <Link to="/about/thamineni-anil-kumar" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">Thamineni Anil Kumar</Link>). Jekka Ramesh serves as the Founder &amp; Developer leading the software platform.
                         </p>
                     </div>
 
