@@ -804,35 +804,6 @@ function PlatformCapabilitiesSection() {
                     </p>
                 </div>
 
-                {/* Operating Business & Leadership Notice */}
-                <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[color:var(--app-surface)] p-5 shadow-sm space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--app-border)] pb-3">
-                        <span className="text-xs font-extrabold uppercase tracking-widest text-[#ff8a1f]">
-                            Operating Entity &amp; Leadership
-                        </span>
-                        <Link to="/about-us" className="text-xs font-bold text-[#ff8a1f] hover:underline">
-                            Learn more on About Us →
-                        </Link>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs sm:text-sm">
-                        <div>
-                            <p className="text-[11px] font-bold uppercase text-[color:var(--app-muted)]">Operated By</p>
-                            <p className="font-extrabold text-[color:var(--app-text)]">SURVETRA SERVICES</p>
-                        </div>
-                        <div>
-                            <p className="text-[11px] font-bold uppercase text-[color:var(--app-muted)]">Founder &amp; Developer</p>
-                            <Link to="/about/jekka-ramesh" className="font-extrabold text-[#ff8a1f] hover:underline block">
-                                Jekka Ramesh – Founder &amp; Developer
-                            </Link>
-                        </div>
-                        <div>
-                            <p className="text-[11px] font-bold uppercase text-[color:var(--app-muted)]">Proprietor</p>
-                            <Link to="/about/thamineni-anil-kumar" className="font-extrabold text-[#ff8a1f] hover:underline block">
-                                Thamineni Anil Kumar – Proprietor
-                            </Link>
-                        </div>
-                    </div>
-                </div>
 
                 <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {capabilities.map((cap) => (
