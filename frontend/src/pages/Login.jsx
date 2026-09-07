@@ -472,12 +472,11 @@ export default function Login() {
     const handleCustomerRequestSignupOtp = async () => {
         const username = String(customerUsername || "").trim().toLowerCase();
         const pwd = String(customerPassword || "").trim();
-        const phone = String(customerPhone || "").trim();
+        const rawContact = String(customerPhone || customerEmail || "").trim();
         const name = String(customerName || "").trim();
-        const email = String(customerEmail || "").trim().toLowerCase();
 
-        if (!username || (!phone && !email) || !pwd) {
-            setCustomerError("Username, contact method (phone or email), and password are required.");
+        if (!username || !rawContact || !pwd) {
+            setCustomerError("Username, contact details (phone number or email), and password are required.");
             return;
         }
 
@@ -485,6 +484,10 @@ export default function Login() {
             setCustomerError("Password must be at least 6 characters.");
             return;
         }
+
+        const isEmail = rawContact.includes("@");
+        const phone = isEmail ? "" : rawContact;
+        const email = isEmail ? rawContact.toLowerCase() : "";
 
         try {
             setCustomerLoading(true);
@@ -995,14 +998,23 @@ export default function Login() {
                                                 </div>
 
                                                 <div>
-                                                    <label className="theme-muted mb-1.5 block text-sm font-medium">{t("phoneNumber")} *</label>
+                                                    <label className="theme-muted mb-1.5 block text-sm font-medium">Phone Number or Email Address *</label>
                                                     <div className="relative">
-                                                        <Phone size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                        <UserCircle2 size={18} className="theme-muted absolute left-4 top-3.5" />
                                                         <input
-                                                            type="tel"
-                                                            placeholder={t("placeholderPhone")}
-                                                            value={customerPhone}
-                                                            onChange={(e) => setCustomerPhone(e.target.value)}
+                                                            type="text"
+                                                            placeholder="Enter phone number or email address"
+                                                            value={customerPhone || customerEmail}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                if (val.includes("@")) {
+                                                                    setCustomerEmail(val);
+                                                                    setCustomerPhone("");
+                                                                } else {
+                                                                    setCustomerPhone(val);
+                                                                    setCustomerEmail("");
+                                                                }
+                                                            }}
                                                             className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
                                                         />
                                                     </div>
@@ -1011,26 +1023,12 @@ export default function Login() {
                                                 <div>
                                                     <label className="theme-muted mb-1.5 block text-sm font-medium">{t("fullName")}</label>
                                                     <div className="relative">
-                                                        <UserCircle2 size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                        <User size={18} className="theme-muted absolute left-4 top-3.5" />
                                                         <input
                                                             type="text"
                                                             placeholder={t("placeholderFullName")}
                                                             value={customerName}
                                                             onChange={(e) => setCustomerName(e.target.value)}
-                                                            className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div>
-                                                    <label className="theme-muted mb-1.5 block text-sm font-medium">{t("emailAddress")}</label>
-                                                    <div className="relative">
-                                                        <Mail size={18} className="theme-muted absolute left-4 top-3.5" />
-                                                        <input
-                                                            type="email"
-                                                            placeholder={t("placeholderEmail")}
-                                                            value={customerEmail}
-                                                            onChange={(e) => setCustomerEmail(e.target.value)}
                                                             className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
                                                         />
                                                     </div>
