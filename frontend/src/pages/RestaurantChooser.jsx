@@ -297,7 +297,7 @@ export default function RestaurantChooser() {
     return (
         <div className="theme-page min-h-screen w-full p-0">
             <div className="w-full">
-                <section className="chooser-shell relative overflow-hidden border-none shadow-none rounded-none p-4 sm:p-6 md:p-10">
+                <section className="chooser-shell relative overflow-hidden border-none shadow-none rounded-none px-3 pt-2 pb-4 sm:px-6 sm:pt-3 sm:pb-6 md:px-8 md:pt-4 md:pb-8">
                     <div className="pointer-events-none absolute -right-10 top-0 h-40 w-40 rounded-full bg-[color:var(--app-accent)]/10 blur-3xl" />
                     <div className="pointer-events-none absolute -left-12 bottom-0 h-52 w-52 rounded-full bg-[#c78f4a]/10 blur-3xl" />
 
