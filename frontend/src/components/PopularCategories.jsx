@@ -203,7 +203,7 @@ export default function PopularCategories({
                         type="button"
                         onClick={() => handleScroll("left")}
                         aria-label="Scroll categories left"
-                        className="absolute -left-2 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white shadow-xl backdrop-blur-md transition duration-200 hover:scale-110 hover:bg-black/90 active:scale-95 sm:-left-3 sm:h-9 sm:w-9"
+                        className="absolute -left-2 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] text-[color:var(--app-text)] shadow-md transition duration-200 hover:scale-110 hover:border-[#ff8a1f] hover:text-[#ff8a1f] active:scale-95 sm:-left-3 sm:h-9 sm:w-9"
                     >
                         <ChevronLeft size={18} />
                     </button>
@@ -280,7 +280,7 @@ export default function PopularCategories({
                         type="button"
                         onClick={() => handleScroll("right")}
                         aria-label="Scroll categories right"
-                        className="absolute -right-2 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white shadow-xl backdrop-blur-md transition duration-200 hover:scale-110 hover:bg-black/90 active:scale-95 sm:-right-3 sm:h-9 sm:w-9"
+                        className="absolute -right-2 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] text-[color:var(--app-text)] shadow-md transition duration-200 hover:scale-110 hover:border-[#ff8a1f] hover:text-[#ff8a1f] active:scale-95 sm:-right-3 sm:h-9 sm:w-9"
                     >
                         <ChevronRight size={18} />
                     </button>

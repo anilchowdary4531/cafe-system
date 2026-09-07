@@ -533,7 +533,7 @@ function ItemSectionRow({
                         type="button"
                         onClick={() => handleScroll("left")}
                         aria-label={`Scroll ${section.label} left`}
-                        className="absolute -left-2 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white shadow-xl backdrop-blur-md transition duration-200 hover:scale-110 hover:bg-black/90 active:scale-95 sm:-left-3 sm:h-9 sm:w-9"
+                        className="absolute -left-2 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] text-[color:var(--app-text)] shadow-md transition duration-200 hover:scale-110 hover:border-[#ff8a1f] hover:text-[#ff8a1f] active:scale-95 sm:-left-3 sm:h-9 sm:w-9"
                     >
                         <ChevronLeft size={18} />
                     </button>
@@ -589,7 +589,7 @@ function ItemSectionRow({
                         type="button"
                         onClick={() => handleScroll("right")}
                         aria-label={`Scroll ${section.label} right`}
-                        className="absolute -right-2 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white shadow-xl backdrop-blur-md transition duration-200 hover:scale-110 hover:bg-black/90 active:scale-95 sm:-right-3 sm:h-9 sm:w-9"
+                        className="absolute -right-2 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] text-[color:var(--app-text)] shadow-md transition duration-200 hover:scale-110 hover:border-[#ff8a1f] hover:text-[#ff8a1f] active:scale-95 sm:-right-3 sm:h-9 sm:w-9"
                     >
                         <ChevronRight size={18} />
                     </button>
@@ -613,20 +613,19 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected, quantity = 0
                     onClick?.();
                 }
             }}
-            className={`chooser-item-card group flex w-[115px] shrink-0 snap-start flex-col overflow-hidden rounded-[14px] border text-left shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition duration-300 hover:-translate-y-0.5 sm:w-[124px] md:w-[132px] lg:w-[140px] ${
+            className={`chooser-item-card group flex w-[115px] shrink-0 snap-start flex-col overflow-hidden rounded-[14px] border text-left transition duration-300 hover:-translate-y-0.5 sm:w-[124px] md:w-[132px] lg:w-[140px] ${
                 quantity > 0
-                    ? "border-emerald-500/35 bg-[linear-gradient(180deg,rgba(16,185,129,0.12)_0%,rgba(16,185,129,0.04)_100%)] shadow-[0_10px_24px_rgba(16,185,129,0.18)]"
-                    : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.02)_100%)] hover:border-white/15 hover:bg-white/6"
+                    ? "border-emerald-500/40 bg-emerald-500/10 shadow-sm"
+                    : "border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] hover:border-[#ff8a1f]/50 hover:shadow-md"
             }`}
         >
-            <div className="relative aspect-[17/10] overflow-hidden bg-white/5">
+            <div className="relative aspect-[17/10] overflow-hidden bg-black/5">
                 <img
                     src={imageSrc}
                     alt={item?.name || "Menu item"}
                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                     loading="lazy"
                 />
-                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0)_35%,rgba(0,0,0,0.35)_100%)]" />
             </div>
 
             <div className="flex min-h-[72px] min-w-0 flex-1 flex-col p-1.5 sm:p-2">
@@ -642,7 +641,7 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected, quantity = 0
                         className={`mt-0.5 inline-flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full border transition ${
                             selected
                                 ? "border-[color:var(--app-primary)] bg-[color:var(--app-primary)] text-[color:var(--app-primary-text)]"
-                                : "border-white/15 bg-black/35 text-white/85"
+                                : "border-[var(--app-border)] bg-black/5 text-[color:var(--app-muted)] hover:text-[color:var(--app-text)]"
                         }`}
                     >
                         <Dot size={12} strokeWidth={3.5} />
@@ -660,7 +659,7 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected, quantity = 0
                             {quantity}
                         </span>
                     ) : (
-                        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-white/5 text-[color:var(--app-accent)]">
+                        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-black/5 text-[color:var(--app-accent)]">
                             <ChevronRight size={10} />
                         </span>
                     )}
