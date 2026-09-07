@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { api } from "../../../utils/apiClient";
 import { showToast } from "../../../utils/toast";
 import { Bell, Check, Trash2, Calendar } from "lucide-react";
-import NotificationSoundPicker from "../../../components/NotificationSoundPicker";
 
 const formatDate = (dateStr) => {
   const d = new Date(dateStr);
@@ -117,8 +116,6 @@ export default function CustomerNotifications() {
           ))}
         </div>
       )}
-
-      <NotificationSoundPicker />
     </div>
   );
 }
