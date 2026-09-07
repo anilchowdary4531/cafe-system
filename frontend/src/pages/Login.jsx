@@ -852,37 +852,6 @@ export default function Login() {
                         </>
                     ) : (
                         <>
-                            {/* CUSTOMER SUBMODE NAVIGATION TABS */}
-                            <div className="flex border-b border-black/10 dark:border-white/10 mb-6 gap-2 text-xs sm:text-sm font-semibold overflow-x-auto pb-1">
-                                <button
-                                    type="button"
-                                    onClick={() => { setCustomerSubMode("password"); setCustomerError(""); }}
-                                    className={`pb-2 px-1 border-b-2 transition ${customerSubMode === "password" ? "border-amber-500 text-amber-500 font-bold" : "border-transparent theme-muted hover:text-amber-500"}`}
-                                >
-                                    Password
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setCustomerSubMode("otp"); setCustomerError(""); }}
-                                    className={`pb-2 px-1 border-b-2 transition ${customerSubMode === "otp" ? "border-amber-500 text-amber-500 font-bold" : "border-transparent theme-muted hover:text-amber-500"}`}
-                                >
-                                    OTP Login
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setCustomerSubMode("register"); setCustomerError(""); }}
-                                    className={`pb-2 px-1 border-b-2 transition ${customerSubMode === "register" ? "border-amber-500 text-amber-500 font-bold" : "border-transparent theme-muted hover:text-amber-500"}`}
-                                >
-                                    Sign Up
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setCustomerSubMode("forgot"); setCustomerError(""); }}
-                                    className={`pb-2 px-1 border-b-2 transition ${customerSubMode === "forgot" ? "border-amber-500 text-amber-500 font-bold" : "border-transparent theme-muted hover:text-amber-500"}`}
-                                >
-                                    Forgot Password
-                                </button>
-                            </div>
 
                             {customerSubMode === "password" ? (
                                 <>
