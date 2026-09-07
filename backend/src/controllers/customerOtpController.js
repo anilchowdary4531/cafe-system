@@ -2,6 +2,7 @@ import { normalizePhone } from "../services/phoneService.js";
 import { requestOtp, verifyOtp } from "../services/otpService.js";
 import { sendEmailOtp } from "../services/emailService.js";
 import { sendSmsOtp } from "../services/smsService.js";
+import { sendWhatsAppOtp } from "../services/msg91WhatsAppService.js";
 import { upsertCustomerAccount } from "../services/customerProfileService.js";
 import { extractVerifiedIdentifier, verifyMsg91AccessToken } from "../services/msg91OtpWidgetService.js";
 
@@ -30,32 +31,42 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
 
       const devOtp = otpRes.devOtp || "";
       const otpToSend = otpRes.code;
+      const isEmailOnly = phone.includes("@");
 
-      // Send OTP to available channels. If both exist -> both.
-      const [smsRes, emailRes] = await Promise.all([
-        sendSmsOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }),
+      // Send OTP to available channels (WhatsApp, SMS, Email).
+      const [whatsAppRes, smsRes, emailRes] = await Promise.all([
+        !isEmailOnly ? sendWhatsAppOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
+        !isEmailOnly ? sendSmsOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
         email ? sendEmailOtp({ email, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
       ]);
 
       if (process.env.NODE_ENV === "production") {
         // eslint-disable-next-line no-console
-        console.log("[customerOtpController] otp_delivery", { phone, smsRes, emailProvided: Boolean(email), emailRes });
+        console.log("[customerOtpController] otp_delivery", {
+          phone,
+          whatsAppRes: whatsAppRes ? { ok: whatsAppRes.ok !== false, status: whatsAppRes.status } : null,
+          smsRes: smsRes ? { ok: smsRes.ok !== false } : null,
+          emailProvided: Boolean(email),
+          emailRes: emailRes ? { ok: emailRes.ok !== false } : null,
+        });
       }
 
+      const deliveredByWhatsApp = Boolean(whatsAppRes && whatsAppRes.ok !== false && !whatsAppRes.skipped);
       const deliveredBySms = Boolean(smsRes && smsRes.ok !== false && !smsRes.skipped);
       const deliveredByEmail = Boolean(emailRes && emailRes.ok !== false && !emailRes.skipped);
-      const delivered = deliveredBySms || deliveredByEmail;
+      const delivered = deliveredByWhatsApp || deliveredBySms || deliveredByEmail;
 
       if (!delivered) {
+        const waErr = whatsAppRes && whatsAppRes.ok === false ? whatsAppRes.error : null;
         const smsErr = smsRes && smsRes.ok === false ? smsRes.error : null;
         const emailErr = emailRes && emailRes.ok === false ? emailRes.error : null;
-        const primaryErr = email ? emailErr || smsErr : smsErr || emailErr;
+        const primaryErr = waErr || smsErr || emailErr || "Failed to send OTP";
         const hint = email
           ? "Please retry after a moment."
-          : "Provide an email (optional) or configure SMS provider and retry.";
+          : "Provide an email (optional) or verify WhatsApp/SMS configuration and retry.";
 
         return reply.code(502).send({
-          message: primaryErr || "Failed to send OTP",
+          message: primaryErr,
           hint,
         });
       }
@@ -65,9 +76,10 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
         phone,
         expiresAt: otpRes.expiresAt,
       };
-      if (devOtp) payload.devOtp = devOtp;
+      if (devOtp && process.env.NODE_ENV !== "production") payload.devOtp = devOtp;
       if (process.env.NODE_ENV !== "production") {
         payload.delivery = {
+          whatsApp: whatsAppRes ? { ok: whatsAppRes.ok !== false, simulated: Boolean(whatsAppRes.simulated) } : null,
           sms: smsRes ? { ok: smsRes.ok !== false, simulated: Boolean(smsRes.simulated) } : null,
           email: emailRes ? { ok: emailRes.ok !== false, simulated: Boolean(emailRes.simulated), skipped: Boolean(emailRes.skipped) } : null,
         };

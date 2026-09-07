@@ -15,11 +15,21 @@ import { requireStaffJwt } from "./services/staffAuthService.js";
 import { getStorageInfo } from "./services/storageService.js";
 
 const nodeEnv = String(process.env.NODE_ENV || "development").trim() || "development";
-const envFileName = nodeEnv === "production" ? ".env.production" : ".env";
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const envPath = path.join(backendRoot, envFileName);
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
+
+// Load environment files in cascading order (.env.nodeEnv.local -> .env.nodeEnv -> .env.local -> .env)
+const envFiles = [
+  `.env.${nodeEnv}.local`,
+  `.env.${nodeEnv}`,
+  ".env.local",
+  ".env",
+];
+
+for (const file of envFiles) {
+  const p = path.join(backendRoot, file);
+  if (fs.existsSync(p)) {
+    dotenv.config({ path: p });
+  }
 }
 
 const app = Fastify({ logger: true });

@@ -1,6 +1,7 @@
 import { normalizePhone } from "../services/phoneService.js";
 import { requestAuthOtp, verifyAuthOtp } from "../services/authOtpService.js";
 import { sendSmsOtp } from "../services/smsService.js";
+import { sendWhatsAppOtp } from "../services/msg91WhatsAppService.js";
 import { upsertCustomerAccount } from "../services/customerProfileService.js";
 import { extractVerifiedIdentifier, verifyMsg91AccessToken } from "../services/msg91OtpWidgetService.js";
 import {
@@ -60,13 +61,24 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions }) 
       const devOtp = otpRes.devOtp || "";
       const otpToSend = otpRes.code;
 
-      const smsRes = await sendSmsOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt });
+      const [whatsAppRes, smsRes] = await Promise.all([
+        sendWhatsAppOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }),
+        sendSmsOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }),
+      ]);
+
       if (process.env.NODE_ENV === "production") {
         // eslint-disable-next-line no-console
-        console.log("[authOtpController] otp_delivery", { phone, actorType, smsRes });
+        console.log("[authOtpController] otp_delivery", { phone, actorType, whatsAppRes: whatsAppRes ? { ok: whatsAppRes.ok !== false, status: whatsAppRes.status } : null, smsRes: smsRes ? { ok: smsRes.ok !== false } : null });
       }
-      if (smsRes && smsRes.ok === false) {
-        return reply.code(502).send({ message: smsRes.error || "Failed to send OTP SMS" });
+
+      const deliveredByWhatsApp = Boolean(whatsAppRes && whatsAppRes.ok !== false && !whatsAppRes.skipped);
+      const deliveredBySms = Boolean(smsRes && smsRes.ok !== false && !smsRes.skipped);
+      const delivered = deliveredByWhatsApp || deliveredBySms;
+
+      if (!delivered) {
+        const waErr = whatsAppRes && whatsAppRes.ok === false ? whatsAppRes.error : null;
+        const smsErr = smsRes && smsRes.ok === false ? smsRes.error : null;
+        return reply.code(502).send({ message: waErr || smsErr || "Failed to send OTP" });
       }
 
       const payload = {
@@ -75,9 +87,10 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions }) 
         actorType,
         expiresAt: otpRes.expiresAt,
       };
-      if (devOtp) payload.devOtp = devOtp;
+      if (devOtp && process.env.NODE_ENV !== "production") payload.devOtp = devOtp;
       if (process.env.NODE_ENV !== "production") {
         payload.delivery = {
+          whatsApp: whatsAppRes ? { ok: whatsAppRes.ok !== false, simulated: Boolean(whatsAppRes.simulated) } : null,
           sms: smsRes ? { ok: smsRes.ok !== false, simulated: Boolean(smsRes.simulated) } : null,
         };
       }

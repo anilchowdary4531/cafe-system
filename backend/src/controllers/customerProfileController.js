@@ -3,6 +3,7 @@ import { requireCustomerPhoneFromJwt, getCustomerAccountByPhone, upsertCustomerA
 import { requestOtp, verifyOtp } from "../services/otpService.js";
 import { sendEmailOtp } from "../services/emailService.js";
 import { sendSmsOtp } from "../services/smsService.js";
+import { sendWhatsAppOtp } from "../services/msg91WhatsAppService.js";
 
 export const buildCustomerProfileController = ({ prisma }) => {
   const getProfile = async (req, reply) => {
@@ -161,6 +162,7 @@ export const buildCustomerProfileController = ({ prisma }) => {
       const email = account.email || "";
 
       await Promise.all([
+        sendWhatsAppOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }),
         sendSmsOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }),
         email ? sendEmailOtp({ email, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
       ]);
@@ -236,6 +238,7 @@ export const buildCustomerProfileController = ({ prisma }) => {
       const email = account.email || "";
 
       await Promise.all([
+        sendWhatsAppOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }),
         sendSmsOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }),
         email ? sendEmailOtp({ email, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
       ]);
