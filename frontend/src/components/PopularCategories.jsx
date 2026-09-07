@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Cake,
+    ChevronLeft,
+    ChevronRight,
     Coffee,
     Flame,
     GlassWater,
@@ -86,6 +88,10 @@ export default function PopularCategories({
     onSelectCategory,
     className = "",
 }) {
+    const scrollRef = useRef(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(true);
+
     const { data: globalCatData } = useCachedGet("/global-categories", {
         ttlMs: 15_000,
         staleMs: 60_000,
@@ -149,6 +155,31 @@ export default function PopularCategories({
         ];
     }, [globalCategories, items]);
 
+    const checkScroll = useCallback(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        setCanScrollLeft(el.scrollLeft > 5);
+        setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 5);
+    }, []);
+
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        checkScroll();
+        el.addEventListener("scroll", checkScroll, { passive: true });
+        window.addEventListener("resize", checkScroll);
+        return () => {
+            el.removeEventListener("scroll", checkScroll);
+            window.removeEventListener("resize", checkScroll);
+        };
+    }, [checkScroll, categoriesList]);
+
+    const handleScroll = (direction) => {
+        if (!scrollRef.current) return;
+        const scrollAmount = direction === "left" ? -280 : 280;
+        scrollRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    };
+
     return (
         <div className={`space-y-3 ${className}`}>
             <div className="flex items-center justify-between">
@@ -166,68 +197,96 @@ export default function PopularCategories({
                 ) : null}
             </div>
 
-            <div className="snap-x snap-mandatory overflow-x-auto pb-2 pt-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex w-max gap-3.5 sm:gap-4">
-                    {categoriesList.map((cat) => {
-                        const isAll = cat.name.toLowerCase() === "all";
-                        const isActive = isAll
-                            ? !selectedCategory
-                            : selectedCategory.toLowerCase() === cat.name.toLowerCase();
+            <div className="relative group/categories">
+                {canScrollLeft && (
+                    <button
+                        type="button"
+                        onClick={() => handleScroll("left")}
+                        aria-label="Scroll categories left"
+                        className="absolute -left-2 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white shadow-xl backdrop-blur-md transition duration-200 hover:scale-110 hover:bg-black/90 active:scale-95 sm:-left-3 sm:h-9 sm:w-9"
+                    >
+                        <ChevronLeft size={18} />
+                    </button>
+                )}
 
-                        const imgUrl = resolveImageUrl(cat.imageUrl) || getCategoryFallbackImage(cat.name);
+                <div
+                    ref={scrollRef}
+                    className="snap-x snap-mandatory overflow-x-auto scroll-smooth pb-2 pt-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
+                    <div className="flex w-max gap-3.5 sm:gap-4">
+                        {categoriesList.map((cat) => {
+                            const isAll = cat.name.toLowerCase() === "all";
+                            const isActive = isAll
+                                ? !selectedCategory
+                                : selectedCategory.toLowerCase() === cat.name.toLowerCase();
 
-                        return (
-                            <button
-                                key={cat.name}
-                                type="button"
-                                onClick={() => {
-                                    if (isAll) {
-                                        onSelectCategory?.("");
-                                    } else {
-                                        onSelectCategory?.(isActive ? "" : cat.name);
-                                    }
-                                }}
-                                className="group flex w-[64px] shrink-0 snap-start flex-col items-center gap-1.5 focus:outline-none sm:w-[72px]"
-                            >
-                                <div
-                                    className={`relative h-[56px] w-[56px] rounded-full p-[2.5px] transition duration-300 sm:h-[64px] sm:w-[64px] ${isActive
-                                            ? "bg-[linear-gradient(135deg,#ff8a1f_0%,#d97706_100%)] shadow-lg shadow-[#ff8a1f]/35 scale-105"
-                                            : "border border-[var(--app-border)] bg-white/10 hover:border-[#ff8a1f]/50 hover:scale-105"
-                                        }`}
+                            const imgUrl = resolveImageUrl(cat.imageUrl) || getCategoryFallbackImage(cat.name);
+
+                            return (
+                                <button
+                                    key={cat.name}
+                                    type="button"
+                                    onClick={() => {
+                                        if (isAll) {
+                                            onSelectCategory?.("");
+                                        } else {
+                                            onSelectCategory?.(isActive ? "" : cat.name);
+                                        }
+                                    }}
+                                    className="group flex w-[64px] shrink-0 snap-start flex-col items-center gap-1.5 focus:outline-none sm:w-[72px]"
                                 >
-                                    <div className="relative h-full w-full overflow-hidden rounded-full bg-zinc-900">
-                                        <img
-                                            src={imgUrl}
-                                            alt={cat.name}
-                                            className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
-                                            loading="lazy"
-                                            onError={(e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = getCategoryFallbackImage(cat.name);
-                                            }}
-                                        />
-                                        {isAll ? (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[1px]">
-                                                <span className="text-[11px] font-black uppercase tracking-wider text-white">
-                                                    ALL
-                                                </span>
-                                            </div>
-                                        ) : null}
+                                    <div
+                                        className={`relative h-[56px] w-[56px] rounded-full p-[2.5px] transition duration-300 sm:h-[64px] sm:w-[64px] ${isActive
+                                                ? "bg-[linear-gradient(135deg,#ff8a1f_0%,#d97706_100%)] shadow-lg shadow-[#ff8a1f]/35 scale-105"
+                                                : "border border-[var(--app-border)] bg-white/10 hover:border-[#ff8a1f]/50 hover:scale-105"
+                                            }`}
+                                    >
+                                        <div className="relative h-full w-full overflow-hidden rounded-full bg-zinc-900">
+                                            <img
+                                                src={imgUrl}
+                                                alt={cat.name}
+                                                className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
+                                                loading="lazy"
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = getCategoryFallbackImage(cat.name);
+                                                }}
+                                            />
+                                            {isAll ? (
+                                                <div className="absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[1px]">
+                                                    <span className="text-[11px] font-black uppercase tracking-wider text-white">
+                                                        ALL
+                                                    </span>
+                                                </div>
+                                            ) : null}
+                                        </div>
                                     </div>
-                                </div>
-                                <span
-                                    className={`truncate text-center text-[10.5px] font-bold capitalize sm:text-[11.5px] max-w-[64px] sm:max-w-[72px] ${isActive
-                                            ? "text-[color:var(--app-accent)]"
-                                            : "text-[color:var(--app-muted)] group-hover:text-[color:var(--app-text)]"
-                                        }`}
-                                >
-                                    {cat.name}
-                                </span>
-                            </button>
-                        );
-                    })}
+                                    <span
+                                        className={`truncate text-center text-[10.5px] font-bold capitalize sm:text-[11.5px] max-w-[64px] sm:max-w-[72px] ${isActive
+                                                ? "text-[color:var(--app-accent)]"
+                                                : "text-[color:var(--app-muted)] group-hover:text-[color:var(--app-text)]"
+                                            }`}
+                                    >
+                                        {cat.name}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
+
+                {canScrollRight && (
+                    <button
+                        type="button"
+                        onClick={() => handleScroll("right")}
+                        aria-label="Scroll categories right"
+                        className="absolute -right-2 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white shadow-xl backdrop-blur-md transition duration-200 hover:scale-110 hover:bg-black/90 active:scale-95 sm:-right-3 sm:h-9 sm:w-9"
+                    >
+                        <ChevronRight size={18} />
+                    </button>
+                )}
             </div>
         </div>
     );
 }
+

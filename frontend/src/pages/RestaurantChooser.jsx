@@ -1,9 +1,10 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
     BarChart3,
     ChefHat,
     ChevronDown,
+    ChevronLeft,
     ChevronRight,
     ChevronUp,
     Dot,
@@ -421,62 +422,18 @@ export default function RestaurantChooser() {
                                 ) : null}
 
                                 <div className="space-y-2.5">
-                                    <div className="space-y-3">
+                                    <div className="space-y-4">
                                         {itemSections.map((section) => (
-                                            <div key={section.key} className="space-y-1">
-                                                <div className="flex items-end justify-between gap-1">
-                                                    <div>
-                                                        <p className="theme-muted text-[9px] font-semibold uppercase tracking-[0.2em] sm:text-[10px]">
-                                                            {section.label}
-                                                        </p>
-                                                        <h3 className="mt-0.5 text-[12px] font-bold sm:text-[13px]">
-                                                            {section.items.length} {section.items.length === 1 ? "item" : "items"}
-                                                        </h3>
-                                                    </div>
-                                                </div>
-
-                                                <div className="snap-x snap-mandatory overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                                    <div className="flex w-max gap-2 pr-1 sm:gap-2.5">
-                                                        {section.items.map((item) => {
-                                                            const cartItem = cart.find((c) => c.id === item.id);
-                                                            const qty = cartItem ? cartItem.quantity : 0;
-                                                            return (
-                                                                <SearchItemCard
-                                                                    key={item.id}
-                                                                    item={item}
-                                                                    selected={selectedItem?.id === item.id}
-                                                                    quantity={qty}
-                                                                    onToggleDetails={(event) => {
-                                                                        const isSame = selectedItem?.id === item.id;
-                                                                        if (isSame) {
-                                                                            closeItemDetails();
-                                                                            return;
-                                                                        }
-
-                                                                        const rect = event?.currentTarget?.getBoundingClientRect?.();
-                                                                        const popupWidth = 250;
-                                                                        const popupHeight = 215;
-                                                                        const gap = 10;
-                                                                        const viewportWidth = window.innerWidth;
-                                                                        const viewportHeight = window.innerHeight;
-                                                                        const left = rect
-                                                                            ? Math.max(12, Math.min(rect.left, viewportWidth - popupWidth - 12))
-                                                                            : Math.max(12, (viewportWidth - popupWidth) / 2);
-                                                                        let top = rect ? rect.bottom + gap : Math.max(12, (viewportHeight - popupHeight) / 2);
-                                                                        if (top + popupHeight > viewportHeight - 12) {
-                                                                            top = rect ? Math.max(12, rect.top - popupHeight - gap) : top;
-                                                                        }
-
-                                                                        setSelectedItem(item);
-                                                                        setPopupAnchor({ left, top });
-                                                                    }}
-                                                                    onClick={() => addItemToCart(item)}
-                                                                />
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            </div>
+                                            <ItemSectionRow
+                                                key={section.key}
+                                                section={section}
+                                                cart={cart}
+                                                selectedItem={selectedItem}
+                                                closeItemDetails={closeItemDetails}
+                                                setSelectedItem={setSelectedItem}
+                                                setPopupAnchor={setPopupAnchor}
+                                                addItemToCart={addItemToCart}
+                                            />
                                         ))}
                                     </div>
                                 </div>
@@ -515,6 +472,129 @@ export default function RestaurantChooser() {
             />
 
             <Footer />
+        </div>
+    );
+}
+
+function ItemSectionRow({
+    section,
+    selectedItem,
+    cart,
+    closeItemDetails,
+    setSelectedItem,
+    setPopupAnchor,
+    addItemToCart,
+}) {
+    const scrollRef = useRef(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(true);
+
+    const checkScroll = useCallback(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        setCanScrollLeft(el.scrollLeft > 5);
+        setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 5);
+    }, []);
+
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        checkScroll();
+        el.addEventListener("scroll", checkScroll, { passive: true });
+        window.addEventListener("resize", checkScroll);
+        return () => {
+            el.removeEventListener("scroll", checkScroll);
+            window.removeEventListener("resize", checkScroll);
+        };
+    }, [checkScroll, section.items]);
+
+    const handleScroll = (direction) => {
+        if (!scrollRef.current) return;
+        const scrollAmount = direction === "left" ? -320 : 320;
+        scrollRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    };
+
+    return (
+        <div className="space-y-1">
+            <div className="flex items-end justify-between gap-1">
+                <div>
+                    <p className="theme-muted text-[9px] font-semibold uppercase tracking-[0.2em] sm:text-[10px]">
+                        {section.label}
+                    </p>
+                    <h3 className="mt-0.5 text-[12px] font-bold sm:text-[13px]">
+                        {section.items.length} {section.items.length === 1 ? "item" : "items"}
+                    </h3>
+                </div>
+            </div>
+
+            <div className="relative group/section-row">
+                {canScrollLeft && (
+                    <button
+                        type="button"
+                        onClick={() => handleScroll("left")}
+                        aria-label={`Scroll ${section.label} left`}
+                        className="absolute -left-2 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white shadow-xl backdrop-blur-md transition duration-200 hover:scale-110 hover:bg-black/90 active:scale-95 sm:-left-3 sm:h-9 sm:w-9"
+                    >
+                        <ChevronLeft size={18} />
+                    </button>
+                )}
+
+                <div
+                    ref={scrollRef}
+                    className="snap-x snap-mandatory overflow-x-auto scroll-smooth pb-1.5 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
+                    <div className="flex w-max gap-2 pr-1 sm:gap-2.5">
+                        {section.items.map((item) => {
+                            const cartItem = cart.find((c) => c.id === item.id);
+                            const qty = cartItem ? cartItem.quantity : 0;
+                            return (
+                                <SearchItemCard
+                                    key={item.id}
+                                    item={item}
+                                    selected={selectedItem?.id === item.id}
+                                    quantity={qty}
+                                    onToggleDetails={(event) => {
+                                        const isSame = selectedItem?.id === item.id;
+                                        if (isSame) {
+                                            closeItemDetails();
+                                            return;
+                                        }
+
+                                        const rect = event?.currentTarget?.getBoundingClientRect?.();
+                                        const popupWidth = 250;
+                                        const popupHeight = 215;
+                                        const gap = 10;
+                                        const viewportWidth = window.innerWidth;
+                                        const viewportHeight = window.innerHeight;
+                                        const left = rect
+                                            ? Math.max(12, Math.min(rect.left, viewportWidth - popupWidth - 12))
+                                            : Math.max(12, (viewportWidth - popupWidth) / 2);
+                                        let top = rect ? rect.bottom + gap : Math.max(12, (viewportHeight - popupHeight) / 2);
+                                        if (top + popupHeight > viewportHeight - 12) {
+                                            top = rect ? Math.max(12, rect.top - popupHeight - gap) : top;
+                                        }
+
+                                        setSelectedItem(item);
+                                        setPopupAnchor({ left, top });
+                                    }}
+                                    onClick={() => addItemToCart(item)}
+                                />
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {canScrollRight && (
+                    <button
+                        type="button"
+                        onClick={() => handleScroll("right")}
+                        aria-label={`Scroll ${section.label} right`}
+                        className="absolute -right-2 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white shadow-xl backdrop-blur-md transition duration-200 hover:scale-110 hover:bg-black/90 active:scale-95 sm:-right-3 sm:h-9 sm:w-9"
+                    >
+                        <ChevronRight size={18} />
+                    </button>
+                )}
+            </div>
         </div>
     );
 }
