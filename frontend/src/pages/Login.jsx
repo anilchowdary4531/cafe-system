@@ -356,24 +356,27 @@ export default function Login() {
     };
 
     const handleCustomerRequestOtp = async () => {
-        const phone = String(customerPhone || "").trim();
-        const emailVal = String(customerEmail || "").trim();
-        if (!phone && !emailVal) {
+        const rawInput = String(customerPhone || customerEmail || "").trim();
+        if (!rawInput) {
             setCustomerError("Phone number or Email address is required.");
             return;
         }
 
+        const isEmail = rawInput.includes("@");
+        const phoneParam = isEmail ? "" : rawInput;
+        const emailParam = isEmail ? rawInput : "";
+
         try {
             setCustomerLoading(true);
             setCustomerError("");
-            const res = await api.post("/customer/send-otp", { phone, email: emailVal });
+            const res = await api.post("/customer/send-otp", { phone: phoneParam, email: emailParam });
             setCustomerStep("otp");
             setCustomerOtp("");
             setCustomerOtpExpiresAt(res.data?.expiresAt || null);
             setCustomerDevOtp(res.data?.devOtp || "");
             setDeliveryInfo(res.data?.delivery || null);
-            setResolvedPhone(res.data?.phone || phone);
-            setResolvedEmail(res.data?.email || emailVal);
+            setResolvedPhone(res.data?.phone || phoneParam);
+            setResolvedEmail(res.data?.email || emailParam);
             setResendTimer(60);
         } catch (err) {
             setCustomerError(err.response?.data?.message || err.message || "Failed to send OTP");
@@ -1173,28 +1176,23 @@ export default function Login() {
                                         {customerStep === "phone" ? (
                                             <>
                                                 <div>
-                                                    <label className="theme-muted mb-2 block text-sm font-medium">{t("phoneNumber")} *</label>
+                                                    <label className="theme-muted mb-2 block text-sm font-medium">Phone Number or Email Address *</label>
                                                     <div className="relative">
-                                                        <Phone size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                        <User size={18} className="theme-muted absolute left-4 top-3.5" />
                                                         <input
-                                                            type="tel"
-                                                            placeholder={t("placeholderPhone")}
-                                                            value={customerPhone}
-                                                            onChange={(e) => setCustomerPhone(e.target.value)}
-                                                            className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div>
-                                                    <label className="theme-muted mb-2 block text-sm font-medium">{t("emailAddress")} (Optional)</label>
-                                                    <div className="relative">
-                                                        <Mail size={18} className="theme-muted absolute left-4 top-3.5" />
-                                                        <input
-                                                            type="email"
-                                                            placeholder={t("placeholderEmail")}
-                                                            value={customerEmail}
-                                                            onChange={(e) => setCustomerEmail(e.target.value)}
+                                                            type="text"
+                                                            placeholder="Enter phone number or email address"
+                                                            value={customerPhone || customerEmail}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                if (val.includes("@")) {
+                                                                    setCustomerEmail(val);
+                                                                    setCustomerPhone("");
+                                                                } else {
+                                                                    setCustomerPhone(val);
+                                                                    setCustomerEmail("");
+                                                                }
+                                                            }}
                                                             className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
                                                         />
                                                     </div>

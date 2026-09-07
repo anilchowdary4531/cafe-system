@@ -1188,27 +1188,23 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                     <div className="order-3 space-y-3">
                                     <div className="grid gap-3 md:grid-cols-2">
                                         {!customerToken && (
-                                            <div>
-                                                <label className="theme-muted mb-2 block text-[13px] sm:text-sm">Phone Number</label>
+                                            <div className="md:col-span-2">
+                                                <label className="theme-muted mb-2 block text-[13px] sm:text-sm">Phone Number or Email Address *</label>
                                                 <input
-                                                    value={phone}
-                                                    onChange={(e) => setPhone(e.target.value)}
-                                                    placeholder="Enter your phone number"
+                                                    value={phone || email}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val.includes("@")) {
+                                                            setEmail(val);
+                                                            setPhone("");
+                                                        } else {
+                                                            setPhone(val);
+                                                            setEmail("");
+                                                        }
+                                                    }}
+                                                    placeholder="Enter phone number or email address"
                                                     className="theme-input w-full rounded-2xl px-3 py-2.5 text-[13px] outline-none sm:px-4 sm:py-3 sm:text-sm"
                                                 />
-                                            </div>
-                                        )}
-
-                                        {!customerToken && (
-                                            <div>
-                                                <label className="theme-muted mb-2 block text-[13px] sm:text-sm">Email (optional)</label>
-                                                <input
-                                                    value={email}
-                                                    onChange={(e) => setEmail(e.target.value)}
-                                                    placeholder={customer?.email || "you@example.com"}
-                                                    className="theme-input w-full rounded-2xl px-3 py-2.5 text-[13px] outline-none sm:px-4 sm:py-3 sm:text-sm"
-                                                />
-                                                <p className="theme-muted mt-2 hidden text-[11px] sm:block sm:text-xs">If provided, we'll send the OTP to email too.</p>
                                             </div>
                                         )}
 
