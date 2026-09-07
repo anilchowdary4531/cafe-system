@@ -1,7 +1,92 @@
 import bcrypt from "bcryptjs";
 import { normalizePhone, getPhoneVariants, isValidPhone, isValidMobilePhone, isValidName } from "../services/phoneService.js";
+import { requestOtp, verifyOtp } from "../services/otpService.js";
+import { sendWhatsAppOtp } from "../services/msg91WhatsAppService.js";
+import { sendSmsOtp } from "../services/smsService.js";
+import { sendEmailOtp } from "../services/emailService.js";
 
 export const buildCustomerAuthController = ({ prisma, app }) => {
+  const requestSignupOtp = async (req, reply) => {
+    try {
+      const body = req.body || {};
+      const username = String(body.username || body.a || "").trim().toLowerCase();
+      const password = String(body.password || body.c || body.b || "").trim();
+      const name = String(body.name || body.d || "").trim();
+      const email = String(body.email || (String(body.phone || body.b || "").includes("@") ? (body.phone || body.b) : "") || "").trim().toLowerCase();
+
+      const rawPhone = String(body.phone || body.b || body.identifier || "").trim();
+      const phone = isValidPhone(rawPhone) ? normalizePhone(rawPhone) : null;
+
+      if (!username) return reply.code(400).send({ message: "Username is required" });
+      if (username.length < 3) return reply.code(400).send({ message: "Username must be at least 3 characters" });
+      if (!password || password.length < 6) return reply.code(400).send({ message: "Password must be at least 6 characters" });
+      if (!phone && !email) return reply.code(400).send({ message: "Phone number or Email is required" });
+
+      // Duplicate checks
+      if (email) {
+        const existingEmailAccount = await prisma.customerAccount.findFirst({
+          where: { email: email.toLowerCase() },
+        });
+        if (existingEmailAccount && existingEmailAccount.password) {
+          return reply.code(400).send({ message: "An account with this email address already exists. Please login instead." });
+        }
+      }
+
+      if (phone) {
+        const phoneVariants = getPhoneVariants(phone);
+        const existingPhoneAccount = await prisma.customerAccount.findFirst({
+          where: {
+            OR: [
+              { phone },
+              ...(phoneVariants.length > 0 ? [{ phone: { in: phoneVariants } }] : []),
+            ],
+          },
+        });
+        if (existingPhoneAccount && existingPhoneAccount.password) {
+          return reply.code(400).send({ message: "An account with this phone number already exists. Please login instead." });
+        }
+      }
+
+      if (username) {
+        const existingUsername = await prisma.customerAccount.findFirst({
+          where: { username: { equals: username, mode: "insensitive" } },
+        });
+        if (existingUsername && existingUsername.password) {
+          return reply.code(400).send({ message: "This username is already taken. Please choose another username or log in." });
+        }
+      }
+
+      const otpRes = await requestOtp({ prisma, phone: phone || email });
+      if (!otpRes.ok) return reply.code(otpRes.status).send(otpRes.payload);
+
+      const devOtp = otpRes.devOtp || "";
+      const otpToSend = otpRes.code;
+
+      const [whatsAppRes, smsRes, emailRes] = await Promise.all([
+        phone ? sendWhatsAppOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
+        phone ? sendSmsOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
+        email ? sendEmailOtp({ email, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
+      ]);
+
+      const payload = {
+        message: "OTP sent to your WhatsApp and email.",
+        phone: phone || null,
+        email: email || null,
+        expiresAt: otpRes.expiresAt,
+        delivery: {
+          whatsApp: whatsAppRes ? { ok: whatsAppRes.ok !== false, simulated: Boolean(whatsAppRes.simulated) } : null,
+          sms: smsRes ? { ok: smsRes.ok !== false, simulated: Boolean(smsRes.simulated) } : null,
+          email: emailRes ? { ok: emailRes.ok !== false, simulated: Boolean(emailRes.simulated), skipped: Boolean(emailRes.skipped) } : null,
+        },
+      };
+      if (devOtp && process.env.NODE_ENV !== "production") payload.devOtp = devOtp;
+      return payload;
+    } catch (err) {
+      console.error("[requestSignupOtp] Error:", err);
+      return reply.code(500).send({ message: "Failed to send signup OTP" });
+    }
+  };
+
   const registerCustomer = async (req, reply) => {
     console.log("========== AUTH REQUEST ==========");
     console.log("URL:", req.url);
@@ -15,27 +100,24 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
       const password = String(body.password || body.c || body.b || "").trim();
       const name = String(body.name || body.d || "").trim();
       const email = String(body.email || (String(body.phone || body.b || "").includes("@") ? (body.phone || body.b) : "") || "").trim().toLowerCase();
+      const otp = String(body.otp || "").trim();
 
       const rawPhone = String(body.phone || body.b || body.identifier || "").trim();
       const phone = isValidPhone(rawPhone) ? normalizePhone(rawPhone) : null;
 
-      console.log("DEBUG [registerCustomer] values:", { username, passwordLength: password.length, name, email, rawPhone, phone });
+      console.log("DEBUG [registerCustomer] values:", { username, passwordLength: password.length, name, email, rawPhone, phone, hasOtp: Boolean(otp) });
 
-      if (!username) {
-        console.log("FAILED HERE -> username missing");
-        return reply.code(400).send({ message: "Username is required" });
-      }
-      if (username.length < 3) {
-        console.log("FAILED HERE -> username too short", username);
-        return reply.code(400).send({ message: "Username must be at least 3 characters" });
-      }
-      if (!password || password.length < 6) {
-        console.log("FAILED HERE -> password invalid/too short");
-        return reply.code(400).send({ message: "Password must be at least 6 characters" });
-      }
-      if (!phone && !email) {
-        console.log("FAILED HERE -> phone/email missing");
-        return reply.code(400).send({ message: "Identifier (Phone or Email) is required" });
+      if (!username) return reply.code(400).send({ message: "Username is required" });
+      if (username.length < 3) return reply.code(400).send({ message: "Username must be at least 3 characters" });
+      if (!password || password.length < 6) return reply.code(400).send({ message: "Password must be at least 6 characters" });
+      if (!phone && !email) return reply.code(400).send({ message: "Identifier (Phone or Email) is required" });
+
+      // If OTP was sent during signup, verify it before creating account
+      if (otp) {
+        const verifyRes = await verifyOtp({ prisma, phone: phone || email, otp });
+        if (!verifyRes.ok) {
+          return reply.code(verifyRes.status || 400).send(verifyRes.payload || { message: "Invalid or expired OTP" });
+        }
       }
 
       // 1. Strict duplicate email check
@@ -83,7 +165,7 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
       const existingAccount = await prisma.customerAccount.findFirst({
         where: {
           OR: [
-            { phone },
+            ...(phone ? [{ phone }] : []),
             ...(email ? [{ email: email.toLowerCase() }] : []),
           ],
         },
@@ -120,7 +202,7 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
       const token = app.jwt.sign(
         {
           type: "customer",
-          phone: account.phone,
+          phone: account.phone || account.email,
           customerAccountId: account.id,
         },
         { expiresIn: process.env.CUSTOMER_JWT_EXPIRES_IN || "30d" }
@@ -135,11 +217,129 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
       };
     } catch (err) {
       console.error("[registerCustomer] Error:", err);
-      // Temporarily return the actual error message to diagnose the 500 error
       return reply.code(500).send({
         message: `Backend Error: ${err.message}`,
-        detail: "If this mentions a missing column, you MUST run 'npx prisma db push' on your server."
       });
+    }
+  };
+
+  const requestForgotPasswordOtp = async (req, reply) => {
+    try {
+      const body = req.body || {};
+      const rawIdentifier = String(body.identifier || body.phone || body.email || body.username || "").trim();
+      if (!rawIdentifier) {
+        return reply.code(400).send({ message: "Phone number, email, or username is required" });
+      }
+
+      const inputLower = rawIdentifier.toLowerCase();
+      const phoneVariants = getPhoneVariants(rawIdentifier);
+
+      const account = await prisma.customerAccount.findFirst({
+        where: {
+          OR: [
+            { username: { equals: rawIdentifier, mode: "insensitive" } },
+            { email: { equals: inputLower, mode: "insensitive" } },
+            { phone: rawIdentifier },
+            ...(phoneVariants.length > 0 ? [{ phone: { in: phoneVariants } }] : []),
+          ],
+        },
+      });
+
+      if (!account) {
+        return reply.code(404).send({ message: "No account found with this phone number, email, or username." });
+      }
+
+      const phone = account.phone;
+      const email = account.email;
+
+      if (!phone && !email) {
+        return reply.code(400).send({ message: "No phone or email contact method registered for this account." });
+      }
+
+      const targetIdentifier = phone || email;
+      const otpRes = await requestOtp({ prisma, phone: targetIdentifier });
+      if (!otpRes.ok) return reply.code(otpRes.status).send(otpRes.payload);
+
+      const devOtp = otpRes.devOtp || "";
+      const otpToSend = otpRes.code;
+
+      const [whatsAppRes, smsRes, emailRes] = await Promise.all([
+        phone ? sendWhatsAppOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
+        phone ? sendSmsOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
+        email ? sendEmailOtp({ email, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
+      ]);
+
+      const payload = {
+        message: "OTP sent to your WhatsApp and email.",
+        phone: phone || null,
+        email: email || null,
+        expiresAt: otpRes.expiresAt,
+        delivery: {
+          whatsApp: whatsAppRes ? { ok: whatsAppRes.ok !== false, simulated: Boolean(whatsAppRes.simulated) } : null,
+          sms: smsRes ? { ok: smsRes.ok !== false, simulated: Boolean(smsRes.simulated) } : null,
+          email: emailRes ? { ok: emailRes.ok !== false, simulated: Boolean(emailRes.simulated), skipped: Boolean(emailRes.skipped) } : null,
+        },
+      };
+      if (devOtp && process.env.NODE_ENV !== "production") payload.devOtp = devOtp;
+      return payload;
+    } catch (err) {
+      console.error("[requestForgotPasswordOtp] Error:", err);
+      return reply.code(500).send({ message: "Failed to send password reset OTP" });
+    }
+  };
+
+  const resetPasswordWithOtp = async (req, reply) => {
+    try {
+      const body = req.body || {};
+      const rawIdentifier = String(body.identifier || body.phone || body.email || body.username || "").trim();
+      const otp = String(body.otp || "").trim();
+      const newPassword = String(body.newPassword || body.password || "").trim();
+
+      if (!rawIdentifier || !otp || !newPassword) {
+        return reply.code(400).send({ message: "Identifier, OTP, and new password are required." });
+      }
+
+      if (newPassword.length < 6) {
+        return reply.code(400).send({ message: "New password must be at least 6 characters." });
+      }
+
+      const inputLower = rawIdentifier.toLowerCase();
+      const phoneVariants = getPhoneVariants(rawIdentifier);
+
+      const account = await prisma.customerAccount.findFirst({
+        where: {
+          OR: [
+            { username: { equals: rawIdentifier, mode: "insensitive" } },
+            { email: { equals: inputLower, mode: "insensitive" } },
+            { phone: rawIdentifier },
+            ...(phoneVariants.length > 0 ? [{ phone: { in: phoneVariants } }] : []),
+          ],
+        },
+      });
+
+      if (!account) {
+        return reply.code(404).send({ message: "No account found with this phone number, email, or username." });
+      }
+
+      const targetIdentifier = account.phone || account.email;
+      const verifyRes = await verifyOtp({ prisma, phone: targetIdentifier, otp });
+      if (!verifyRes.ok) {
+        return reply.code(verifyRes.status || 400).send(verifyRes.payload || { message: "Invalid or expired OTP" });
+      }
+
+      const hashedPassword = bcrypt.hashSync(newPassword, 10);
+      await prisma.customerAccount.update({
+        where: { id: account.id },
+        data: { password: hashedPassword },
+      });
+
+      return {
+        success: true,
+        message: "Password reset successful. Please log in with your new password.",
+      };
+    } catch (err) {
+      console.error("[resetPasswordWithOtp] Error:", err);
+      return reply.code(500).send({ message: "Failed to reset password" });
     }
   };
 
@@ -395,7 +595,10 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
   };
 
   return {
+    requestSignupOtp,
     registerCustomer,
+    requestForgotPasswordOtp,
+    resetPasswordWithOtp,
     loginWithPassword,
     googleLogin,
   };

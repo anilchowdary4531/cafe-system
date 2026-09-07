@@ -17,7 +17,25 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
     try {
       const body = req.body || {};
       let phone = normalizePhone(body.phone || "");
-      const email = String(body.email || "").trim().toLowerCase();
+      let email = String(body.email || "").trim().toLowerCase();
+
+      // If phone or email is provided, try resolving the registered customer account to send OTP to BOTH channels
+      let account = null;
+      if (phone || email) {
+        account = await prisma.customerAccount.findFirst({
+          where: {
+            OR: [
+              ...(phone ? [{ phone }, { username: phone }] : []),
+              ...(email ? [{ email: email.toLowerCase() }] : []),
+            ],
+          },
+        });
+
+        if (account) {
+          if (!phone && account.phone) phone = account.phone;
+          if (!email && account.email) email = account.email.toLowerCase();
+        }
+      }
 
       // If no phone but email is provided, we use email as the identifier
       if (!phone && email) {
@@ -33,7 +51,7 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
       const otpToSend = otpRes.code;
       const isEmailOnly = phone.includes("@");
 
-      // Send OTP to available channels (WhatsApp, SMS, Email).
+      // Send ONE OTP to available channels (WhatsApp, SMS, Email).
       const [whatsAppRes, smsRes, emailRes] = await Promise.all([
         !isEmailOnly ? sendWhatsAppOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
         !isEmailOnly ? sendSmsOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
@@ -44,9 +62,9 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
         // eslint-disable-next-line no-console
         console.log("[customerOtpController] otp_delivery", {
           phone,
+          emailProvided: Boolean(email),
           whatsAppRes: whatsAppRes ? { ok: whatsAppRes.ok !== false, status: whatsAppRes.status } : null,
           smsRes: smsRes ? { ok: smsRes.ok !== false } : null,
-          emailProvided: Boolean(email),
           emailRes: emailRes ? { ok: emailRes.ok !== false } : null,
         });
       }
@@ -74,16 +92,15 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
       const payload = {
         message: "OTP sent",
         phone,
+        email: email || null,
         expiresAt: otpRes.expiresAt,
-      };
-      if (devOtp && process.env.NODE_ENV !== "production") payload.devOtp = devOtp;
-      if (process.env.NODE_ENV !== "production") {
-        payload.delivery = {
+        delivery: {
           whatsApp: whatsAppRes ? { ok: whatsAppRes.ok !== false, simulated: Boolean(whatsAppRes.simulated) } : null,
           sms: smsRes ? { ok: smsRes.ok !== false, simulated: Boolean(smsRes.simulated) } : null,
           email: emailRes ? { ok: emailRes.ok !== false, simulated: Boolean(emailRes.simulated), skipped: Boolean(emailRes.skipped) } : null,
-        };
-      }
+        },
+      };
+      if (devOtp && process.env.NODE_ENV !== "production") payload.devOtp = devOtp;
       return payload;
     } catch (err) {
       // eslint-disable-next-line no-console

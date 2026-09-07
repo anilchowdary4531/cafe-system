@@ -2,6 +2,7 @@ import { normalizePhone } from "../services/phoneService.js";
 import { requestAuthOtp, verifyAuthOtp } from "../services/authOtpService.js";
 import { sendSmsOtp } from "../services/smsService.js";
 import { sendWhatsAppOtp } from "../services/msg91WhatsAppService.js";
+import { sendEmailOtp } from "../services/emailService.js";
 import { upsertCustomerAccount } from "../services/customerProfileService.js";
 import { extractVerifiedIdentifier, verifyMsg91AccessToken } from "../services/msg91OtpWidgetService.js";
 import {
@@ -41,6 +42,7 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions }) 
       const phone = normalizePhone(body.phone || "");
       const actorType = normalizeActorType(body.actorType);
       const restaurantId = Number(body.restaurantId || 0) || null;
+      let email = String(body.email || "").trim().toLowerCase();
 
       if (!phone) return reply.code(400).send({ message: "Phone number is required" });
       if (!ALLOWED_ACTOR_TYPES.has(actorType)) return reply.code(400).send({ message: "Invalid actorType" });
@@ -50,9 +52,11 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions }) 
         return reply.code(400).send({ message: "restaurantId is required for this actorType" });
       }
 
+      let user = null;
       if (actorType !== "CUSTOMER") {
-        const user = await resolveStaffUser({ prisma, phone, actorType, restaurantId });
+        user = await resolveStaffUser({ prisma, phone, actorType, restaurantId });
         if (!user) return reply.code(404).send({ message: "Account not found or inactive" });
+        if (!email && user.email) email = String(user.email).trim().toLowerCase();
       }
 
       const otpRes = await requestAuthOtp({ prisma, phone, actorType });
@@ -61,39 +65,48 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions }) 
       const devOtp = otpRes.devOtp || "";
       const otpToSend = otpRes.code;
 
-      const [whatsAppRes, smsRes] = await Promise.all([
+      const [whatsAppRes, smsRes, emailRes] = await Promise.all([
         sendWhatsAppOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }),
         sendSmsOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }),
+        email ? sendEmailOtp({ email, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
       ]);
 
       if (process.env.NODE_ENV === "production") {
         // eslint-disable-next-line no-console
-        console.log("[authOtpController] otp_delivery", { phone, actorType, whatsAppRes: whatsAppRes ? { ok: whatsAppRes.ok !== false, status: whatsAppRes.status } : null, smsRes: smsRes ? { ok: smsRes.ok !== false } : null });
+        console.log("[authOtpController] otp_delivery", {
+          phone,
+          actorType,
+          whatsAppRes: whatsAppRes ? { ok: whatsAppRes.ok !== false, status: whatsAppRes.status } : null,
+          smsRes: smsRes ? { ok: smsRes.ok !== false } : null,
+          emailRes: emailRes ? { ok: emailRes.ok !== false } : null,
+        });
       }
 
       const deliveredByWhatsApp = Boolean(whatsAppRes && whatsAppRes.ok !== false && !whatsAppRes.skipped);
       const deliveredBySms = Boolean(smsRes && smsRes.ok !== false && !smsRes.skipped);
-      const delivered = deliveredByWhatsApp || deliveredBySms;
+      const deliveredByEmail = Boolean(emailRes && emailRes.ok !== false && !emailRes.skipped);
+      const delivered = deliveredByWhatsApp || deliveredBySms || deliveredByEmail;
 
       if (!delivered) {
         const waErr = whatsAppRes && whatsAppRes.ok === false ? whatsAppRes.error : null;
         const smsErr = smsRes && smsRes.ok === false ? smsRes.error : null;
-        return reply.code(502).send({ message: waErr || smsErr || "Failed to send OTP" });
+        const emailErr = emailRes && emailRes.ok === false ? emailRes.error : null;
+        return reply.code(502).send({ message: waErr || smsErr || emailErr || "Failed to send OTP" });
       }
 
       const payload = {
         message: "OTP sent",
         phone,
+        email: email || null,
         actorType,
         expiresAt: otpRes.expiresAt,
-      };
-      if (devOtp && process.env.NODE_ENV !== "production") payload.devOtp = devOtp;
-      if (process.env.NODE_ENV !== "production") {
-        payload.delivery = {
+        delivery: {
           whatsApp: whatsAppRes ? { ok: whatsAppRes.ok !== false, simulated: Boolean(whatsAppRes.simulated) } : null,
           sms: smsRes ? { ok: smsRes.ok !== false, simulated: Boolean(smsRes.simulated) } : null,
-        };
-      }
+          email: emailRes ? { ok: emailRes.ok !== false, simulated: Boolean(emailRes.simulated), skipped: Boolean(emailRes.skipped) } : null,
+        },
+      };
+      if (devOtp && process.env.NODE_ENV !== "production") payload.devOtp = devOtp;
       return payload;
     } catch (err) {
       // eslint-disable-next-line no-console

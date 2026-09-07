@@ -226,6 +226,46 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
     const [otp, setOtp] = useState("");
     const [otpExpiresAt, setOtpExpiresAt] = useState(null);
     const [devOtp, setDevOtp] = useState("");
+    const [deliveryInfo, setDeliveryInfo] = useState(null);
+    const [resolvedPhone, setResolvedPhone] = useState("");
+    const [resolvedEmail, setResolvedEmail] = useState("");
+    const [resendTimer, setResendTimer] = useState(0);
+
+    const maskPhone = (phoneStr) => {
+        const str = String(phoneStr || "").trim();
+        if (!str) return "";
+        const digits = str.replace(/[^\d]/g, "");
+        if (!digits) return "";
+        return `******${digits.slice(-4)}`;
+    };
+
+    const maskEmail = (emailStr) => {
+        const str = String(emailStr || "").trim().toLowerCase();
+        if (!str || !str.includes("@")) return "";
+        const [name, domain] = str.split("@");
+        if (!name) return "";
+        const maskedName = name.length <= 2 ? `${name[0]}***` : `${name[0]}***${name[name.length - 1]}`;
+        return `${maskedName}@${domain}`;
+    };
+
+    const getOtpDeliveryMessage = (deliveryObj, hasEmail) => {
+        if (!deliveryObj) return "OTP sent to your WhatsApp and email.";
+        const waOk = deliveryObj.whatsApp?.ok !== false && !deliveryObj.whatsApp?.skipped;
+        const emailOk = deliveryObj.email?.ok !== false && !deliveryObj.email?.skipped;
+
+        if (waOk && emailOk) return "OTP sent to your WhatsApp and email.";
+        if (waOk && !emailOk) return hasEmail ? "OTP sent to WhatsApp. Email delivery is temporarily unavailable." : "OTP sent to your WhatsApp.";
+        if (!waOk && emailOk) return "OTP sent to email. WhatsApp delivery is temporarily unavailable.";
+        return "Unable to send OTP right now. Please try again.";
+    };
+
+    useEffect(() => {
+        if (resendTimer <= 0) return;
+        const interval = setInterval(() => {
+            setResendTimer((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [resendTimer]);
     const [showOptionalDetails, setShowOptionalDetails] = useState(false);
     const [tableChoice, setTableChoice] = useState("");
     const [notes, setNotes] = useState("");
@@ -395,7 +435,11 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         setOtp("");
         setOtpExpiresAt(otpRes.data?.expiresAt || null);
         setDevOtp(otpRes.data?.devOtp || "");
-        setSuccess("OTP sent. Enter the code to confirm your order.");
+        setDeliveryInfo(otpRes.data?.delivery || null);
+        setResolvedPhone(otpRes.data?.phone || normalizedPhone);
+        setResolvedEmail(otpRes.data?.email || String(email || "").trim());
+        setResendTimer(60);
+        setSuccess("");
     };
 
     const handleSubmit = async () => {
@@ -1169,16 +1213,38 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                         )}
 
                                         {otpStep === "otp" && !customerToken && (
-                                            <div className="checkout-paper-flat md:col-span-2 py-1">
-                                                <label className="theme-muted mb-2 block text-[13px] sm:text-sm">OTP</label>
-                                                <input
-                                                    value={otp}
-                                                    onChange={(e) => setOtp(e.target.value)}
-                                                    inputMode="numeric"
-                                                    autoComplete="one-time-code"
-                                                    placeholder="Enter 6-digit OTP"
-                                                    className="theme-input w-full rounded-2xl px-3 py-2.5 text-[13px] outline-none sm:px-4 sm:py-3 sm:text-sm"
-                                                />
+                                            <div className="checkout-paper-flat md:col-span-2 py-1 space-y-3">
+                                                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs space-y-1.5">
+                                                    <div className="font-semibold flex items-center gap-1.5">
+                                                        <span>✓</span> {getOtpDeliveryMessage(deliveryInfo, Boolean(resolvedEmail || email))}
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2 text-[11px] font-mono">
+                                                        {(resolvedPhone || phone) && (
+                                                            <span className="px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10">
+                                                                WhatsApp: {maskPhone(resolvedPhone || phone)}
+                                                            </span>
+                                                        )}
+                                                        {(resolvedEmail || email) && (
+                                                            <span className="px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10">
+                                                                Email: {maskEmail(resolvedEmail || email)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="theme-muted mb-2 block text-[13px] sm:text-sm">Enter 6-Digit OTP</label>
+                                                    <input
+                                                        value={otp}
+                                                        onChange={(e) => setOtp(e.target.value)}
+                                                        inputMode="numeric"
+                                                        maxLength={6}
+                                                        autoComplete="one-time-code"
+                                                        placeholder="Enter 6-digit OTP"
+                                                        className="theme-input w-full rounded-2xl px-4 py-3 text-center text-lg tracking-widest font-mono outline-none sm:text-xl"
+                                                    />
+                                                </div>
+
                                                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[11px] sm:text-sm">
                                                     <button
                                                         type="button"
@@ -1192,7 +1258,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                         }}
                                                         className="theme-muted underline decoration-dotted underline-offset-4 hover:opacity-80"
                                                     >
-                                                        Change number
+                                                        Change phone / email
                                                     </button>
                                                     <button
                                                         type="button"
@@ -1203,14 +1269,14 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                                 await requestOtp(String(phone || customer?.phone || "").trim());
                                                             } catch (err) {
                                                                 setError(err.response?.data?.message || err.message || "Failed to resend OTP");
-                                                            } finally {
+                                                             } finally {
                                                                 setSubmitting(false);
                                                             }
                                                         }}
-                                                        disabled={submitting}
-                                                        className="theme-muted underline decoration-dotted underline-offset-4 hover:opacity-80 disabled:opacity-60"
+                                                        disabled={submitting || resendTimer > 0}
+                                                        className="theme-accent-text font-semibold hover:underline disabled:opacity-50 disabled:no-underline"
                                                     >
-                                                        Resend OTP
+                                                        {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : "Resend OTP"}
                                                     </button>
                                                 </div>
                                                 {import.meta.env.DEV && devOtp && <p className="theme-muted mt-2 text-[11px]">Dev OTP: {devOtp}</p>}

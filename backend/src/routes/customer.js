@@ -152,7 +152,10 @@ export default async function customerRoutes(app, deps) {
   app.post("/customer/send-otp", otpController.sendOtp);
   app.post("/customer/verify-otp", otpController.verifyOtp);
 
+  app.post("/customer/request-signup-otp", authController.requestSignupOtp);
   app.post("/customer/register", authController.registerCustomer);
+  app.post("/customer/forgot-password", authController.requestForgotPasswordOtp);
+  app.post("/customer/reset-password", authController.resetPasswordWithOtp);
   app.post("/customer/login-password", authController.loginWithPassword);
   app.post("/customer/password-login", authController.loginWithPassword);
   app.post("/customer/google-auth", authController.googleLogin);
