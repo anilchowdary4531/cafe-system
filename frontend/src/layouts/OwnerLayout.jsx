@@ -658,7 +658,19 @@ export default function OwnerLayout() {
                 const res = await axios.get(`${API}/owner/${restaurantId}/staff`);
                 if (!mounted) return;
 
-                const users = (Array.isArray(res.data?.users) ? res.data.users : [])
+                const rawUsers = Array.isArray(res.data?.users) ? res.data.users : [];
+                const allUsers = [...rawUsers];
+                if (user && user.id && !allUsers.some((u) => String(u.id) === String(user.id))) {
+                    allUsers.unshift({
+                        id: user.id,
+                        name: user.name || "Owner",
+                        role: user.role || "OWNER",
+                        designation: user.designation || "Owner",
+                        isActive: true,
+                    });
+                }
+
+                const users = allUsers
                     .filter(
                         (staffUser) => staffUser && Boolean(staffUser.isActive !== false)
                     )
@@ -1846,13 +1858,14 @@ export default function OwnerLayout() {
                                                                                     <button
                                                                                         key={`${assignmentKey}-${staffId}`}
                                                                                         type="button"
-                                                                                        onClick={() =>
+                                                                                        onClick={() => {
                                                                                             assignStaffToTable(
                                                                                                 assignmentKey,
                                                                                                 staffId,
                                                                                                 table
-                                                                                            )
-                                                                                        }
+                                                                                            );
+                                                                                            setOpenStaffTableKey("");
+                                                                                        }}
                                                                                         className={`theme-table-staff-option rounded-lg px-2 py-1 text-[10px] font-semibold transition ${
                                                                                             isSelected
                                                                                                 ? "is-selected"
@@ -1871,12 +1884,13 @@ export default function OwnerLayout() {
                                                                 {assignedStaff && (
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() =>
+                                                                        onClick={() => {
                                                                             clearTableAssignment(
                                                                                 assignmentKey,
                                                                                 table
-                                                                            )
-                                                                        }
+                                                                            );
+                                                                            setOpenStaffTableKey("");
+                                                                        }}
                                                                         className="theme-table-remove-btn mt-2 rounded-md px-2 py-1 text-[10px] font-semibold transition"
                                                                     >
                                                                         Remove assigned server
