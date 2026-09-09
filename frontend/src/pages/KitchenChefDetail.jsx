@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
     ArrowLeft,
+    Ban,
     Bell,
     BellOff,
     CheckCircle2,
@@ -10,6 +11,7 @@ import {
     Flame,
     History,
     LoaderCircle,
+    MoreVertical,
     RefreshCw,
     Sparkles,
     UtensilsCrossed,
@@ -53,6 +55,7 @@ const ACTION_BADGES = {
     REASSIGNED: { bg: "bg-amber-500/10 text-amber-400 border-amber-500/20", label: "Reassigned" },
     UNASSIGNED: { bg: "bg-zinc-800 text-zinc-400 border-zinc-700", label: "Unassigned" },
     COMPLETED: { bg: "bg-teal-500/10 text-teal-300 border-teal-500/20", label: "Completed" },
+    DECLINED: { bg: "bg-red-500/10 text-red-500 border-red-500/20", label: "Declined" },
 };
 
 const getTimeLabel = (value) => {
@@ -94,10 +97,25 @@ function ModernTicketCard({
     chef,
     chefLabel,
     onAction,
+    onDecline,
     actionLabel = "Complete",
-    actionIcon = <CheckCircle2 size={16} />,
+    actionIcon = <CheckCircle2 size={15} />,
     isPickAction = false,
 }) {
+    const [menuOpen, setMenuOpen] = useState(false);
+    const menuRef = useRef(null);
+
+    useEffect(() => {
+        if (!menuOpen) return undefined;
+        const handleClickOutside = (e) => {
+            if (menuRef.current && !menuRef.current.contains(e.target)) {
+                setMenuOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [menuOpen]);
+
     return (
         <article className="group relative border-b border-[var(--app-border)]/60 py-3.5 last:border-b-0 transition-colors duration-150">
             <div className="flex items-center justify-between gap-3">
@@ -133,7 +151,7 @@ function ModernTicketCard({
                     </div>
                 </div>
 
-                <div className="text-right shrink-0">
+                <div className="text-right shrink-0 flex items-center gap-2">
                     <button
                         type="button"
                         onClick={() => onAction?.(ticket.itemKey)}
@@ -146,6 +164,37 @@ function ModernTicketCard({
                         {actionIcon}
                         {actionLabel}
                     </button>
+
+                    {/* Three Dots Options Menu */}
+                    <div className="relative" ref={menuRef}>
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setMenuOpen((prev) => !prev);
+                            }}
+                            className="p-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] theme-muted hover:text-[var(--app-text)] hover:border-[var(--app-border-strong)] transition cursor-pointer flex items-center justify-center"
+                            title="More options"
+                        >
+                            <MoreVertical size={16} />
+                        </button>
+
+                        {menuOpen && (
+                            <div className="absolute right-0 top-full mt-1.5 z-50 w-44 rounded-2xl theme-modal p-1.5 shadow-xl border border-[var(--app-border)]">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setMenuOpen(false);
+                                        onDecline?.(ticket);
+                                    }}
+                                    className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-extrabold text-red-500 hover:bg-red-500/10 transition text-left cursor-pointer"
+                                >
+                                    <Ban size={14} />
+                                    <span>Decline Item</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -361,6 +410,54 @@ export default function KitchenChefDetail() {
         return ticketRows.filter((ticket) => !String(assignmentsPruned?.[ticket.itemKey] || "").trim());
     }, [assignmentsPruned, ticketRows]);
 
+    const [declineModalItem, setDeclineModalItem] = useState(null);
+    const [declineReason, setDeclineReason] = useState("");
+
+    const REASON_PRESETS = [
+        "Out of stock / Ingredients missing",
+        "Kitchen station / Equipment issue",
+        "High order queue / Over capacity",
+        "Special prep request cannot be fulfilled",
+        "Customer requested cancellation",
+    ];
+
+    const handleConfirmDecline = useCallback(() => {
+        if (!declineModalItem || !declineReason.trim()) return;
+
+        const ticket = declineModalItem;
+        const reasonText = declineReason.trim();
+
+        setAssignments((prev) => {
+            const next = { ...(prev || {}) };
+            delete next[ticket.itemKey];
+            return next;
+        });
+
+        const storedEntry = appendKitchenAssignmentHistory(
+            restaurantId,
+            createKitchenAssignmentHistoryEntry({
+                action: "DECLINED",
+                item: ticket,
+                chef: currentChef,
+                note: `Declined: ${reasonText}`,
+            })
+        );
+
+        if (storedEntry) {
+            setHistoryEntries((prev) => [...prev, storedEntry]);
+        }
+
+        showToast({
+            title: "Item Declined",
+            message: `${ticket.itemName} (${ticket.orderRef}) was declined: "${reasonText}"`,
+            variant: "error",
+            durationMs: 3000,
+        });
+
+        setDeclineModalItem(null);
+        setDeclineReason("");
+    }, [currentChef, declineModalItem, declineReason, restaurantId]);
+
     const handleCompleteTicket = useCallback(
         (ticketKey) => {
             const normalizedTicketKey = String(ticketKey || "").trim();
@@ -475,12 +572,14 @@ export default function KitchenChefDetail() {
     const pageDesignation = String(currentChef?.designation || "Chef").trim() || "Chef";
 
     useEffect(() => {
-        if (!historyOpen && !soundModalOpen) return undefined;
+        if (!historyOpen && !soundModalOpen && !declineModalItem) return undefined;
 
         const onKeyDown = (event) => {
             if (event.key === "Escape") {
                 setHistoryOpen(false);
                 setSoundModalOpen(false);
+                setDeclineModalItem(null);
+                setDeclineReason("");
             }
         };
 
@@ -665,6 +764,7 @@ export default function KitchenChefDetail() {
                                         chef={null}
                                         chefLabel="Unassigned"
                                         onAction={handlePickTicket}
+                                        onDecline={(t) => setDeclineModalItem(t)}
                                         actionLabel="Pick Ticket"
                                         actionIcon={<ChefHat size={15} />}
                                         isPickAction={true}
@@ -710,6 +810,7 @@ export default function KitchenChefDetail() {
                                         ticket={ticket}
                                         chef={currentChef}
                                         onAction={handleCompleteTicket}
+                                        onDecline={(t) => setDeclineModalItem(t)}
                                         actionLabel="Mark Complete"
                                         actionIcon={<CheckCircle2 size={15} />}
                                         isPickAction={false}
@@ -820,6 +921,104 @@ export default function KitchenChefDetail() {
                             </div>
 
                             <NotificationSoundPicker />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* DECLINE ITEM REASON MODAL */}
+            {declineModalItem && (
+                <div
+                    className="theme-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
+                    onClick={() => {
+                        setDeclineModalItem(null);
+                        setDeclineReason("");
+                    }}
+                >
+                    <div
+                        className="theme-modal w-full max-w-lg rounded-3xl p-6 space-y-5 shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between border-b border-[var(--app-border)] pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-500/15 text-red-500 border border-red-500/30">
+                                    <Ban size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-[var(--app-text)]">Decline Item</h3>
+                                    <p className="text-xs theme-muted">Specify reason for declining {declineModalItem.itemName}</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setDeclineModalItem(null);
+                                    setDeclineReason("");
+                                }}
+                                className="rounded-xl border border-[var(--app-border)] p-2 theme-muted hover:text-[var(--app-text)] hover:bg-[var(--app-surface-2)] transition cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3.5 space-y-1">
+                                <p className="text-xs font-bold text-[var(--app-text)]">{declineModalItem.qty}x {declineModalItem.itemName}</p>
+                                <p className="text-[11px] theme-muted">{declineModalItem.orderRef} • Table {declineModalItem.tableNo || "N/A"}</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold uppercase tracking-wider theme-muted block">Select Common Reason</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {REASON_PRESETS.map((preset) => (
+                                        <button
+                                            key={preset}
+                                            type="button"
+                                            onClick={() => setDeclineReason(preset)}
+                                            className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition cursor-pointer border ${
+                                                declineReason === preset
+                                                    ? "bg-red-500 text-white border-red-500 font-extrabold shadow-sm"
+                                                    : "bg-[var(--app-surface-2)] text-[var(--app-text)] border-[var(--app-border)] hover:border-red-500/40"
+                                            }`}
+                                        >
+                                            {preset}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase tracking-wider theme-muted block">Or Specify Reason</label>
+                                <textarea
+                                    rows={3}
+                                    value={declineReason}
+                                    onChange={(e) => setDeclineReason(e.target.value)}
+                                    placeholder="Type reason for declining this item..."
+                                    className="theme-input w-full rounded-2xl p-3 text-xs outline-none focus:ring-2 focus:ring-red-500/40"
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3 pt-2 border-t border-[var(--app-border)]">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setDeclineModalItem(null);
+                                        setDeclineReason("");
+                                    }}
+                                    className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 py-2 text-xs font-extrabold text-[var(--app-text)] hover:bg-white/5 transition cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmDecline}
+                                    disabled={!declineReason.trim()}
+                                    className="rounded-xl bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white px-4 py-2 text-xs font-extrabold transition shadow-md cursor-pointer flex items-center gap-1.5"
+                                >
+                                    <Ban size={14} />
+                                    <span>Confirm Decline</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

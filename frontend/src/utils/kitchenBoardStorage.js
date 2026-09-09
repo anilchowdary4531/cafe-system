@@ -136,6 +136,7 @@ export const createKitchenAssignmentHistoryEntry = ({
         normalizedAction === "REASSIGNED" ||
         normalizedAction === "UNASSIGNED" ||
         normalizedAction === "COMPLETED" ||
+        normalizedAction === "DECLINED" ||
         normalizedAction === "ASSIGNED"
             ? normalizedAction
             : "ASSIGNED";
