@@ -372,24 +372,23 @@ const TABLE_STATE_RECENT_WINDOW_MS = 3 * 60 * 60 * 1000;
 const toTableStateClassToken = (stateKey) =>
     String(stateKey || TABLE_STATE_KEYS.BLANK).toLowerCase().replace(/_/g, "-");
 
-const resolveTableState = (table) => {
+const resolveTableState = (table, printedTableKeys = new Set()) => {
     const activeOrders = Array.isArray(table?.activeOrders) ? table.activeOrders : [];
     if (activeOrders.length > 0) {
+        const assignmentKey = String(table?.assignmentKey || table?.key || "");
+        const isPrinted =
+            printedTableKeys.has(assignmentKey) ||
+            activeOrders.some(
+                (order) => String(order?.status || "").toUpperCase() === "DELIVERED"
+            );
+        if (isPrinted) return TABLE_STATE_KEYS.PRINTED;
+
         const hasRunningKot = activeOrders.some((order) =>
             ACTIVE_KOT_STATUSES.has(String(order?.status || "").toUpperCase())
         );
         return hasRunningKot ? TABLE_STATE_KEYS.RUNNING_KOT : TABLE_STATE_KEYS.RUNNING;
     }
 
-    const lastOrderStatus = String(table?.lastOrderStatus || "").toUpperCase();
-    const lastPaymentStatus = String(table?.lastPaymentStatus || "").toUpperCase();
-    const lastOrderTime = new Date(table?.lastOrderAt || 0).getTime();
-    const isRecentOrder =
-        !Number.isNaN(lastOrderTime) &&
-        Date.now() - lastOrderTime <= TABLE_STATE_RECENT_WINDOW_MS;
-
-    if (isRecentOrder && lastPaymentStatus === "PAID") return TABLE_STATE_KEYS.PAID;
-    if (isRecentOrder && lastOrderStatus === "DELIVERED") return TABLE_STATE_KEYS.PRINTED;
     return TABLE_STATE_KEYS.BLANK;
 };
 
@@ -432,6 +431,9 @@ export default function OwnerLayout() {
     const [receiptActionError, setReceiptActionError] = useState("");
     const [tablePopoverPlacement, setTablePopoverPlacement] = useState({});
     const [selectedLiveOrder, setSelectedLiveOrder] = useState(null);
+    const [printedTableKeys, setPrintedTableKeys] = useState(() => new Set());
+    const [tableGroups, setTableGroups] = useState({});
+    const [activeGroupFilter, setActiveGroupFilter] = useState("All");
 
     const { user, logout } = useAuth();
     const restaurantId = Number(user?.restaurantId || 0);
@@ -890,7 +892,10 @@ export default function OwnerLayout() {
         });
     };
 
-    const handleReceiptPrint = ({ tableLabel, activeOrders, tableReceiptTotal } = {}) => {
+    const handleReceiptPrint = ({ tableLabel, activeOrders, tableReceiptTotal, assignmentKey } = {}) => {
+        if (assignmentKey) {
+            setPrintedTableKeys((prev) => new Set([...prev, assignmentKey]));
+        }
         const printWindow = window.open("", "_blank");
         if (!printWindow) return;
 
@@ -940,6 +945,13 @@ export default function OwnerLayout() {
             if (hasAssignment) {
                 clearTableAssignment(assignmentKey);
             }
+            if (assignmentKey) {
+                setPrintedTableKeys((prev) => {
+                    const next = new Set(prev);
+                    next.delete(assignmentKey);
+                    return next;
+                });
+            }
             await refreshTableOverview();
             setOpenOrdersTableKey("");
             setOpenStaffTableKey("");
@@ -984,6 +996,89 @@ export default function OwnerLayout() {
 
     const freeTables = Math.max(0, tableOverview.total - tableOverview.occupied);
     const isDashboardRoute = location.pathname === "/owner";
+
+    useEffect(() => {
+        if (!restaurantId) return;
+        const key = `owner_table_groups_v1_${restaurantId}`;
+        const loadGroups = () => {
+            try {
+                const raw = localStorage.getItem(key);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                        setTableGroups(parsed);
+                    }
+                } else {
+                    setTableGroups({});
+                }
+            } catch {
+                setTableGroups({});
+            }
+        };
+        loadGroups();
+        const handleStorageChange = (e) => {
+            if (!e.key || e.key === key) loadGroups();
+        };
+        window.addEventListener("storage", handleStorageChange);
+        return () => window.removeEventListener("storage", handleStorageChange);
+    }, [restaurantId]);
+
+    const getTableGroup = useCallback(
+        (table) => {
+            if (table?.groupName && String(table.groupName).trim()) {
+                return String(table.groupName).trim();
+            }
+            const idKey = String(table?.id || "");
+            if (idKey && tableGroups[idKey] && String(tableGroups[idKey]).trim()) {
+                return String(tableGroups[idKey]).trim();
+            }
+            const noKey = String(table?.tableNo || "").trim();
+            if (noKey && tableGroups[noKey] && String(tableGroups[noKey]).trim()) {
+                return String(tableGroups[noKey]).trim();
+            }
+
+            if (noKey) {
+                if (/^\d+$/.test(noKey)) {
+                    return "Main Hall";
+                }
+                const letterMatch = noKey.match(/^([A-Za-z]+)\s*\d+$/);
+                if (letterMatch) {
+                    const prefix = letterMatch[1].toUpperCase();
+                    return prefix === "T" ? "Section T" : `Section ${prefix}`;
+                }
+            }
+
+            return "Main Area";
+        },
+        [tableGroups]
+    );
+
+    const groupedTablesMap = useMemo(() => {
+        const map = {};
+        (tableOverview.tables || []).forEach((table) => {
+            const group = getTableGroup(table);
+            if (!map[group]) map[group] = [];
+            map[group].push(table);
+        });
+        return map;
+    }, [tableOverview.tables, getTableGroup]);
+
+    const availableGroupNames = useMemo(() => {
+        return Object.keys(groupedTablesMap).sort((a, b) =>
+            a.localeCompare(b, undefined, { sensitivity: "base" })
+        );
+    }, [groupedTablesMap]);
+
+    const filteredGroupEntries = useMemo(() => {
+        if (activeGroupFilter === "All") {
+            return availableGroupNames.map((name) => [name, groupedTablesMap[name]]);
+        }
+        const match = availableGroupNames.find(
+            (name) => name.toLowerCase() === activeGroupFilter.toLowerCase()
+        );
+        if (match) return [[match, groupedTablesMap[match]]];
+        return availableGroupNames.map((name) => [name, groupedTablesMap[name]]);
+    }, [activeGroupFilter, availableGroupNames, groupedTablesMap]);
     const stripOnlineOrders = useMemo(() => {
         const rows = tableOverview.tables.flatMap((table) => {
             const activeOrders = Array.isArray(table?.activeOrders) ? table.activeOrders : [];
@@ -1261,26 +1356,88 @@ export default function OwnerLayout() {
                                 <div
                                     className={
                                         isDashboardRoute
-                                            ? "flex min-h-0 flex-1 flex-col gap-2 pt-2"
-                                            : "flex flex-col gap-1.5"
+                                            ? "flex min-h-0 flex-1 flex-col gap-3 pt-2"
+                                            : "flex flex-col gap-2"
                                     }
                                 >
-                                    <span className="theme-muted mr-1 text-[11px] font-bold uppercase tracking-[0.2em]">
-                                        Tables
-                                    </span>
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <span className="theme-muted text-[11px] font-bold uppercase tracking-[0.2em]">
+                                            Tables by Group
+                                        </span>
+
+                                        {availableGroupNames.length > 1 && (
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveGroupFilter("All")}
+                                                    className={`rounded-full px-3 py-1 text-xs font-bold transition-all ${
+                                                        activeGroupFilter === "All"
+                                                            ? "bg-[color:var(--app-primary)] text-white shadow-sm"
+                                                            : "theme-soft-button"
+                                                    }`}
+                                                >
+                                                    All ({tableOverview.total})
+                                                </button>
+                                                {availableGroupNames.map((groupName) => {
+                                                    const count = groupedTablesMap[groupName]?.length || 0;
+                                                    const isSelected =
+                                                        activeGroupFilter.toLowerCase() === groupName.toLowerCase();
+                                                    return (
+                                                        <button
+                                                            key={groupName}
+                                                            type="button"
+                                                            onClick={() => setActiveGroupFilter(groupName)}
+                                                            className={`rounded-full px-3 py-1 text-xs font-bold transition-all ${
+                                                                isSelected
+                                                                    ? "bg-[color:var(--app-primary)] text-white shadow-sm"
+                                                                    : "theme-soft-button"
+                                                            }`}
+                                                        >
+                                                            {groupName} ({count})
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+
                                     {tableOverview.loading ? (
                                         <span className="theme-muted text-xs">Loading tables...</span>
                                     ) : tableOverview.tables.length === 0 ? (
                                         <span className="theme-muted text-xs">No tables found.</span>
                                     ) : (
-                                        <div
-                                            className={
-                                                isDashboardRoute
-                                                    ? "grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-3 sm:gap-4 w-full auto-rows-fr overflow-visible pb-4"
-                                                    : "flex flex-wrap gap-2 pb-3"
-                                            }
-                                        >
-                                            {tableOverview.tables.map((table) => {
+                                        <div className="flex flex-col gap-4 pb-4">
+                                            {filteredGroupEntries.map(([groupName, groupTables]) => {
+                                                const occupiedInGroup = groupTables.filter((t) => t.isOccupied).length;
+                                                return (
+                                                    <section
+                                                        key={groupName}
+                                                        className="flex flex-col gap-2.5 rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_97%,#000_3%)] p-3 sm:p-4 shadow-xs"
+                                                    >
+                                                        <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)] pb-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[color:var(--app-primary)]">
+                                                                    {groupName}
+                                                                </span>
+                                                                <span className="rounded-full bg-black/5 dark:bg-white/10 px-2.5 py-0.5 text-[10px] font-bold theme-muted">
+                                                                    {groupTables.length} table{groupTables.length === 1 ? "" : "s"}
+                                                                </span>
+                                                            </div>
+                                                            {occupiedInGroup > 0 && (
+                                                                <span className="text-[10px] font-bold text-emerald-500">
+                                                                    {occupiedInGroup} occupied
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        <div
+                                                            className={
+                                                                isDashboardRoute
+                                                                    ? "grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-3 sm:gap-4 w-full auto-rows-fr overflow-visible pt-1"
+                                                                    : "flex flex-wrap gap-2 pt-1"
+                                                            }
+                                                        >
+                                                            {groupTables.map((table) => {
                                                 const assignmentKey = String(
                                                     table.assignmentKey || table.key
                                                 );
@@ -1744,6 +1901,10 @@ export default function OwnerLayout() {
                                                             </div>
                                                         )}
                                                     </div>
+                                                );
+                                            })}
+                                                        </div>
+                                                    </section>
                                                 );
                                             })}
                                         </div>

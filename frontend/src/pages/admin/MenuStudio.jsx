@@ -499,7 +499,7 @@ export default function MenuStudio() {
                                                                 setOpenActionMenuMeta(null);
                                                             }}
                                                             disabled={item.isAvailable}
-                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-45"
+                                                            className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-emerald-400 transition hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-45"
                                                         >
                                                             Enable
                                                         </button>
@@ -553,9 +553,9 @@ export default function MenuStudio() {
                                                         </p>
                                                     )}
                                                     <span
-                                                        className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                                                        className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] ${
                                                             item.isAvailable
-                                                                ? "border-emerald-500/65 bg-emerald-500/20 text-emerald-200"
+                                                                ? "border-emerald-400 bg-emerald-500 text-white shadow-xs"
                                                                 : "border-slate-500/60 bg-slate-500/20 text-[color:var(--app-muted)]"
                                                         }`}
                                                     >
