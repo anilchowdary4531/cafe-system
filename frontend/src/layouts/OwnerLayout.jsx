@@ -20,7 +20,7 @@ import {
     IndianRupee,
     Truck,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { resolveRestaurantName } from "../utils/restaurantContext";
 import BrandLogo from "../components/BrandLogo";
