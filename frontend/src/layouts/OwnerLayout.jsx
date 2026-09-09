@@ -1167,6 +1167,18 @@ export default function OwnerLayout() {
             {(openOrdersTableKey || openStaffTableKey || openMoreTableKey) && (
                 <div
                     className="fixed inset-0 z-40 bg-black/5"
+                    onMouseDown={() => {
+                        setOpenOrdersTableKey("");
+                        setOpenStaffTableKey("");
+                        setOpenMoreTableKey("");
+                        setReceiptActionError("");
+                    }}
+                    onTouchStart={() => {
+                        setOpenOrdersTableKey("");
+                        setOpenStaffTableKey("");
+                        setOpenMoreTableKey("");
+                        setReceiptActionError("");
+                    }}
                     onClick={() => {
                         setOpenOrdersTableKey("");
                         setOpenStaffTableKey("");
@@ -1545,10 +1557,12 @@ export default function OwnerLayout() {
                                                                 ? ` - Managed by ${assignedStaffLabel}`
                                                                 : ""
                                                         }`}
-                                                        className={`theme-table-box relative w-full aspect-square min-h-[130px] max-w-[150px] flex flex-col justify-between rounded-2xl p-3 pb-8 text-xs transition-all duration-200 shadow-md hover:shadow-xl hover:-translate-y-0.5 state-${tableStateClassToken} ${
+                                                        className={`theme-table-box relative w-full aspect-square min-h-[130px] max-w-[150px] flex flex-col justify-between rounded-2xl p-3 pb-8 text-xs transition-all duration-200 shadow-md state-${tableStateClassToken} ${
                                                             table.isOccupied ? "is-occupied" : ""
                                                         } ${isDropTarget ? "is-drop-target" : ""} ${
-                                                            hasAnyPopoverOpen ? "z-[50] shadow-2xl ring-2 ring-amber-500/50" : "z-1"
+                                                            hasAnyPopoverOpen
+                                                                ? "z-[50] shadow-2xl ring-2 ring-amber-500/50 !transform-none"
+                                                                : "hover:shadow-xl hover:-translate-y-0.5 z-1"
                                                         }`}
                                                     >
                                                         <div className="flex h-full flex-col justify-between">
@@ -1691,7 +1705,9 @@ export default function OwnerLayout() {
 
                                                         {table.isOccupied && isOrdersOpen && (
                                                             <div
-                                                                className={`theme-table-popover absolute left-0 z-[60] w-72 rounded-xl p-2 text-[11px] shadow-2xl transition-all duration-150 ${ordersPopoverYClass}`}
+                                                                onClick={(event) => event.stopPropagation()}
+                                                                onMouseDown={(event) => event.stopPropagation()}
+                                                                className={`theme-table-popover absolute left-0 z-[60] w-72 rounded-xl p-2 text-[11px] shadow-2xl transition-opacity duration-150 ${ordersPopoverYClass}`}
                                                             >
                                                                 <div className="mb-1 flex items-center justify-between gap-2">
                                                                     <p className="font-semibold">
@@ -1832,7 +1848,9 @@ export default function OwnerLayout() {
 
                                                         {table.isOccupied && isStaffOpen && (
                                                             <div
-                                                                className={`theme-table-popover absolute left-0 z-[60] w-64 rounded-xl p-2 text-[11px] shadow-2xl transition-all duration-150 ${staffPopoverYClass}`}
+                                                                onClick={(event) => event.stopPropagation()}
+                                                                onMouseDown={(event) => event.stopPropagation()}
+                                                                className={`theme-table-popover absolute left-0 z-[60] w-64 rounded-xl p-2 text-[11px] shadow-2xl transition-opacity duration-150 ${staffPopoverYClass}`}
                                                             >
                                                                 <p className="font-semibold">
                                                                     Assign server for table {tableLabel}
@@ -1897,7 +1915,9 @@ export default function OwnerLayout() {
 
                                                         {isMoreOpen && (
                                                             <div
-                                                                className={`theme-table-popover absolute right-0 z-[60] w-44 rounded-xl p-2 text-[11px] shadow-2xl transition-all duration-150 ${morePopoverYClass}`}
+                                                                onClick={(event) => event.stopPropagation()}
+                                                                onMouseDown={(event) => event.stopPropagation()}
+                                                                className={`theme-table-popover absolute right-0 z-[60] w-44 rounded-xl p-2 text-[11px] shadow-2xl transition-opacity duration-150 ${morePopoverYClass}`}
                                                             >
                                                                 <div className="theme-table-order-row rounded-md px-2 py-1.5">
                                                                     <p className="theme-muted text-[10px] uppercase tracking-[0.08em]">
