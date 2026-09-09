@@ -1316,11 +1316,11 @@ export default function OwnerLayout() {
                             <div
                                 className={
                                     isDashboardRoute
-                                        ? "flex min-h-0 flex-col gap-3 xl:col-span-3"
+                                        ? "flex min-h-0 flex-col gap-1.5 xl:col-span-3"
                                         : ""
                                 }
                             >
-                                <div className="flex flex-wrap items-center justify-between gap-3 py-1">
+                                <div className="flex flex-wrap items-center justify-between gap-2.5 py-0">
                                     <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
                                         <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 font-bold text-amber-400">
                                             <TableProperties size={15} />
@@ -1356,8 +1356,8 @@ export default function OwnerLayout() {
                                 <div
                                     className={
                                         isDashboardRoute
-                                            ? "flex min-h-0 flex-1 flex-col gap-3 pt-2"
-                                            : "flex flex-col gap-2"
+                                            ? "flex min-h-0 flex-1 flex-col gap-1.5 pt-0.5"
+                                            : "flex flex-col gap-1.5"
                                     }
                                 >
                                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1406,15 +1406,15 @@ export default function OwnerLayout() {
                                     ) : tableOverview.tables.length === 0 ? (
                                         <span className="theme-muted text-xs">No tables found.</span>
                                     ) : (
-                                        <div className="flex flex-col gap-2.5 pb-2">
+                                        <div className="flex flex-col gap-2 pb-1">
                                             {filteredGroupEntries.map(([groupName, groupTables]) => {
                                                 const occupiedInGroup = groupTables.filter((t) => t.isOccupied).length;
                                                 return (
                                                     <section
                                                         key={groupName}
-                                                        className="flex flex-col gap-1.5 py-0.5"
+                                                        className="flex flex-col gap-1 py-0"
                                                     >
-                                                        <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)]/60 pb-1">
+                                                        <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)]/50 pb-0.5">
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-xs font-extrabold uppercase tracking-[0.18em] text-[color:var(--app-primary)]">
                                                                     {groupName}
