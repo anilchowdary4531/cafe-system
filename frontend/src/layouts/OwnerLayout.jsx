@@ -1406,15 +1406,15 @@ export default function OwnerLayout() {
                                     ) : tableOverview.tables.length === 0 ? (
                                         <span className="theme-muted text-xs">No tables found.</span>
                                     ) : (
-                                        <div className="flex flex-col gap-4 pb-4">
+                                        <div className="flex flex-col gap-2.5 pb-2">
                                             {filteredGroupEntries.map(([groupName, groupTables]) => {
                                                 const occupiedInGroup = groupTables.filter((t) => t.isOccupied).length;
                                                 return (
                                                     <section
                                                         key={groupName}
-                                                        className="flex flex-col gap-3 py-2"
+                                                        className="flex flex-col gap-1.5 py-0.5"
                                                     >
-                                                        <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)] pb-2">
+                                                        <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)]/60 pb-1">
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-xs font-extrabold uppercase tracking-[0.18em] text-[color:var(--app-primary)]">
                                                                     {groupName}

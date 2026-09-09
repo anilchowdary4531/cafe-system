@@ -753,15 +753,15 @@ export default function OwnerTables() {
                     )}
                 </div>
             ) : (
-                <div className="mt-6 flex flex-col gap-6">
+                <div className="mt-4 flex flex-col gap-3">
                     {groupedTableEntries.map(([groupName, groupTables]) => {
                         const activeCount = groupTables.filter((t) => t.isActive).length;
                         return (
                             <section
                                 key={groupName}
-                                className="flex flex-col gap-3 py-2"
+                                className="flex flex-col gap-2 py-0.5"
                             >
-                                <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                                <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
                                     <div className="flex items-center gap-2.5">
                                         <span className="text-sm font-extrabold uppercase tracking-widest text-orange-400">
                                             {groupName}
