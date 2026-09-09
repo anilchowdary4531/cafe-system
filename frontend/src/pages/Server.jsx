@@ -387,31 +387,6 @@ export default function Server() {
     }, [refreshTables, restaurantId]);
 
     useEffect(() => {
-        if (!restaurantId || typeof window === "undefined") return;
-
-        const list = Array.isArray(tablesData) ? tablesData : [];
-        if (!list.length) return;
-
-        const currentAssignments = readTableStaffAssignments(restaurantId);
-        let changed = false;
-
-        list.forEach((table) => {
-            const tableNo = String(table?.tableNo || "").trim();
-            const assignmentKey = table?.id ? `table-${table.id}` : `table-${tableNo.toLowerCase()}`;
-            if (!assignmentKey) return;
-            if (table?.isOccupied) return;
-            if (!currentAssignments[assignmentKey]) return;
-            delete currentAssignments[assignmentKey];
-            changed = true;
-        });
-
-        if (changed) {
-            writeTableStaffAssignments(restaurantId, currentAssignments);
-            setTableAssignments(currentAssignments);
-        }
-    }, [restaurantId, tablesData]);
-
-    useEffect(() => {
         if (typeof window === "undefined" || !restaurantId) return undefined;
 
         const handleStorage = (event) => {
@@ -436,7 +411,15 @@ export default function Server() {
                 const assignmentKey = table.id
                     ? `table-${table.id}`
                     : `table-${tableNo.toLowerCase()}`;
-                const assignedStaffId = String(tableAssignments[assignmentKey] || "").trim();
+                const assignedStaffId = String(
+                    tableAssignments[assignmentKey] ||
+                    tableAssignments[table.key] ||
+                    tableAssignments[String(table.id || "")] ||
+                    tableAssignments[`table-${table.id}`] ||
+                    tableAssignments[String(tableNo)] ||
+                    tableAssignments[`table-${tableNo.toLowerCase()}`] ||
+                    ""
+                ).trim();
 
                 return {
                     id: table.id,
