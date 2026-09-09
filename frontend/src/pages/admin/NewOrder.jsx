@@ -1257,16 +1257,16 @@ export default function NewOrder() {
 
             {/* PETPOOJA STYLE PAYMENT & CUSTOMER CHANGE CALCULATOR MODAL */}
             {showCheckoutModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 overflow-y-auto">
-                    <div className="theme-panel w-full max-w-lg rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface,var(--app-bg))] p-5 sm:p-6 text-[color:var(--app-text)] shadow-2xl space-y-4 max-h-[92vh] flex flex-col justify-between">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 overflow-y-auto">
+                    <div className="theme-panel w-full max-w-lg rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_96%,#000_4%)] p-6 text-[color:var(--app-text)] shadow-2xl space-y-5 max-h-[92vh] flex flex-col justify-between">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between pb-3 border-b border-[color:var(--app-border)]">
                             <div>
                                 <h3 className="text-xl font-extrabold flex items-center gap-2 text-[color:var(--app-text)]">
-                                    <Receipt size={22} className="text-emerald-500" />
+                                    <Receipt size={20} className="theme-accent-text" />
                                     Checkout & Payment
                                 </h3>
-                                <p className="theme-muted text-xs mt-0.5">
+                                <p className="theme-muted text-xs mt-0.5 font-semibold">
                                     {activeBill.billNumber} • {orderType === "DINE_IN" ? `Table ${tableNo}` : "Takeaway"}
                                 </p>
                             </div>
@@ -1281,45 +1281,45 @@ export default function NewOrder() {
                         </div>
 
                         <div className="space-y-4 overflow-y-auto pr-1">
-                            {/* Total Bill Box */}
-                            <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_70%,transparent)] p-4 flex items-center justify-between">
+                            {/* Total Bill Section - Paper Style Header */}
+                            <div className="flex items-baseline justify-between pb-3 border-b border-[color:var(--app-border)]">
                                 <div>
-                                    <span className="theme-muted text-xs uppercase font-extrabold tracking-wider">Total Payable Amount</span>
-                                    <p className="theme-muted text-xs">{totalItems} item{totalItems === 1 ? "" : "s"} in cart</p>
+                                    <span className="theme-muted text-xs uppercase font-extrabold tracking-widest">Total Payable</span>
+                                    <p className="theme-muted text-xs font-semibold">{totalItems} item{totalItems === 1 ? "" : "s"} in cart</p>
                                 </div>
-                                <span className="text-2xl sm:text-3xl font-black text-emerald-500 tabular-nums">
+                                <span className="text-3xl font-black text-[color:var(--app-text)] tabular-nums">
                                     Rs {toInr(subtotal)}
                                 </span>
                             </div>
 
-                            {/* Customer Details Summary */}
-                            <div className="grid grid-cols-2 gap-2 text-xs">
+                            {/* Customer Details Summary - Clean Underline Inputs */}
+                            <div className="grid grid-cols-2 gap-4 text-xs">
                                 <div>
-                                    <label className="theme-muted block font-semibold mb-1">Customer Name</label>
+                                    <label className="theme-muted block font-extrabold uppercase text-[10px] tracking-wider mb-1">Customer Name</label>
                                     <input
                                         type="text"
                                         placeholder="Walk-in Customer"
                                         value={customerName}
                                         onChange={(e) => setCustomerName(e.target.value)}
-                                        className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] px-3 py-1.5 font-semibold text-[color:var(--app-text)] outline-none focus:border-emerald-500/50"
+                                        className="w-full bg-transparent border-b border-[color:var(--app-border)] py-1 text-sm font-semibold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-[color:var(--app-text)] transition"
                                     />
                                 </div>
                                 <div>
-                                    <label className="theme-muted block font-semibold mb-1">Phone Number</label>
+                                    <label className="theme-muted block font-extrabold uppercase text-[10px] tracking-wider mb-1">Phone Number</label>
                                     <input
                                         type="text"
                                         placeholder="Optional"
                                         value={phone}
                                         onChange={(e) => setPhone(e.target.value)}
-                                        className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] px-3 py-1.5 font-semibold text-[color:var(--app-text)] outline-none focus:border-emerald-500/50"
+                                        className="w-full bg-transparent border-b border-[color:var(--app-border)] py-1 text-sm font-semibold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-[color:var(--app-text)] transition"
                                     />
                                 </div>
                             </div>
 
                             {/* Payment Mode Selection */}
-                            <div>
+                            <div className="pt-1">
                                 <label className="theme-muted block text-xs font-extrabold uppercase tracking-wider mb-2">
-                                    Select Payment Mode
+                                    Payment Mode
                                 </label>
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
@@ -1329,13 +1329,13 @@ export default function NewOrder() {
                                             if (!cashGiven) setCashGiven(String(subtotal));
                                         }}
                                         className={[
-                                            "flex items-center justify-center gap-2 rounded-2xl border p-3.5 text-sm font-bold transition",
+                                            "flex items-center justify-center gap-2 rounded-2xl p-3 text-sm font-bold transition border",
                                             paymentMethod === "CASH"
-                                                ? "border-emerald-500 bg-emerald-500/15 text-emerald-500 shadow-md ring-2 ring-emerald-500/30"
-                                                : "border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] theme-muted hover:text-[color:var(--app-text)]",
+                                                ? "border-amber-500/60 bg-amber-500/15 text-[color:var(--app-text)] shadow-sm ring-1 ring-amber-500/30"
+                                                : "theme-soft-button opacity-70 hover:opacity-100",
                                         ].join(" ")}
                                     >
-                                        <Banknote size={20} />
+                                        <Banknote size={18} />
                                         <span>CASH</span>
                                     </button>
 
@@ -1343,31 +1343,31 @@ export default function NewOrder() {
                                         type="button"
                                         onClick={() => setPaymentMethod("ONLINE")}
                                         className={[
-                                            "flex items-center justify-center gap-2 rounded-2xl border p-3.5 text-sm font-bold transition",
+                                            "flex items-center justify-center gap-2 rounded-2xl p-3 text-sm font-bold transition border",
                                             paymentMethod === "ONLINE"
-                                                ? "border-indigo-500 bg-indigo-500/15 text-indigo-400 shadow-md ring-2 ring-indigo-500/30"
-                                                : "border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] theme-muted hover:text-[color:var(--app-text)]",
+                                                ? "border-amber-500/60 bg-amber-500/15 text-[color:var(--app-text)] shadow-sm ring-1 ring-amber-500/30"
+                                                : "theme-soft-button opacity-70 hover:opacity-100",
                                         ].join(" ")}
                                     >
-                                        <CreditCard size={20} />
+                                        <CreditCard size={18} />
                                         <span>ONLINE / UPI</span>
                                     </button>
                                 </div>
                             </div>
 
-                            {/* CASH TENDER & CHANGE RETURN CALCULATOR (PetPooja Style) */}
+                            {/* CASH TENDER & CHANGE RETURN CALCULATOR */}
                             {paymentMethod === "CASH" && (
-                                <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_40%,transparent)] p-4">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <label className="theme-muted text-xs font-bold uppercase tracking-wider">
-                                            Cash Given by Customer (Rs)
+                                <div className="space-y-3 pt-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="theme-muted text-xs font-extrabold uppercase tracking-wider">
+                                            Cash Received from Customer
                                         </label>
-                                        <span className="text-xs theme-muted font-semibold">Enter amount or tap preset</span>
+                                        <span className="theme-muted text-xs font-semibold">Enter amount or tap preset</span>
                                     </div>
 
-                                    {/* Amount Input */}
-                                    <div className="relative">
-                                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-lg font-bold theme-muted">Rs</span>
+                                    {/* Clean Amount Input */}
+                                    <div className="flex items-center justify-between border-b-2 border-[color:var(--app-border)] pb-1.5 focus-within:border-[color:var(--app-text)] transition">
+                                        <span className="text-xl font-bold theme-muted">Rs</span>
                                         <input
                                             type="number"
                                             step="any"
@@ -1375,16 +1375,16 @@ export default function NewOrder() {
                                             placeholder={toInr(subtotal)}
                                             value={cashGiven}
                                             onChange={(e) => setCashGiven(e.target.value)}
-                                            className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_90%,transparent)] pl-10 pr-4 py-2.5 text-xl font-black text-[color:var(--app-text)] outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 tabular-nums"
+                                            className="w-full bg-transparent text-right text-3xl font-black text-[color:var(--app-text)] outline-none tabular-nums"
                                         />
                                     </div>
 
-                                    {/* Quick Cash Tender Buttons (PetPooja style) */}
+                                    {/* Quick Cash Presets as Theme Chips */}
                                     <div className="flex flex-wrap gap-2 pt-1">
                                         <button
                                             type="button"
                                             onClick={() => setCashGiven(String(subtotal))}
-                                            className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-500 hover:bg-emerald-500/20 transition"
+                                            className="rounded-xl theme-soft-button px-3 py-1.5 text-xs font-bold hover:bg-[color:color-mix(in_srgb,var(--app-text)_12%,transparent)]"
                                         >
                                             Exact (Rs {toInr(subtotal)})
                                         </button>
@@ -1393,7 +1393,7 @@ export default function NewOrder() {
                                                 key={amt}
                                                 type="button"
                                                 onClick={() => setCashGiven(String(amt))}
-                                                className="rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_70%,transparent)] px-3 py-1.5 text-xs font-bold text-[color:var(--app-text)] hover:border-emerald-500/50 hover:bg-emerald-500/10 transition"
+                                                className="rounded-xl theme-soft-button px-3 py-1.5 text-xs font-bold hover:bg-[color:color-mix(in_srgb,var(--app-text)_12%,transparent)]"
                                             >
                                                 Rs {amt}
                                             </button>
@@ -1402,14 +1402,14 @@ export default function NewOrder() {
                                             <button
                                                 type="button"
                                                 onClick={() => setCashGiven(String(Math.ceil(subtotal / 50) * 50))}
-                                                className="rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_70%,transparent)] px-3 py-1.5 text-xs font-bold text-[color:var(--app-text)] hover:border-emerald-500/50 transition"
+                                                className="rounded-xl theme-soft-button px-3 py-1.5 text-xs font-bold hover:bg-[color:color-mix(in_srgb,var(--app-text)_12%,transparent)]"
                                             >
                                                 Rs {Math.ceil(subtotal / 50) * 50}
                                             </button>
                                         )}
                                     </div>
 
-                                    {/* LIVE RETURN CHANGE CALCULATOR DISPLAY */}
+                                    {/* LIVE RETURN CHANGE CALCULATOR DISPLAY - Dashed Paper Line */}
                                     {(() => {
                                         const given = parseFloat(cashGiven) || 0;
                                         const change = given - subtotal;
@@ -1418,22 +1418,22 @@ export default function NewOrder() {
                                         if (!cashGiven) return null;
 
                                         return isEnough ? (
-                                            <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/15 p-3.5 text-center shadow-inner">
-                                                <span className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-400">
+                                            <div className="flex items-center justify-between pt-3 border-t border-dashed border-[color:var(--app-border)]">
+                                                <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
                                                     Return Change to Customer
                                                 </span>
-                                                <div className="text-3xl font-black text-emerald-400 tabular-nums mt-0.5">
+                                                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
                                                     Rs {toInr(change)}
-                                                </div>
+                                                </span>
                                             </div>
                                         ) : (
-                                            <div className="rounded-2xl border border-amber-500/40 bg-amber-500/15 p-3 text-center shadow-inner">
-                                                <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400">
+                                            <div className="flex items-center justify-between pt-3 border-t border-dashed border-[color:var(--app-border)]">
+                                                <span className="text-xs font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400">
                                                     Balance Shortage
                                                 </span>
-                                                <div className="text-xl font-bold text-amber-400 tabular-nums mt-0.5">
+                                                <span className="text-xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
                                                     Rs {toInr(Math.abs(change))} remaining
-                                                </div>
+                                                </span>
                                             </div>
                                         );
                                     })()}
@@ -1442,8 +1442,8 @@ export default function NewOrder() {
 
                             {/* ONLINE PAYMENT DISPLAY */}
                             {paymentMethod === "ONLINE" && (
-                                <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-4 text-center space-y-2">
-                                    <QrCode size={32} className="mx-auto text-indigo-400" />
+                                <div className="py-4 text-center space-y-2 border-t border-dashed border-[color:var(--app-border)]">
+                                    <QrCode size={32} className="mx-auto theme-muted" />
                                     <p className="text-sm font-bold text-[color:var(--app-text)]">
                                         Accept UPI QR / Card POS Payment
                                     </p>
@@ -1455,7 +1455,7 @@ export default function NewOrder() {
                         </div>
 
                         {/* Modal Actions */}
-                        <div className="pt-3 border-t border-[color:var(--app-border)] grid grid-cols-2 gap-3">
+                        <div className="pt-4 border-t border-[color:var(--app-border)] grid grid-cols-2 gap-3">
                             <button
                                 type="button"
                                 onClick={() => handleCompleteOrder({ printReceipt: false })}
@@ -1469,7 +1469,7 @@ export default function NewOrder() {
                             <button
                                 type="button"
                                 onClick={() => handleCompleteOrder({ printReceipt: true })}
-                                className="rounded-2xl py-3 px-3 text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
+                                className="theme-button rounded-2xl py-3 px-3 text-xs sm:text-sm font-bold shadow-lg flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
                                 disabled={placing || (paymentMethod === "CASH" && (parseFloat(cashGiven) || 0) < subtotal)}
                             >
                                 {placing ? (
