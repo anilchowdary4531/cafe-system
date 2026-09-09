@@ -74,15 +74,15 @@ const getRelativeLabel = (timestamp) => {
 
 function MetricCard({ icon: Icon, label, value, hint, accentColor = "amber" }) {
     return (
-        <div className="relative overflow-hidden rounded-2xl border border-zinc-800/80 bg-gradient-to-b from-zinc-900/90 to-zinc-950/90 p-4 shadow-xl backdrop-blur-xl transition hover:border-zinc-700">
+        <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] theme-panel p-4 shadow-xl backdrop-blur-xl transition hover:border-[var(--app-border-strong)]">
             <div className="flex items-center gap-3.5">
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-${accentColor}-500/10 text-${accentColor}-400 border border-${accentColor}-500/20 shadow-inner`}>
+                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-${accentColor}-500/15 text-${accentColor}-400 border border-${accentColor}-500/30 shadow-inner`}>
                     <Icon size={20} />
                 </div>
                 <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-extrabold uppercase tracking-widest text-zinc-400">{label}</p>
-                    <p className="mt-0.5 text-2xl font-black tracking-tight text-white">{value}</p>
-                    {hint ? <p className="text-[11px] font-medium text-zinc-400 truncate mt-0.5">{hint}</p> : null}
+                    <p className="text-[11px] font-extrabold uppercase tracking-widest theme-muted">{label}</p>
+                    <p className="mt-0.5 text-2xl font-black tracking-tight text-[var(--app-text)]">{value}</p>
+                    {hint ? <p className="text-[11px] font-medium theme-muted truncate mt-0.5">{hint}</p> : null}
                 </div>
             </div>
         </div>
@@ -99,56 +99,56 @@ function ModernTicketCard({
     isPickAction = false,
 }) {
     return (
-        <article className="group relative overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/70 p-4.5 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-amber-500/40 hover:shadow-amber-500/5">
+        <article className="group relative overflow-hidden rounded-2xl border border-[var(--app-border)] theme-panel p-4.5 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-[var(--app-primary)] hover:shadow-xl">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-xs font-black text-amber-400">
+                        <span className="rounded-lg bg-[color-mix(in_srgb,var(--app-primary)_20%,transparent)] border border-[var(--app-border-strong)] px-2.5 py-0.5 text-xs font-black text-[var(--app-primary)]">
                             {ticket.qty}x
                         </span>
-                        <h4 className="font-extrabold text-base text-white truncate tracking-tight group-hover:text-amber-300 transition duration-200">
+                        <h4 className="font-extrabold text-base text-[var(--app-text)] truncate tracking-tight group-hover:text-[var(--app-primary)] transition duration-200">
                             {ticket.itemName}
                         </h4>
                     </div>
 
                     <div className="mt-2 flex items-center gap-2 text-xs flex-wrap">
-                        <span className="rounded-md bg-zinc-800 px-2 py-0.5 text-[11px] font-bold text-zinc-300 border border-zinc-700/50">
+                        <span className="rounded-md bg-[var(--app-surface-2)] px-2 py-0.5 text-[11px] font-bold text-[var(--app-text)] border border-[var(--app-border)]">
                             {ticket.orderRef}
                         </span>
                         {ticket.tableNo && (
-                            <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-300 border border-amber-500/20">
+                            <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-500 border border-amber-500/20">
                                 Table {ticket.tableNo}
                             </span>
                         )}
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-400">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-500">
                             <Clock size={12} />
                             {ticket.ageText}
                         </span>
                     </div>
 
-                    <p className="mt-1.5 text-[10px] font-extrabold uppercase tracking-widest text-zinc-400">
-                        {ticket.orderLabel || "KITCHEN TICKET"} • <span className="text-emerald-400">{String(ticket.orderStatus || "").replace(/_/g, " ")}</span>
+                    <p className="mt-1.5 text-[10px] font-extrabold uppercase tracking-widest theme-muted">
+                        {ticket.orderLabel || "KITCHEN TICKET"} • <span className="text-emerald-500">{String(ticket.orderStatus || "").replace(/_/g, " ")}</span>
                     </p>
                 </div>
 
                 <div className="text-right shrink-0">
-                    <p className="text-base font-black text-amber-400 tabular-nums">
+                    <p className="text-base font-black theme-price tabular-nums">
                         {formatKitchenMoney(ticket.lineTotal)}
                     </p>
-                    <span className="mt-1 inline-block rounded-full bg-zinc-800/80 px-2.5 py-0.5 text-[10px] font-bold text-zinc-300 border border-zinc-700/50">
+                    <span className="mt-1 inline-block rounded-full bg-[var(--app-surface-2)] px-2.5 py-0.5 text-[10px] font-bold theme-muted border border-[var(--app-border)]">
                         {chefLabel || chef?.name || "Unassigned"}
                     </span>
                 </div>
             </div>
 
             {ticket.notes ? (
-                <div className="mt-3 rounded-xl bg-amber-500/5 border border-amber-500/15 p-2.5 text-xs italic text-amber-200/90 flex items-start gap-1.5">
-                    <Sparkles size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                <div className="mt-3 rounded-xl bg-[color-mix(in_srgb,var(--app-primary)_10%,transparent)] border border-[var(--app-border-strong)] p-2.5 text-xs italic text-[var(--app-text)] flex items-start gap-1.5">
+                    <Sparkles size={14} className="text-[var(--app-primary)] shrink-0 mt-0.5" />
                     <span>"{ticket.notes}"</span>
                 </div>
             ) : null}
 
-            <div className="mt-4 border-t border-zinc-800/80 pt-3 flex items-center justify-end">
+            <div className="mt-4 border-t border-[var(--app-border)] pt-3 flex items-center justify-end">
                 <button
                     type="button"
                     onClick={() => onAction?.(ticket.itemKey)}
@@ -170,13 +170,13 @@ function ModernHistoryCard({ entry, chef }) {
     const badge = ACTION_BADGES[String(entry?.action || "ASSIGNED").toUpperCase()] || ACTION_BADGES.ASSIGNED;
 
     return (
-        <article className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4 shadow-md backdrop-blur-md">
+        <article className="rounded-2xl border border-[var(--app-border)] theme-panel p-4 shadow-md backdrop-blur-md">
             <div className="flex items-start justify-between gap-3">
                 <div>
-                    <h5 className="font-extrabold text-sm text-white tracking-tight">
+                    <h5 className="font-extrabold text-sm text-[var(--app-text)] tracking-tight">
                         {entry.itemName || "Item"}
                     </h5>
-                    <p className="mt-0.5 text-xs text-zinc-400">
+                    <p className="mt-0.5 text-xs theme-muted">
                         {entry.orderRef || "Order"} {entry.orderLabel ? `• ${entry.orderLabel}` : ""} {entry.qty ? `(${entry.qty}x)` : ""}
                     </p>
                 </div>
@@ -185,19 +185,19 @@ function ModernHistoryCard({ entry, chef }) {
                     <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase border ${badge.bg}`}>
                         {badge.label}
                     </span>
-                    <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-[10px] font-bold text-zinc-300 border border-zinc-700">
+                    <span className="rounded-full bg-[var(--app-surface-2)] px-2.5 py-0.5 text-[10px] font-bold theme-muted border border-[var(--app-border)]">
                         {entry.chefName || chef?.name || "Chef"}
                     </span>
                 </div>
             </div>
 
-            <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-zinc-400">
+            <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold theme-muted">
                 <span>{getTimeLabel(entry.timestamp)}</span>
                 <span>•</span>
-                <span className="text-amber-400/90">{getRelativeLabel(entry.timestamp)}</span>
+                <span className="text-[var(--app-primary)]">{getRelativeLabel(entry.timestamp)}</span>
             </div>
 
-            {entry.note ? <p className="mt-2 text-xs italic text-zinc-400">Note: {entry.note}</p> : null}
+            {entry.note ? <p className="mt-2 text-xs italic theme-muted">Note: {entry.note}</p> : null}
         </article>
     );
 }
@@ -506,25 +506,25 @@ export default function KitchenChefDetail() {
     }, [historyOpen, soundModalOpen]);
 
     return (
-        <div className="min-h-screen bg-[#090a0f] text-zinc-100 selection:bg-amber-500 selection:text-black font-sans relative overflow-x-hidden">
+        <div className="min-h-screen theme-page selection:bg-amber-500 selection:text-black font-sans relative overflow-x-hidden">
             {/* Ambient Background Gradient Glows */}
-            <div className="pointer-events-none fixed -top-40 -left-40 h-96 w-96 rounded-full bg-amber-500/10 blur-[120px]" />
-            <div className="pointer-events-none fixed top-1/3 -right-40 h-96 w-96 rounded-full bg-orange-600/10 blur-[140px]" />
+            <div className="pointer-events-none fixed -top-40 -left-40 h-96 w-96 rounded-full bg-[var(--app-primary)]/10 blur-[120px]" />
+            <div className="pointer-events-none fixed top-1/3 -right-40 h-96 w-96 rounded-full bg-[var(--app-accent)]/10 blur-[140px]" />
 
             {/* TOP GLASS NAVIGATION BAR */}
-            <header className="sticky top-0 z-40 backdrop-blur-xl bg-zinc-950/80 border-b border-zinc-800/80 px-4 py-3.5 sm:px-6 md:px-8">
+            <header className="sticky top-0 z-40 theme-nav border-b border-[var(--app-border)] px-4 py-3.5 sm:px-6 md:px-8">
                 <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <Link
                             to="/kitchen"
-                            className="rounded-xl border border-zinc-800 bg-zinc-900/80 px-3.5 py-2 text-xs font-black text-zinc-200 transition hover:border-zinc-700 hover:bg-zinc-800 flex items-center gap-2 shadow-md cursor-pointer"
+                            className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3.5 py-2 text-xs font-black text-[var(--app-text)] transition hover:border-[var(--app-border-strong)] flex items-center gap-2 shadow-md cursor-pointer"
                         >
                             <ArrowLeft size={16} />
                             <span>Kitchen Board</span>
                         </Link>
                         <div>
-                            <p className="text-[10px] font-extrabold uppercase tracking-[0.25em] text-amber-500/90">{restaurantName}</p>
-                            <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
+                            <p className="text-[10px] font-extrabold uppercase tracking-[0.25em] theme-brand-text">{restaurantName}</p>
+                            <h1 className="text-lg font-black tracking-tight text-[var(--app-text)] flex items-center gap-2">
                                 {pageTitle}
                             </h1>
                         </div>
@@ -532,7 +532,7 @@ export default function KitchenChefDetail() {
 
                     <div className="flex items-center gap-2.5">
                         {/* Live Socket Status */}
-                        <div className="hidden sm:flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-xs font-bold text-zinc-400">
+                        <div className="hidden sm:flex items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-1.5 text-xs font-bold theme-muted">
                             <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
                             <span>{connected ? "Socket Live" : "Reconnecting"}</span>
                         </div>
@@ -541,9 +541,9 @@ export default function KitchenChefDetail() {
                         <button
                             type="button"
                             onClick={() => setSoundModalOpen(true)}
-                            className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs font-black text-amber-400 hover:bg-amber-500/20 transition flex items-center gap-2 shadow-md cursor-pointer"
+                            className="rounded-xl border border-[var(--app-border-strong)] bg-[color-mix(in_srgb,var(--app-primary)_15%,transparent)] px-3.5 py-2 text-xs font-black text-[var(--app-primary)] hover:bg-[color-mix(in_srgb,var(--app-primary)_25%,transparent)] transition flex items-center gap-2 shadow-md cursor-pointer"
                         >
-                            {soundMuted ? <BellOff size={16} className="text-zinc-400" /> : <Bell size={16} className="animate-pulse" />}
+                            {soundMuted ? <BellOff size={16} className="theme-muted" /> : <Bell size={16} className="animate-pulse" />}
                             <span className="hidden sm:inline">{soundMuted ? "Muted" : "Alerts On"}</span>
                         </button>
 
@@ -551,7 +551,7 @@ export default function KitchenChefDetail() {
                             type="button"
                             onClick={refreshBoard}
                             disabled={refreshing || ordersLoading || staffLoading}
-                            className="rounded-xl border border-zinc-800 bg-zinc-900/80 p-2 text-zinc-300 hover:bg-zinc-800 transition cursor-pointer"
+                            className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-2 text-[var(--app-text)] hover:border-[var(--app-border-strong)] transition cursor-pointer"
                             title="Refresh Board"
                         >
                             <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
@@ -564,7 +564,7 @@ export default function KitchenChefDetail() {
             <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:px-8 space-y-6">
 
                 {/* CHEF HERO IDENTITY & METRICS HEADER */}
-                <div className="rounded-3xl border border-zinc-800/80 bg-gradient-to-r from-zinc-900/90 via-zinc-950/90 to-zinc-900/90 p-6 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+                <div className="rounded-3xl theme-panel p-6 shadow-2xl relative overflow-hidden border border-[var(--app-border)]">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
                         
                         {/* Chef Profile Badge */}
@@ -573,22 +573,22 @@ export default function KitchenChefDetail() {
                                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-black font-black text-xl shadow-xl shadow-amber-500/20 border-2 border-amber-400/40">
                                     <ChefHat size={32} />
                                 </div>
-                                <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-black border-2 border-zinc-900">
+                                <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-black border-2 border-[var(--app-surface)]">
                                     <Check size={12} strokeWidth={3} />
                                 </span>
                             </div>
 
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">{pageTitle}</h2>
-                                    <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-0.5 text-xs font-black text-amber-400">
+                                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--app-text)]">{pageTitle}</h2>
+                                    <span className="rounded-full bg-[color-mix(in_srgb,var(--app-primary)_20%,transparent)] border border-[var(--app-border-strong)] px-3 py-0.5 text-xs font-black text-[var(--app-primary)]">
                                         {pageDesignation}
                                     </span>
                                 </div>
-                                <p className="text-xs text-zinc-400 mt-1 flex items-center gap-2">
+                                <p className="text-xs theme-muted mt-1 flex items-center gap-2">
                                     <span>{restaurantName} Kitchen Station</span>
                                     <span>•</span>
-                                    <span className="text-emerald-400 font-semibold">Active Dispatch Station</span>
+                                    <span className="text-emerald-500 font-semibold">Active Dispatch Station</span>
                                 </p>
                             </div>
                         </div>
@@ -598,16 +598,16 @@ export default function KitchenChefDetail() {
                             <button
                                 type="button"
                                 onClick={() => setHistoryOpen(true)}
-                                className="rounded-xl border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-white px-4 py-2.5 text-xs font-black transition flex items-center gap-2 shadow-lg cursor-pointer"
+                                className="rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] text-[var(--app-text)] hover:border-[var(--app-primary)] px-4 py-2.5 text-xs font-black transition flex items-center gap-2 shadow-lg cursor-pointer"
                             >
-                                <History size={16} className="text-amber-400" />
+                                <History size={16} className="text-[var(--app-primary)]" />
                                 <span>Activity History ({relevantHistory.length})</span>
                             </button>
                         </div>
                     </div>
 
                     {/* Metric Cards Row */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-zinc-800/80">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-[var(--app-border)]">
                         <MetricCard
                             icon={Flame}
                             label="Live Orders"
@@ -643,26 +643,26 @@ export default function KitchenChefDetail() {
                                     <Flame size={18} />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-black tracking-tight text-white">Pick from Pass</h3>
-                                    <p className="text-xs text-zinc-400">Claim an open ticket to add to your live cooking queue</p>
+                                    <h3 className="text-lg font-black tracking-tight text-[var(--app-text)]">Pick from Pass</h3>
+                                    <p className="text-xs theme-muted">Claim an open ticket to add to your live cooking queue</p>
                                 </div>
                             </div>
-                            <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-black text-amber-400">
+                            <span className="rounded-full bg-[color-mix(in_srgb,var(--app-primary)_20%,transparent)] border border-[var(--app-border-strong)] px-3 py-1 text-xs font-black text-[var(--app-primary)]">
                                 {availableTickets.length} Open
                             </span>
                         </div>
 
                         <div className="space-y-3.5 min-h-[300px]">
                             {ordersLoading || staffLoading ? (
-                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl border border-zinc-800/80 bg-zinc-900/40 text-zinc-400 space-y-3">
-                                    <LoaderCircle size={28} className="animate-spin text-amber-500" />
+                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl theme-panel border border-[var(--app-border)] theme-muted space-y-3">
+                                    <LoaderCircle size={28} className="animate-spin text-[var(--app-primary)]" />
                                     <p className="text-xs font-bold uppercase tracking-wider">Syncing Pass Tickets...</p>
                                 </div>
                             ) : availableTickets.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl border border-zinc-800/80 bg-zinc-900/40 text-center p-6 space-y-3">
-                                    <UtensilsCrossed size={36} className="text-zinc-600 opacity-60" />
-                                    <h4 className="text-sm font-bold text-zinc-300">Pass is Clear!</h4>
-                                    <p className="text-xs text-zinc-500 max-w-xs">No unassigned tickets waiting on the pass right now.</p>
+                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl theme-panel border border-[var(--app-border)] text-center p-6 space-y-3">
+                                    <UtensilsCrossed size={36} className="theme-muted opacity-60" />
+                                    <h4 className="text-sm font-bold text-[var(--app-text)]">Pass is Clear!</h4>
+                                    <p className="text-xs theme-muted max-w-xs">No unassigned tickets waiting on the pass right now.</p>
                                 </div>
                             ) : (
                                 availableTickets.map((ticket) => (
@@ -689,8 +689,8 @@ export default function KitchenChefDetail() {
                                     <ChefHat size={18} />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-black tracking-tight text-white">My Live Cooking Load</h3>
-                                    <p className="text-xs text-zinc-400">Tickets currently assigned to {pageTitle}</p>
+                                    <h3 className="text-lg font-black tracking-tight text-[var(--app-text)]">My Live Cooking Load</h3>
+                                    <p className="text-xs theme-muted">Tickets currently assigned to {pageTitle}</p>
                                 </div>
                             </div>
                             <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-xs font-black text-emerald-400">
@@ -700,15 +700,15 @@ export default function KitchenChefDetail() {
 
                         <div className="space-y-3.5 min-h-[300px]">
                             {ordersLoading || staffLoading ? (
-                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl border border-zinc-800/80 bg-zinc-900/40 text-zinc-400 space-y-3">
+                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl theme-panel border border-[var(--app-border)] theme-muted space-y-3">
                                     <LoaderCircle size={28} className="animate-spin text-emerald-500" />
                                     <p className="text-xs font-bold uppercase tracking-wider">Syncing Live Load...</p>
                                 </div>
                             ) : currentTickets.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl border border-zinc-800/80 bg-zinc-900/40 text-center p-6 space-y-3">
-                                    <ChefHat size={36} className="text-zinc-600 opacity-60" />
-                                    <h4 className="text-sm font-bold text-zinc-300">No Active Load</h4>
-                                    <p className="text-xs text-zinc-500 max-w-xs">Pick orders from the left column to start cooking.</p>
+                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl theme-panel border border-[var(--app-border)] text-center p-6 space-y-3">
+                                    <ChefHat size={36} className="theme-muted opacity-60" />
+                                    <h4 className="text-sm font-bold text-[var(--app-text)]">No Active Load</h4>
+                                    <p className="text-xs theme-muted max-w-xs">Pick orders from the left column to start cooking.</p>
                                 </div>
                             ) : (
                                 currentTickets.map((ticket) => (
@@ -732,27 +732,27 @@ export default function KitchenChefDetail() {
             {/* ACTIVITY HISTORY MODAL */}
             {historyOpen && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+                    className="theme-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
                     onClick={() => setHistoryOpen(false)}
                 >
                     <div
-                        className="w-full max-w-3xl rounded-3xl border border-zinc-800 bg-zinc-950 p-6 space-y-5 shadow-2xl"
+                        className="theme-modal w-full max-w-3xl rounded-3xl p-6 space-y-5 shadow-2xl"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+                        <div className="flex items-center justify-between border-b border-[var(--app-border)] pb-4">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--app-primary)_15%,transparent)] text-[var(--app-primary)] border border-[var(--app-border-strong)]">
                                     <History size={20} />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-black text-white">Activity Trail — {pageTitle}</h3>
-                                    <p className="text-xs text-zinc-400">Past item assignments and completion logs</p>
+                                    <h3 className="text-lg font-black text-[var(--app-text)]">Activity Trail — {pageTitle}</h3>
+                                    <p className="text-xs theme-muted">Past item assignments and completion logs</p>
                                 </div>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setHistoryOpen(false)}
-                                className="rounded-xl border border-zinc-800 p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+                                className="rounded-xl border border-[var(--app-border)] p-2 theme-muted hover:text-[var(--app-text)] hover:bg-[var(--app-surface-2)] transition cursor-pointer"
                             >
                                 <X size={18} />
                             </button>
@@ -760,7 +760,7 @@ export default function KitchenChefDetail() {
 
                         <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-1">
                             {relevantHistory.length === 0 ? (
-                                <p className="text-center text-xs text-zinc-500 py-10">No activity trail recorded for this chef yet.</p>
+                                <p className="text-center text-xs theme-muted py-10">No activity trail recorded for this chef yet.</p>
                             ) : (
                                 relevantHistory.map((entry) => (
                                     <ModernHistoryCard
@@ -778,39 +778,39 @@ export default function KitchenChefDetail() {
             {/* SOUND SETTINGS MODAL */}
             {soundModalOpen && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+                    className="theme-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
                     onClick={() => setSoundModalOpen(false)}
                 >
                     <div
-                        className="w-full max-w-2xl rounded-3xl border border-zinc-800 bg-zinc-950 p-6 space-y-5 shadow-2xl"
+                        className="theme-modal w-full max-w-2xl rounded-3xl p-6 space-y-5 shadow-2xl"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+                        <div className="flex items-center justify-between border-b border-[var(--app-border)] pb-4">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--app-primary)_15%,transparent)] text-[var(--app-primary)] border border-[var(--app-border-strong)]">
                                     <Bell size={20} className="animate-pulse" />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-black text-white">Kitchen Order Chime & Alerts</h3>
-                                    <p className="text-xs text-zinc-400">Configure real-time ticket arrival audio alerts</p>
+                                    <h3 className="text-lg font-black text-[var(--app-text)]">Kitchen Order Chime & Alerts</h3>
+                                    <p className="text-xs theme-muted">Configure real-time ticket arrival audio alerts</p>
                                 </div>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setSoundModalOpen(false)}
-                                className="rounded-xl border border-zinc-800 p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+                                className="rounded-xl border border-[var(--app-border)] p-2 theme-muted hover:text-[var(--app-text)] hover:bg-[var(--app-surface-2)] transition cursor-pointer"
                             >
                                 <X size={18} />
                             </button>
                         </div>
 
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+                            <div className="flex items-center justify-between rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-4">
                                 <div className="flex items-center gap-3">
-                                    {soundMuted ? <VolumeX size={20} className="text-zinc-500" /> : <Volume2 size={20} className="text-amber-400" />}
+                                    {soundMuted ? <VolumeX size={20} className="theme-muted" /> : <Volume2 size={20} className="text-[var(--app-primary)]" />}
                                     <div>
-                                        <p className="text-sm font-bold text-white">{soundMuted ? "Sound Alerts Muted" : "Sound Alerts Active"}</p>
-                                        <p className="text-xs text-zinc-400">Plays notification sound when new orders arrive</p>
+                                        <p className="text-sm font-bold text-[var(--app-text)]">{soundMuted ? "Sound Alerts Muted" : "Sound Alerts Active"}</p>
+                                        <p className="text-xs theme-muted">Plays notification sound when new orders arrive</p>
                                     </div>
                                 </div>
                                 <button
@@ -818,7 +818,7 @@ export default function KitchenChefDetail() {
                                     onClick={toggleSoundMute}
                                     className={`rounded-xl px-4 py-2 text-xs font-black transition cursor-pointer ${
                                         soundMuted
-                                            ? "bg-amber-500 text-black hover:bg-amber-400"
+                                            ? "theme-button"
                                             : "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30"
                                     }`}
                                 >
