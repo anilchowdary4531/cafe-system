@@ -1384,7 +1384,7 @@ export default function NewOrder() {
                                         <button
                                             type="button"
                                             onClick={() => setCashGiven(String(subtotal))}
-                                            className="rounded-xl bg-black dark:bg-stone-900 text-white px-3.5 py-1.5 text-xs font-extrabold shadow-sm hover:bg-stone-800 transition"
+                                            className="rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 text-xs font-extrabold shadow-sm transition"
                                         >
                                             Exact (Rs {toInr(subtotal)})
                                         </button>
