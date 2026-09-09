@@ -2,13 +2,19 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
     ArrowLeft,
+    Banknote,
+    CheckCircle2,
     Coffee,
+    CreditCard,
     IceCream,
     LoaderCircle,
     Pause,
     Pizza,
     Play,
     Plus,
+    Printer,
+    QrCode,
+    Receipt,
     Salad,
     Sandwich,
     Search,
@@ -149,10 +155,15 @@ const buildBillPrintMarkup = ({ restaurantName, order } = {}) => {
         ? "Dine In"
         : "Takeaway";
 
+    const paymentMethod = order?.paymentMethod ? String(order.paymentMethod).toUpperCase() : "";
+    const cashGiven = order?.cashGiven !== undefined && order?.cashGiven !== null ? Number(order.cashGiven) : null;
+    const changeReturned = order?.changeReturned !== undefined && order?.changeReturned !== null ? Number(order.changeReturned) : null;
+
     const metaRows = [
         ["Order No", order?.orderNo || "-"],
         ["Bill No", order?.invoiceNo || order?.orderNo || "-"],
         ["Type", orderType],
+        ...(paymentMethod ? [["Payment Mode", paymentMethod]] : []),
         ...(String(order?.tableNo || "").trim() ? [["Table", order.tableNo]] : []),
         ...(String(order?.customerName || "").trim() ? [["Customer", order.customerName]] : []),
         ...(String(order?.phone || "").trim() ? [["Phone", order.phone]] : []),
@@ -184,6 +195,8 @@ const buildBillPrintMarkup = ({ restaurantName, order } = {}) => {
         ...(taxAmount > 0 ? [["Tax", taxAmount]] : []),
         ...(serviceChargeAmount > 0 ? [["Service Charge", serviceChargeAmount]] : []),
         ...(discountAmount > 0 ? [["Discount", -discountAmount]] : []),
+        ...(paymentMethod === "CASH" && cashGiven !== null ? [["Cash Given", cashGiven]] : []),
+        ...(paymentMethod === "CASH" && changeReturned !== null ? [["Change Returned", changeReturned]] : []),
     ]
         .map(
             ([label, amount]) => `
@@ -516,6 +529,9 @@ export default function NewOrder() {
     const [placing, setPlacing] = useState(false);
     const [activeCategory, setActiveCategory] = useState("ALL");
     const [billToClose, setBillToClose] = useState(null);
+    const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState("CASH");
+    const [cashGiven, setCashGiven] = useState("");
     const searchRef = useRef(null);
 
     const tableNo = String(searchParams.get("table") || "").trim() || null;
@@ -773,21 +789,7 @@ export default function NewOrder() {
         searchRef.current.focus();
     }, []);
 
-    const handlePrintBill = useCallback(() => {
-        if (!socket || !connected) {
-            showToast({ title: "Offline", message: "Socket not connected", variant: "error" });
-            return;
-        }
-        if (placing) return;
-        if (cartItems.length === 0) {
-            showToast({ title: "Cart empty", message: "Add at least one item", variant: "error" });
-            return;
-        }
-        if (String(orderType || "").toUpperCase() === "DINE_IN" && !tableNo) {
-            showToast({ title: "Select table", message: "Choose a table for dine-in orders", variant: "error" });
-            return;
-        }
-
+    const triggerPrintReceipt = useCallback((order) => {
         const printFrame = document.createElement("iframe");
         printFrame.setAttribute("aria-hidden", "true");
         printFrame.style.position = "fixed";
@@ -807,28 +809,75 @@ export default function NewOrder() {
             }
         };
 
-        const printBill = (order) => {
-            const markup = buildBillPrintMarkup({
-                restaurantName,
-                order,
-            });
+        const markup = buildBillPrintMarkup({
+            restaurantName,
+            order,
+        });
 
-            printFrame.onload = () => {
-                setTimeout(() => {
-                    try {
-                        printFrame.contentWindow?.focus?.();
-                        printFrame.contentWindow?.print?.();
-                    } catch {
-                        // ignore print errors so the order flow can still complete
-                    } finally {
-                        setTimeout(cleanupPrintFrame, 750);
-                    }
-                }, 200);
-            };
-
-            printFrame.srcdoc = markup;
-            document.body.appendChild(printFrame);
+        printFrame.onload = () => {
+            setTimeout(() => {
+                try {
+                    printFrame.contentWindow?.focus?.();
+                    printFrame.contentWindow?.print?.();
+                } catch {
+                    // ignore print errors so the order flow can still complete
+                } finally {
+                    setTimeout(cleanupPrintFrame, 750);
+                }
+            }, 200);
         };
+
+        printFrame.srcdoc = markup;
+        document.body.appendChild(printFrame);
+    }, [restaurantName]);
+
+    const handleOpenCheckoutModal = useCallback(() => {
+        if (!socket || !connected) {
+            showToast({ title: "Offline", message: "Socket not connected", variant: "error" });
+            return;
+        }
+        if (placing) return;
+        if (cartItems.length === 0) {
+            showToast({ title: "Cart empty", message: "Add at least one item", variant: "error" });
+            return;
+        }
+        if (String(orderType || "").toUpperCase() === "DINE_IN" && !tableNo) {
+            showToast({ title: "Select table", message: "Choose a table for dine-in orders", variant: "error" });
+            return;
+        }
+
+        setCashGiven(String(subtotal));
+        setShowCheckoutModal(true);
+    }, [cartItems.length, connected, orderType, placing, socket, subtotal, tableNo]);
+
+    const handleCompleteOrder = useCallback(({ printReceipt = true } = {}) => {
+        if (!socket || !connected) {
+            showToast({ title: "Offline", message: "Socket not connected", variant: "error" });
+            return;
+        }
+        if (placing) return;
+        if (cartItems.length === 0) {
+            showToast({ title: "Cart empty", message: "Add at least one item", variant: "error" });
+            return;
+        }
+
+        const cashGivenNum = paymentMethod === "CASH" ? (parseFloat(cashGiven) || 0) : subtotal;
+        const changeReturnedNum = paymentMethod === "CASH" ? Math.max(0, cashGivenNum - subtotal) : 0;
+
+        if (paymentMethod === "CASH" && cashGivenNum < subtotal) {
+            showToast({
+                title: "Insufficient Cash",
+                message: `Customer gave Rs ${toInr(cashGivenNum)}, but total is Rs ${toInr(subtotal)}`,
+                variant: "error",
+            });
+            return;
+        }
+
+        const paymentNotes = paymentMethod === "CASH"
+            ? `Paid via CASH. Cash Given: Rs ${toInr(cashGivenNum)}, Change Returned: Rs ${toInr(changeReturnedNum)}.`
+            : `Paid via ONLINE / UPI.`;
+
+        const finalNotes = [notes ? String(notes).trim() : null, paymentNotes].filter(Boolean).join(" | ");
 
         setPlacing(true);
         socket.emit(
@@ -836,24 +885,40 @@ export default function NewOrder() {
             {
                 orderType: String(orderType || "TAKEAWAY").toUpperCase(),
                 tableNo: String(orderType || "").toUpperCase() === "DINE_IN" ? tableNo : null,
-                notes: notes ? String(notes).trim() : null,
+                notes: finalNotes,
                 customerName: customerName ? String(customerName).trim() : null,
                 phone: phone ? String(phone).trim() : null,
                 items: cartItems.map((it) => ({ menuItemId: it.menuItemId, qty: it.qty })),
+                paymentMethod,
+                cashGiven: cashGivenNum,
+                changeReturned: changeReturnedNum,
             },
             (ack) => {
                 try {
                     if (ack?.ok) {
-                        printBill(ack?.order);
+                        const createdOrder = {
+                            ...ack.order,
+                            paymentMethod,
+                            cashGiven: cashGivenNum,
+                            changeReturned: changeReturnedNum,
+                        };
+
+                        if (printReceipt) {
+                            triggerPrintReceipt(createdOrder);
+                        }
+
                         showToast({
-                            title: "Bill ready",
-                            message: ack?.order?.invoiceNo || ack?.order?.orderNo || "Receipt opened for printing",
+                            title: "Order Completed",
+                            message: `${ack?.order?.invoiceNo || ack?.order?.orderNo || "Bill"} processed successfully (${paymentMethod})`,
                             variant: "success",
                         });
+
+                        setShowCheckoutModal(false);
+                        setCashGiven("");
                         removeCompletedBill(activeBill.id);
                         return;
                     }
-                    cleanupPrintFrame();
+
                     showToast({
                         title: "Bill failed",
                         message: String(ack?.message || "Unable to create bill"),
@@ -864,7 +929,7 @@ export default function NewOrder() {
                 }
             }
         );
-    }, [activeBill?.id, cartItems, connected, customerName, notes, orderType, phone, placing, removeCompletedBill, restaurantName, socket, tableNo]);
+    }, [socket, connected, placing, cartItems, paymentMethod, cashGiven, subtotal, notes, orderType, tableNo, customerName, phone, activeBill.id, triggerPrintReceipt, removeCompletedBill]);
 
     return (
         <div className="theme-page min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_430px]">
@@ -1143,18 +1208,13 @@ export default function NewOrder() {
                             </button>
                             <button
                                 type="button"
-                                onClick={handlePrintBill}
-                                className="theme-button rounded-2xl px-2 py-3 text-xs font-semibold"
-                                disabled={!connected || placing}
+                                onClick={handleOpenCheckoutModal}
+                                className="theme-button rounded-2xl px-2 py-3 text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-1.5 shadow-md transition active:scale-[0.98]"
+                                disabled={!connected || placing || cartItems.length === 0}
+                                title="Complete Order & Checkout"
                             >
-                                {placing ? (
-                                    <span className="inline-flex items-center gap-1">
-                                        <LoaderCircle size={14} className="animate-spin" />
-                                        Printing...
-                                    </span>
-                                ) : (
-                                    "Print Bill"
-                                )}
+                                <CheckCircle2 size={16} />
+                                Done
                             </button>
                         </div>
                     </div>
@@ -1189,6 +1249,240 @@ export default function NewOrder() {
                                 className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 transition"
                             >
                                 Cancel Bill
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PETPOOJA STYLE PAYMENT & CUSTOMER CHANGE CALCULATOR MODAL */}
+            {showCheckoutModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 overflow-y-auto">
+                    <div className="theme-panel w-full max-w-lg rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface,var(--app-bg))] p-5 sm:p-6 text-[color:var(--app-text)] shadow-2xl space-y-4 max-h-[92vh] flex flex-col justify-between">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between pb-3 border-b border-[color:var(--app-border)]">
+                            <div>
+                                <h3 className="text-xl font-extrabold flex items-center gap-2 text-[color:var(--app-text)]">
+                                    <Receipt size={22} className="text-emerald-500" />
+                                    Checkout & Payment
+                                </h3>
+                                <p className="theme-muted text-xs mt-0.5">
+                                    {activeBill.billNumber} • {orderType === "DINE_IN" ? `Table ${tableNo}` : "Takeaway"}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowCheckoutModal(false)}
+                                className="theme-soft-button inline-flex h-8 w-8 items-center justify-center rounded-full"
+                                aria-label="Close checkout modal"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4 overflow-y-auto pr-1">
+                            {/* Total Bill Box */}
+                            <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_70%,transparent)] p-4 flex items-center justify-between">
+                                <div>
+                                    <span className="theme-muted text-xs uppercase font-extrabold tracking-wider">Total Payable Amount</span>
+                                    <p className="theme-muted text-xs">{totalItems} item{totalItems === 1 ? "" : "s"} in cart</p>
+                                </div>
+                                <span className="text-2xl sm:text-3xl font-black text-emerald-500 tabular-nums">
+                                    Rs {toInr(subtotal)}
+                                </span>
+                            </div>
+
+                            {/* Customer Details Summary */}
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                    <label className="theme-muted block font-semibold mb-1">Customer Name</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Walk-in Customer"
+                                        value={customerName}
+                                        onChange={(e) => setCustomerName(e.target.value)}
+                                        className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] px-3 py-1.5 font-semibold text-[color:var(--app-text)] outline-none focus:border-emerald-500/50"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="theme-muted block font-semibold mb-1">Phone Number</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Optional"
+                                        value={phone}
+                                        onChange={(e) => setPhone(e.target.value)}
+                                        className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] px-3 py-1.5 font-semibold text-[color:var(--app-text)] outline-none focus:border-emerald-500/50"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Payment Mode Selection */}
+                            <div>
+                                <label className="theme-muted block text-xs font-extrabold uppercase tracking-wider mb-2">
+                                    Select Payment Mode
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPaymentMethod("CASH");
+                                            if (!cashGiven) setCashGiven(String(subtotal));
+                                        }}
+                                        className={[
+                                            "flex items-center justify-center gap-2 rounded-2xl border p-3.5 text-sm font-bold transition",
+                                            paymentMethod === "CASH"
+                                                ? "border-emerald-500 bg-emerald-500/15 text-emerald-500 shadow-md ring-2 ring-emerald-500/30"
+                                                : "border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] theme-muted hover:text-[color:var(--app-text)]",
+                                        ].join(" ")}
+                                    >
+                                        <Banknote size={20} />
+                                        <span>CASH</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentMethod("ONLINE")}
+                                        className={[
+                                            "flex items-center justify-center gap-2 rounded-2xl border p-3.5 text-sm font-bold transition",
+                                            paymentMethod === "ONLINE"
+                                                ? "border-indigo-500 bg-indigo-500/15 text-indigo-400 shadow-md ring-2 ring-indigo-500/30"
+                                                : "border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] theme-muted hover:text-[color:var(--app-text)]",
+                                        ].join(" ")}
+                                    >
+                                        <CreditCard size={20} />
+                                        <span>ONLINE / UPI</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* CASH TENDER & CHANGE RETURN CALCULATOR (PetPooja Style) */}
+                            {paymentMethod === "CASH" && (
+                                <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_40%,transparent)] p-4">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <label className="theme-muted text-xs font-bold uppercase tracking-wider">
+                                            Cash Given by Customer (Rs)
+                                        </label>
+                                        <span className="text-xs theme-muted font-semibold">Enter amount or tap preset</span>
+                                    </div>
+
+                                    {/* Amount Input */}
+                                    <div className="relative">
+                                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-lg font-bold theme-muted">Rs</span>
+                                        <input
+                                            type="number"
+                                            step="any"
+                                            inputMode="decimal"
+                                            placeholder={toInr(subtotal)}
+                                            value={cashGiven}
+                                            onChange={(e) => setCashGiven(e.target.value)}
+                                            className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_90%,transparent)] pl-10 pr-4 py-2.5 text-xl font-black text-[color:var(--app-text)] outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 tabular-nums"
+                                        />
+                                    </div>
+
+                                    {/* Quick Cash Tender Buttons (PetPooja style) */}
+                                    <div className="flex flex-wrap gap-2 pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setCashGiven(String(subtotal))}
+                                            className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-500 hover:bg-emerald-500/20 transition"
+                                        >
+                                            Exact (Rs {toInr(subtotal)})
+                                        </button>
+                                        {[100, 200, 500, 2000].map((amt) => (
+                                            <button
+                                                key={amt}
+                                                type="button"
+                                                onClick={() => setCashGiven(String(amt))}
+                                                className="rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_70%,transparent)] px-3 py-1.5 text-xs font-bold text-[color:var(--app-text)] hover:border-emerald-500/50 hover:bg-emerald-500/10 transition"
+                                            >
+                                                Rs {amt}
+                                            </button>
+                                        ))}
+                                        {Math.ceil(subtotal / 50) * 50 > subtotal && Math.ceil(subtotal / 50) * 50 !== 100 && Math.ceil(subtotal / 50) * 50 !== 200 && Math.ceil(subtotal / 50) * 50 !== 500 && Math.ceil(subtotal / 50) * 50 !== 2000 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setCashGiven(String(Math.ceil(subtotal / 50) * 50))}
+                                                className="rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_70%,transparent)] px-3 py-1.5 text-xs font-bold text-[color:var(--app-text)] hover:border-emerald-500/50 transition"
+                                            >
+                                                Rs {Math.ceil(subtotal / 50) * 50}
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* LIVE RETURN CHANGE CALCULATOR DISPLAY */}
+                                    {(() => {
+                                        const given = parseFloat(cashGiven) || 0;
+                                        const change = given - subtotal;
+                                        const isEnough = given >= subtotal;
+
+                                        if (!cashGiven) return null;
+
+                                        return isEnough ? (
+                                            <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/15 p-3.5 text-center shadow-inner">
+                                                <span className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-400">
+                                                    Return Change to Customer
+                                                </span>
+                                                <div className="text-3xl font-black text-emerald-400 tabular-nums mt-0.5">
+                                                    Rs {toInr(change)}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="rounded-2xl border border-amber-500/40 bg-amber-500/15 p-3 text-center shadow-inner">
+                                                <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400">
+                                                    Balance Shortage
+                                                </span>
+                                                <div className="text-xl font-bold text-amber-400 tabular-nums mt-0.5">
+                                                    Rs {toInr(Math.abs(change))} remaining
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+
+                            {/* ONLINE PAYMENT DISPLAY */}
+                            {paymentMethod === "ONLINE" && (
+                                <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-4 text-center space-y-2">
+                                    <QrCode size={32} className="mx-auto text-indigo-400" />
+                                    <p className="text-sm font-bold text-[color:var(--app-text)]">
+                                        Accept UPI QR / Card POS Payment
+                                    </p>
+                                    <p className="theme-muted text-xs">
+                                        Verify payment confirmation on your UPI QR or POS machine before completing order.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Actions */}
+                        <div className="pt-3 border-t border-[color:var(--app-border)] grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => handleCompleteOrder({ printReceipt: false })}
+                                className="theme-soft-button rounded-2xl py-3 px-3 text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5"
+                                disabled={placing || (paymentMethod === "CASH" && (parseFloat(cashGiven) || 0) < subtotal)}
+                            >
+                                <CheckCircle2 size={16} />
+                                Complete Only
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleCompleteOrder({ printReceipt: true })}
+                                className="rounded-2xl py-3 px-3 text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
+                                disabled={placing || (paymentMethod === "CASH" && (parseFloat(cashGiven) || 0) < subtotal)}
+                            >
+                                {placing ? (
+                                    <span className="inline-flex items-center gap-1">
+                                        <LoaderCircle size={16} className="animate-spin" />
+                                        Processing...
+                                    </span>
+                                ) : (
+                                    <>
+                                        <Printer size={16} />
+                                        Complete & Print
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>
