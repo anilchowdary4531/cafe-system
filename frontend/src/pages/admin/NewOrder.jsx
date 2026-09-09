@@ -1257,18 +1257,22 @@ export default function NewOrder() {
 
             {/* PETPOOJA STYLE PAYMENT & CUSTOMER CHANGE CALCULATOR MODAL */}
             {showCheckoutModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 overflow-y-auto">
-                    <div className="theme-panel w-full max-w-lg rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_96%,#000_4%)] p-6 text-[color:var(--app-text)] shadow-2xl space-y-5 max-h-[92vh] flex flex-col justify-between">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 overflow-y-auto">
+                    <div className="theme-panel w-full max-w-lg rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface,var(--app-bg))] p-6 text-[color:var(--app-text)] shadow-2xl space-y-5 max-h-[92vh] flex flex-col justify-between">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between pb-3 border-b border-[color:var(--app-border)]">
-                            <div>
-                                <h3 className="text-xl font-extrabold flex items-center gap-2 text-[color:var(--app-text)]">
-                                    <Receipt size={20} className="theme-accent-text" />
-                                    Checkout & Payment
-                                </h3>
-                                <p className="theme-muted text-xs mt-0.5 font-semibold">
-                                    {activeBill.billNumber} • {orderType === "DINE_IN" ? `Table ${tableNo}` : "Takeaway"}
-                                </p>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-2xl bg-orange-500/10 text-orange-600 border border-orange-500/20">
+                                    <Receipt size={22} />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-[color:var(--app-text)] tracking-tight">
+                                        Checkout & Payment
+                                    </h3>
+                                    <p className="theme-muted text-xs font-bold mt-0.5">
+                                        {activeBill.billNumber} • {orderType === "DINE_IN" ? `Table ${tableNo}` : "Takeaway"}
+                                    </p>
+                                </div>
                             </div>
                             <button
                                 type="button"
@@ -1281,45 +1285,53 @@ export default function NewOrder() {
                         </div>
 
                         <div className="space-y-4 overflow-y-auto pr-1">
-                            {/* Total Bill Section - Paper Style Header */}
-                            <div className="flex items-baseline justify-between pb-3 border-b border-[color:var(--app-border)]">
+                            {/* Total Bill Section - High Contrast Hero Banner */}
+                            <div className="rounded-2xl bg-gradient-to-r from-stone-900 via-amber-950 to-stone-900 text-white p-4.5 shadow-md flex items-center justify-between border border-amber-500/30">
                                 <div>
-                                    <span className="theme-muted text-xs uppercase font-extrabold tracking-widest">Total Payable</span>
-                                    <p className="theme-muted text-xs font-semibold">{totalItems} item{totalItems === 1 ? "" : "s"} in cart</p>
+                                    <span className="text-amber-400 text-xs uppercase font-black tracking-widest block">
+                                        Total Payable Amount
+                                    </span>
+                                    <p className="text-stone-300 text-xs font-medium mt-0.5">
+                                        {totalItems} item{totalItems === 1 ? "" : "s"} in cart
+                                    </p>
                                 </div>
-                                <span className="text-3xl font-black text-[color:var(--app-text)] tabular-nums">
+                                <span className="text-3xl sm:text-4xl font-black text-amber-300 tabular-nums">
                                     Rs {toInr(subtotal)}
                                 </span>
                             </div>
 
-                            {/* Customer Details Summary - Clean Underline Inputs */}
-                            <div className="grid grid-cols-2 gap-4 text-xs">
-                                <div>
-                                    <label className="theme-muted block font-extrabold uppercase text-[10px] tracking-wider mb-1">Customer Name</label>
+                            {/* Customer Details Summary - High Visibility Input Cards */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-2xl border-2 border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] p-2.5 focus-within:border-orange-500 transition shadow-xs">
+                                    <label className="text-stone-800 dark:text-stone-200 block font-extrabold uppercase text-[10px] tracking-wider mb-1">
+                                        Customer Name
+                                    </label>
                                     <input
                                         type="text"
                                         placeholder="Walk-in Customer"
                                         value={customerName}
                                         onChange={(e) => setCustomerName(e.target.value)}
-                                        className="w-full bg-transparent border-b border-[color:var(--app-border)] py-1 text-sm font-semibold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-[color:var(--app-text)] transition"
+                                        className="w-full bg-transparent text-sm font-bold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none"
                                     />
                                 </div>
-                                <div>
-                                    <label className="theme-muted block font-extrabold uppercase text-[10px] tracking-wider mb-1">Phone Number</label>
+                                <div className="rounded-2xl border-2 border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] p-2.5 focus-within:border-orange-500 transition shadow-xs">
+                                    <label className="text-stone-800 dark:text-stone-200 block font-extrabold uppercase text-[10px] tracking-wider mb-1">
+                                        Phone Number
+                                    </label>
                                     <input
                                         type="text"
                                         placeholder="Optional"
                                         value={phone}
                                         onChange={(e) => setPhone(e.target.value)}
-                                        className="w-full bg-transparent border-b border-[color:var(--app-border)] py-1 text-sm font-semibold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-[color:var(--app-text)] transition"
+                                        className="w-full bg-transparent text-sm font-bold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none"
                                     />
                                 </div>
                             </div>
 
-                            {/* Payment Mode Selection */}
-                            <div className="pt-1">
-                                <label className="theme-muted block text-xs font-extrabold uppercase tracking-wider mb-2">
-                                    Payment Mode
+                            {/* Payment Mode Selection - Vibrant High Contrast Pills */}
+                            <div>
+                                <label className="text-stone-900 dark:text-stone-100 block text-xs font-black uppercase tracking-wider mb-2">
+                                    Select Payment Mode
                                 </label>
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
@@ -1329,13 +1341,13 @@ export default function NewOrder() {
                                             if (!cashGiven) setCashGiven(String(subtotal));
                                         }}
                                         className={[
-                                            "flex items-center justify-center gap-2 rounded-2xl p-3 text-sm font-bold transition border",
+                                            "flex items-center justify-center gap-2.5 rounded-2xl p-3.5 text-sm font-black transition border-2 shadow-sm",
                                             paymentMethod === "CASH"
-                                                ? "border-amber-500/60 bg-amber-500/15 text-[color:var(--app-text)] shadow-sm ring-1 ring-amber-500/30"
-                                                : "theme-soft-button opacity-70 hover:opacity-100",
+                                                ? "bg-orange-500 text-white border-orange-600 shadow-orange-500/20 scale-[1.02]"
+                                                : "bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] text-stone-700 dark:text-stone-300 border-[color:var(--app-border)] hover:border-orange-300",
                                         ].join(" ")}
                                     >
-                                        <Banknote size={18} />
+                                        <Banknote size={20} />
                                         <span>CASH</span>
                                     </button>
 
@@ -1343,13 +1355,13 @@ export default function NewOrder() {
                                         type="button"
                                         onClick={() => setPaymentMethod("ONLINE")}
                                         className={[
-                                            "flex items-center justify-center gap-2 rounded-2xl p-3 text-sm font-bold transition border",
+                                            "flex items-center justify-center gap-2.5 rounded-2xl p-3.5 text-sm font-black transition border-2 shadow-sm",
                                             paymentMethod === "ONLINE"
-                                                ? "border-amber-500/60 bg-amber-500/15 text-[color:var(--app-text)] shadow-sm ring-1 ring-amber-500/30"
-                                                : "theme-soft-button opacity-70 hover:opacity-100",
+                                                ? "bg-orange-500 text-white border-orange-600 shadow-orange-500/20 scale-[1.02]"
+                                                : "bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] text-stone-700 dark:text-stone-300 border-[color:var(--app-border)] hover:border-orange-300",
                                         ].join(" ")}
                                     >
-                                        <CreditCard size={18} />
+                                        <CreditCard size={20} />
                                         <span>ONLINE / UPI</span>
                                     </button>
                                 </div>
@@ -1357,17 +1369,17 @@ export default function NewOrder() {
 
                             {/* CASH TENDER & CHANGE RETURN CALCULATOR */}
                             {paymentMethod === "CASH" && (
-                                <div className="space-y-3 pt-2">
+                                <div className="space-y-3 pt-1">
                                     <div className="flex items-center justify-between">
-                                        <label className="theme-muted text-xs font-extrabold uppercase tracking-wider">
+                                        <label className="text-stone-900 dark:text-stone-100 text-xs font-black uppercase tracking-wider">
                                             Cash Received from Customer
                                         </label>
-                                        <span className="theme-muted text-xs font-semibold">Enter amount or tap preset</span>
+                                        <span className="theme-muted text-xs font-bold">Tap preset or enter amount</span>
                                     </div>
 
-                                    {/* Clean Amount Input */}
-                                    <div className="flex items-center justify-between border-b-2 border-[color:var(--app-border)] pb-1.5 focus-within:border-[color:var(--app-text)] transition">
-                                        <span className="text-xl font-bold theme-muted">Rs</span>
+                                    {/* High Contrast Input Box */}
+                                    <div className="rounded-2xl border-2 border-orange-500 bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_90%,transparent)] px-4 py-2.5 shadow-md flex items-center justify-between focus-within:ring-2 focus-within:ring-orange-500/20">
+                                        <span className="text-xl font-black text-orange-600 dark:text-orange-400">Rs</span>
                                         <input
                                             type="number"
                                             step="any"
@@ -1375,16 +1387,16 @@ export default function NewOrder() {
                                             placeholder={toInr(subtotal)}
                                             value={cashGiven}
                                             onChange={(e) => setCashGiven(e.target.value)}
-                                            className="w-full bg-transparent text-right text-3xl font-black text-[color:var(--app-text)] outline-none tabular-nums"
+                                            className="w-full bg-transparent text-right text-3xl font-black text-stone-900 dark:text-white outline-none tabular-nums"
                                         />
                                     </div>
 
-                                    {/* Quick Cash Presets as Theme Chips */}
+                                    {/* Quick Cash Presets as High Contrast Chips */}
                                     <div className="flex flex-wrap gap-2 pt-1">
                                         <button
                                             type="button"
                                             onClick={() => setCashGiven(String(subtotal))}
-                                            className="rounded-xl theme-soft-button px-3 py-1.5 text-xs font-bold hover:bg-[color:color-mix(in_srgb,var(--app-text)_12%,transparent)]"
+                                            className="rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 text-xs font-extrabold shadow-sm transition"
                                         >
                                             Exact (Rs {toInr(subtotal)})
                                         </button>
@@ -1393,7 +1405,7 @@ export default function NewOrder() {
                                                 key={amt}
                                                 type="button"
                                                 onClick={() => setCashGiven(String(amt))}
-                                                className="rounded-xl theme-soft-button px-3 py-1.5 text-xs font-bold hover:bg-[color:color-mix(in_srgb,var(--app-text)_12%,transparent)]"
+                                                className="rounded-xl border-2 border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_70%,transparent)] text-stone-900 dark:text-stone-100 hover:border-orange-500 hover:text-orange-600 px-3.5 py-2 text-xs font-extrabold shadow-xs transition"
                                             >
                                                 Rs {amt}
                                             </button>
@@ -1402,14 +1414,14 @@ export default function NewOrder() {
                                             <button
                                                 type="button"
                                                 onClick={() => setCashGiven(String(Math.ceil(subtotal / 50) * 50))}
-                                                className="rounded-xl theme-soft-button px-3 py-1.5 text-xs font-bold hover:bg-[color:color-mix(in_srgb,var(--app-text)_12%,transparent)]"
+                                                className="rounded-xl border-2 border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_70%,transparent)] text-stone-900 dark:text-stone-100 hover:border-orange-500 hover:text-orange-600 px-3.5 py-2 text-xs font-extrabold shadow-xs transition"
                                             >
                                                 Rs {Math.ceil(subtotal / 50) * 50}
                                             </button>
                                         )}
                                     </div>
 
-                                    {/* LIVE RETURN CHANGE CALCULATOR DISPLAY - Dashed Paper Line */}
+                                    {/* LIVE RETURN CHANGE CALCULATOR DISPLAY - Striking Card Banner */}
                                     {(() => {
                                         const given = parseFloat(cashGiven) || 0;
                                         const change = given - subtotal;
@@ -1418,20 +1430,30 @@ export default function NewOrder() {
                                         if (!cashGiven) return null;
 
                                         return isEnough ? (
-                                            <div className="flex items-center justify-between pt-3 border-t border-dashed border-[color:var(--app-border)]">
-                                                <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                                                    Return Change to Customer
-                                                </span>
-                                                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
+                                            <div className="rounded-2xl border-2 border-emerald-500/60 bg-emerald-500/15 p-4 flex items-center justify-between shadow-sm">
+                                                <div>
+                                                    <span className="text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300 block">
+                                                        Return Change to Customer
+                                                    </span>
+                                                    <span className="text-[11px] font-semibold text-emerald-800/80 dark:text-emerald-300/80">
+                                                        Cash tendered: Rs {toInr(given)}
+                                                    </span>
+                                                </div>
+                                                <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
                                                     Rs {toInr(change)}
                                                 </span>
                                             </div>
                                         ) : (
-                                            <div className="flex items-center justify-between pt-3 border-t border-dashed border-[color:var(--app-border)]">
-                                                <span className="text-xs font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400">
-                                                    Balance Shortage
-                                                </span>
-                                                <span className="text-xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+                                            <div className="rounded-2xl border-2 border-amber-500/60 bg-amber-500/15 p-4 flex items-center justify-between shadow-sm">
+                                                <div>
+                                                    <span className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300 block">
+                                                        Balance Shortage
+                                                    </span>
+                                                    <span className="text-[11px] font-semibold text-amber-800/80 dark:text-amber-300/80">
+                                                        Total is Rs {toInr(subtotal)}
+                                                    </span>
+                                                </div>
+                                                <span className="text-xl font-black text-amber-700 dark:text-amber-400 tabular-nums">
                                                     Rs {toInr(Math.abs(change))} remaining
                                                 </span>
                                             </div>
@@ -1442,24 +1464,24 @@ export default function NewOrder() {
 
                             {/* ONLINE PAYMENT DISPLAY */}
                             {paymentMethod === "ONLINE" && (
-                                <div className="py-4 text-center space-y-2 border-t border-dashed border-[color:var(--app-border)]">
-                                    <QrCode size={32} className="mx-auto theme-muted" />
-                                    <p className="text-sm font-bold text-[color:var(--app-text)]">
+                                <div className="rounded-2xl border-2 border-indigo-500/30 bg-indigo-500/10 p-5 text-center space-y-2">
+                                    <QrCode size={36} className="mx-auto text-indigo-500 dark:text-indigo-400" />
+                                    <p className="text-sm font-black text-stone-900 dark:text-stone-100">
                                         Accept UPI QR / Card POS Payment
                                     </p>
-                                    <p className="theme-muted text-xs">
+                                    <p className="theme-muted text-xs font-medium">
                                         Verify payment confirmation on your UPI QR or POS machine before completing order.
                                     </p>
                                 </div>
                             )}
                         </div>
 
-                        {/* Modal Actions */}
+                        {/* Modal Actions - Bold High Contrast Buttons */}
                         <div className="pt-4 border-t border-[color:var(--app-border)] grid grid-cols-2 gap-3">
                             <button
                                 type="button"
                                 onClick={() => handleCompleteOrder({ printReceipt: false })}
-                                className="theme-soft-button rounded-2xl py-3 px-3 text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5"
+                                className="rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-extrabold border-2 border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] text-stone-800 dark:text-stone-100 hover:bg-[color:color-mix(in_srgb,var(--app-text)_8%,transparent)] transition flex items-center justify-center gap-2 shadow-xs"
                                 disabled={placing || (paymentMethod === "CASH" && (parseFloat(cashGiven) || 0) < subtotal)}
                             >
                                 <CheckCircle2 size={16} />
@@ -1469,7 +1491,7 @@ export default function NewOrder() {
                             <button
                                 type="button"
                                 onClick={() => handleCompleteOrder({ printReceipt: true })}
-                                className="theme-button rounded-2xl py-3 px-3 text-xs sm:text-sm font-bold shadow-lg flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
+                                className="rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-extrabold bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition active:scale-[0.98]"
                                 disabled={placing || (paymentMethod === "CASH" && (parseFloat(cashGiven) || 0) < subtotal)}
                             >
                                 {placing ? (
