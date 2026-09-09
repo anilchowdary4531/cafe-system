@@ -1412,11 +1412,11 @@ export default function OwnerLayout() {
                                                 return (
                                                     <section
                                                         key={groupName}
-                                                        className="flex flex-col gap-2.5 rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_97%,#000_3%)] p-3 sm:p-4 shadow-xs"
+                                                        className="flex flex-col gap-3 py-2"
                                                     >
                                                         <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)] pb-2">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[color:var(--app-primary)]">
+                                                                <span className="text-xs font-extrabold uppercase tracking-[0.18em] text-[color:var(--app-primary)]">
                                                                     {groupName}
                                                                 </span>
                                                                 <span className="rounded-full bg-black/5 dark:bg-white/10 px-2.5 py-0.5 text-[10px] font-bold theme-muted">

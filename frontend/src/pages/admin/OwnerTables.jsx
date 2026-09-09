@@ -759,7 +759,7 @@ export default function OwnerTables() {
                         return (
                             <section
                                 key={groupName}
-                                className="flex flex-col gap-3.5 rounded-2xl border border-white/10 bg-[#111827] p-4 shadow-sm"
+                                className="flex flex-col gap-3 py-2"
                             >
                                 <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
                                     <div className="flex items-center gap-2.5">
