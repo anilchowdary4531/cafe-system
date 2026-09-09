@@ -74,15 +74,15 @@ const getRelativeLabel = (timestamp) => {
 
 function MetricCard({ icon: Icon, label, value, hint, accentColor = "amber" }) {
     return (
-        <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] theme-panel p-4 shadow-xl backdrop-blur-xl transition hover:border-[var(--app-border-strong)]">
-            <div className="flex items-center gap-3.5">
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-${accentColor}-500/15 text-${accentColor}-400 border border-${accentColor}-500/30 shadow-inner`}>
-                    <Icon size={20} />
+        <div className="relative overflow-hidden py-2 px-1">
+            <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-${accentColor}-500/15 text-${accentColor}-500 border border-${accentColor}-500/20`}>
+                    <Icon size={18} />
                 </div>
                 <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-extrabold uppercase tracking-widest theme-muted">{label}</p>
-                    <p className="mt-0.5 text-2xl font-black tracking-tight text-[var(--app-text)]">{value}</p>
-                    {hint ? <p className="text-[11px] font-medium theme-muted truncate mt-0.5">{hint}</p> : null}
+                    <p className="text-[10px] font-extrabold uppercase tracking-widest theme-muted">{label}</p>
+                    <p className="mt-0.5 text-xl font-black tracking-tight text-[var(--app-text)]">{value}</p>
+                    {hint ? <p className="text-[10px] font-medium theme-muted truncate mt-0.5">{hint}</p> : null}
                 </div>
             </div>
         </div>
@@ -99,24 +99,27 @@ function ModernTicketCard({
     isPickAction = false,
 }) {
     return (
-        <article className="group relative overflow-hidden rounded-2xl border border-[var(--app-border)] theme-panel p-4.5 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-[var(--app-primary)] hover:shadow-xl">
-            <div className="flex items-start justify-between gap-3">
+        <article className="group relative border-b border-[var(--app-border)]/60 py-3.5 last:border-b-0 transition-colors duration-150">
+            <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="rounded-lg bg-[color-mix(in_srgb,var(--app-primary)_20%,transparent)] border border-[var(--app-border-strong)] px-2.5 py-0.5 text-xs font-black text-[var(--app-primary)]">
+                        <span className="rounded-md bg-[color-mix(in_srgb,var(--app-primary)_18%,transparent)] px-2 py-0.5 text-xs font-black text-[var(--app-primary)]">
                             {ticket.qty}x
                         </span>
                         <h4 className="font-extrabold text-base text-[var(--app-text)] truncate tracking-tight group-hover:text-[var(--app-primary)] transition duration-200">
                             {ticket.itemName}
                         </h4>
+                        <span className="text-sm font-black theme-price tabular-nums">
+                            {formatKitchenMoney(ticket.lineTotal)}
+                        </span>
                     </div>
 
-                    <div className="mt-2 flex items-center gap-2 text-xs flex-wrap">
-                        <span className="rounded-md bg-[var(--app-surface-2)] px-2 py-0.5 text-[11px] font-bold text-[var(--app-text)] border border-[var(--app-border)]">
+                    <div className="mt-1.5 flex items-center gap-2 text-xs flex-wrap">
+                        <span className="font-bold text-[11px] theme-muted">
                             {ticket.orderRef}
                         </span>
                         {ticket.tableNo && (
-                            <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-500 border border-amber-500/20">
+                            <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400">
                                 Table {ticket.tableNo}
                             </span>
                         )}
@@ -124,44 +127,34 @@ function ModernTicketCard({
                             <Clock size={12} />
                             {ticket.ageText}
                         </span>
+                        <span className="text-[10px] font-extrabold uppercase tracking-widest theme-muted">
+                            • <span className="text-emerald-500 font-bold">{String(ticket.orderStatus || "").replace(/_/g, " ")}</span>
+                        </span>
                     </div>
-
-                    <p className="mt-1.5 text-[10px] font-extrabold uppercase tracking-widest theme-muted">
-                        {ticket.orderLabel || "KITCHEN TICKET"} • <span className="text-emerald-500">{String(ticket.orderStatus || "").replace(/_/g, " ")}</span>
-                    </p>
                 </div>
 
                 <div className="text-right shrink-0">
-                    <p className="text-base font-black theme-price tabular-nums">
-                        {formatKitchenMoney(ticket.lineTotal)}
-                    </p>
-                    <span className="mt-1 inline-block rounded-full bg-[var(--app-surface-2)] px-2.5 py-0.5 text-[10px] font-bold theme-muted border border-[var(--app-border)]">
-                        {chefLabel || chef?.name || "Unassigned"}
-                    </span>
+                    <button
+                        type="button"
+                        onClick={() => onAction?.(ticket.itemKey)}
+                        className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition flex items-center gap-1.5 shadow-sm cursor-pointer ${
+                            isPickAction
+                                ? "bg-amber-500 hover:bg-amber-400 text-black"
+                                : "bg-emerald-500 hover:bg-emerald-400 text-black"
+                        }`}
+                    >
+                        {actionIcon}
+                        {actionLabel}
+                    </button>
                 </div>
             </div>
 
             {ticket.notes ? (
-                <div className="mt-3 rounded-xl bg-[color-mix(in_srgb,var(--app-primary)_10%,transparent)] border border-[var(--app-border-strong)] p-2.5 text-xs italic text-[var(--app-text)] flex items-start gap-1.5">
+                <div className="mt-2 rounded-xl bg-[color-mix(in_srgb,var(--app-primary)_8%,transparent)] px-3 py-1.5 text-xs italic text-[var(--app-text)] flex items-start gap-1.5 border-l-2 border-[var(--app-primary)]">
                     <Sparkles size={14} className="text-[var(--app-primary)] shrink-0 mt-0.5" />
                     <span>"{ticket.notes}"</span>
                 </div>
             ) : null}
-
-            <div className="mt-4 border-t border-[var(--app-border)] pt-3 flex items-center justify-end">
-                <button
-                    type="button"
-                    onClick={() => onAction?.(ticket.itemKey)}
-                    className={`rounded-xl px-4 py-2 text-xs font-black transition flex items-center gap-1.5 shadow-md cursor-pointer ${
-                        isPickAction
-                            ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black shadow-amber-500/20"
-                            : "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-emerald-500/20"
-                    }`}
-                >
-                    {actionIcon}
-                    {actionLabel}
-                </button>
-            </div>
         </article>
     );
 }
@@ -170,7 +163,7 @@ function ModernHistoryCard({ entry, chef }) {
     const badge = ACTION_BADGES[String(entry?.action || "ASSIGNED").toUpperCase()] || ACTION_BADGES.ASSIGNED;
 
     return (
-        <article className="rounded-2xl border border-[var(--app-border)] theme-panel p-4 shadow-md backdrop-blur-md">
+        <article className="border-b border-[var(--app-border)]/60 py-3 last:border-b-0 transition-colors duration-150">
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <h5 className="font-extrabold text-sm text-[var(--app-text)] tracking-tight">
@@ -185,19 +178,19 @@ function ModernHistoryCard({ entry, chef }) {
                     <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase border ${badge.bg}`}>
                         {badge.label}
                     </span>
-                    <span className="rounded-full bg-[var(--app-surface-2)] px-2.5 py-0.5 text-[10px] font-bold theme-muted border border-[var(--app-border)]">
+                    <span className="text-[11px] font-bold theme-muted">
                         {entry.chefName || chef?.name || "Chef"}
                     </span>
                 </div>
             </div>
 
-            <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold theme-muted">
+            <div className="mt-2 flex items-center gap-2 text-[11px] font-semibold theme-muted">
                 <span>{getTimeLabel(entry.timestamp)}</span>
                 <span>•</span>
                 <span className="text-[var(--app-primary)]">{getRelativeLabel(entry.timestamp)}</span>
             </div>
 
-            {entry.note ? <p className="mt-2 text-xs italic theme-muted">Note: {entry.note}</p> : null}
+            {entry.note ? <p className="mt-1 text-xs italic theme-muted">Note: {entry.note}</p> : null}
         </article>
     );
 }
@@ -564,28 +557,28 @@ export default function KitchenChefDetail() {
             <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:px-8 space-y-6">
 
                 {/* CHEF HERO IDENTITY & METRICS HEADER */}
-                <div className="rounded-3xl theme-panel p-6 shadow-2xl relative overflow-hidden border border-[var(--app-border)]">
+                <div className="py-2 pb-6 border-b border-[var(--app-border)]/60 relative overflow-hidden">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
                         
                         {/* Chef Profile Badge */}
                         <div className="flex items-center gap-4">
                             <div className="relative">
-                                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-black font-black text-xl shadow-xl shadow-amber-500/20 border-2 border-amber-400/40">
-                                    <ChefHat size={32} />
+                                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500 text-black font-black text-xl shadow-md border-2 border-amber-400/40">
+                                    <ChefHat size={28} />
                                 </div>
-                                <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-black border-2 border-[var(--app-surface)]">
-                                    <Check size={12} strokeWidth={3} />
+                                <span className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-emerald-500 text-black border-2 border-[var(--app-bg)]">
+                                    <Check size={10} strokeWidth={3} />
                                 </span>
                             </div>
 
                             <div>
                                 <div className="flex items-center gap-2">
                                     <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--app-text)]">{pageTitle}</h2>
-                                    <span className="rounded-full bg-[color-mix(in_srgb,var(--app-primary)_20%,transparent)] border border-[var(--app-border-strong)] px-3 py-0.5 text-xs font-black text-[var(--app-primary)]">
+                                    <span className="rounded-full bg-[color-mix(in_srgb,var(--app-primary)_15%,transparent)] px-3 py-0.5 text-xs font-black text-[var(--app-primary)]">
                                         {pageDesignation}
                                     </span>
                                 </div>
-                                <p className="text-xs theme-muted mt-1 flex items-center gap-2">
+                                <p className="text-xs theme-muted mt-0.5 flex items-center gap-2">
                                     <span>{restaurantName} Kitchen Station</span>
                                     <span>•</span>
                                     <span className="text-emerald-500 font-semibold">Active Dispatch Station</span>
@@ -598,7 +591,7 @@ export default function KitchenChefDetail() {
                             <button
                                 type="button"
                                 onClick={() => setHistoryOpen(true)}
-                                className="rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] text-[var(--app-text)] hover:border-[var(--app-primary)] px-4 py-2.5 text-xs font-black transition flex items-center gap-2 shadow-lg cursor-pointer"
+                                className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] text-[var(--app-text)] hover:border-[var(--app-primary)] px-4 py-2 text-xs font-black transition flex items-center gap-2 shadow-sm cursor-pointer"
                             >
                                 <History size={16} className="text-[var(--app-primary)]" />
                                 <span>Activity History ({relevantHistory.length})</span>
@@ -607,7 +600,7 @@ export default function KitchenChefDetail() {
                     </div>
 
                     {/* Metric Cards Row */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-[var(--app-border)]">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 pt-4 border-t border-[var(--app-border)]/40">
                         <MetricCard
                             icon={Flame}
                             label="Live Orders"
@@ -633,34 +626,34 @@ export default function KitchenChefDetail() {
                 </div>
 
                 {/* BOARD COLUMNS: PASS (PICK) VS LIVE LOAD (ASSIGNED) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-2">
 
                     {/* LEFT COLUMN: LIVE ORDERS TO PICK FROM PASS */}
-                    <section className="space-y-4">
-                        <div className="flex items-center justify-between">
+                    <section className="space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-[var(--app-border)]/60">
                             <div className="flex items-center gap-2.5">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                                    <Flame size={18} />
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500">
+                                    <Flame size={16} />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-black tracking-tight text-[var(--app-text)]">Pick from Pass</h3>
-                                    <p className="text-xs theme-muted">Claim an open ticket to add to your live cooking queue</p>
+                                    <h3 className="text-base font-black tracking-tight text-[var(--app-text)]">Pick from Pass</h3>
+                                    <p className="text-[11px] theme-muted">Claim an open ticket to add to your live cooking queue</p>
                                 </div>
                             </div>
-                            <span className="rounded-full bg-[color-mix(in_srgb,var(--app-primary)_20%,transparent)] border border-[var(--app-border-strong)] px-3 py-1 text-xs font-black text-[var(--app-primary)]">
+                            <span className="rounded-full bg-[color-mix(in_srgb,var(--app-primary)_18%,transparent)] px-2.5 py-0.5 text-xs font-black text-[var(--app-primary)]">
                                 {availableTickets.length} Open
                             </span>
                         </div>
 
-                        <div className="space-y-3.5 min-h-[300px]">
+                        <div className="min-h-[250px]">
                             {ordersLoading || staffLoading ? (
-                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl theme-panel border border-[var(--app-border)] theme-muted space-y-3">
-                                    <LoaderCircle size={28} className="animate-spin text-[var(--app-primary)]" />
+                                <div className="flex flex-col items-center justify-center py-12 theme-muted space-y-2">
+                                    <LoaderCircle size={24} className="animate-spin text-[var(--app-primary)]" />
                                     <p className="text-xs font-bold uppercase tracking-wider">Syncing Pass Tickets...</p>
                                 </div>
                             ) : availableTickets.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl theme-panel border border-[var(--app-border)] text-center p-6 space-y-3">
-                                    <UtensilsCrossed size={36} className="theme-muted opacity-60" />
+                                <div className="flex flex-col items-center justify-center py-12 text-center p-6 space-y-2">
+                                    <UtensilsCrossed size={32} className="theme-muted opacity-40" />
                                     <h4 className="text-sm font-bold text-[var(--app-text)]">Pass is Clear!</h4>
                                     <p className="text-xs theme-muted max-w-xs">No unassigned tickets waiting on the pass right now.</p>
                                 </div>
@@ -673,7 +666,7 @@ export default function KitchenChefDetail() {
                                         chefLabel="Unassigned"
                                         onAction={handlePickTicket}
                                         actionLabel="Pick Ticket"
-                                        actionIcon={<ChefHat size={16} />}
+                                        actionIcon={<ChefHat size={15} />}
                                         isPickAction={true}
                                     />
                                 ))
@@ -682,31 +675,31 @@ export default function KitchenChefDetail() {
                     </section>
 
                     {/* RIGHT COLUMN: CHEF'S LIVE LOAD (ASSIGNED TO THIS CHEF) */}
-                    <section className="space-y-4">
-                        <div className="flex items-center justify-between">
+                    <section className="space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-[var(--app-border)]/60">
                             <div className="flex items-center gap-2.5">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                    <ChefHat size={18} />
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+                                    <ChefHat size={16} />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-black tracking-tight text-[var(--app-text)]">My Live Cooking Load</h3>
-                                    <p className="text-xs theme-muted">Tickets currently assigned to {pageTitle}</p>
+                                    <h3 className="text-base font-black tracking-tight text-[var(--app-text)]">My Live Cooking Load</h3>
+                                    <p className="text-[11px] theme-muted">Tickets currently assigned to {pageTitle}</p>
                                 </div>
                             </div>
-                            <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-xs font-black text-emerald-400">
+                            <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-black text-emerald-500">
                                 {currentTickets.length} Active
                             </span>
                         </div>
 
-                        <div className="space-y-3.5 min-h-[300px]">
+                        <div className="min-h-[250px]">
                             {ordersLoading || staffLoading ? (
-                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl theme-panel border border-[var(--app-border)] theme-muted space-y-3">
-                                    <LoaderCircle size={28} className="animate-spin text-emerald-500" />
+                                <div className="flex flex-col items-center justify-center py-12 theme-muted space-y-2">
+                                    <LoaderCircle size={24} className="animate-spin text-emerald-500" />
                                     <p className="text-xs font-bold uppercase tracking-wider">Syncing Live Load...</p>
                                 </div>
                             ) : currentTickets.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-16 rounded-3xl theme-panel border border-[var(--app-border)] text-center p-6 space-y-3">
-                                    <ChefHat size={36} className="theme-muted opacity-60" />
+                                <div className="flex flex-col items-center justify-center py-12 text-center p-6 space-y-2">
+                                    <ChefHat size={32} className="theme-muted opacity-40" />
                                     <h4 className="text-sm font-bold text-[var(--app-text)]">No Active Load</h4>
                                     <p className="text-xs theme-muted max-w-xs">Pick orders from the left column to start cooking.</p>
                                 </div>
@@ -718,7 +711,7 @@ export default function KitchenChefDetail() {
                                         chef={currentChef}
                                         onAction={handleCompleteTicket}
                                         actionLabel="Mark Complete"
-                                        actionIcon={<CheckCircle2 size={16} />}
+                                        actionIcon={<CheckCircle2 size={15} />}
                                         isPickAction={false}
                                     />
                                 ))
