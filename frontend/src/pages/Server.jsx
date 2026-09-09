@@ -319,8 +319,68 @@ export default function Server() {
     const [billPaymentMethod, setBillPaymentMethod] = useState("CASH");
     const [showBillPanel, setShowBillPanel] = useState(false);
     const [tableAssignments, setTableAssignments] = useState({});
+    const [tableGroups, setTableGroups] = useState({});
+    const [activeGroupFilter, setActiveGroupFilter] = useState("All");
 
     const selectedTableNo = String(searchParams.get("table") || "").trim();
+
+    useEffect(() => {
+        if (!restaurantId) return;
+        const key = `owner_table_groups_v1_${restaurantId}`;
+        const loadGroups = () => {
+            try {
+                const raw = localStorage.getItem(key);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                        setTableGroups(parsed);
+                    } else {
+                        setTableGroups({});
+                    }
+                } else {
+                    setTableGroups({});
+                }
+            } catch {
+                setTableGroups({});
+            }
+        };
+        loadGroups();
+        const handleStorageChange = (e) => {
+            if (!e.key || e.key === key) loadGroups();
+        };
+        window.addEventListener("storage", handleStorageChange);
+        return () => window.removeEventListener("storage", handleStorageChange);
+    }, [restaurantId]);
+
+    const getTableGroup = useCallback(
+        (table) => {
+            if (table?.groupName && String(table.groupName).trim()) {
+                return String(table.groupName).trim();
+            }
+            const idKey = String(table?.id || "");
+            if (idKey && tableGroups[idKey] && String(tableGroups[idKey]).trim()) {
+                return String(tableGroups[idKey]).trim();
+            }
+            const noKey = String(table?.tableNo || "").trim();
+            if (noKey && tableGroups[noKey] && String(tableGroups[noKey]).trim()) {
+                return String(tableGroups[noKey]).trim();
+            }
+
+            if (noKey) {
+                if (/^\d+$/.test(noKey)) {
+                    return "Main Hall";
+                }
+                const letterMatch = noKey.match(/^([A-Za-z]+)\s*\d+$/);
+                if (letterMatch) {
+                    const prefix = letterMatch[1].toUpperCase();
+                    return prefix === "T" ? "Section T" : `Section ${prefix}`;
+                }
+            }
+
+            return "Main Area";
+        },
+        [tableGroups]
+    );
 
     const {
         data: tablesData,
@@ -430,11 +490,39 @@ export default function Server() {
                     activeOrderCount: Number(table.activeOrderCount || 0),
                     activeOrders: Array.isArray(table.activeOrders) ? table.activeOrders : [],
                     assignedStaffId,
+                    groupName: getTableGroup(table),
                 };
             })
             .filter((table) => table.tableNo)
             .sort((a, b) => a.tableNo.localeCompare(b.tableNo, undefined, { numeric: true }));
-    }, [tableAssignments, tablesData]);
+    }, [getTableGroup, tableAssignments, tablesData]);
+
+    const groupedTablesMap = useMemo(() => {
+        const map = {};
+        allTables.forEach((table) => {
+            const group = table.groupName || "Main Area";
+            if (!map[group]) map[group] = [];
+            map[group].push(table);
+        });
+        return map;
+    }, [allTables]);
+
+    const availableGroupNames = useMemo(() => {
+        return Object.keys(groupedTablesMap).sort((a, b) =>
+            a.localeCompare(b, undefined, { sensitivity: "base" })
+        );
+    }, [groupedTablesMap]);
+
+    const filteredGroupEntries = useMemo(() => {
+        if (activeGroupFilter === "All") {
+            return availableGroupNames.map((name) => [name, groupedTablesMap[name]]);
+        }
+        const match = availableGroupNames.find(
+            (name) => name.toLowerCase() === activeGroupFilter.toLowerCase()
+        );
+        if (match) return [[match, groupedTablesMap[match]]];
+        return availableGroupNames.map((name) => [name, groupedTablesMap[name]]);
+    }, [activeGroupFilter, availableGroupNames, groupedTablesMap]);
 
     const selectedTable = useMemo(
         () => allTables.find((table) => table.tableNo === selectedTableNo) || null,
@@ -926,7 +1014,7 @@ export default function Server() {
                                     value={selectedTableNo}
                                     onChange={(event) => setTable(event.target.value)}
                                     disabled={tablesLoading || allTables.length === 0}
-                                    className="theme-input w-full rounded-2xl px-3 py-2 text-sm outline-none sm:min-w-[200px] sm:w-auto"
+                                    className="theme-input w-full rounded-2xl px-3 py-2 text-sm outline-none sm:min-w-[220px] sm:w-auto font-medium"
                                 >
                                     <option value="">
                                         {tablesLoading
@@ -935,15 +1023,120 @@ export default function Server() {
                                                 ? "No tables available"
                                                 : "Select a table"}
                                     </option>
-                                    {allTables.map((table) => (
-                                        <option key={table.id} value={table.tableNo}>
-                                            Table {table.tableNo} {table.isOccupied ? "• Occupied" : "• Free"}
-                                            {table.seats ? ` • ${table.seats} seats` : ""}
-                                        </option>
+                                    {availableGroupNames.map((groupName) => (
+                                        <optgroup key={groupName} label={`── ${groupName} ──`}>
+                                            {groupedTablesMap[groupName].map((table) => (
+                                                <option key={table.id} value={table.tableNo}>
+                                                    Table {table.tableNo} {table.isOccupied ? "• Occupied" : "• Free"}
+                                                    {table.seats ? ` • ${table.seats} seats` : ""}
+                                                </option>
+                                            ))}
+                                        </optgroup>
                                     ))}
                                 </select>
                             </div>
                         </div>
+
+                        {allTables.length > 0 ? (
+                            <div className="mt-3 border-t border-[color:var(--app-border)]/50 pt-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="text-[11px] font-extrabold uppercase tracking-wider theme-muted mr-1">
+                                            Groups:
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveGroupFilter("All")}
+                                            className={`rounded-full px-2.5 py-0.5 text-xs font-bold transition-all ${
+                                                activeGroupFilter === "All"
+                                                    ? "bg-[color:var(--app-primary)] text-white shadow-sm"
+                                                    : "theme-soft-button"
+                                            }`}
+                                        >
+                                            All ({allTables.length})
+                                        </button>
+                                        {availableGroupNames.map((groupName) => {
+                                            const count = groupedTablesMap[groupName]?.length || 0;
+                                            const isSelected =
+                                                activeGroupFilter.toLowerCase() === groupName.toLowerCase();
+                                            return (
+                                                <button
+                                                    key={groupName}
+                                                    type="button"
+                                                    onClick={() => setActiveGroupFilter(groupName)}
+                                                    className={`rounded-full px-2.5 py-0.5 text-xs font-bold transition-all ${
+                                                        isSelected
+                                                            ? "bg-[color:var(--app-primary)] text-white shadow-sm"
+                                                            : "theme-soft-button"
+                                                    }`}
+                                                >
+                                                    {groupName} ({count})
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="grid gap-2 sm:gap-3">
+                                    {filteredGroupEntries.map(([groupName, groupTables]) => {
+                                        const occupiedInGroup = groupTables.filter((t) => t.isOccupied).length;
+                                        return (
+                                            <div
+                                                key={groupName}
+                                                className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:color-mix(in_srgb,var(--app-surface-2)_40%,transparent)] p-2.5"
+                                            >
+                                                <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)]/30 pb-1.5 mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs font-extrabold uppercase tracking-wider text-[color:var(--app-primary)]">
+                                                            {groupName}
+                                                        </span>
+                                                        <span className="rounded-full bg-black/10 dark:bg-white/10 px-2 py-0.5 text-[10px] font-bold theme-muted">
+                                                            {groupTables.length} table{groupTables.length === 1 ? "" : "s"}
+                                                        </span>
+                                                    </div>
+                                                    {occupiedInGroup > 0 ? (
+                                                        <span className="text-[10px] font-bold text-amber-500">
+                                                            {occupiedInGroup} occupied
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {groupTables.map((table) => {
+                                                        const isSelected = table.tableNo === selectedTableNo;
+                                                        return (
+                                                            <button
+                                                                key={table.id}
+                                                                type="button"
+                                                                onClick={() => setTable(table.tableNo)}
+                                                                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                                                                    isSelected
+                                                                        ? "bg-[color:var(--app-primary)] text-white shadow-md scale-[1.02] ring-2 ring-[color:var(--app-primary)]/40"
+                                                                        : table.isOccupied
+                                                                            ? "border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                                                                            : "theme-soft-button"
+                                                                }`}
+                                                            >
+                                                                <span>Table {table.tableNo}</span>
+                                                                {table.seats ? (
+                                                                    <span className="opacity-70 text-[10px]">({table.seats}s)</span>
+                                                                ) : null}
+                                                                {table.isOccupied ? (
+                                                                    <span
+                                                                        className={`inline-block w-2 h-2 rounded-full ${
+                                                                            isSelected ? "bg-white" : "bg-amber-500"
+                                                                        }`}
+                                                                    />
+                                                                ) : null}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ) : null}
 
                         {tablesError ? (
                             <div className="mt-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
