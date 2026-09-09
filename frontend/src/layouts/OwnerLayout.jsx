@@ -660,9 +660,7 @@ export default function OwnerLayout() {
 
                 const users = (Array.isArray(res.data?.users) ? res.data.users : [])
                     .filter(
-                        (staffUser) =>
-                            String(staffUser?.role || "").toUpperCase() !== "OWNER" &&
-                            Boolean(staffUser?.isActive)
+                        (staffUser) => staffUser && Boolean(staffUser.isActive !== false)
                     )
                     .map((staffUser, index) => ({
                         ...staffUser,
@@ -765,9 +763,15 @@ export default function OwnerLayout() {
     useEffect(() => {
         if (!assignmentsHydrated || staffOverview.loading || tableOverview.loading) return;
 
-        const validTableKeys = new Set(
-            tableOverview.tables.map((table) => String(table.assignmentKey || table.key))
-        );
+        const validTableKeys = new Set();
+        tableOverview.tables.forEach((table) => {
+            if (table.assignmentKey) validTableKeys.add(String(table.assignmentKey));
+            if (table.key) validTableKeys.add(String(table.key));
+            if (table.id) validTableKeys.add(String(table.id));
+            if (table.id) validTableKeys.add(`table-${table.id}`);
+            if (table.tableNo) validTableKeys.add(`table-${String(table.tableNo).trim().toLowerCase()}`);
+        });
+
         const validStaffIds = new Set(staffOverview.users.map((staffUser) => String(staffUser.id)));
 
         setTableAssignments((prev) => {
@@ -780,8 +784,7 @@ export default function OwnerLayout() {
                 const normalizedStaffId = String(staffId || "");
                 if (
                     validTableKeys.has(tableKey) &&
-                    validStaffIds.has(normalizedStaffId) &&
-                    tableOccupiedByKey.get(tableKey)
+                    (validStaffIds.size === 0 || validStaffIds.has(normalizedStaffId))
                 ) {
                     next[tableKey] = normalizedStaffId;
                 } else {
@@ -800,7 +803,6 @@ export default function OwnerLayout() {
         staffOverview.users,
         tableOverview.loading,
         tableOverview.tables,
-        tableOccupiedByKey,
     ]);
 
     const assignedTableCountByStaff = useMemo(() => {
@@ -836,11 +838,6 @@ export default function OwnerLayout() {
 
     const handleTableDrop = (event, tableKey) => {
         event.preventDefault();
-        if (!tableOccupiedByKey.get(tableKey)) {
-            setDragOverTableKey("");
-            setDraggedStaffId("");
-            return;
-        }
         const droppedStaffId = String(
             event.dataTransfer.getData("text/plain") || draggedStaffId || ""
         ).trim();
@@ -871,7 +868,6 @@ export default function OwnerLayout() {
     const assignStaffToTable = (tableKey, staffId) => {
         const normalizedStaffId = String(staffId || "").trim();
         if (!normalizedStaffId || !staffById.has(normalizedStaffId)) return;
-        if (!tableOccupiedByKey.get(tableKey)) return;
 
         setTableAssignments((prev) => ({
             ...prev,
@@ -1471,15 +1467,19 @@ export default function OwnerLayout() {
                                                             }
                                                         >
                                                             {groupTables.map((table) => {
-                                                const assignmentKey = String(
-                                                    table.assignmentKey || table.key
-                                                );
-                                                const assignedStaffId = String(
-                                                    tableAssignments[assignmentKey] || ""
-                                                );
-                                                const assignedStaff = assignedStaffId
-                                                    ? staffById.get(assignedStaffId)
-                                                    : null;
+                                                 const assignmentKey = String(
+                                                     table.assignmentKey || table.key
+                                                 );
+                                                 const assignedStaffId = String(
+                                                     tableAssignments[assignmentKey] ||
+                                                     tableAssignments[table.key] ||
+                                                     tableAssignments[`table-${table.id}`] ||
+                                                     tableAssignments[`table-${String(table.tableNo || "").trim().toLowerCase()}`] ||
+                                                     ""
+                                                 );
+                                                 const assignedStaff = assignedStaffId
+                                                     ? staffById.get(assignedStaffId)
+                                                     : null;
                                                 const assignedStaffLabel = assignedStaff
                                                     ? getStaffDisplayLabel(assignedStaff)
                                                     : "";
