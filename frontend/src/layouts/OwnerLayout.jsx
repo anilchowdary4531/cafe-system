@@ -760,51 +760,6 @@ export default function OwnerLayout() {
         return map;
     }, [tableOverview.tables]);
 
-    useEffect(() => {
-        if (!assignmentsHydrated || staffOverview.loading || tableOverview.loading) return;
-
-        const validTableKeys = new Set();
-        tableOverview.tables.forEach((table) => {
-            if (table.assignmentKey) validTableKeys.add(String(table.assignmentKey));
-            if (table.key) validTableKeys.add(String(table.key));
-            if (table.id) validTableKeys.add(String(table.id));
-            if (table.id) validTableKeys.add(`table-${table.id}`);
-            if (table.tableNo) validTableKeys.add(`table-${String(table.tableNo).trim().toLowerCase()}`);
-        });
-
-        const validStaffIds = new Set(staffOverview.users.map((staffUser) => String(staffUser.id)));
-
-        setTableAssignments((prev) => {
-            if (!prev || typeof prev !== "object") return {};
-
-            let changed = false;
-            const next = {};
-
-            Object.entries(prev).forEach(([tableKey, staffId]) => {
-                const normalizedStaffId = String(staffId || "");
-                if (
-                    validTableKeys.has(tableKey) &&
-                    (validStaffIds.size === 0 || validStaffIds.has(normalizedStaffId))
-                ) {
-                    next[tableKey] = normalizedStaffId;
-                } else {
-                    changed = true;
-                }
-            });
-
-            if (!changed && Object.keys(next).length === Object.keys(prev).length) {
-                return prev;
-            }
-            return next;
-        });
-    }, [
-        assignmentsHydrated,
-        staffOverview.loading,
-        staffOverview.users,
-        tableOverview.loading,
-        tableOverview.tables,
-    ]);
-
     const assignedTableCountByStaff = useMemo(() => {
         const counts = {};
         Object.values(tableAssignments).forEach((staffId) => {
@@ -836,43 +791,56 @@ export default function OwnerLayout() {
         }
     };
 
-    const handleTableDrop = (event, tableKey) => {
+    const handleTableDrop = (event, tableKey, tableObj) => {
         event.preventDefault();
         const droppedStaffId = String(
             event.dataTransfer.getData("text/plain") || draggedStaffId || ""
         ).trim();
 
-        if (!droppedStaffId || !staffById.has(droppedStaffId)) {
+        if (!droppedStaffId) {
             setDragOverTableKey("");
             setDraggedStaffId("");
             return;
         }
 
-        setTableAssignments((prev) => ({
-            ...prev,
-            [tableKey]: droppedStaffId,
-        }));
+        assignStaffToTable(tableKey, droppedStaffId, tableObj);
         setDragOverTableKey("");
         setDraggedStaffId("");
     };
 
-    const clearTableAssignment = (tableKey) => {
+    const clearTableAssignment = (tableKey, tableObj) => {
         setTableAssignments((prev) => {
-            if (!prev?.[tableKey]) return prev;
-            const next = { ...prev };
+            const next = { ...(prev || {}) };
             delete next[tableKey];
+            if (tableObj) {
+                if (tableObj.assignmentKey) delete next[String(tableObj.assignmentKey)];
+                if (tableObj.key) delete next[String(tableObj.key)];
+                if (tableObj.id) delete next[String(tableObj.id)];
+                if (tableObj.id) delete next[`table-${tableObj.id}`];
+                if (tableObj.tableNo) delete next[String(tableObj.tableNo)];
+                if (tableObj.tableNo) delete next[`table-${String(tableObj.tableNo).trim().toLowerCase()}`];
+            }
             return next;
         });
     };
 
-    const assignStaffToTable = (tableKey, staffId) => {
+    const assignStaffToTable = (tableKey, staffId, tableObj) => {
         const normalizedStaffId = String(staffId || "").trim();
-        if (!normalizedStaffId || !staffById.has(normalizedStaffId)) return;
+        if (!normalizedStaffId) return;
 
-        setTableAssignments((prev) => ({
-            ...prev,
-            [tableKey]: normalizedStaffId,
-        }));
+        setTableAssignments((prev) => {
+            const next = { ...(prev || {}) };
+            next[tableKey] = normalizedStaffId;
+            if (tableObj) {
+                if (tableObj.assignmentKey) next[String(tableObj.assignmentKey)] = normalizedStaffId;
+                if (tableObj.key) next[String(tableObj.key)] = normalizedStaffId;
+                if (tableObj.id) next[String(tableObj.id)] = normalizedStaffId;
+                if (tableObj.id) next[`table-${tableObj.id}`] = normalizedStaffId;
+                if (tableObj.tableNo) next[String(tableObj.tableNo)] = normalizedStaffId;
+                if (tableObj.tableNo) next[`table-${String(tableObj.tableNo).trim().toLowerCase()}`] = normalizedStaffId;
+            }
+            return next;
+        });
     };
 
     const refreshTableOverview = async () => {
@@ -1473,12 +1441,14 @@ export default function OwnerLayout() {
                                                  const assignedStaffId = String(
                                                      tableAssignments[assignmentKey] ||
                                                      tableAssignments[table.key] ||
+                                                     tableAssignments[String(table.id || "")] ||
                                                      tableAssignments[`table-${table.id}`] ||
+                                                     tableAssignments[String(table.tableNo || "")] ||
                                                      tableAssignments[`table-${String(table.tableNo || "").trim().toLowerCase()}`] ||
                                                      ""
                                                  );
                                                  const assignedStaff = assignedStaffId
-                                                     ? staffById.get(assignedStaffId)
+                                                     ? staffById.get(assignedStaffId) || { id: assignedStaffId, name: `Server`, role: "STAFF" }
                                                      : null;
                                                 const assignedStaffLabel = assignedStaff
                                                     ? getStaffDisplayLabel(assignedStaff)
@@ -1879,7 +1849,8 @@ export default function OwnerLayout() {
                                                                                         onClick={() =>
                                                                                             assignStaffToTable(
                                                                                                 assignmentKey,
-                                                                                                staffId
+                                                                                                staffId,
+                                                                                                table
                                                                                             )
                                                                                         }
                                                                                         className={`theme-table-staff-option rounded-lg px-2 py-1 text-[10px] font-semibold transition ${
@@ -1902,7 +1873,8 @@ export default function OwnerLayout() {
                                                                         type="button"
                                                                         onClick={() =>
                                                                             clearTableAssignment(
-                                                                                assignmentKey
+                                                                                assignmentKey,
+                                                                                table
                                                                             )
                                                                         }
                                                                         className="theme-table-remove-btn mt-2 rounded-md px-2 py-1 text-[10px] font-semibold transition"
