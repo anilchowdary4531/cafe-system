@@ -298,8 +298,14 @@ export default function Login() {
         const ownerPhone = String(registerOwnerPhone || "").trim();
         const ownerPassword = String(registerOwnerPassword || "").trim();
 
-        if (!restaurantName || !ownerName || !ownerEmail || !ownerPassword) {
-            setRegisterError("Restaurant name, owner name, owner email, and password are required.");
+        if (!restaurantName || !ownerName || !ownerEmail || !ownerPhone || !ownerPassword) {
+            setRegisterError("Restaurant name, owner name, owner email, owner mobile phone number, and password are required.");
+            return;
+        }
+
+        const cleanPhoneDigits = ownerPhone.replace(/\D/g, "");
+        if (cleanPhoneDigits.length < 10) {
+            setRegisterError("Owner mobile phone number must contain at least 10 valid digits.");
             return;
         }
 

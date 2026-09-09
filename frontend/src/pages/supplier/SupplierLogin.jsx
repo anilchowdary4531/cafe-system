@@ -69,6 +69,11 @@ export default function SupplierLogin() {
                 showToast("Supplier login successful!");
                 navigate("/supplier");
             } else if (subMode === "register") {
+                if (!form.phone || !form.phone.trim()) {
+                    showToast("Valid mobile phone number is strictly required for supplier registration.", { type: "error" });
+                    setLoading(false);
+                    return;
+                }
                 const res = await api.post("/auth/supplier/register", {
                     email: form.email,
                     phone: form.phone,

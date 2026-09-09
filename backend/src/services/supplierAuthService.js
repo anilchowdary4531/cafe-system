@@ -65,8 +65,8 @@ export async function registerSupplier({ email, phone, password, businessName })
     if (!isValidEmail(cleanEmail)) {
         throw { statusCode: 400, message: "Invalid email format" };
     }
-    if (cleanPhone && !isValidPhone(cleanPhone)) {
-        throw { statusCode: 400, message: "Invalid phone number format" };
+    if (!cleanPhone || !isValidPhone(cleanPhone)) {
+        throw { statusCode: 400, message: "Valid mobile phone number is strictly required for supplier registration" };
     }
     if (!password || password.length < 6) {
         throw { statusCode: 400, message: "Password must be at least 6 characters long" };
@@ -217,8 +217,8 @@ export async function verifySupplierOtp({ email, phone, otp }) {
         throw { statusCode: 404, message: "Supplier account not found with this email" };
     }
 
-    // Master Dev OTP override (123456 or 000000) for instant testing & activation
-    if (cleanOtp === "123456" || cleanOtp === "000000") {
+    // Master Dev OTP override (123456) for instant testing & activation
+    if (cleanOtp === "123456") {
         const updatedSupplier = await prisma.supplier.update({
             where: { id: supplier.id },
             data: {
@@ -270,7 +270,7 @@ export async function verifySupplierOtp({ email, phone, otp }) {
     }
 
     const isDev = process.env.NODE_ENV !== "production";
-    const isMasterDevOtp = isDev && (cleanOtp === "123456" || cleanOtp === "000000");
+    const isMasterDevOtp = isDev && cleanOtp === "123456";
     const isMatch = isMasterDevOtp || (await bcrypt.compare(cleanOtp, otpRecord.otpHash));
 
     if (!isMatch) {

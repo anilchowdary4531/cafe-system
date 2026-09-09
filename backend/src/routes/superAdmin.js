@@ -397,10 +397,15 @@ export default async function superAdminRoutes(app, deps) {
       const ownerPassword = String(body.ownerPassword || body.password || "").trim();
       const slug = slugify(body.slug || restaurantName);
 
-      if (!restaurantName || !slug || !ownerName || !ownerEmail || !ownerPassword) {
+      if (!restaurantName || !slug || !ownerName || !ownerEmail || !ownerPhone || !ownerPassword) {
         return reply.code(400).send({
-          message: "Restaurant name, slug, owner name, owner email, and owner password are required",
+          message: "Restaurant name, slug, owner name, owner email, owner mobile phone number, and owner password are required",
         });
+      }
+
+      const cleanPhoneDigits = ownerPhone.replace(/\D/g, "");
+      if (cleanPhoneDigits.length < 10) {
+        return reply.code(400).send({ message: "Owner mobile phone number must contain at least 10 valid digits" });
       }
 
       if (ownerPassword.length < 6) {

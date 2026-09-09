@@ -94,6 +94,7 @@ test("Super Admin Create Restaurant Endpoint - Input Validation", async () => {
       name: "Cafe Mocha",
       ownerName: "Alice",
       ownerEmail: "alice@mocha.com",
+      ownerPhone: "9876543210",
       ownerPassword: "123",
     },
   });

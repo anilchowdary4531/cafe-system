@@ -110,7 +110,7 @@ export const buildCustomerAuthController = ({ prisma, app }) => {
       if (!username) return reply.code(400).send({ message: "Username is required" });
       if (username.length < 3) return reply.code(400).send({ message: "Username must be at least 3 characters" });
       if (!password || password.length < 6) return reply.code(400).send({ message: "Password must be at least 6 characters" });
-      if (!phone && !email) return reply.code(400).send({ message: "Identifier (Phone or Email) is required" });
+      if (!phone) return reply.code(400).send({ message: "Valid 10-digit mobile phone number is strictly required to create a customer account" });
 
       // If OTP was sent during signup, verify it before creating account
       if (otp) {

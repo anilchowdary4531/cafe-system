@@ -199,7 +199,7 @@ export default function SuperAdminCreateRestaurant() {
                         <Input label="Legal Name" value={form.legalName} onChange={(value) => updateForm("legalName", value)} />
                         <Input label="Owner Name" value={form.ownerName} onChange={(value) => updateForm("ownerName", value)} required />
                         <Input label="Owner Email" type="email" value={form.ownerEmail} onChange={(value) => updateForm("ownerEmail", value)} required />
-                        <Input label="Owner Phone" value={form.ownerPhone} onChange={(value) => updateForm("ownerPhone", value)} />
+                        <Input label="Owner Phone" value={form.ownerPhone} onChange={(value) => updateForm("ownerPhone", value)} required />
                         <Input label="Owner Password" type="password" value={form.ownerPassword} onChange={(value) => updateForm("ownerPassword", value)} required />
 
                         <div className="grid gap-3 md:grid-cols-2">
