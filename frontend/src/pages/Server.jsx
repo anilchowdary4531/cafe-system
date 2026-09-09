@@ -529,9 +529,60 @@ export default function Server() {
 
     const billPanelVisible = Boolean(selectedTableNo) && showBillPanel;
 
+    const assignServerToTable = useCallback(
+        (targetTableNo) => {
+            const tableNoStr = String(targetTableNo || "").trim();
+            const staffIdStr = String(user?.id || "").trim();
+            if (!restaurantId || !tableNoStr || !staffIdStr) return;
+
+            const currentAssignments = readTableStaffAssignments(restaurantId);
+
+            const tableObj = (allTables || []).find(
+                (t) => String(t.tableNo || "").trim().toLowerCase() === tableNoStr.toLowerCase()
+            );
+
+            let changed = false;
+
+            const keysToSet = new Set([
+                tableNoStr,
+                tableNoStr.toLowerCase(),
+                `table-${tableNoStr.toLowerCase()}`,
+            ]);
+
+            if (tableObj) {
+                if (tableObj.assignmentKey) keysToSet.add(String(tableObj.assignmentKey));
+                if (tableObj.key) keysToSet.add(String(tableObj.key));
+                if (tableObj.id) keysToSet.add(String(tableObj.id));
+                if (tableObj.id) keysToSet.add(`table-${tableObj.id}`);
+            }
+
+            keysToSet.forEach((k) => {
+                if (currentAssignments[k] !== staffIdStr) {
+                    currentAssignments[k] = staffIdStr;
+                    changed = true;
+                }
+            });
+
+            if (changed) {
+                writeTableStaffAssignments(restaurantId, currentAssignments);
+                setTableAssignments(currentAssignments);
+            }
+        },
+        [allTables, restaurantId, user?.id]
+    );
+
+    useEffect(() => {
+        if (selectedTableNo && user?.id) {
+            assignServerToTable(selectedTableNo);
+        }
+    }, [assignServerToTable, selectedTableNo, user?.id]);
+
     const setTable = useCallback(
         (tableNo) => {
             const value = String(tableNo || "").trim();
+            if (value) {
+                assignServerToTable(value);
+            }
             setSearchParams(
                 (prev) => {
                     if (value) prev.set("table", value);
@@ -541,7 +592,7 @@ export default function Server() {
                 { replace: true }
             );
         },
-        [setSearchParams]
+        [assignServerToTable, setSearchParams]
     );
 
     const addItem = useCallback(
@@ -555,9 +606,10 @@ export default function Server() {
                 return;
             }
 
+            assignServerToTable(selectedTableNo);
             setCart((prev) => mergeQty(prev, item, +1, defaultChefName));
         },
-        [defaultChefName, selectedTableNo]
+        [assignServerToTable, defaultChefName, selectedTableNo]
     );
 
     const subItem = useCallback((item) => {

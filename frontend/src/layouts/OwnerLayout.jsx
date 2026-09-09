@@ -755,6 +755,34 @@ export default function OwnerLayout() {
         }
     }, [assignmentsHydrated, restaurantId, tableAssignments]);
 
+    useEffect(() => {
+        if (!restaurantId || typeof window === "undefined") return undefined;
+
+        const handleStorage = (event) => {
+            if (!event.key || event.key === getTableStaffStorageKey(restaurantId)) {
+                try {
+                    const raw = localStorage.getItem(getTableStaffStorageKey(restaurantId));
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                            const normalized = Object.entries(parsed).reduce((acc, [tableKey, staffId]) => {
+                                if (!tableKey) return acc;
+                                acc[String(tableKey)] = String(staffId || "");
+                                return acc;
+                            }, {});
+                            setTableAssignments(normalized);
+                        }
+                    }
+                } catch {
+                    // Ignore JSON parse errors.
+                }
+            }
+        };
+
+        window.addEventListener("storage", handleStorage);
+        return () => window.removeEventListener("storage", handleStorage);
+    }, [restaurantId]);
+
     const staffById = useMemo(() => {
         const map = new Map();
         staffOverview.users.forEach((staffUser) => {
