@@ -1,10 +1,23 @@
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import SeoHead from "../components/SeoHead";
-import { User, Code2, Building2, ChevronRight, ArrowLeft } from "lucide-react";
+import { User, Code2, Building2, ChevronRight, ArrowLeft, Camera, Trash2 } from "lucide-react";
+import { showToast } from "../utils/toast";
+
+const STORAGE_KEY = "jekka_ramesh_profile_photo_v1";
 
 export default function JekkaRameshProfile() {
+    const fileInputRef = useRef(null);
+    const [profilePic, setProfilePic] = useState(() => {
+        try {
+            return localStorage.getItem(STORAGE_KEY) || "";
+        } catch {
+            return "";
+        }
+    });
+
     const pageTitle = "Jekka Ramesh – Founder & Developer | Tiffzy";
     const pageDescription = "Jekka Ramesh is the Founder and Developer of Tiffzy, a smart QR restaurant ordering and food technology platform operated by SURVETRA SERVICES.";
 
@@ -21,6 +34,41 @@ export default function JekkaRameshProfile() {
             "url": "https://www.tiffzy.com"
         },
         "url": "https://www.tiffzy.com/about/jekka-ramesh"
+    };
+
+    const handlePhotoUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+            showToast({ title: "Invalid File", message: "Please select an image file (.png, .jpg, .webp)", variant: "error" });
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const dataUrl = evt.target?.result;
+            if (dataUrl) {
+                setProfilePic(dataUrl);
+                try {
+                    localStorage.setItem(STORAGE_KEY, dataUrl);
+                } catch {
+                    // ignore
+                }
+                showToast({ title: "Photo Updated", message: "Profile photo updated from local device.", variant: "success" });
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemovePhoto = () => {
+        setProfilePic("");
+        try {
+            localStorage.removeItem(STORAGE_KEY);
+        } catch {
+            // ignore
+        }
+        showToast({ title: "Photo Removed", message: "Profile photo reset to default icon.", variant: "info" });
     };
 
     return (
@@ -55,9 +103,45 @@ export default function JekkaRameshProfile() {
                 {/* Header Card */}
                 <div className="rounded-3xl border border-[var(--app-border,rgba(0,0,0,0.1))] bg-white dark:bg-slate-900 p-8 sm:p-10 shadow-sm space-y-6">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-                        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-inner">
-                            <Code2 size={36} />
+                        <div className="flex flex-col items-center gap-2.5">
+                            <div className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl border-2 border-amber-500/30 bg-amber-500/10 text-amber-500 shadow-md">
+                                {profilePic ? (
+                                    <img src={profilePic} alt="Jekka Ramesh" className="h-full w-full object-cover" />
+                                ) : (
+                                    <Code2 size={40} />
+                                )}
+                            </div>
+
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/webp,image/*"
+                                onChange={handlePhotoUpload}
+                                className="hidden"
+                            />
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition active:scale-95"
+                                >
+                                    <Camera size={13} />
+                                    <span>{profilePic ? "Change Photo" : "Upload Photo"}</span>
+                                </button>
+                                {profilePic ? (
+                                    <button
+                                        type="button"
+                                        onClick={handleRemovePhoto}
+                                        className="inline-flex items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 p-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 transition active:scale-95"
+                                        title="Remove Photo"
+                                    >
+                                        <Trash2 size={13} />
+                                    </button>
+                                ) : null}
+                            </div>
                         </div>
+
                         <div>
                             <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-0.5 text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-500/20 mb-2">
                                 <User size={13} />
@@ -115,3 +199,4 @@ export default function JekkaRameshProfile() {
         </div>
     );
 }
+

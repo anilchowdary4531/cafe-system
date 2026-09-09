@@ -477,6 +477,8 @@ export default function OwnerSettings() {
                             <MapLocationPicker
                                 latitude={form.latitude}
                                 longitude={form.longitude}
+                                ownerPhone={form.phone || form.ownerPhone}
+                                ownerName={form.name || form.legalName}
                                 onSelectLocation={({ lat, lng }) => {
                                     setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }));
                                 }}

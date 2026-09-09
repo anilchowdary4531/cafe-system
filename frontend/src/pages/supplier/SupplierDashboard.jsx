@@ -42,49 +42,98 @@ import { resolveImageUrl } from "../../utils/resolveImageUrl";
 const getSupplyProductImageUrl = (item) => {
     if (!item) return "";
     let raw = "";
+
+    // 1. Check explicit primary image or imageUrl or image properties
     if (typeof item.primaryImage === "string" && item.primaryImage.trim()) raw = item.primaryImage.trim();
     else if (typeof item.imageUrl === "string" && item.imageUrl.trim()) raw = item.imageUrl.trim();
     else if (typeof item.image === "string" && item.image.trim()) raw = item.image.trim();
+    else if (typeof item.photoUrl === "string" && item.photoUrl.trim()) raw = item.photoUrl.trim();
     else if (Array.isArray(item.images) && item.images.length > 0) {
-        const first = item.images[0];
+        const primaryObj = item.images.find((img) => img && (img.isPrimary || img.primary));
+        const first = primaryObj || item.images[0];
         if (typeof first === "string" && first.trim()) raw = first.trim();
         else if (first && typeof first.imageUrl === "string" && first.imageUrl.trim()) raw = first.imageUrl.trim();
         else if (first && typeof first.url === "string" && first.url.trim()) raw = first.url.trim();
+        else if (first && typeof first.src === "string" && first.src.trim()) raw = first.src.trim();
     }
 
+    // 2. If a valid custom image URL or base64 data URL exists, return it immediately
     const resolved = resolveImageUrl(raw);
     if (resolved) return resolved;
 
+    // 3. Fallback matching: Specific product names MUST be checked before broad category fallbacks!
     const name = String(item.name || "").toLowerCase();
     const cat = String(item.category?.name || item.categoryName || item.category || "").toLowerCase();
 
-    if (name.includes("chicken") || name.includes("checken") || name.includes("poultry") || name.includes("meat") || cat.includes("meat")) {
+    if (name.includes("tomato")) {
+        return "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("onion")) {
+        return "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cf?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("mirchi") || name.includes("chili") || name.includes("chilli") || name.includes("pepper")) {
+        return "https://images.unsplash.com/photo-1588252303782-cb80119abd6d?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("pudina") || name.includes("pudin") || name.includes("mint")) {
+        return "https://images.unsplash.com/photo-1628556270448-4d4e4148e1b1?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("besan") || name.includes("gram flour") || name.includes("chickpea flour")) {
+        return "https://images.unsplash.com/photo-1608797178974-15b35a64ede9?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("vinegar")) {
+        return "https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("coke") || name.includes("cola") || name.includes("sprite") || name.includes("pepsi") || name.includes("soda")) {
+        return "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("egg")) {
+        return "https://images.unsplash.com/photo-1516448620398-c5f44bf9f441?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("chicken") || name.includes("checken") || name.includes("poultry") || name.includes("meat")) {
         return "https://images.unsplash.com/photo-1587593810167-a84920ea0781?auto=format&fit=crop&w=600&q=80";
     }
-    if (name.includes("water") || name.includes("bottle") || name.includes("beverage") || cat.includes("beverage")) {
-        return "https://images.unsplash.com/photo-1548839140-29a749e1bc4e?auto=format&fit=crop&w=600&q=80";
-    }
-    if (cat.includes("produce") || name.includes("vegetable") || name.includes("fruit") || name.includes("tomato") || name.includes("onion")) {
-        return "https://images.unsplash.com/photo-1610348725531-843dff563e2c?auto=format&fit=crop&w=600&q=80";
-    }
-    if (cat.includes("dairy") || name.includes("milk") || name.includes("cheese") || name.includes("butter") || name.includes("paneer")) {
-        return "https://images.unsplash.com/photo-1628088062854-d1870b4553da?auto=format&fit=crop&w=600&q=80";
-    }
-    if (cat.includes("spice") || cat.includes("sauce") || name.includes("chili") || name.includes("pepper") || name.includes("sauce")) {
-        return "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=600&q=80";
-    }
-    if (cat.includes("bakery") || name.includes("flour") || name.includes("bread") || name.includes("bun")) {
+    if (name.includes("flour") || name.includes("atta") || name.includes("maida") || name.includes("bread") || name.includes("bun")) {
         return "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80";
     }
-    if (cat.includes("oil") || name.includes("oil") || name.includes("ghee")) {
+    if (name.includes("oil") || name.includes("ghee")) {
         return "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80";
     }
-    if (cat.includes("packaging") || cat.includes("disposable") || name.includes("box") || name.includes("container") || name.includes("cup")) {
+    if (name.includes("milk") || name.includes("cheese") || name.includes("paneer") || name.includes("butter")) {
+        return "https://images.unsplash.com/photo-1628088062854-d1870b4553da?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("rice")) {
+        return "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=600&q=80";
+    }
+
+    // Secondary broad category fallbacks
+    if (cat.includes("beverage")) {
+        return "https://images.unsplash.com/photo-1548839140-29a749e1bc4e?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("meat")) {
+        return "https://images.unsplash.com/photo-1587593810167-a84920ea0781?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("dairy")) {
+        return "https://images.unsplash.com/photo-1628088062854-d1870b4553da?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("spice") || cat.includes("sauce") || cat.includes("condiment")) {
+        return "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("bakery")) {
+        return "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("oil")) {
+        return "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("packaging") || cat.includes("disposable")) {
         return "https://images.unsplash.com/photo-1607613009820-a29f7bb81c04?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("produce") || cat.includes("vegetable") || cat.includes("fruit")) {
+        return "https://images.unsplash.com/photo-1610348725531-843dff563e2c?auto=format&fit=crop&w=600&q=80";
     }
 
     return "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80";
 };
+
 
 
 export default function SupplierDashboard() {

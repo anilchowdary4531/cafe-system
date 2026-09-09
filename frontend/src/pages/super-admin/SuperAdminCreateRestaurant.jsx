@@ -218,8 +218,17 @@ export default function SuperAdminCreateRestaurant() {
                             <MapLocationPicker
                                 latitude={form.latitude}
                                 longitude={form.longitude}
-                                onSelectLocation={({ lat, lng }) => {
-                                    setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }));
+                                ownerPhone={form.ownerPhone || form.restaurantPhone}
+                                ownerName={form.name || form.ownerName}
+                                onSelectLocation={({ lat, lng, city, state, pincode }) => {
+                                    setForm((prev) => ({
+                                        ...prev,
+                                        latitude: lat,
+                                        longitude: lng,
+                                        ...(city && !prev.city ? { city } : {}),
+                                        ...(state && !prev.state ? { state } : {}),
+                                        ...(pincode && !prev.pincode ? { pincode } : {}),
+                                    }));
                                 }}
                             />
                         </div>

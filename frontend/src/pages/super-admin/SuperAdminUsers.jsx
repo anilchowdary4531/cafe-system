@@ -28,6 +28,7 @@ import { api, cachedGet } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import SuperAdminSidebar from "../../components/super-admin/SuperAdminSidebar";
+import tiffzyLogo from "../../assets/tiffzy-logo.png";
 
 const formatPhone = (raw) => {
     const s = String(raw || "").trim();

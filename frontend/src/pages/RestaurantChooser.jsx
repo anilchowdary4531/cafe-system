@@ -8,7 +8,7 @@ import {
     ChevronRight,
     ChevronUp,
     Dot,
-    Map as MapIcon,
+    MapPin,
     Navigation,
     QrCode,
     Receipt,
@@ -32,7 +32,11 @@ import CustomerNotificationBell from "../components/CustomerNotificationBell";
 import Footer from "../components/Footer";
 import PromoBannerSlider from "../components/PromoBannerSlider";
 import PopularCategories, { normalizeCategoryName } from "../components/PopularCategories";
-import TiffzyMapModal from "../components/TiffzyMapModal";
+import CustomerAddressModal, {
+    formatAddressLine,
+    getStoredActiveAddress,
+    setStoredActiveAddress,
+} from "../components/CustomerAddressModal";
 import SeoHead from "../components/SeoHead";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 import { isVegModeItem } from "./restaurant/RestaurantMenu";
@@ -128,7 +132,8 @@ export default function RestaurantChooser() {
     const [popupAnchor, setPopupAnchor] = useState(null);
     const [cartOpen, setCartOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState("");
-    const [isMapOpen, setIsMapOpen] = useState(false);
+    const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+    const [activeAddress, setActiveAddress] = useState(() => getStoredActiveAddress());
     const vegModeEnabled = Boolean(restaurantContext?.vegOnly);
     const profilePath = customer ? "/profile/overview?scope=customer" : "/login?mode=customer";
     const profileLabel = customer ? "Profile" : "Login";
@@ -345,22 +350,22 @@ export default function RestaurantChooser() {
                                 </Link>
 
                                 <button
-                                    onClick={() => detectNearest({ userTriggered: true })}
-                                    disabled={detecting || restaurantLoading || browseRestaurants.length === 0}
+                                    type="button"
+                                    onClick={() => setIsAddressModalOpen(true)}
                                     style={{ border: "none", boxShadow: "none" }}
-                                    className="chooser-chip theme-soft-button inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-3 py-2 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-70 sm:px-4 sm:py-3 sm:text-sm"
+                                    className="chooser-chip theme-soft-button inline-flex shrink-0 items-center justify-between gap-1.5 rounded-2xl bg-[#fe5102]/10 px-3 py-2 text-[11px] font-bold text-[#fe5102] hover:bg-[#fe5102]/20 sm:px-3.5 sm:py-2.5 sm:text-xs max-w-[240px] sm:max-w-[320px]"
+                                    title={formatAddressLine(activeAddress) || "Select Delivery Address"}
                                 >
-                                    <Navigation size={16} />
-                                    {detecting ? "Detecting..." : "Use my location"}
-                                </button>
-
-                                <button
-                                    onClick={() => setIsMapOpen(true)}
-                                    style={{ border: "none", boxShadow: "none" }}
-                                    className="chooser-chip theme-soft-button inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-[#fe5102]/10 px-3 py-2 text-[11px] font-bold text-[#fe5102] hover:bg-[#fe5102]/20 sm:px-4 sm:py-3 sm:text-sm"
-                                >
-                                    <MapIcon size={16} />
-                                    View Map 🗺️
+                                    <div className="flex items-center gap-1.5 min-w-0 truncate text-left">
+                                        <MapPin size={15} className="shrink-0 text-[#fe5102]" />
+                                        <span className="font-black text-[#fe5102] uppercase tracking-wider text-[10px] shrink-0">
+                                            {activeAddress?.label ? `${activeAddress.label}:` : "Deliver:"}
+                                        </span>
+                                        <span className="truncate text-xs font-semibold text-[color:var(--app-text)]">
+                                            {formatAddressLine(activeAddress) || "Select Address..."}
+                                        </span>
+                                    </div>
+                                    <ChevronDown size={14} className="shrink-0 text-[color:var(--app-muted)] ml-0.5" />
                                 </button>
                             </div>
 
@@ -465,10 +470,14 @@ export default function RestaurantChooser() {
 
             <CartDrawer open={cartOpen} setOpen={setCartOpen} />
 
-            <TiffzyMapModal
-                isOpen={isMapOpen}
-                onClose={() => setIsMapOpen(false)}
-                restaurants={browseRestaurants}
+            <CustomerAddressModal
+                isOpen={isAddressModalOpen}
+                onClose={() => setIsAddressModalOpen(false)}
+                activeAddress={activeAddress}
+                onSelectAddress={(addr) => {
+                    setActiveAddress(addr);
+                    setStoredActiveAddress(addr);
+                }}
             />
 
             <Footer />

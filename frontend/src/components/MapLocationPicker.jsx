@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { LocateFixed, MessageCircle, Loader2 } from "lucide-react";
 import { MAP_CONFIG } from "../utils/mapConfig";
 import { loadGoogleMaps, getGoogleMapsApiKey } from "../utils/googleMapsLoader";
+import { showToast } from "../utils/toast";
 
 /**
  * MapLocationPicker - Interactive Google Maps Location Selector Component
@@ -13,12 +15,15 @@ export default function MapLocationPicker({
     latitude,
     longitude,
     onSelectLocation,
+    ownerPhone = "",
+    ownerName = "",
     height = "260px",
 }) {
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
     const markerRef = useRef(null);
     const [mapError, setMapError] = useState(null);
+    const [locating, setLocating] = useState(false);
 
     const hasValidCoords =
         Number.isFinite(Number(latitude)) &&
@@ -119,24 +124,128 @@ export default function MapLocationPicker({
         }
     }, [latitude, longitude]);
 
+    // Handle detecting current GPS location
+    const handleDetectCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            showToast("Geolocation is not supported by your browser.", { type: "error" });
+            return;
+        }
+
+        setLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const lat = Math.round(position.coords.latitude * 1000000) / 1000000;
+                const lng = Math.round(position.coords.longitude * 1000000) / 1000000;
+                const pos = { lat, lng };
+
+                if (mapRef.current && markerRef.current) {
+                    markerRef.current.setPosition(pos);
+                    mapRef.current.panTo(pos);
+                    mapRef.current.setZoom(15);
+                }
+
+                let city = "";
+                let state = "";
+                let pincode = "";
+
+                if (window.google?.maps?.Geocoder) {
+                    try {
+                        const geocoder = new window.google.maps.Geocoder();
+                        const res = await geocoder.geocode({ location: pos });
+                        if (res?.results?.[0]) {
+                            for (const comp of res.results[0].address_components) {
+                                if (comp.types.includes("locality") || comp.types.includes("administrative_area_level_3")) {
+                                    city = comp.long_name;
+                                }
+                                if (comp.types.includes("administrative_area_level_1")) {
+                                    state = comp.long_name;
+                                }
+                                if (comp.types.includes("postal_code")) {
+                                    pincode = comp.long_name;
+                                }
+                            }
+                        }
+                    } catch {
+                        // Ignore geocode error
+                    }
+                }
+
+                onSelectLocation?.({ lat, lng, city, state, pincode });
+                showToast("Current GPS location detected & set!", { type: "success" });
+                setLocating(false);
+            },
+            (err) => {
+                console.warn("[MapLocationPicker] Geolocation error:", err);
+                showToast("Location permission denied or unavailable. Please click map manually.", { type: "error" });
+                setLocating(false);
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    };
+
+    // Handle asking location via WhatsApp
+    const handleAskWhatsApp = () => {
+        let cleanPhone = "";
+        if (ownerPhone) {
+            const digits = String(ownerPhone).replace(/\D/g, "");
+            if (digits.length === 10) cleanPhone = `91${digits}`;
+            else if (digits.length > 10) cleanPhone = digits;
+        }
+
+        const nameText = ownerName ? ` for ${ownerName}` : "";
+        const msg = `Hello! Please share your restaurant outlet's Google Maps location pin or address link with Tiffzy Admin so we can complete your outlet setup${nameText}. Thank you!`;
+        const waUrl = cleanPhone
+            ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
+            : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+
+        window.open(waUrl, "_blank");
+        showToast("Opened WhatsApp to request location pin!", { type: "info" });
+    };
+
     return (
-        <div className="space-y-2">
-            <div className="flex items-center justify-between">
+        <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                     Location Coordinates
                 </span>
-                {hasValidCoords ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-500/30">
-                        <span>📍</span>
-                        <span>
-                            {Number(latitude).toFixed(4)}° N, {Number(longitude).toFixed(4)}° E
+
+                <div className="flex flex-wrap items-center gap-2">
+                    {hasValidCoords ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                            <span>📍</span>
+                            <span>
+                                {Number(latitude).toFixed(4)}° N, {Number(longitude).toFixed(4)}° E
+                            </span>
                         </span>
-                    </span>
-                ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-bold text-amber-400 border border-amber-500/30">
-                        Location not set
-                    </span>
-                )}
+                    ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-bold text-amber-400 border border-amber-500/30">
+                            Location not set
+                        </span>
+                    )}
+
+                    {/* Current Location Button */}
+                    <button
+                        type="button"
+                        onClick={handleDetectCurrentLocation}
+                        disabled={locating}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-extrabold text-amber-500 dark:text-amber-400 hover:bg-amber-500/20 transition active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
+                        title="Detect & set current GPS location"
+                    >
+                        {locating ? <Loader2 size={13} className="animate-spin" /> : <LocateFixed size={13} />}
+                        <span>{locating ? "Locating..." : "Use Current Location"}</span>
+                    </button>
+
+                    {/* Ask via WhatsApp Button */}
+                    <button
+                        type="button"
+                        onClick={handleAskWhatsApp}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-600/20 px-3 py-1 text-xs font-extrabold text-emerald-500 dark:text-emerald-400 hover:bg-emerald-600/30 transition active:scale-95 cursor-pointer shadow-sm"
+                        title="Send WhatsApp message asking for location pin"
+                    >
+                        <MessageCircle size={13} className="text-emerald-500 dark:text-emerald-400" />
+                        <span>Ask via WhatsApp</span>
+                    </button>
+                </div>
             </div>
 
             {/* Map Canvas */}
@@ -158,7 +267,7 @@ export default function MapLocationPicker({
                     <button
                         type="button"
                         onClick={() => onSelectLocation?.({ lat: null, lng: null })}
-                        className="text-red-400 underline hover:text-red-300"
+                        className="text-red-400 underline hover:text-red-300 cursor-pointer"
                     >
                         Clear Location
                     </button>
@@ -167,3 +276,4 @@ export default function MapLocationPicker({
         </div>
     );
 }
+

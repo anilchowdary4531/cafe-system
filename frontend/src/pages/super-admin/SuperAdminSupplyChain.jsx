@@ -37,10 +37,107 @@ import {
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import { useAuth } from "../../context/AuthContext";
+import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import tiffzyLogo from "../../assets/tiffzy-logo.png";
 import SuperAdminSidebar from "../../components/super-admin/SuperAdminSidebar";
 
 const CHART_COLORS = ["#f5b94e", "#10b981", "#3b82f6", "#ef4444", "#8b5cf6"];
+
+const getSupplyProductImageUrl = (item) => {
+    if (!item) return "";
+    let raw = "";
+
+    // 1. Check explicit primary image or imageUrl or image properties
+    if (typeof item.primaryImage === "string" && item.primaryImage.trim()) raw = item.primaryImage.trim();
+    else if (typeof item.imageUrl === "string" && item.imageUrl.trim()) raw = item.imageUrl.trim();
+    else if (typeof item.image === "string" && item.image.trim()) raw = item.image.trim();
+    else if (typeof item.photoUrl === "string" && item.photoUrl.trim()) raw = item.photoUrl.trim();
+    else if (Array.isArray(item.images) && item.images.length > 0) {
+        const primaryObj = item.images.find((img) => img && (img.isPrimary || img.primary));
+        const first = primaryObj || item.images[0];
+        if (typeof first === "string" && first.trim()) raw = first.trim();
+        else if (first && typeof first.imageUrl === "string" && first.imageUrl.trim()) raw = first.imageUrl.trim();
+        else if (first && typeof first.url === "string" && first.url.trim()) raw = first.url.trim();
+        else if (first && typeof first.src === "string" && first.src.trim()) raw = first.src.trim();
+    }
+
+    // 2. If a valid custom image URL or base64 data URL exists, return it immediately
+    const resolved = resolveImageUrl(raw);
+    if (resolved) return resolved;
+
+    // 3. Fallback matching: Specific product names MUST be checked before broad category fallbacks!
+    const name = String(item.name || "").toLowerCase();
+    const cat = String(item.category?.name || item.categoryName || item.category || "").toLowerCase();
+
+    if (name.includes("tomato")) {
+        return "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("onion")) {
+        return "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cf?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("mirchi") || name.includes("chili") || name.includes("chilli") || name.includes("pepper")) {
+        return "https://images.unsplash.com/photo-1588252303782-cb80119abd6d?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("pudina") || name.includes("pudin") || name.includes("mint")) {
+        return "https://images.unsplash.com/photo-1628556270448-4d4e4148e1b1?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("besan") || name.includes("gram flour") || name.includes("chickpea flour")) {
+        return "https://images.unsplash.com/photo-1608797178974-15b35a64ede9?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("vinegar")) {
+        return "https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("coke") || name.includes("cola") || name.includes("sprite") || name.includes("pepsi") || name.includes("soda")) {
+        return "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("egg")) {
+        return "https://images.unsplash.com/photo-1516448620398-c5f44bf9f441?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("chicken") || name.includes("checken") || name.includes("poultry") || name.includes("meat")) {
+        return "https://images.unsplash.com/photo-1587593810167-a84920ea0781?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("flour") || name.includes("atta") || name.includes("maida") || name.includes("bread") || name.includes("bun")) {
+        return "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("oil") || name.includes("ghee")) {
+        return "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("milk") || name.includes("cheese") || name.includes("paneer") || name.includes("butter")) {
+        return "https://images.unsplash.com/photo-1628088062854-d1870b4553da?auto=format&fit=crop&w=600&q=80";
+    }
+    if (name.includes("rice")) {
+        return "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=600&q=80";
+    }
+
+    // Secondary broad category fallbacks
+    if (cat.includes("beverage")) {
+        return "https://images.unsplash.com/photo-1548839140-29a749e1bc4e?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("meat")) {
+        return "https://images.unsplash.com/photo-1587593810167-a84920ea0781?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("dairy")) {
+        return "https://images.unsplash.com/photo-1628088062854-d1870b4553da?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("spice") || cat.includes("sauce") || cat.includes("condiment")) {
+        return "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("bakery")) {
+        return "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("oil")) {
+        return "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("packaging") || cat.includes("disposable")) {
+        return "https://images.unsplash.com/photo-1607613009820-a29f7bb81c04?auto=format&fit=crop&w=600&q=80";
+    }
+    if (cat.includes("produce") || cat.includes("vegetable") || cat.includes("fruit")) {
+        return "https://images.unsplash.com/photo-1610348725531-843dff563e2c?auto=format&fit=crop&w=600&q=80";
+    }
+
+    return "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80";
+};
+
 
 export default function SuperAdminSupplyChain() {
     const { user, logout } = useAuth();
@@ -134,11 +231,12 @@ export default function SuperAdminSupplyChain() {
     const filteredProducts = products.filter((p) => {
         // Category Filter
         if (selectedCategory !== "ALL") {
+            const selStr = String(selectedCategory);
             const catMatch =
-                p.categoryId === selectedCategory ||
-                p.category?.id === selectedCategory ||
-                p.category?.slug === selectedCategory ||
-                p.category?.name === selectedCategory;
+                String(p.categoryId || "") === selStr ||
+                String(p.category?.id || "") === selStr ||
+                String(p.category?.slug || "").toLowerCase() === selStr.toLowerCase() ||
+                String(p.category?.name || "").toLowerCase() === selStr.toLowerCase();
             if (!catMatch) return false;
         }
         // Status Filter
@@ -402,15 +500,24 @@ export default function SuperAdminSupplyChain() {
                                     <select
                                         value={selectedCategory}
                                         onChange={(e) => setSelectedCategory(e.target.value)}
-                                        className="theme-input rounded-2xl px-4 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#f5b94e] cursor-pointer"
+                                        className="rounded-2xl border border-[var(--app-border,rgba(0,0,0,0.15))] bg-white dark:bg-slate-900 text-gray-900 dark:text-white px-4 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#f5b94e] cursor-pointer shadow-sm"
                                     >
-                                        <option value="ALL">📦 All Categories ({products.length})</option>
+                                        <option value="ALL" className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white font-bold">
+                                            📦 All Categories ({products.length})
+                                        </option>
                                         {availableCategories.map((c) => {
-                                            const catProdCount = products.filter(
-                                                (p) => p.categoryId === c.id || p.category?.id === c.id || p.category?.name === c.name
-                                            ).length;
+                                            const catVal = String(c.id || c.slug || c.name);
+                                            const catProdCount = products.filter((p) => {
+                                                const selStr = String(catVal);
+                                                return (
+                                                    String(p.categoryId || "") === selStr ||
+                                                    String(p.category?.id || "") === selStr ||
+                                                    String(p.category?.slug || "").toLowerCase() === selStr.toLowerCase() ||
+                                                    String(p.category?.name || "").toLowerCase() === String(c.name || "").toLowerCase()
+                                                );
+                                            }).length;
                                             return (
-                                                <option key={c.id || c.slug || c.name} value={c.id || c.slug || c.name}>
+                                                <option key={catVal} value={catVal} className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white">
                                                     {c.name} ({catProdCount})
                                                 </option>
                                             );
@@ -424,13 +531,13 @@ export default function SuperAdminSupplyChain() {
                                     <select
                                         value={selectedStatus}
                                         onChange={(e) => setSelectedStatus(e.target.value)}
-                                        className="theme-input rounded-2xl px-4 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#f5b94e] cursor-pointer"
+                                        className="rounded-2xl border border-[var(--app-border,rgba(0,0,0,0.15))] bg-white dark:bg-slate-900 text-gray-900 dark:text-white px-4 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#f5b94e] cursor-pointer shadow-sm"
                                     >
-                                        <option value="ALL">All Statuses</option>
-                                        <option value="ACTIVE">Active / Approved</option>
-                                        <option value="PENDING">Pending Review</option>
-                                        <option value="REJECTED">Rejected</option>
-                                        <option value="SUSPENDED">Suspended</option>
+                                        <option value="ALL" className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white font-bold">All Statuses</option>
+                                        <option value="ACTIVE" className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white">Active / Approved</option>
+                                        <option value="PENDING" className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white">Pending Review</option>
+                                        <option value="REJECTED" className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white">Rejected</option>
+                                        <option value="SUSPENDED" className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white">Suspended</option>
                                     </select>
                                 </div>
 
@@ -470,18 +577,21 @@ export default function SuperAdminSupplyChain() {
                                         All ({products.length})
                                     </button>
                                     {availableCategories.map((cat) => {
-                                        const isSelected =
-                                            selectedCategory === cat.id ||
-                                            selectedCategory === cat.slug ||
-                                            selectedCategory === cat.name;
-                                        const catCount = products.filter(
-                                            (p) => p.categoryId === cat.id || p.category?.id === cat.id || p.category?.name === cat.name
-                                        ).length;
+                                        const catVal = String(cat.id || cat.slug || cat.name);
+                                        const isSelected = String(selectedCategory) === catVal;
+                                        const catCount = products.filter((p) => {
+                                            return (
+                                                String(p.categoryId || "") === catVal ||
+                                                String(p.category?.id || "") === catVal ||
+                                                String(p.category?.slug || "").toLowerCase() === catVal.toLowerCase() ||
+                                                String(p.category?.name || "").toLowerCase() === String(cat.name || "").toLowerCase()
+                                            );
+                                        }).length;
                                         return (
                                             <button
-                                                key={cat.id || cat.slug || cat.name}
+                                                key={catVal}
                                                 type="button"
-                                                onClick={() => setSelectedCategory(cat.id || cat.slug || cat.name)}
+                                                onClick={() => setSelectedCategory(catVal)}
                                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
                                                     isSelected
                                                         ? "theme-button shadow-sm"
@@ -555,48 +665,71 @@ export default function SuperAdminSupplyChain() {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {filteredProducts.map((p) => (
-                                        <div key={p.id} className="theme-panel rounded-2xl p-5 space-y-3 border shadow-sm hover:border-[#f5b94e]/40 transition">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div>
-                                                    <span className="theme-chip rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider mb-1.5 inline-block">
-                                                        {p.category?.name || "General Raw Ingredient"}
-                                                    </span>
-                                                    <h3 className="font-bold text-base leading-snug">{p.name}</h3>
-                                                    <p className="theme-muted text-xs mt-0.5">Supplier: <strong className="font-semibold text-white">{p.supplier?.profile?.businessName || "Unknown"}</strong></p>
+                                    {filteredProducts.map((p) => {
+                                        const prodImg = getSupplyProductImageUrl(p);
+                                        return (
+                                            <div key={p.id} className="theme-panel rounded-2xl p-4 space-y-3 border shadow-sm hover:border-[#f5b94e]/40 transition flex flex-col justify-between">
+                                                <div className="space-y-3">
+                                                    {/* Product Image Banner */}
+                                                    <div className="relative h-40 w-full overflow-hidden rounded-xl bg-gray-100 dark:bg-slate-800 border border-[var(--app-border,rgba(0,0,0,0.08))]">
+                                                        <img
+                                                            src={prodImg}
+                                                            alt={p.name}
+                                                            className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                                                            onError={(e) => {
+                                                                e.target.onerror = null;
+                                                                e.target.src = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80";
+                                                            }}
+                                                        />
+                                                        <span className="absolute top-2 left-2 backdrop-blur-md bg-black/60 text-white rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider border border-white/20">
+                                                            {p.category?.name || "General Raw Ingredient"}
+                                                        </span>
+                                                        <span className={`absolute top-2 right-2 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold shadow-sm ${
+                                                            p.status === "ACTIVE" ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
+                                                        }`}>
+                                                            {p.status}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Product Meta */}
+                                                    <div>
+                                                        <h3 className="font-extrabold text-base leading-snug">{p.name}</h3>
+                                                        <p className="theme-muted text-xs mt-0.5">
+                                                            Supplier: <strong className="font-semibold text-amber-600 dark:text-amber-400">{p.supplier?.profile?.businessName || "SocialSea"}</strong>
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="text-xs space-y-1 theme-muted border-t theme-border pt-3">
+                                                        <p>Base Price: <span className="font-black text-gray-900 dark:text-white text-sm">₹{p.prices?.[0]?.basePrice || p.basePrice || 100}</span> / {p.unit}</p>
+                                                        <p>MOQ: <span className="font-bold text-gray-900 dark:text-white">{p.moq} {p.unit}</span> • Stock: <span className="font-bold text-emerald-500">{p.inventory?.availableQuantity ?? 500} {p.unit}</span></p>
+                                                    </div>
                                                 </div>
-                                                <span className={`rounded-full px-3 py-0.5 text-xs font-bold ${
-                                                    p.status === "ACTIVE" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "theme-chip"
-                                                }`}>
-                                                    {p.status}
-                                                </span>
+
+                                                {/* Approve / Reject Actions */}
+                                                <div className="flex items-center gap-2 pt-2 border-t theme-border">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleUpdateProductStatus(p.id, "ACTIVE")}
+                                                        className="flex-1 theme-button py-2 text-xs font-extrabold cursor-pointer transition shadow-sm rounded-xl"
+                                                    >
+                                                        Approve
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleUpdateProductStatus(p.id, "REJECTED")}
+                                                        className="flex-1 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 py-2 text-xs font-bold cursor-pointer transition"
+                                                    >
+                                                        Reject
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="text-xs space-y-1 theme-muted border-t theme-border pt-3">
-                                                <p>Base Price: <span className="font-black text-white text-sm">₹{p.prices?.[0]?.basePrice || 100}</span> / {p.unit}</p>
-                                                <p>MOQ: <span className="font-bold text-white">{p.moq} {p.unit}</span> • Stock: <span className="font-bold text-emerald-400">{p.inventory?.availableQuantity || 500} {p.unit}</span></p>
-                                            </div>
-                                            <div className="flex items-center gap-2 pt-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleUpdateProductStatus(p.id, "ACTIVE")}
-                                                    className="flex-1 theme-button py-2 text-xs font-extrabold cursor-pointer transition shadow-sm rounded-xl"
-                                                >
-                                                    Approve
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleUpdateProductStatus(p.id, "REJECTED")}
-                                                    className="flex-1 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 py-2 text-xs font-bold cursor-pointer transition"
-                                                >
-                                                    Reject
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
                     )}
+
 
                     {/* Tab 2: Supplier Verification & KYC Review */}
                     {activeTab === "suppliers" && (

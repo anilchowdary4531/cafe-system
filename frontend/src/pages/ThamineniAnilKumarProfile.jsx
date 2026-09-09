@@ -1,10 +1,23 @@
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import SeoHead from "../components/SeoHead";
-import { User, Building2, ShieldCheck, ChevronRight, ArrowLeft } from "lucide-react";
+import { User, Building2, ChevronRight, ArrowLeft, Camera, Trash2 } from "lucide-react";
+import { showToast } from "../utils/toast";
+
+const STORAGE_KEY = "thamineni_anil_kumar_profile_photo_v1";
 
 export default function ThamineniAnilKumarProfile() {
+    const fileInputRef = useRef(null);
+    const [profilePic, setProfilePic] = useState(() => {
+        try {
+            return localStorage.getItem(STORAGE_KEY) || "";
+        } catch {
+            return "";
+        }
+    });
+
     const pageTitle = "Thamineni Anil Kumar – Proprietor | SURVETRA SERVICES";
     const pageDescription = "Thamineni Anil Kumar is the Proprietor of SURVETRA SERVICES, the business operating Tiffzy.";
 
@@ -21,6 +34,41 @@ export default function ThamineniAnilKumarProfile() {
             "url": "https://www.tiffzy.com"
         },
         "url": "https://www.tiffzy.com/about/thamineni-anil-kumar"
+    };
+
+    const handlePhotoUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+            showToast({ title: "Invalid File", message: "Please select an image file (.png, .jpg, .webp)", variant: "error" });
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const dataUrl = evt.target?.result;
+            if (dataUrl) {
+                setProfilePic(dataUrl);
+                try {
+                    localStorage.setItem(STORAGE_KEY, dataUrl);
+                } catch {
+                    // ignore
+                }
+                showToast({ title: "Photo Updated", message: "Profile photo updated from local device.", variant: "success" });
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemovePhoto = () => {
+        setProfilePic("");
+        try {
+            localStorage.removeItem(STORAGE_KEY);
+        } catch {
+            // ignore
+        }
+        showToast({ title: "Photo Removed", message: "Profile photo reset to default icon.", variant: "info" });
     };
 
     return (
@@ -55,9 +103,45 @@ export default function ThamineniAnilKumarProfile() {
                 {/* Header Card */}
                 <div className="rounded-3xl border border-[var(--app-border,rgba(0,0,0,0.1))] bg-white dark:bg-slate-900 p-8 sm:p-10 shadow-sm space-y-6">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-                        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-inner">
-                            <Building2 size={36} />
+                        <div className="flex flex-col items-center gap-2.5">
+                            <div className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl border-2 border-amber-500/30 bg-amber-500/10 text-amber-500 shadow-md">
+                                {profilePic ? (
+                                    <img src={profilePic} alt="Thamineni Anil Kumar" className="h-full w-full object-cover" />
+                                ) : (
+                                    <Building2 size={40} />
+                                )}
+                            </div>
+
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/webp,image/*"
+                                onChange={handlePhotoUpload}
+                                className="hidden"
+                            />
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition active:scale-95"
+                                >
+                                    <Camera size={13} />
+                                    <span>{profilePic ? "Change Photo" : "Upload Photo"}</span>
+                                </button>
+                                {profilePic ? (
+                                    <button
+                                        type="button"
+                                        onClick={handleRemovePhoto}
+                                        className="inline-flex items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 p-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 transition active:scale-95"
+                                        title="Remove Photo"
+                                    >
+                                        <Trash2 size={13} />
+                                    </button>
+                                ) : null}
+                            </div>
                         </div>
+
                         <div>
                             <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-0.5 text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-500/20 mb-2">
                                 <User size={13} />
@@ -76,7 +160,7 @@ export default function ThamineniAnilKumarProfile() {
 
                     {/* Biography Section */}
                     <div className="space-y-4 text-base text-gray-700 dark:text-gray-300 leading-relaxed">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Business Ownership &amp; Management</h2>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Biography &amp; Role</h2>
                         <p className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-gray-800 dark:text-gray-200 font-medium">
                             &quot;Thamineni Anil Kumar is the Proprietor of SURVETRA SERVICES, the business operating Tiffzy.&quot;
                         </p>
@@ -85,14 +169,14 @@ export default function ThamineniAnilKumarProfile() {
                         </p>
                     </div>
 
-                    {/* Legal Entity Card */}
+                    {/* Technical Relation */}
                     <div className="rounded-2xl border border-[var(--app-border,rgba(0,0,0,0.1))] bg-gray-50 dark:bg-slate-800/60 p-6 space-y-3">
                         <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 dark:text-white flex items-center gap-2">
-                            <ShieldCheck size={16} className="text-emerald-500" />
-                            <span>Business Operating Entity</span>
+                            <Building2 size={16} className="text-amber-500" />
+                            <span>Software Platform Relation</span>
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                            SURVETRA SERVICES is the registered sole proprietorship operating Tiffzy. The software platform product vision and technology development are led by Founder &amp; Developer <Link to="/about/jekka-ramesh" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">Jekka Ramesh</Link>.
+                            SURVETRA SERVICES (Proprietor: Thamineni Anil Kumar) operates Tiffzy. Software architecture, engineering, and platform development are led by <Link to="/about/jekka-ramesh" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">Jekka Ramesh</Link> (Founder &amp; Developer).
                         </p>
                     </div>
 

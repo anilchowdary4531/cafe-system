@@ -16,6 +16,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import ThemeSelector from "../../components/ThemeSelector";
 import { useAuth } from "../../context/AuthContext";
 import SuperAdminSidebar from "../../components/super-admin/SuperAdminSidebar";
+import tiffzyLogo from "../../assets/tiffzy-logo.png";
 
 export default function SuperAdminSettings() {
     const navigate = useNavigate();
