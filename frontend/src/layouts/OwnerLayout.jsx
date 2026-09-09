@@ -1320,7 +1320,7 @@ export default function OwnerLayout() {
                                         : ""
                                 }
                             >
-                                <div className="theme-panel flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-3 sm:p-4 shadow-sm">
+                                <div className="flex flex-wrap items-center justify-between gap-3 py-1">
                                     <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
                                         <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 font-bold text-amber-400">
                                             <TableProperties size={15} />
