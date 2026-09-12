@@ -10,6 +10,7 @@ import {
     Dot,
     MapPin,
     Navigation,
+    Plus,
     QrCode,
     Receipt,
     Search,
@@ -669,7 +670,7 @@ function SearchItemCard({ item, onClick, onToggleDetails, selected, quantity = 0
                         </span>
                     ) : (
                         <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-black/5 text-[color:var(--app-accent)]">
-                            <ChevronRight size={10} />
+                            <Plus size={10} />
                         </span>
                     )}
                 </div>
