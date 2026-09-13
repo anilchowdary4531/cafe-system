@@ -45,6 +45,7 @@ import com.tiffzy.app.ui.customer.profile.NotificationsScreen
 import com.tiffzy.app.ui.customer.profile.SettingsScreen
 import com.tiffzy.app.ui.customer.menu.LiveBillScreen
 import com.tiffzy.app.ui.customer.scanner.ScannerScreen
+import com.tiffzy.app.ui.customer.map.MapScreen
 import com.tiffzy.app.ui.payment.PaymentActivity
 import com.tiffzy.app.ui.components.PlaceholderScreen
 import com.tiffzy.app.data.repository.CartRepository
