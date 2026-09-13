@@ -18,6 +18,7 @@ export default function MapLocationPicker({
     ownerPhone = "",
     ownerName = "",
     height = "260px",
+    hideControls = false,
 }) {
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
@@ -203,56 +204,58 @@ export default function MapLocationPicker({
     };
 
     return (
-        <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                    Location Coordinates
-                </span>
+        <div className="space-y-2">
+            {!hideControls && (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                        Location Coordinates
+                    </span>
 
-                <div className="flex flex-wrap items-center gap-2">
-                    {hasValidCoords ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-500/30">
-                            <span>📍</span>
-                            <span>
-                                {Number(latitude).toFixed(4)}° N, {Number(longitude).toFixed(4)}° E
+                    <div className="flex flex-wrap items-center gap-2">
+                        {hasValidCoords ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                                <span>📍</span>
+                                <span>
+                                    {Number(latitude).toFixed(4)}° N, {Number(longitude).toFixed(4)}° E
+                                </span>
                             </span>
-                        </span>
-                    ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-bold text-amber-400 border border-amber-500/30">
-                            Location not set
-                        </span>
-                    )}
+                        ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-bold text-amber-400 border border-amber-500/30">
+                                Location not set
+                            </span>
+                        )}
 
-                    {/* Current Location Button */}
-                    <button
-                        type="button"
-                        onClick={handleDetectCurrentLocation}
-                        disabled={locating}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-extrabold text-amber-500 dark:text-amber-400 hover:bg-amber-500/20 transition active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
-                        title="Detect & set current GPS location"
-                    >
-                        {locating ? <Loader2 size={13} className="animate-spin" /> : <LocateFixed size={13} />}
-                        <span>{locating ? "Locating..." : "Use Current Location"}</span>
-                    </button>
+                        {/* Current Location Button */}
+                        <button
+                            type="button"
+                            onClick={handleDetectCurrentLocation}
+                            disabled={locating}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-extrabold text-amber-500 dark:text-amber-400 hover:bg-amber-500/20 transition active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
+                            title="Detect & set current GPS location"
+                        >
+                            {locating ? <Loader2 size={13} className="animate-spin" /> : <LocateFixed size={13} />}
+                            <span>{locating ? "Locating..." : "Use Current Location"}</span>
+                        </button>
 
-                    {/* Ask via WhatsApp Button */}
-                    <button
-                        type="button"
-                        onClick={handleAskWhatsApp}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-600/20 px-3 py-1 text-xs font-extrabold text-emerald-500 dark:text-emerald-400 hover:bg-emerald-600/30 transition active:scale-95 cursor-pointer shadow-sm"
-                        title="Send WhatsApp message asking for location pin"
-                    >
-                        <MessageCircle size={13} className="text-emerald-500 dark:text-emerald-400" />
-                        <span>Ask via WhatsApp</span>
-                    </button>
+                        {/* Ask via WhatsApp Button */}
+                        <button
+                            type="button"
+                            onClick={handleAskWhatsApp}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-600/20 px-3 py-1 text-xs font-extrabold text-emerald-500 dark:text-emerald-400 hover:bg-emerald-600/30 transition active:scale-95 cursor-pointer shadow-sm"
+                            title="Send WhatsApp message asking for location pin"
+                        >
+                            <MessageCircle size={13} className="text-emerald-500 dark:text-emerald-400" />
+                            <span>Ask via WhatsApp</span>
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Map Canvas */}
             <div
                 ref={mapContainerRef}
                 style={{ height }}
-                className="relative overflow-hidden rounded-2xl border border-white/10 shadow-inner bg-gray-900 flex items-center justify-center"
+                className="relative overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 shadow-sm bg-gray-900 flex items-center justify-center"
             >
                 {mapError && (
                     <div className="p-4 text-center text-xs text-amber-400">
@@ -261,18 +264,20 @@ export default function MapLocationPicker({
                 )}
             </div>
 
-            <div className="flex items-center justify-between text-xs text-gray-400">
-                <p>Click map or drag pin to select restaurant outlet location.</p>
-                {hasValidCoords && (
-                    <button
-                        type="button"
-                        onClick={() => onSelectLocation?.({ lat: null, lng: null })}
-                        className="text-red-400 underline hover:text-red-300 cursor-pointer"
-                    >
-                        Clear Location
-                    </button>
-                )}
-            </div>
+            {!hideControls && (
+                <div className="flex items-center justify-between text-xs text-gray-400">
+                    <p>Click map or drag pin to select location.</p>
+                    {hasValidCoords && (
+                        <button
+                            type="button"
+                            onClick={() => onSelectLocation?.({ lat: null, lng: null })}
+                            className="text-red-400 underline hover:text-red-300 cursor-pointer"
+                        >
+                            Clear Location
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

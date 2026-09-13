@@ -436,8 +436,8 @@ export default function CustomerAddressModal({
 
                     {/* Interactive Map Picker Section */}
                     {mapViewOpen && (
-                        <div className="rounded-2xl border border-[#fe5102]/40 bg-black/5 p-3.5 space-y-3 animate-in fade-in-50 duration-200">
-                            <div className="flex items-center justify-between">
+                        <div className="space-y-3 pt-1 animate-in fade-in-50 duration-200">
+                            <div className="flex items-center justify-between px-1">
                                 <div className="flex items-center gap-2">
                                     <Map size={16} className="text-[#fe5102]" />
                                     <h3 className="text-xs font-bold uppercase tracking-wider text-[color:var(--app-text)]">
@@ -447,33 +447,35 @@ export default function CustomerAddressModal({
                                 <button
                                     type="button"
                                     onClick={() => setMapViewOpen(false)}
-                                    className="text-xs font-bold text-[color:var(--app-accent)] hover:underline"
+                                    className="text-xs font-bold theme-muted hover:underline"
                                 >
                                     Close Map
                                 </button>
                             </div>
 
-                            <div className="overflow-hidden rounded-xl border border-[var(--app-border)]">
+                            {/* Large Map Canvas */}
+                            <div className="overflow-hidden rounded-2xl shadow-md border border-[var(--app-border)]">
                                 <MapLocationPicker
                                     latitude={mapSelectedCoords?.lat || activeAddress?.latitude}
                                     longitude={mapSelectedCoords?.lng || activeAddress?.longitude}
                                     onSelectLocation={handleMapLocationChange}
-                                    height="220px"
+                                    height="350px"
+                                    hideControls={true}
                                 />
                             </div>
 
-                            {/* Live Address Card */}
-                            <div className="rounded-xl border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] p-3 text-xs space-y-1 shadow-sm">
+                            {/* Live Address directly on paper */}
+                            <div className="px-1 py-1 text-xs space-y-1">
                                 <div className="flex items-center justify-between text-[11px] font-bold text-[#fe5102]">
                                     <span>📍 DETECTED PIN LOCATION</span>
                                     {mapGeocoding && <span className="animate-pulse theme-muted">Geocoding...</span>}
                                 </div>
-                                <p className="font-semibold text-[color:var(--app-text)]">
-                                    {mapAddressDetails ? formatAddressLine(mapAddressDetails) : "Click or drag pin on map to pick delivery spot."}
+                                <p className="font-semibold text-[color:var(--app-text)] text-sm leading-snug">
+                                    {mapAddressDetails ? formatAddressLine(mapAddressDetails) : "Click or drag pin on map to set exact location."}
                                 </p>
                                 {mapSelectedCoords && (
                                     <p className="theme-muted text-[10px] font-mono">
-                                        Coords: {mapSelectedCoords.lat.toFixed(5)}, {mapSelectedCoords.lng.toFixed(5)}
+                                        Coords: {mapSelectedCoords.lat.toFixed(5)}° N, {mapSelectedCoords.lng.toFixed(5)}° E
                                     </p>
                                 )}
                             </div>
@@ -481,7 +483,7 @@ export default function CustomerAddressModal({
                             <button
                                 type="button"
                                 onClick={handleConfirmMapLocation}
-                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#fe5102] p-3 text-xs font-bold text-white shadow-md transition hover:bg-[#e04700]"
+                                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#fe5102] py-3.5 px-4 text-xs font-bold text-white shadow-lg transition hover:bg-[#e04700] active:scale-[0.99]"
                             >
                                 <Check size={16} />
                                 Confirm & Deliver to Selected Map Pin
