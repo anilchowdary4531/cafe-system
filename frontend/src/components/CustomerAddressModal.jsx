@@ -148,32 +148,35 @@ export default function CustomerAddressModal({
             return;
         }
 
-        const line1 = mapAddressDetails?.line1 || "Map Location Pin";
+        const autoLine1 = mapAddressDetails?.line1 && mapAddressDetails?.line1 !== "Selected Location Pin" && mapAddressDetails?.line1 !== "Selected Map Location Pin"
+            ? mapAddressDetails.line1
+            : "";
         const mandal = mapAddressDetails?.mandal || "";
         const city = mapAddressDetails?.city || "";
         const postalCode = mapAddressDetails?.postalCode || "";
 
-        const selectedMapObj = {
-            id: `map_${Date.now()}`,
-            label: "Map Location Pin",
-            line1,
+        setFormData({
+            id: null,
+            label: "Home",
+            name: String(customer?.name || "").trim(),
+            phone: String(customer?.phone || "").trim(),
+            line1: autoLine1,
+            line2: "",
             mandal,
             city,
             postalCode,
             latitude: mapSelectedCoords.lat,
             longitude: mapSelectedCoords.lng,
-            isMapPin: true,
-        };
+            isDefault: false,
+        });
 
-        onSelectAddress?.(selectedMapObj);
-        setStoredActiveAddress(selectedMapObj);
+        setEditingAddress(null);
+        setFormOpen(true);
         showToast({
-            title: "Location Selected from Map 📍",
-            message: formatAddressLine(selectedMapObj),
+            title: "Location Pinned! 📍",
+            message: "Now add your House/Flat No. or Office Name to save address.",
             variant: "success",
         });
-        setMapViewOpen(false);
-        onClose?.();
     };
 
     const handleUseCurrentLocation = async () => {
@@ -486,18 +489,26 @@ export default function CustomerAddressModal({
                                 className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#fe5102] py-3.5 px-4 text-xs font-bold text-white shadow-lg transition hover:bg-[#e04700] active:scale-[0.99]"
                             >
                                 <Check size={16} />
-                                Confirm & Deliver to Selected Map Pin
+                                Confirm Pin & Add House / Office Details →
                             </button>
                         </div>
                     )}
 
-                    {/* Form Section */}
+                    {/* Zomato-Style Form Section */}
                     {formOpen ? (
-                        <form onSubmit={handleSaveForm} className="rounded-2xl border border-[var(--app-border)] bg-black/5 p-4 space-y-3">
+                        <form onSubmit={handleSaveForm} className="rounded-2xl border border-[var(--app-border)] bg-black/5 p-4 space-y-3 animate-in fade-in-50 duration-200">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-xs font-bold uppercase tracking-wider text-[color:var(--app-text)]">
-                                    {editingAddress ? "Edit Address" : "Add New Address"}
-                                </h3>
+                                <div>
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-[color:var(--app-text)]">
+                                        {editingAddress ? "Edit Address Details" : "Complete Address Details"}
+                                    </h3>
+                                    {formData.latitude && formData.longitude && (
+                                        <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
+                                            <span>📍</span>
+                                            <span>Map Pin Attached ({Number(formData.latitude).toFixed(4)}°, {Number(formData.longitude).toFixed(4)}°)</span>
+                                        </p>
+                                    )}
+                                </div>
                                 <button
                                     type="button"
                                     onClick={() => setFormOpen(false)}
@@ -507,56 +518,73 @@ export default function CustomerAddressModal({
                                 </button>
                             </div>
 
-                            {/* Label Selection */}
-                            <div className="flex items-center gap-2">
-                                {["Home", "Work", "Other"].map((tag) => (
-                                    <button
-                                        key={tag}
-                                        type="button"
-                                        onClick={() => setFormData((prev) => ({ ...prev, label: tag }))}
-                                        className={`flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-bold transition ${
-                                            formData.label === tag
-                                                ? "bg-[#fe5102] text-white shadow-sm"
-                                                : "border border-[var(--app-border)] bg-white/50 text-[color:var(--app-text)] hover:bg-white"
-                                        }`}
-                                    >
-                                        {tag === "Home" ? <Home size={12} /> : tag === "Work" ? <Building2 size={12} /> : <MapPin size={12} />}
-                                        {tag}
-                                    </button>
-                                ))}
+                            {/* Save Address As Tag Selection */}
+                            <div className="space-y-1">
+                                <label className="theme-muted text-[11px] font-bold block">Save Address As *</label>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {["Home", "Work", "Hotel", "Other"].map((tag) => (
+                                        <button
+                                            key={tag}
+                                            type="button"
+                                            onClick={() => setFormData((prev) => ({ ...prev, label: tag }))}
+                                            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-bold transition ${
+                                                formData.label === tag
+                                                    ? "bg-[#fe5102] text-white shadow-sm"
+                                                    : "border border-[var(--app-border)] bg-white/50 text-[color:var(--app-text)] hover:bg-white"
+                                            }`}
+                                        >
+                                            {tag === "Home" ? <Home size={12} /> : tag === "Work" ? <Building2 size={12} /> : <MapPin size={12} />}
+                                            {tag}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
-                            <input
-                                type="text"
-                                placeholder="House / Flat / Building No. *"
-                                value={formData.line1}
-                                onChange={(e) => setFormData((prev) => ({ ...prev, line1: e.target.value }))}
-                                className="w-full rounded-xl border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] p-2.5 text-xs outline-none focus:border-[#fe5102]"
-                            />
+                            {/* House / Flat / Building Name */}
+                            <div>
+                                <label className="theme-muted text-[11px] font-bold block mb-1">House / Flat / Office Name *</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Flat 402, Sunshine Heights or Office Bay 3"
+                                    value={formData.line1}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, line1: e.target.value }))}
+                                    className="w-full rounded-xl border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] p-2.5 text-xs outline-none focus:border-[#fe5102]"
+                                />
+                            </div>
 
-                            <input
-                                type="text"
-                                placeholder="Street / Area / Mandal *"
-                                value={formData.mandal}
-                                onChange={(e) => setFormData((prev) => ({ ...prev, mandal: e.target.value }))}
-                                className="w-full rounded-xl border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] p-2.5 text-xs outline-none focus:border-[#fe5102]"
-                            />
+                            {/* Street / Area / Mandal */}
+                            <div>
+                                <label className="theme-muted text-[11px] font-bold block mb-1">Street / Area / Mandal / Landmark *</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. 2nd Main Road, Near SBI Bank, AECS Layout"
+                                    value={formData.mandal}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, mandal: e.target.value }))}
+                                    className="w-full rounded-xl border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] p-2.5 text-xs outline-none focus:border-[#fe5102]"
+                                />
+                            </div>
 
                             <div className="grid grid-cols-2 gap-2">
-                                <input
-                                    type="text"
-                                    placeholder="City *"
-                                    value={formData.city}
-                                    onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
-                                    className="w-full rounded-xl border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] p-2.5 text-xs outline-none focus:border-[#fe5102]"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Postal Code / Pincode"
-                                    value={formData.postalCode}
-                                    onChange={(e) => setFormData((prev) => ({ ...prev, postalCode: e.target.value }))}
-                                    className="w-full rounded-xl border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] p-2.5 text-xs outline-none focus:border-[#fe5102]"
-                                />
+                                <div>
+                                    <label className="theme-muted text-[11px] font-bold block mb-1">City *</label>
+                                    <input
+                                        type="text"
+                                        placeholder="City *"
+                                        value={formData.city}
+                                        onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
+                                        className="w-full rounded-xl border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] p-2.5 text-xs outline-none focus:border-[#fe5102]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="theme-muted text-[11px] font-bold block mb-1">Pincode</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Postal Code"
+                                        value={formData.postalCode}
+                                        onChange={(e) => setFormData((prev) => ({ ...prev, postalCode: e.target.value }))}
+                                        className="w-full rounded-xl border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] p-2.5 text-xs outline-none focus:border-[#fe5102]"
+                                    />
+                                </div>
                             </div>
 
                             <label className="flex items-center gap-2 pt-1 text-xs cursor-pointer">
@@ -572,10 +600,10 @@ export default function CustomerAddressModal({
                             <button
                                 type="submit"
                                 disabled={saving}
-                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#fe5102] p-2.5 text-xs font-bold text-white shadow-md transition hover:bg-[#e04700] disabled:opacity-70"
+                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#fe5102] p-3 text-xs font-bold text-white shadow-md transition hover:bg-[#e04700] disabled:opacity-70 mt-2"
                             >
                                 {saving ? <LoaderCircle size={14} className="animate-spin" /> : <Check size={14} />}
-                                {saving ? "Saving..." : editingAddress ? "Update Address" : "Save & Use Address"}
+                                {saving ? "Saving Address..." : editingAddress ? "Update Address" : "Save Address & Deliver Here"}
                             </button>
                         </form>
                     ) : (
