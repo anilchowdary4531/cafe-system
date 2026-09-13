@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { requireStaffJwt } from "../services/staffAuthService.js";
-import { getPhoneVariants, isValidPhone } from "../services/phoneService.js";
+import { getPhoneVariants, isValidPhone, isValidMobilePhone, normalizePhone } from "../services/phoneService.js";
 import { createCashfreeVendor } from "../services/vendor.service.js";
 import { buildAdminSettlementController } from "../controllers/adminSettlementController.js";
 import {
@@ -218,7 +218,7 @@ export default async function superAdminRoutes(app, deps) {
     try {
       const q = String(req.query?.q || "").trim();
 
-      const customerAccounts = await prisma.customerAccount.findMany({
+      const rawCustomerAccounts = await prisma.customerAccount.findMany({
         where: q
           ? {
             OR: [
@@ -231,6 +231,19 @@ export default async function superAdminRoutes(app, deps) {
           : {},
         orderBy: { createdAt: "desc" },
       });
+
+      // Phone-numbers ONLY: Filter out accounts without valid mobile phone numbers
+      const validMobileAccounts = rawCustomerAccounts.filter((acc) => isValidMobilePhone(acc.phone));
+
+      // Deduplicate: Keep only the latest record for each unique normalized phone number
+      const seenPhones = new Set();
+      const customerAccounts = [];
+      for (const acc of validMobileAccounts) {
+        const norm = normalizePhone(acc.phone);
+        if (!norm || seenPhones.has(norm)) continue;
+        seenPhones.add(norm);
+        customerAccounts.push(acc);
+      }
 
       const customersData = await Promise.all(
         customerAccounts.map(async (acc) => {
@@ -254,7 +267,7 @@ export default async function superAdminRoutes(app, deps) {
             id: acc.id,
             name: acc.name || "Customer",
             username: acc.username || "Not set",
-            phone: (acc.phone && isValidPhone(acc.phone)) ? acc.phone : "Not set",
+            phone: acc.phone,
             email: acc.email || "Not set",
             avatarUrl: acc.avatarUrl || null,
             googleId: acc.googleId,
@@ -309,7 +322,7 @@ export default async function superAdminRoutes(app, deps) {
       });
 
       // 2. Fetch Customer Accounts
-      const customerAccounts = await prisma.customerAccount.findMany({
+      const rawCustomerAccounts = await prisma.customerAccount.findMany({
         where: q
           ? {
             OR: [
@@ -322,6 +335,17 @@ export default async function superAdminRoutes(app, deps) {
           : {},
         orderBy: { createdAt: "desc" },
       });
+
+      // Phone-numbers ONLY & Deduplicated Customers
+      const seenPhones = new Set();
+      const customerAccounts = [];
+      for (const acc of rawCustomerAccounts) {
+        if (!acc.phone || !isValidMobilePhone(acc.phone)) continue;
+        const norm = normalizePhone(acc.phone);
+        if (!norm || seenPhones.has(norm)) continue;
+        seenPhones.add(norm);
+        customerAccounts.push(acc);
+      }
 
       const formattedStaff = staffUsers.map((u) => ({
         id: `staff_${u.id}`,
@@ -342,7 +366,7 @@ export default async function superAdminRoutes(app, deps) {
         userType: "CUSTOMER",
         name: c.name || "Customer",
         email: c.email || "Not set",
-        phone: (c.phone && isValidPhone(c.phone)) ? c.phone : "Not set",
+        phone: c.phone,
         role: "CUSTOMER",
         avatarUrl: c.avatarUrl || null,
         isActive: true,
@@ -367,6 +391,49 @@ export default async function superAdminRoutes(app, deps) {
     } catch (err) {
       console.error("[/super-admin/all-users] Error:", err);
       return reply.code(500).send({ message: "Failed to fetch all platform users" });
+    }
+  });
+
+  app.post("/super-admin/cleanup-invalid-users", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const allAccounts = await prisma.customerAccount.findMany({
+        orderBy: { createdAt: "desc" },
+      });
+
+      const invalidAccountIds = [];
+      const validAccountsByPhone = new Map();
+
+      for (const acc of allAccounts) {
+        if (!acc.phone || !isValidMobilePhone(acc.phone)) {
+          invalidAccountIds.push(acc.id);
+        } else {
+          const norm = normalizePhone(acc.phone);
+          if (validAccountsByPhone.has(norm)) {
+            // Duplicate phone number — mark older record for deletion
+            invalidAccountIds.push(acc.id);
+          } else {
+            validAccountsByPhone.set(norm, acc);
+          }
+        }
+      }
+
+      let deletedCount = 0;
+      if (invalidAccountIds.length > 0) {
+        const deleteResult = await prisma.customerAccount.deleteMany({
+          where: { id: { in: invalidAccountIds } },
+        });
+        deletedCount = deleteResult.count;
+      }
+
+      return {
+        success: true,
+        message: `Successfully purged ${deletedCount} user accounts without valid phone numbers or with duplicate phone numbers.`,
+        deletedCount,
+        remainingValidUsers: validAccountsByPhone.size,
+      };
+    } catch (err) {
+      console.error("[/super-admin/cleanup-invalid-users] Error:", err);
+      return reply.code(500).send({ message: "Failed to clean up invalid user accounts" });
     }
   });
 

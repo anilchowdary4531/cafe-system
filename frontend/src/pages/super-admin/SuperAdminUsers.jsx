@@ -37,6 +37,9 @@ const formatPhone = (raw) => {
     }
     const digits = s.replace(/[^\d]/g, "");
     if (digits.length < 7) return "Not set";
+    if (s.startsWith("+")) return s;
+    if (digits.length === 10) return `+91 ${digits}`;
+    if (digits.length === 12 && digits.startsWith("91")) return `+91 ${digits.slice(2)}`;
     return s;
 };
 
@@ -72,6 +75,37 @@ export default function SuperAdminUsers() {
 
     const [deleteModalCustomer, setDeleteModalCustomer] = useState(null);
     const [deleting, setDeleting] = useState(false);
+
+    const [cleanupModalOpen, setCleanupModalOpen] = useState(false);
+    const [cleaning, setCleaning] = useState(false);
+
+    const handleCleanupUsers = async () => {
+        try {
+            setCleaning(true);
+            const res = await api.post("/super-admin/cleanup-invalid-users");
+            showToast({
+                title: "Database Cleanup Complete",
+                message: res.data?.message || "Purged accounts without phone numbers and duplicates.",
+                variant: "success",
+            });
+            setCleanupModalOpen(false);
+            if (activeTab === "all") {
+                loadAllUsers("");
+            } else if (activeTab === "staff") {
+                loadStaff("");
+            } else {
+                loadCustomers("");
+            }
+        } catch (err) {
+            showToast({
+                title: "Cleanup Failed",
+                message: err.response?.data?.message || "Failed to purge invalid user accounts",
+                variant: "error",
+            });
+        } finally {
+            setCleaning(false);
+        }
+    };
 
     const confirmDeleteCustomer = async () => {
         if (!deleteModalCustomer?.rawId && !deleteModalCustomer?.id) return;
@@ -257,6 +291,16 @@ export default function SuperAdminUsers() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setCleanupModalOpen(true)}
+                            className="inline-flex items-center gap-2 rounded-full bg-rose-500/10 px-4 py-2 text-sm font-bold text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition active:scale-95 shadow-sm"
+                            title="Purge accounts without valid phone numbers and delete duplicate phone records"
+                        >
+                            <Trash2 size={16} />
+                            <span>Purge Non-Phone & Duplicate Users</span>
+                        </button>
+
                         <button
                             type="button"
                             onClick={logout}
@@ -729,6 +773,64 @@ export default function SuperAdminUsers() {
                                     <>
                                         <Trash2 size={16} />
                                         <span>Delete Account</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PURGE CLEANUP MODAL */}
+            {cleanupModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+                    <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-black/10 dark:border-white/15 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500 font-bold shrink-0">
+                                <Trash2 size={24} />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Purge Non-Phone & Duplicate Accounts</h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Super Admin Database Cleanup
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl bg-rose-500/5 dark:bg-rose-500/10 p-4 border border-rose-500/20 text-xs text-rose-600 dark:text-rose-400 space-y-2">
+                            <p className="font-bold text-sm">
+                                Are you sure you want to run database cleanup?
+                            </p>
+                            <ul className="list-disc pl-4 space-y-1">
+                                <li>All customer accounts without a valid phone number will be permanently deleted.</li>
+                                <li>Duplicate accounts sharing the same phone number will be purged (keeping the latest account).</li>
+                            </ul>
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setCleanupModalOpen(false)}
+                                disabled={cleaning}
+                                className="w-1/2 rounded-xl border border-gray-300 dark:border-slate-700 px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleCleanupUsers}
+                                disabled={cleaning}
+                                className="w-1/2 flex items-center justify-center gap-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 text-sm shadow-md transition disabled:opacity-60"
+                            >
+                                {cleaning ? (
+                                    <>
+                                        <Sparkles size={16} className="animate-spin" />
+                                        <span>Purging...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 size={16} />
+                                        <span>Purge Accounts</span>
                                     </>
                                 )}
                             </button>
