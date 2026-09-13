@@ -6,6 +6,7 @@ import {
     Home,
     LoaderCircle,
     LocateFixed,
+    Map,
     MapPin,
     Plus,
     Pencil,
@@ -16,6 +17,7 @@ import { api, invalidateGetCache } from "../utils/apiClient";
 import useCachedGet from "../hooks/useCachedGet";
 import { useAuth } from "../context/AuthContext";
 import { showToast } from "../utils/toast";
+import MapLocationPicker from "./MapLocationPicker";
 
 const STORAGE_KEY = "tiffzy_selected_address_v1";
 
@@ -75,6 +77,10 @@ export default function CustomerAddressModal({
 }) {
     const { customer } = useAuth();
     const [formOpen, setFormOpen] = useState(false);
+    const [mapViewOpen, setMapViewOpen] = useState(false);
+    const [mapSelectedCoords, setMapSelectedCoords] = useState(null);
+    const [mapAddressDetails, setMapAddressDetails] = useState(null);
+    const [mapGeocoding, setMapGeocoding] = useState(false);
     const [editingAddress, setEditingAddress] = useState(null);
     const [formData, setFormData] = useState(() => emptyForm(customer));
     const [saving, setSaving] = useState(false);
@@ -97,6 +103,78 @@ export default function CustomerAddressModal({
             onSelectAddress?.(defaultAddr);
         }
     }, [isOpen, activeAddress, savedAddresses, onSelectAddress]);
+
+    const handleMapLocationChange = useCallback(async (coords) => {
+        if (!coords || coords.lat === null || coords.lng === null) return;
+        const lat = Number(coords.lat);
+        const lng = Number(coords.lng);
+        setMapSelectedCoords({ lat, lng });
+        setMapGeocoding(true);
+
+        try {
+            const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=en`;
+            const res = await fetch(url, { headers: { Accept: "application/json" } });
+            const payload = await res.json();
+            const addrDetails = payload?.address || {};
+
+            const city = addrDetails.city || addrDetails.town || addrDetails.village || addrDetails.county || coords.city || "";
+            const mandal = [addrDetails.suburb, addrDetails.neighbourhood, addrDetails.road, addrDetails.city_district]
+                .filter(Boolean)
+                .join(", ") || city;
+            const line1 = [addrDetails.house_number, addrDetails.building, addrDetails.road].filter(Boolean).join(", ") || "Selected Map Location Pin";
+            const postalCode = addrDetails.postcode || coords.pincode || "";
+
+            setMapAddressDetails({
+                line1,
+                mandal,
+                city,
+                postalCode,
+            });
+        } catch {
+            setMapAddressDetails({
+                line1: "Selected Location Pin",
+                mandal: coords.city || "",
+                city: coords.city || "",
+                postalCode: coords.pincode || "",
+            });
+        } finally {
+            setMapGeocoding(false);
+        }
+    }, []);
+
+    const handleConfirmMapLocation = () => {
+        if (!mapSelectedCoords) {
+            showToast({ title: "No Pin Selected", message: "Please click or drag the pin on the map.", variant: "error" });
+            return;
+        }
+
+        const line1 = mapAddressDetails?.line1 || "Map Location Pin";
+        const mandal = mapAddressDetails?.mandal || "";
+        const city = mapAddressDetails?.city || "";
+        const postalCode = mapAddressDetails?.postalCode || "";
+
+        const selectedMapObj = {
+            id: `map_${Date.now()}`,
+            label: "Map Location Pin",
+            line1,
+            mandal,
+            city,
+            postalCode,
+            latitude: mapSelectedCoords.lat,
+            longitude: mapSelectedCoords.lng,
+            isMapPin: true,
+        };
+
+        onSelectAddress?.(selectedMapObj);
+        setStoredActiveAddress(selectedMapObj);
+        showToast({
+            title: "Location Selected from Map 📍",
+            message: formatAddressLine(selectedMapObj),
+            variant: "success",
+        });
+        setMapViewOpen(false);
+        onClose?.();
+    };
 
     const handleUseCurrentLocation = async () => {
         if (!("geolocation" in navigator)) {
@@ -305,26 +383,111 @@ export default function CustomerAddressModal({
 
                 {/* Body Content */}
                 <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                    {/* GPS Button */}
-                    <button
-                        type="button"
-                        onClick={handleUseCurrentLocation}
-                        disabled={gpsLoading}
-                        className="flex w-full items-center justify-between rounded-2xl border border-[#fe5102]/30 bg-[#fe5102]/5 p-4 text-left transition hover:bg-[#fe5102]/10 active:scale-[0.99]"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#fe5102] text-white shadow-md">
-                                {gpsLoading ? <LoaderCircle size={20} className="animate-spin" /> : <LocateFixed size={20} />}
+                    {/* Location Action Buttons */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {/* GPS Button */}
+                        <button
+                            type="button"
+                            onClick={handleUseCurrentLocation}
+                            disabled={gpsLoading}
+                            className="flex items-center justify-between rounded-2xl border border-[#fe5102]/30 bg-[#fe5102]/5 p-3.5 text-left transition hover:bg-[#fe5102]/10 active:scale-[0.99]"
+                        >
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#fe5102] text-white shadow-md">
+                                    {gpsLoading ? <LoaderCircle size={18} className="animate-spin" /> : <LocateFixed size={18} />}
+                                </div>
+                                <div className="min-w-0">
+                                    <h3 className="text-xs font-bold text-[#fe5102] truncate">Use Current Location</h3>
+                                    <p className="theme-muted text-[10px] truncate">Detect location via GPS</p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="text-sm font-bold text-[#fe5102]">Use Current Location</h3>
-                                <p className="theme-muted text-xs">Detect coordinates & address automatically via GPS</p>
+                            <span className="rounded-full bg-[#fe5102] px-2.5 py-0.5 text-[10px] font-bold text-white shadow-sm shrink-0">
+                                {gpsLoading ? "Locating..." : "GPS"}
+                            </span>
+                        </button>
+
+                        {/* Select on Map Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setMapViewOpen((prev) => !prev);
+                                setFormOpen(false);
+                            }}
+                            className={`flex items-center justify-between rounded-2xl border p-3.5 text-left transition active:scale-[0.99] ${
+                                mapViewOpen
+                                    ? "border-[#fe5102] bg-[#fe5102]/15 shadow-sm"
+                                    : "border-[#fe5102]/30 bg-[#fe5102]/5 hover:bg-[#fe5102]/10"
+                            }`}
+                        >
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#fe5102] text-white shadow-md">
+                                    <Map size={18} />
+                                </div>
+                                <div className="min-w-0">
+                                    <h3 className="text-xs font-bold text-[#fe5102] truncate">Select on Map</h3>
+                                    <p className="theme-muted text-[10px] truncate">Pin location visually</p>
+                                </div>
                             </div>
+                            <span className="rounded-full bg-[#fe5102] px-2.5 py-0.5 text-[10px] font-bold text-white shadow-sm shrink-0">
+                                {mapViewOpen ? "Close Map" : "MAP 🗺️"}
+                            </span>
+                        </button>
+                    </div>
+
+                    {/* Interactive Map Picker Section */}
+                    {mapViewOpen && (
+                        <div className="rounded-2xl border border-[#fe5102]/40 bg-black/5 p-3.5 space-y-3 animate-in fade-in-50 duration-200">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Map size={16} className="text-[#fe5102]" />
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-[color:var(--app-text)]">
+                                        Interactive Location Pin
+                                    </h3>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setMapViewOpen(false)}
+                                    className="text-xs font-bold text-[color:var(--app-accent)] hover:underline"
+                                >
+                                    Close Map
+                                </button>
+                            </div>
+
+                            <div className="overflow-hidden rounded-xl border border-[var(--app-border)]">
+                                <MapLocationPicker
+                                    latitude={mapSelectedCoords?.lat || activeAddress?.latitude}
+                                    longitude={mapSelectedCoords?.lng || activeAddress?.longitude}
+                                    onSelectLocation={handleMapLocationChange}
+                                    height="220px"
+                                />
+                            </div>
+
+                            {/* Live Address Card */}
+                            <div className="rounded-xl border border-[var(--app-border)] bg-[color:var(--app-surface,#fff)] p-3 text-xs space-y-1 shadow-sm">
+                                <div className="flex items-center justify-between text-[11px] font-bold text-[#fe5102]">
+                                    <span>📍 DETECTED PIN LOCATION</span>
+                                    {mapGeocoding && <span className="animate-pulse theme-muted">Geocoding...</span>}
+                                </div>
+                                <p className="font-semibold text-[color:var(--app-text)]">
+                                    {mapAddressDetails ? formatAddressLine(mapAddressDetails) : "Click or drag pin on map to pick delivery spot."}
+                                </p>
+                                {mapSelectedCoords && (
+                                    <p className="theme-muted text-[10px] font-mono">
+                                        Coords: {mapSelectedCoords.lat.toFixed(5)}, {mapSelectedCoords.lng.toFixed(5)}
+                                    </p>
+                                )}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={handleConfirmMapLocation}
+                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#fe5102] p-3 text-xs font-bold text-white shadow-md transition hover:bg-[#e04700]"
+                            >
+                                <Check size={16} />
+                                Confirm & Deliver to Selected Map Pin
+                            </button>
                         </div>
-                        <span className="rounded-full bg-[#fe5102] px-3 py-1 text-xs font-bold text-white shadow-sm">
-                            {gpsLoading ? "Locating..." : "GPS"}
-                        </span>
-                    </button>
+                    )}
 
                     {/* Form Section */}
                     {formOpen ? (
