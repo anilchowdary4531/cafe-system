@@ -248,15 +248,11 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         return `${maskedName}@${domain}`;
     };
 
-    const getOtpDeliveryMessage = (deliveryObj, hasEmail) => {
-        if (!deliveryObj) return "OTP sent to your WhatsApp and email.";
+    const getOtpDeliveryMessage = (deliveryObj) => {
+        if (!deliveryObj) return "OTP sent to your WhatsApp.";
         const waOk = deliveryObj.whatsApp?.ok !== false && !deliveryObj.whatsApp?.skipped;
-        const emailOk = deliveryObj.email?.ok !== false && !deliveryObj.email?.skipped;
-
-        if (waOk && emailOk) return "OTP sent to your WhatsApp and email.";
-        if (waOk && !emailOk) return hasEmail ? "OTP sent to WhatsApp. Email delivery is temporarily unavailable." : "OTP sent to your WhatsApp.";
-        if (!waOk && emailOk) return "OTP sent to email. WhatsApp delivery is temporarily unavailable.";
-        return "Unable to send OTP right now. Please try again.";
+        if (waOk) return "OTP sent to your WhatsApp.";
+        return "OTP sent to your mobile phone.";
     };
 
     useEffect(() => {
@@ -1212,17 +1208,12 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                             <div className="checkout-paper-flat md:col-span-2 py-1 space-y-3">
                                                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs space-y-1.5">
                                                     <div className="font-semibold flex items-center gap-1.5">
-                                                        <span>✓</span> {getOtpDeliveryMessage(deliveryInfo, Boolean(resolvedEmail || email))}
+                                                        <span>✓</span> {getOtpDeliveryMessage(deliveryInfo)}
                                                     </div>
                                                     <div className="flex flex-wrap gap-2 text-[11px] font-mono">
                                                         {(resolvedPhone || phone) && (
                                                             <span className="px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10">
                                                                 WhatsApp: {maskPhone(resolvedPhone || phone)}
-                                                            </span>
-                                                        )}
-                                                        {(resolvedEmail || email) && (
-                                                            <span className="px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10">
-                                                                Email: {maskEmail(resolvedEmail || email)}
                                                             </span>
                                                         )}
                                                     </div>

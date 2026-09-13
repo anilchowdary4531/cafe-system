@@ -81,23 +81,13 @@ export default function Login() {
         return `${maskedName}@${domain}`;
     };
 
-    const getOtpDeliveryMessage = (deliveryObj, hasEmail) => {
-        if (!deliveryObj) return "OTP sent to your WhatsApp and email.";
+    const getOtpDeliveryMessage = (deliveryObj) => {
+        if (!deliveryObj) return "OTP sent to your WhatsApp.";
         const waOk = deliveryObj.whatsApp?.ok !== false && !deliveryObj.whatsApp?.skipped;
-        const emailOk = deliveryObj.email?.ok !== false && !deliveryObj.email?.skipped;
-
-        if (waOk && emailOk) {
-            return "OTP sent to your WhatsApp and email.";
+        if (waOk) {
+            return "OTP sent to your WhatsApp.";
         }
-        if (waOk && !emailOk) {
-            return hasEmail
-                ? "OTP sent to WhatsApp. Email delivery is temporarily unavailable."
-                : "OTP sent to your WhatsApp.";
-        }
-        if (!waOk && emailOk) {
-            return "OTP sent to email. WhatsApp delivery is temporarily unavailable.";
-        }
-        return "Unable to send OTP right now. Please try again.";
+        return "OTP sent to your mobile phone.";
     };
 
     // Countdown Timer Effect
@@ -708,20 +698,15 @@ export default function Login() {
                                     </>
                                 ) : (
                                     <>
-                                        {/* DUAL OTP VERIFICATION FOR LOGIN */}
+                                        {/* OTP VERIFICATION FOR LOGIN */}
                                         <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm space-y-2">
                                             <div className="font-semibold flex items-center gap-2">
-                                                <span>✓</span> {getOtpDeliveryMessage(deliveryInfo, Boolean(resolvedEmail || customerEmail))}
+                                                <span>✓</span> {getOtpDeliveryMessage(deliveryInfo)}
                                             </div>
                                             <div className="flex flex-wrap gap-2 text-xs font-mono">
-                                                {resolvedPhone && (
+                                                {(resolvedPhone || customerPhone) && (
                                                     <span className="px-2.5 py-1 rounded-lg bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10">
                                                         WhatsApp: {maskPhone(resolvedPhone || customerPhone)}
-                                                    </span>
-                                                )}
-                                                {(resolvedEmail || customerEmail) && (
-                                                    <span className="px-2.5 py-1 rounded-lg bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10">
-                                                        Email: {maskEmail(resolvedEmail || customerEmail)}
                                                     </span>
                                                 )}
                                             </div>
