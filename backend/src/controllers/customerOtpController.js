@@ -97,7 +97,28 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
         });
       }
 
-      let existingName = (account && isValidName(account.name)) ? account.name.trim() : null;
+      let existingName = null;
+      if (account) {
+        if (isValidName(account.name)) {
+          existingName = account.name.trim();
+        } else if (isValidName(account.username)) {
+          existingName = account.username.trim();
+        }
+      }
+
+      if (!existingName && phoneVariants.length > 0) {
+        const existingCustomer = await prisma.customer.findFirst({
+          where: {
+            phone: { in: phoneVariants },
+            name: { not: null },
+          },
+          select: { name: true },
+        });
+
+        if (existingCustomer && isValidName(existingCustomer.name)) {
+          existingName = existingCustomer.name.trim();
+        }
+      }
 
       if (!existingName && (phoneVariants.length > 0 || email)) {
         const lastOrderWithName = await prisma.order.findFirst({
