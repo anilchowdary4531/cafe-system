@@ -216,6 +216,27 @@ export default async function superAdminRoutes(app, deps) {
 
   app.get("/super-admin/customers", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
+      // Auto-purge any phoneless CustomerAccount and per-restaurant Customer records from DB
+      const allAccountsForPurge = await prisma.customerAccount.findMany();
+      const invalidAccountIds = allAccountsForPurge
+        .filter((acc) => !acc.phone || !isValidMobilePhone(acc.phone))
+        .map((acc) => acc.id);
+      if (invalidAccountIds.length > 0) {
+        await prisma.customerAccount.deleteMany({
+          where: { id: { in: invalidAccountIds } },
+        });
+      }
+
+      const allPerRestaurantForPurge = await prisma.customer.findMany();
+      const invalidPerRestaurantIds = allPerRestaurantForPurge
+        .filter((c) => !c.phone || !isValidMobilePhone(c.phone))
+        .map((c) => c.id);
+      if (invalidPerRestaurantIds.length > 0) {
+        await prisma.customer.deleteMany({
+          where: { id: { in: invalidPerRestaurantIds } },
+        });
+      }
+
       const q = String(req.query?.q || "").trim();
 
       const rawCustomerAccounts = await prisma.customerAccount.findMany({
@@ -291,6 +312,27 @@ export default async function superAdminRoutes(app, deps) {
 
   app.get("/super-admin/all-users", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
+      // Auto-purge any phoneless CustomerAccount and per-restaurant Customer records from DB
+      const allAccountsForPurge = await prisma.customerAccount.findMany();
+      const invalidAccountIds = allAccountsForPurge
+        .filter((acc) => !acc.phone || !isValidMobilePhone(acc.phone))
+        .map((acc) => acc.id);
+      if (invalidAccountIds.length > 0) {
+        await prisma.customerAccount.deleteMany({
+          where: { id: { in: invalidAccountIds } },
+        });
+      }
+
+      const allPerRestaurantForPurge = await prisma.customer.findMany();
+      const invalidPerRestaurantIds = allPerRestaurantForPurge
+        .filter((c) => !c.phone || !isValidMobilePhone(c.phone))
+        .map((c) => c.id);
+      if (invalidPerRestaurantIds.length > 0) {
+        await prisma.customer.deleteMany({
+          where: { id: { in: invalidPerRestaurantIds } },
+        });
+      }
+
       const q = String(req.query?.q || "").trim();
 
       // 1. Fetch Staff/Owners/SuperAdmins
@@ -423,6 +465,18 @@ export default async function superAdminRoutes(app, deps) {
           where: { id: { in: invalidAccountIds } },
         });
         deletedCount = deleteResult.count;
+      }
+
+      // Also clean up per-restaurant Customer records without valid phone numbers
+      const allPerRestaurantCustomers = await prisma.customer.findMany();
+      const invalidCustomerIds = allPerRestaurantCustomers
+        .filter((c) => !c.phone || !isValidMobilePhone(c.phone))
+        .map((c) => c.id);
+
+      if (invalidCustomerIds.length > 0) {
+        await prisma.customer.deleteMany({
+          where: { id: { in: invalidCustomerIds } },
+        });
       }
 
       return {

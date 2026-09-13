@@ -254,6 +254,11 @@ export default function SuperAdminUsers() {
     };
 
     const filteredAllUsers = allUsers.filter((u) => {
+        if (u.userType === "CUSTOMER" || u.role === "CUSTOMER") {
+            if (!u.phone || u.phone === "Not set" || formatPhone(u.phone) === "Not set") {
+                return false;
+            }
+        }
         if (roleFilter === "ALL") return true;
         return String(u.role || "").toUpperCase() === roleFilter;
     });
@@ -668,8 +673,8 @@ export default function SuperAdminUsers() {
                                             <th className="px-4 py-3 font-bold text-right">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {customers.map((c) => (
+                                     <tbody>
+                                        {customers.filter((c) => c.phone && c.phone !== "Not set" && formatPhone(c.phone) !== "Not set").map((c) => (
                                             <tr key={c.id} className="border-t theme-border hover:bg-black/5 dark:hover:bg-white/5 transition">
                                                 <td className="px-4 py-3 font-bold">
                                                     <div className="flex items-center gap-2">
