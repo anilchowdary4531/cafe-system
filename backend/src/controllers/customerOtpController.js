@@ -89,11 +89,16 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
         });
       }
 
+      const hasName = Boolean(account && account.name && account.name.trim() !== "");
+      const existingName = (account && account.name && account.name.trim()) ? account.name.trim() : null;
+
       const payload = {
         message: "OTP sent",
         phone,
         email: email || null,
         expiresAt: otpRes.expiresAt,
+        hasName,
+        existingName,
         delivery: {
           whatsApp: whatsAppRes ? { ok: whatsAppRes.ok !== false, simulated: Boolean(whatsAppRes.simulated) } : null,
           sms: smsRes ? { ok: smsRes.ok !== false, simulated: Boolean(smsRes.simulated) } : null,

@@ -11,7 +11,7 @@ import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
 
 export default function Login() {
-    const { login, loginSession, loginCustomer } = useAuth();
+    const { login, loginSession, loginCustomer, customer } = useAuth();
     const { t } = useLanguage();
     const navigate = useNavigate();
     const location = useLocation();
@@ -38,6 +38,7 @@ export default function Login() {
     const [customerPhone, setCustomerPhone] = useState("");
     const [customerName, setCustomerName] = useState("");
     const [customerEmail, setCustomerEmail] = useState("");
+    const [hasExistingName, setHasExistingName] = useState(false);
     const [customerStep, setCustomerStep] = useState("phone"); // phone -> otp
     const [customerOtp, setCustomerOtp] = useState("");
     const [customerOtpExpiresAt, setCustomerOtpExpiresAt] = useState(null);
@@ -211,7 +212,13 @@ export default function Login() {
         setDeliveryInfo(null);
         setResolvedPhone("");
         setResolvedEmail("");
-    }, [mode]);
+        if (customer?.name) {
+            setCustomerName(customer.name);
+            setHasExistingName(true);
+        } else {
+            setHasExistingName(false);
+        }
+    }, [mode, customer]);
 
     useEffect(() => {
         if (mode !== "staff") return;
@@ -356,6 +363,18 @@ export default function Login() {
             setResolvedPhone(res.data?.phone || phoneParam);
             setResolvedEmail(res.data?.email || emailParam);
             setResendTimer(60);
+
+            const nameFromBackend = String(res.data?.existingName || "").trim();
+            const hasNameFromBackend = Boolean(res.data?.hasName || nameFromBackend);
+            if (hasNameFromBackend) {
+                setHasExistingName(true);
+                setCustomerName(nameFromBackend);
+            } else if (customer?.name) {
+                setHasExistingName(true);
+                setCustomerName(customer.name);
+            } else {
+                setHasExistingName(false);
+            }
         } catch (err) {
             setCustomerError(err.response?.data?.message || err.message || "Failed to send OTP");
         } finally {
@@ -721,19 +740,21 @@ export default function Login() {
                                             />
                                         </div>
 
-                                        <div>
-                                            <label className="theme-muted mb-2 block text-sm font-medium">{t("fullName")} (Optional)</label>
-                                            <div className="relative">
-                                                <UserCircle2 size={18} className="theme-muted absolute left-4 top-3.5" />
-                                                <input
-                                                    type="text"
-                                                    placeholder={t("placeholderFullName")}
-                                                    value={customerName}
-                                                    onChange={(e) => setCustomerName(e.target.value)}
-                                                    className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
-                                                />
+                                        {!hasExistingName && (
+                                            <div>
+                                                <label className="theme-muted mb-2 block text-sm font-medium">{t("fullName")} (Optional)</label>
+                                                <div className="relative">
+                                                    <UserCircle2 size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder={t("placeholderFullName")}
+                                                        value={customerName}
+                                                        onChange={(e) => setCustomerName(e.target.value)}
+                                                        className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
+                                                    />
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
 
                                         <button
                                             onClick={handleCustomerVerifyOtp}

@@ -77,6 +77,7 @@ describe("SuperAdminCreateRestaurant Page Audit", () => {
         fireEvent.change(screen.getByLabelText(/Restaurant Name/i), { target: { value: "Tasty Bites" } });
         fireEvent.change(screen.getByLabelText(/Owner Name/i), { target: { value: "John Doe" } });
         fireEvent.change(screen.getByLabelText(/Owner Email/i), { target: { value: "owner@tastybites.com" } });
+        fireEvent.change(screen.getByLabelText(/Owner Phone/i), { target: { value: "9876543210" } });
         fireEvent.change(screen.getByLabelText(/Owner Password/i), { target: { value: "password123" } });
 
         const submitBtn = screen.getByRole("button", { name: /Create Restaurant & Owner/i });
@@ -90,6 +91,7 @@ describe("SuperAdminCreateRestaurant Page Audit", () => {
                     slug: "tasty-bites",
                     ownerName: "John Doe",
                     ownerEmail: "owner@tastybites.com",
+                    ownerPhone: "9876543210",
                     ownerPassword: "password123",
                 })
             );
@@ -113,6 +115,7 @@ describe("SuperAdminCreateRestaurant Page Audit", () => {
         fireEvent.change(screen.getByLabelText(/Restaurant Name/i), { target: { value: "Existing Cafe" } });
         fireEvent.change(screen.getByLabelText(/Owner Name/i), { target: { value: "Jane Doe" } });
         fireEvent.change(screen.getByLabelText(/Owner Email/i), { target: { value: "jane@existing.com" } });
+        fireEvent.change(screen.getByLabelText(/Owner Phone/i), { target: { value: "9876543210" } });
         fireEvent.change(screen.getByLabelText(/Owner Password/i), { target: { value: "securepass" } });
 
         fireEvent.click(screen.getByRole("button", { name: /Create Restaurant & Owner/i }));
