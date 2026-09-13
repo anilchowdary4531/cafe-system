@@ -1,4 +1,4 @@
-import { normalizePhone } from "../services/phoneService.js";
+import { normalizePhone, getPhoneVariants, isValidName } from "../services/phoneService.js";
 import { requestOtp, verifyOtp } from "../services/otpService.js";
 import { sendEmailOtp } from "../services/emailService.js";
 import { sendSmsOtp } from "../services/smsService.js";
@@ -16,8 +16,10 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
     console.log("==================================");
     try {
       const body = req.body || {};
-      let phone = normalizePhone(body.phone || "");
+      const rawInput = String(body.phone || "").trim();
+      let phone = normalizePhone(rawInput);
       let email = String(body.email || "").trim().toLowerCase();
+      const phoneVariants = rawInput ? getPhoneVariants(rawInput) : (phone ? getPhoneVariants(phone) : []);
 
       // If phone or email is provided, try resolving the registered customer account to send OTP to BOTH channels
       let account = null;
@@ -25,6 +27,12 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
         account = await prisma.customerAccount.findFirst({
           where: {
             OR: [
+              ...(phoneVariants.length > 0
+                ? [
+                    { phone: { in: phoneVariants } },
+                    { username: { in: phoneVariants } },
+                  ]
+                : []),
               ...(phone ? [{ phone }, { username: phone }] : []),
               ...(email ? [{ email: email.toLowerCase() }] : []),
             ],
@@ -89,8 +97,24 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
         });
       }
 
-      const hasName = Boolean(account && account.name && account.name.trim() !== "");
-      const existingName = (account && account.name && account.name.trim()) ? account.name.trim() : null;
+      let existingName = (account && isValidName(account.name)) ? account.name.trim() : null;
+
+      if (!existingName && phoneVariants.length > 0) {
+        const lastOrderWithName = await prisma.order.findFirst({
+          where: {
+            phone: { in: phoneVariants },
+            customerName: { not: "" },
+          },
+          orderBy: { createdAt: "desc" },
+          select: { customerName: true },
+        });
+
+        if (lastOrderWithName && isValidName(lastOrderWithName.customerName)) {
+          existingName = lastOrderWithName.customerName.trim();
+        }
+      }
+
+      const hasName = Boolean(existingName);
 
       const payload = {
         message: "OTP sent",

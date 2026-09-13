@@ -740,7 +740,7 @@ export default function Login() {
                                             />
                                         </div>
 
-                                        {!hasExistingName && (
+                                        {!hasExistingName && (!customerName || customerName.trim().length < 2 || ["customer", "user", "not set"].includes(customerName.trim().toLowerCase())) && (
                                             <div>
                                                 <label className="theme-muted mb-2 block text-sm font-medium">{t("fullName")} (Optional)</label>
                                                 <div className="relative">
