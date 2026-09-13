@@ -220,6 +220,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
     const { customer, customerToken, loginCustomer } = useAuth();
     const { restaurantContext, setRestaurantContext } = useRestaurantContext();
     const [customerName, setCustomerName] = useState("");
+    const [hasExistingName, setHasExistingName] = useState(false);
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
     const [otpStep, setOtpStep] = useState("ready"); // phone -> otp -> ready
@@ -325,6 +326,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
     useEffect(() => {
         if (!open) return;
         setCustomerName(customer?.name || "");
+        setHasExistingName(Boolean(customer?.name));
         setEmail(customer?.email || "");
         setPhone(customer?.phone || "");
         setTableChoice(String(restaurantContext?.tableNo || ""));
@@ -436,6 +438,18 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         setResolvedEmail(otpRes.data?.email || String(email || "").trim());
         setResendTimer(60);
         setSuccess("");
+
+        const nameFromBackend = String(otpRes.data?.existingName || "").trim();
+        const hasNameFromBackend = Boolean(otpRes.data?.hasName || nameFromBackend);
+        if (hasNameFromBackend) {
+            setHasExistingName(true);
+            setCustomerName(nameFromBackend);
+        } else if (customer?.name) {
+            setHasExistingName(true);
+            setCustomerName(customer.name);
+        } else {
+            setHasExistingName(false);
+        }
     };
 
     const handleSubmit = async () => {
@@ -1277,28 +1291,30 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
 
                                     </div>
 
-                                    <div className="checkout-paper-flat">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowOptionalDetails((v) => !v)}
-                                            className="flex w-full items-center justify-between text-left"
-                                        >
-                                            <span className="text-[13px] font-semibold sm:text-sm">Customer details (optional)</span>
-                                            <span className="theme-muted text-[13px] sm:text-sm">{showOptionalDetails ? "Hide" : "Add / Edit"}</span>
-                                        </button>
+                                    {!hasExistingName && (
+                                        <div className="checkout-paper-flat">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowOptionalDetails((v) => !v)}
+                                                className="flex w-full items-center justify-between text-left"
+                                            >
+                                                <span className="text-[13px] font-semibold sm:text-sm">Customer details (optional)</span>
+                                                <span className="theme-muted text-[13px] sm:text-sm">{showOptionalDetails ? "Hide" : "Add / Edit"}</span>
+                                            </button>
 
-                                        {showOptionalDetails && (
-                                            <div className="mt-4">
-                                                <label className="theme-muted mb-2 block text-[13px] sm:text-sm">Name</label>
-                                                <input
-                                                    value={customerName}
-                                                    onChange={(e) => setCustomerName(e.target.value)}
-                                                    placeholder={customer?.name || "Customer name"}
-                                                    className="theme-input w-full rounded-2xl px-3 py-2.5 text-[13px] outline-none sm:px-4 sm:py-3 sm:text-sm"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
+                                            {showOptionalDetails && (
+                                                <div className="mt-4">
+                                                    <label className="theme-muted mb-2 block text-[13px] sm:text-sm font-medium">Full Name (Optional)</label>
+                                                    <input
+                                                        value={customerName}
+                                                        onChange={(e) => setCustomerName(e.target.value)}
+                                                        placeholder={customer?.name || "Customer name"}
+                                                        className="theme-input w-full rounded-2xl px-3 py-2.5 text-[13px] outline-none sm:px-4 sm:py-3 sm:text-sm"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     <div className="checkout-paper-flat">
                                         <label className="theme-muted mb-2 block text-[13px] sm:text-sm">Notes (optional)</label>

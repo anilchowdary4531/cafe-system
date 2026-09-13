@@ -723,17 +723,17 @@ export default function Login() {
                                             />
                                         </div>
 
-                                        {!(hasExistingName || (customerName && customerName.trim().length >= 2 && !["customer", "user", "not set"].includes(customerName.trim().toLowerCase()))) && (
+                                        {!hasExistingName && (
                                             <div>
-                                                <label className="theme-muted mb-2 block text-sm font-medium">{t("fullName")} (Optional)</label>
+                                                <label className="theme-muted mb-2 block text-sm font-medium">Full Name (Optional)</label>
                                                 <div className="relative">
-                                                    <UserCircle2 size={18} className="theme-muted absolute left-4 top-3.5" />
+                                                    <User size={18} className="theme-muted absolute left-4 top-3.5" />
                                                     <input
                                                         type="text"
-                                                        placeholder={t("placeholderFullName")}
+                                                        placeholder="Enter your full name"
                                                         value={customerName}
                                                         onChange={(e) => setCustomerName(e.target.value)}
-                                                        className="theme-input w-full rounded-xl px-11 py-3 outline-none transition"
+                                                        className="theme-input w-full rounded-xl pl-11 pr-4 py-3 outline-none transition"
                                                     />
                                                 </div>
                                             </div>
