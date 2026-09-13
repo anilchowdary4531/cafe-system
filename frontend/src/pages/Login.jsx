@@ -766,6 +766,8 @@ export default function Login() {
                                                     setCustomerOtp("");
                                                     setCustomerOtpExpiresAt(null);
                                                     setCustomerDevOtp("");
+                                                    setHasExistingName(false);
+                                                    setCustomerName("");
                                                 }}
                                                 className="theme-muted hover:underline"
                                             >
