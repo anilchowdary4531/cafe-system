@@ -39,6 +39,8 @@ export default function SuperAdminCategories() {
     const [formData, setFormData] = useState({ name: "", imageUrl: "", priority: 0 });
 
     const [syncing, setSyncing] = useState(false);
+    const [seedingTobacco, setSeedingTobacco] = useState(false);
+    const [tobaccoMessage, setTobaccoMessage] = useState("");
 
     const loadCategories = async () => {
         try {
@@ -67,6 +69,23 @@ export default function SuperAdminCategories() {
             setError(err.response?.data?.message || "Failed to sync categories from menu items");
         } finally {
             setSyncing(false);
+        }
+    };
+
+    const handlePlaceTobaccoCatalog = async () => {
+        try {
+            setSeedingTobacco(true);
+            setError("");
+            setTobaccoMessage("");
+            const res = await api.post("/super-admin/categories/place-tobacco");
+            const data = res?.data || res;
+            setTobaccoMessage(data?.message || "Cigarettes catalog placed successfully!");
+            await loadCategories();
+        } catch (err) {
+            console.error("[SuperAdminCategories] Place tobacco error:", err);
+            setError(err.response?.data?.message || "Failed to place cigarettes catalog");
+        } finally {
+            setSeedingTobacco(false);
         }
     };
 
@@ -132,6 +151,39 @@ export default function SuperAdminCategories() {
 
             <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
                 {error && <div className="mb-6 rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-300 text-sm">{error}</div>}
+
+                {/* Quick Action: Cigarettes & Tobacco Placement */}
+                <div className="mb-8 overflow-hidden rounded-3xl border border-amber-500/30 bg-gradient-to-r from-amber-950/40 via-amber-900/30 to-orange-950/40 p-6 text-white shadow-xl backdrop-blur-sm">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="space-y-1.5 max-w-2xl">
+                            <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-black uppercase text-amber-300 border border-amber-500/30">
+                                <span>🚬 Cigarettes & Tobacco Management</span>
+                            </div>
+                            <h2 className="text-xl font-extrabold tracking-tight text-amber-100">
+                                Place Cigarettes Catalog Platform-Wide
+                            </h2>
+                            <p className="text-xs text-amber-200/80 leading-relaxed">
+                                One-click publish global Cigarettes category and automatically seed standard tobacco items (Marlboro Advance Compact, Gold Flake King's Blue, Gold Flake Indie Mint, Classic Ice Burst) into all active restaurant menus.
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={handlePlaceTobaccoCatalog}
+                            disabled={seedingTobacco}
+                            className="inline-flex shrink-0 items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 px-6 py-3.5 text-sm font-black text-zinc-950 shadow-lg shadow-amber-500/20 transition duration-200 active:scale-95 disabled:opacity-50"
+                        >
+                            <Sparkles size={18} className={seedingTobacco ? "animate-spin" : ""} />
+                            <span>{seedingTobacco ? "Placing Cigarettes..." : "Place Cigarettes Catalog"}</span>
+                        </button>
+                    </div>
+
+                    {tobaccoMessage ? (
+                        <div className="mt-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3 text-xs font-bold text-emerald-300">
+                            ✅ {tobaccoMessage}
+                        </div>
+                    ) : null}
+                </div>
 
                 {showForm && (
                     <div className="theme-panel mb-8 rounded-3xl p-6 border theme-border">

@@ -801,6 +801,70 @@ export default async function superAdminRoutes(app, deps) {
     }
   });
 
+  app.post("/super-admin/categories/place-tobacco", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      await createGlobalCategoryStore(prisma, {
+        name: "Cigarettes",
+        imageUrl: "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17",
+        priority: 15,
+        isActive: true,
+      }).catch(() => {});
+
+      await createGlobalCategoryStore(prisma, {
+        name: "Cigarettes & Tobacco",
+        imageUrl: "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17",
+        priority: 14,
+        isActive: true,
+      }).catch(() => {});
+
+      const restaurants = await prisma.restaurant.findMany({ select: { id: true, name: true, slug: true } });
+
+      const tobaccoCatalog = [
+        { name: "Marlboro Advance Compact (10 pcs)", price: 122, category: "Cigarettes", image: "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17", rating: 4.9, reviewCount: 312, orderCount: 1850, isAvailable: true },
+        { name: "Gold Flake King's Blue (10 pcs)", price: 240, category: "Cigarettes", image: "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17", rating: 4.8, reviewCount: 245, orderCount: 1620, isAvailable: true },
+        { name: "Gold Flake Indie Mint (10 pcs)", price: 125, category: "Cigarettes", image: "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17", rating: 4.7, reviewCount: 190, orderCount: 1410, isAvailable: true },
+        { name: "Gold Flake Filter (10 pcs)", price: 127, category: "Cigarettes", image: "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17", rating: 4.8, reviewCount: 180, orderCount: 1350, isAvailable: true },
+        { name: "Classic Connect (20 pcs)", price: 390, category: "Cigarettes", image: "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17", rating: 4.9, reviewCount: 210, orderCount: 1550, isAvailable: true },
+        { name: "Classic Ice Burst (10 pcs)", price: 240, category: "Cigarettes", image: "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17", rating: 4.9, reviewCount: 420, orderCount: 2100, isAvailable: true },
+      ];
+
+      let totalAdded = 0;
+      for (const r of restaurants) {
+        for (const item of tobaccoCatalog) {
+          const existing = await prisma.menuItem.findFirst({
+            where: { restaurantId: r.id, name: item.name },
+          });
+
+          if (!existing) {
+            await prisma.menuItem.create({
+              data: {
+                restaurantId: r.id,
+                name: item.name,
+                price: item.price,
+                category: item.category,
+                image: item.image,
+                rating: item.rating,
+                reviewCount: item.reviewCount,
+                orderCount: item.orderCount,
+                isAvailable: true,
+              },
+            });
+            totalAdded++;
+          }
+        }
+      }
+
+      return {
+        message: `Cigarettes catalog placed successfully across ${restaurants.length} restaurants! (${totalAdded} items added)`,
+        totalAdded,
+        restaurantCount: restaurants.length,
+      };
+    } catch (err) {
+      console.error("[SuperAdmin] place tobacco catalog error:", err);
+      return reply.code(500).send({ message: err?.message || "Failed to place cigarettes catalog" });
+    }
+  });
+
   ///////////////////////////////////////////////////////////
   // BANNERS
   ///////////////////////////////////////////////////////////
