@@ -558,6 +558,7 @@ export default function Kitchen() {
                 return list;
             });
             setLastSyncAt(new Date());
+            playNotificationSound();
             const tableNo = String(order?.tableNo || "").trim();
             showToast({
                 title: "New ticket arrived",

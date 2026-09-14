@@ -6,6 +6,7 @@ import { api } from "../../utils/apiClient";
 import { useStaffSocket } from "../../context/StaffSocketContext";
 import { showToast } from "../../utils/toast";
 import { resolveEffectiveStaffRole } from "../../utils/staffRole";
+import { playNotificationSound } from "../../utils/soundPlayer";
 
 const STATUS_COLUMNS = ["PLACED", "PREPARING", "READY", "DELIVERED"];
 
@@ -102,6 +103,7 @@ export default function OwnerKitchenLive() {
                 return copy;
             });
             setLastSyncAt(new Date());
+            playNotificationSound();
             const tableNo = String(order?.tableNo || "").trim();
             showToast({
                 title: "New order",

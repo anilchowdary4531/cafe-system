@@ -17,6 +17,8 @@ import supplyMarketplaceRoutes from "./supplyMarketplace.routes.js";
 import superAdminSupplyRoutes from "./superAdminSupply.routes.js";
 import supplyChatRoutes from "./supplyChat.routes.js";
 
+import ppiWalletRoutes from "./ppiWallet.routes.js";
+
 // Single route entrypoint to keep server.js simple.
 export default async function routes(app, deps) {
   await healthRoutes(app, deps);
@@ -36,5 +38,6 @@ export default async function routes(app, deps) {
   await paymentRoutes(app, deps);
   await vendorRoutes(app, deps);
   await walletRoutes(app, deps);
+  await ppiWalletRoutes(app, deps);
   await notificationRoutes(app, deps);
 }

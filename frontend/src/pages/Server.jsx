@@ -15,6 +15,8 @@ import useCachedGet from "../hooks/useCachedGet";
 import { api } from "../utils/apiClient";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
 import { showToast } from "../utils/toast";
+import { playNotificationSound } from "../utils/soundPlayer";
+import { appendOwnerNotification } from "../utils/ownerNotifications";
 
 const ACTIVE_STATUSES = new Set(["PLACED", "ACCEPTED", "PREPARING", "READY"]);
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
@@ -791,6 +793,15 @@ export default function Server() {
                 copy[idx] = order;
                 return copy;
             });
+            playNotificationSound();
+            const orderNo = order?.orderNo || `#${order?.id || ""}`;
+            const total = order?.total ? `₹${order.total}` : "";
+            const tableInfo = order?.tableNo ? `Table ${order.tableNo}` : "Dine In";
+            appendOwnerNotification({
+                title: "🔔 New Order Received!",
+                message: `Order ${orderNo} (${tableInfo}) for ${total}`,
+                type: "orders",
+            });
         };
 
         const onUpdated = (order) => {
@@ -905,6 +916,15 @@ export default function Server() {
             async (ack) => {
                 try {
                     if (ack?.ok) {
+                        playNotificationSound();
+                        const orderNo = ack?.order?.orderNo || `#${ack?.order?.id || ""}`;
+                        const total = ack?.order?.total ? `₹${ack.order.total}` : "";
+                        appendOwnerNotification({
+                            title: "🔔 Table Order Placed!",
+                            message: `Table ${selectedTableNo} order ${orderNo} placed (${total})`,
+                            type: "orders",
+                        });
+
                         showToast({
                             title: "Order created",
                             message:

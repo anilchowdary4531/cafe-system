@@ -18,6 +18,15 @@ import {
     MenuSection,
 } from "./RestaurantMenu";
 import VegModeToggle from "../../components/VegModeToggle";
+import {
+    TOBACCO_KEYWORDS,
+    isTobaccoItem,
+    isTobaccoText,
+    isTobaccoAgeConfirmed,
+    setTobaccoAgeConfirmed,
+} from "../../utils/tobaccoUtils";
+import TobaccoBanner from "../../components/tobacco/TobaccoBanner";
+import TobaccoAgeVerificationModal from "../../components/tobacco/TobaccoAgeVerificationModal";
 
 const FEATURED_MENU_THRESHOLD = 10;
 
@@ -45,6 +54,43 @@ export default function RestaurantPublicMenu() {
     const [activeSection, setActiveSection] = useState("all");
     const [cartOpen, setCartOpen] = useState(false);
     const [favorites, setFavorites] = useState(() => getCustomerFavorites());
+    const [showAgeModal, setShowAgeModal] = useState(false);
+    const [pendingTobaccoItem, setPendingTobaccoItem] = useState(null);
+
+    const isTobaccoSearch = useMemo(() => {
+        return isTobaccoText(search) || activeSection === "cigarettes-tobacco";
+    }, [search, activeSection]);
+
+    const handleViewTobaccoItems = () => {
+        if (!isTobaccoAgeConfirmed()) {
+            setShowAgeModal(true);
+        } else {
+            scrollToSection("cigarettes-tobacco");
+        }
+    };
+
+    const handleAddToCart = (item) => {
+        if (isTobaccoItem(item) && !isTobaccoAgeConfirmed()) {
+            setPendingTobaccoItem(item);
+            setShowAgeModal(true);
+            return;
+        }
+        addToCart(item);
+    };
+
+    const handleAgeConfirm = () => {
+        setTobaccoAgeConfirmed();
+        setShowAgeModal(false);
+        if (pendingTobaccoItem) {
+            addToCart(pendingTobaccoItem);
+            setPendingTobaccoItem(null);
+        }
+    };
+
+    const handleAgeCancel = () => {
+        setShowAgeModal(false);
+        setPendingTobaccoItem(null);
+    };
 
     const sectionRefs = useRef(new Map());
     const menuStartRef = useRef(null);
@@ -362,6 +408,13 @@ export default function RestaurantPublicMenu() {
                 </div>
 
                 <div className="space-y-3 sm:space-y-4">
+                    {isTobaccoSearch && (
+                        <TobaccoBanner
+                            onViewItems={handleViewTobaccoItems}
+                            className="mb-4"
+                        />
+                    )}
+
                     {menuSections.map((section) => (
                         <MenuSection
                             key={section.key}
@@ -370,7 +423,7 @@ export default function RestaurantPublicMenu() {
                             slug={slug}
                             favoriteKeySet={favoriteKeySet}
                             onToggleFavorite={handleToggleFavorite}
-                            onAdd={addToCart}
+                            onAdd={handleAddToCart}
                             sectionRef={registerSectionRef(section.key)}
                             cart={cart}
                         />
@@ -428,6 +481,11 @@ export default function RestaurantPublicMenu() {
 
             <Footer />
             <CartDrawer open={cartOpen} setOpen={setCartOpen} />
+            <TobaccoAgeVerificationModal
+                isOpen={showAgeModal}
+                onConfirm={handleAgeConfirm}
+                onCancel={handleAgeCancel}
+            />
         </div>
     );
 }

@@ -31,6 +31,10 @@ const CATEGORY_DEFAULT_IMAGES = {
     food: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80",
     sweet: "https://images.unsplash.com/photo-1587314168485-3236d6710814?auto=format&fit=crop&w=300&q=80",
     sweets: "https://images.unsplash.com/photo-1587314168485-3236d6710814?auto=format&fit=crop&w=300&q=80",
+    cigarettes: "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17?auto=format&fit=crop&w=300&q=80",
+    cigarette: "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17?auto=format&fit=crop&w=300&q=80",
+    tobacco: "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17?auto=format&fit=crop&w=300&q=80",
+    "paan corner": "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17?auto=format&fit=crop&w=300&q=80",
 };
 
 const DEFAULT_FALLBACK_CATEGORIES = [
@@ -38,6 +42,7 @@ const DEFAULT_FALLBACK_CATEGORIES = [
     { name: "Pizza" },
     { name: "Burger" },
     { name: "Coffee" },
+    { name: "Cigarettes" },
     { name: "Fast Food" },
     { name: "Desserts" },
     { name: "Beverages" },
@@ -59,6 +64,7 @@ export const getCategoryFallbackImage = (name = "") => {
 
 export const getCategoryIcon = (name = "") => {
     const clean = String(name).toLowerCase().trim();
+    if (clean.includes("cigarette") || clean.includes("tobacco") || clean.includes("paan")) return Tags;
     if (clean.includes("pizza")) return Pizza;
     if (clean.includes("coffee") || clean.includes("cafe")) return Coffee;
     if (clean.includes("cake") || clean.includes("dessert") || clean.includes("sweet")) return Cake;

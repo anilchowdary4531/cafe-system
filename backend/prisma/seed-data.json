@@ -57,7 +57,11 @@
         { "name": "Pizza", "price": 220, "category": "Food", "image": "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3", "rating": 4.8, "reviewCount": 154, "orderCount": 960 },
         { "name": "Burger", "price": 140, "category": "Food", "image": "https://images.unsplash.com/photo-1550547660-d9450f859349", "rating": 4.6, "reviewCount": 99, "orderCount": 720 },
         { "name": "Cold Coffee", "price": 180, "category": "Coffee", "image": "https://images.unsplash.com/photo-1461023058943-07fcbe16d735", "rating": 4.9, "reviewCount": 188, "orderCount": 1400 },
-        { "name": "Cappuccino", "price": 160, "category": "Coffee", "image": "https://images.unsplash.com/photo-1509042239860-f550ce710b93", "rating": 4.8, "reviewCount": 143, "orderCount": 1100 }
+        { "name": "Cappuccino", "price": 160, "category": "Coffee", "image": "https://images.unsplash.com/photo-1509042239860-f550ce710b93", "rating": 4.8, "reviewCount": 143, "orderCount": 1100 },
+        { "name": "Marlboro Advance Compact (10 pcs)", "price": 122, "category": "Cigarettes", "image": "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17", "rating": 4.9, "reviewCount": 312, "orderCount": 1850 },
+        { "name": "Gold Flake King's Blue (10 pcs)", "price": 240, "category": "Cigarettes", "image": "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17", "rating": 4.8, "reviewCount": 245, "orderCount": 1620 },
+        { "name": "Gold Flake Indie Mint (10 pcs)", "price": 125, "category": "Cigarettes", "image": "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17", "rating": 4.7, "reviewCount": 190, "orderCount": 1410 },
+        { "name": "Classic Ice Burst (10 pcs)", "price": 240, "category": "Cigarettes", "image": "https://images.unsplash.com/photo-1527076580004-984e7a8e7e17", "rating": 4.9, "reviewCount": 420, "orderCount": 2100 }
       ],
       "tables": [
         { "tableNo": "T1", "seats": 4 },

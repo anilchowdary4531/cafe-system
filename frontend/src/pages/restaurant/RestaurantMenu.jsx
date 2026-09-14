@@ -31,6 +31,16 @@ import { getCustomerFavorites, toggleFavoriteMenuItem } from "../../utils/custom
 import { showToast } from "../../utils/toast";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 
+import {
+    TOBACCO_KEYWORDS,
+    isTobaccoItem,
+    isTobaccoText,
+    isTobaccoAgeConfirmed,
+    setTobaccoAgeConfirmed,
+} from "../../utils/tobaccoUtils";
+import TobaccoBanner from "../../components/tobacco/TobaccoBanner";
+import TobaccoAgeVerificationModal from "../../components/tobacco/TobaccoAgeVerificationModal";
+
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
 const EMPTY_MENU = [];
 
@@ -42,8 +52,9 @@ const DESSERT_KEYWORDS = ["dessert", "cake", "brownie", "ice cream", "icecream",
 const GENERIC_CATEGORY_RE = /^(food|general|menu|items?|item|specials?|special|misc|miscellaneous|other|others?)$/i;
 const FEATURED_MENU_THRESHOLD = 10;
 
-const SECTION_RULES = [
+export const SECTION_RULES = [
     { key: "coffee-drinks", label: "Coffee & Drinks", keywords: COFFEE_KEYWORDS, Icon: Coffee, rank: 10 },
+    { key: "cigarettes-tobacco", label: "Cigarettes & Tobacco", keywords: TOBACCO_KEYWORDS, Icon: Tags, rank: 15 },
     { key: "biryani", label: "Biryani", keywords: ["biryani"], Icon: UtensilsCrossed, rank: 20 },
     { key: "pizza", label: "Pizza", keywords: ["pizza"], Icon: Pizza, rank: 30 },
     { key: "burgers", label: "Burgers", keywords: ["burger"], Icon: Sandwich, rank: 40 },
@@ -206,6 +217,43 @@ export default function RestaurantMenu() {
     const [activeSection, setActiveSection] = useState("all");
     const [cartOpen, setCartOpen] = useState(false);
     const [favorites, setFavorites] = useState(() => getCustomerFavorites());
+    const [showAgeModal, setShowAgeModal] = useState(false);
+    const [pendingTobaccoItem, setPendingTobaccoItem] = useState(null);
+
+    const isTobaccoSearch = useMemo(() => {
+        return isTobaccoText(search) || activeSection === "cigarettes-tobacco";
+    }, [search, activeSection]);
+
+    const handleViewTobaccoItems = () => {
+        if (!isTobaccoAgeConfirmed()) {
+            setShowAgeModal(true);
+        } else {
+            scrollToSection("cigarettes-tobacco");
+        }
+    };
+
+    const handleAddToCart = (item) => {
+        if (isTobaccoItem(item) && !isTobaccoAgeConfirmed()) {
+            setPendingTobaccoItem(item);
+            setShowAgeModal(true);
+            return;
+        }
+        addToCart(item);
+    };
+
+    const handleAgeConfirm = () => {
+        setTobaccoAgeConfirmed();
+        setShowAgeModal(false);
+        if (pendingTobaccoItem) {
+            addToCart(pendingTobaccoItem);
+            setPendingTobaccoItem(null);
+        }
+    };
+
+    const handleAgeCancel = () => {
+        setShowAgeModal(false);
+        setPendingTobaccoItem(null);
+    };
 
     const sectionRefs = useRef(new Map());
     const menuStartRef = useRef(null);
@@ -550,6 +598,13 @@ export default function RestaurantMenu() {
                 </div>
 
                 <div className="space-y-3 sm:space-y-4">
+                    {isTobaccoSearch && (
+                        <TobaccoBanner
+                            onViewItems={handleViewTobaccoItems}
+                            className="mb-4"
+                        />
+                    )}
+
                     {menuSections.map((section) => (
                         <MenuSection
                             key={section.key}
@@ -558,7 +613,7 @@ export default function RestaurantMenu() {
                             slug={slug}
                             favoriteKeySet={favoriteKeySet}
                             onToggleFavorite={handleToggleFavorite}
-                            onAdd={addToCart}
+                            onAdd={handleAddToCart}
                             sectionRef={registerSectionRef(section.key)}
                             cart={cart}
                         />
@@ -617,6 +672,11 @@ export default function RestaurantMenu() {
 
             <Footer />
             <CartDrawer open={cartOpen} setOpen={setCartOpen} />
+            <TobaccoAgeVerificationModal
+                isOpen={showAgeModal}
+                onConfirm={handleAgeConfirm}
+                onCancel={handleAgeCancel}
+            />
         </div>
     );
 }

@@ -82,6 +82,19 @@ export default function Terms() {
                         </p>
                     </section>
 
+                    <section className="space-y-3">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">7. Purchase of Cigarettes & Tobacco Products</h2>
+                        <p>
+                            In compliance with the Cigarettes and Other Tobacco Products (Prohibition of Advertisement and Regulation of Trade and Commerce, Production, Supply and Distribution) Act, 2003 (COTPA) and applicable Indian regulations:
+                        </p>
+                        <ul className="list-disc pl-6 space-y-2">
+                            <li>You must be at least eighteen (18) years of age to purchase cigarettes, tobacco products, paan, hookah, rolling papers, or nicotine products on Tiffzy.</li>
+                            <li>Sale or delivery of tobacco products to minors (persons under 18 years of age) is strictly prohibited by law.</li>
+                            <li>Tobacco products cannot be ordered for delivery to, or purchased within a 100-yard radius of, any educational institution (schools, colleges, or universities).</li>
+                            <li>Mandatory age verification and legal location confirmation is required before purchasing any tobacco products on the platform. Any misrepresentation of age or delivery location constitutes a material breach of these Terms and will result in immediate account suspension and reporting to statutory authorities.</li>
+                        </ul>
+                    </section>
+
                     <section className="rounded-3xl border border-[var(--app-border,rgba(0,0,0,0.1))] bg-white dark:bg-slate-900 p-6 space-y-2 text-xs">
                         <h3 className="font-bold text-sm text-gray-900 dark:text-white">Contact & Entity Details</h3>
                         <p><strong className="text-gray-900 dark:text-gray-200">Legal Entity:</strong> SURVETRA SERVICES</p>

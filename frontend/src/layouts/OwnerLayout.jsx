@@ -35,6 +35,8 @@ import {
     subscribeOwnerNotifications,
 } from "../utils/ownerNotifications";
 import { API } from "../config";
+import { useStaffSocket } from "../context/StaffSocketContext";
+import { playNotificationSound } from "../utils/soundPlayer";
 
 const MODULES = [
     "dashboard",
@@ -582,64 +584,80 @@ export default function OwnerLayout() {
 
     const [popupOrder, setPopupOrder] = useState(null);
     const knownOrderIdsRef = useState(() => new Set())[0];
+    const { socket } = useStaffSocket();
+
+    const loadTableOverview = useCallback(async () => {
+        if (!restaurantId) {
+            setTableOverview({
+                loading: false,
+                total: 0,
+                occupied: 0,
+                tables: [],
+            });
+            return;
+        }
+
+        try {
+            const res = await axios.get(`${API}/owner/${restaurantId}/tables`);
+            const tables = normalizeTableRows(res.data);
+            const occupied = tables.filter((table) => table.isOccupied).length;
+
+            const activeOrders = tables.flatMap((t) => (Array.isArray(t.activeOrders) ? t.activeOrders : []));
+            if (knownOrderIdsRef.size > 0) {
+                const brandNewOrder = activeOrders.find((o) => o?.id && !knownOrderIdsRef.has(o.id));
+                if (brandNewOrder) {
+                    setPopupOrder(brandNewOrder);
+                }
+            }
+            activeOrders.forEach((o) => {
+                if (o?.id) knownOrderIdsRef.add(o.id);
+            });
+
+            setTableOverview({
+                loading: false,
+                total: tables.length,
+                occupied,
+                tables,
+            });
+        } catch {
+            setTableOverview((prev) => ({
+                ...prev,
+                loading: false,
+            }));
+        }
+    }, [knownOrderIdsRef, restaurantId]);
 
     useEffect(() => {
-        let mounted = true;
-
-        const loadTableOverview = async () => {
-            if (!restaurantId) {
-                if (!mounted) return;
-                setTableOverview({
-                    loading: false,
-                    total: 0,
-                    occupied: 0,
-                    tables: [],
-                });
-                return;
-            }
-
-            try {
-                const res = await axios.get(`${API}/owner/${restaurantId}/tables`);
-                if (!mounted) return;
-
-                const tables = normalizeTableRows(res.data);
-                const occupied = tables.filter((table) => table.isOccupied).length;
-
-                // Detect newly arrived active orders
-                const activeOrders = tables.flatMap((t) => (Array.isArray(t.activeOrders) ? t.activeOrders : []));
-                if (knownOrderIdsRef.size > 0) {
-                    const brandNewOrder = activeOrders.find((o) => o?.id && !knownOrderIdsRef.has(o.id));
-                    if (brandNewOrder) {
-                        setPopupOrder(brandNewOrder);
-                    }
-                }
-                activeOrders.forEach((o) => {
-                    if (o?.id) knownOrderIdsRef.add(o.id);
-                });
-
-                setTableOverview({
-                    loading: false,
-                    total: tables.length,
-                    occupied,
-                    tables,
-                });
-            } catch (err) {
-                if (!mounted) return;
-                setTableOverview((prev) => ({
-                    ...prev,
-                    loading: false,
-                }));
-            }
-        };
-
         loadTableOverview();
         const intervalId = setInterval(loadTableOverview, 10000);
 
         return () => {
-            mounted = false;
             clearInterval(intervalId);
         };
-    }, [knownOrderIdsRef, restaurantId]);
+    }, [loadTableOverview]);
+
+    // Realtime Socket Event Listener for instant new orders and notifications
+    useEffect(() => {
+        if (!socket) return undefined;
+
+        const handleNewOrder = (order) => {
+            if (order) {
+                setPopupOrder(order);
+                playNotificationSound();
+                loadTableOverview();
+            }
+        };
+
+        socket.on("order:created", handleNewOrder);
+        socket.on("new_order", handleNewOrder);
+        socket.on("notification:new", loadTableOverview);
+
+        return () => {
+            socket.off("order:created", handleNewOrder);
+            socket.off("new_order", handleNewOrder);
+            socket.off("notification:new", loadTableOverview);
+        };
+    }, [loadTableOverview, socket]);
 
     useEffect(() => {
         let mounted = true;

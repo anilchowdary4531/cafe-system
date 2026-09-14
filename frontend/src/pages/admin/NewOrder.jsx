@@ -29,6 +29,8 @@ import { useStaffSocket } from "../../context/StaffSocketContext";
 import useCachedGet from "../../hooks/useCachedGet";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { showToast } from "../../utils/toast";
+import { playNotificationSound } from "../../utils/soundPlayer";
+import { appendOwnerNotification } from "../../utils/ownerNotifications";
 
 const toInr = (value) => {
     const n = Number(value || 0);
@@ -896,6 +898,16 @@ export default function NewOrder() {
             (ack) => {
                 try {
                     if (ack?.ok) {
+                        playNotificationSound();
+                        const orderNo = ack?.order?.invoiceNo || ack?.order?.orderNo || `#${ack?.order?.id || ""}`;
+                        const total = ack?.order?.total ? `₹${ack.order.total}` : "";
+                        const tableInfo = tableNo ? `Table ${tableNo}` : "Counter / POS";
+                        appendOwnerNotification({
+                            title: "🔔 New Order Processed!",
+                            message: `Bill ${orderNo} (${tableInfo}) processed for ${total}`,
+                            type: "orders",
+                        });
+
                         const createdOrder = {
                             ...ack.order,
                             paymentMethod,
