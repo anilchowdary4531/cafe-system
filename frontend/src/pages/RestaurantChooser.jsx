@@ -33,6 +33,15 @@ import CustomerNotificationBell from "../components/CustomerNotificationBell";
 import Footer from "../components/Footer";
 import PromoBannerSlider from "../components/PromoBannerSlider";
 import PopularCategories, { normalizeCategoryName } from "../components/PopularCategories";
+import {
+    TOBACCO_KEYWORDS,
+    isTobaccoItem,
+    isTobaccoText,
+    isTobaccoAgeConfirmed,
+    setTobaccoAgeConfirmed,
+} from "../utils/tobaccoUtils";
+import TobaccoBanner from "../components/tobacco/TobaccoBanner";
+import TobaccoAgeVerificationModal from "../components/tobacco/TobaccoAgeVerificationModal";
 import CustomerAddressModal, {
     formatAddressLine,
     getStoredActiveAddress,
@@ -135,9 +144,35 @@ export default function RestaurantChooser() {
     const [selectedCategory, setSelectedCategory] = useState("");
     const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
     const [activeAddress, setActiveAddress] = useState(() => getStoredActiveAddress());
+    const [showAgeModal, setShowAgeModal] = useState(false);
+    const [pendingTobaccoItem, setPendingTobaccoItem] = useState(null);
     const vegModeEnabled = Boolean(restaurantContext?.vegOnly);
     const profilePath = customer ? "/profile/overview?scope=customer" : "/login?mode=customer";
     const profileLabel = customer ? "Profile" : "Login";
+
+    const isTobaccoSearch = useMemo(() => {
+        return isTobaccoText(search) || isTobaccoText(selectedCategory);
+    }, [search, selectedCategory]);
+
+    const handleViewTobaccoItems = () => {
+        if (!isTobaccoAgeConfirmed()) {
+            setShowAgeModal(true);
+        }
+    };
+
+    const handleAgeConfirm = () => {
+        setTobaccoAgeConfirmed();
+        setShowAgeModal(false);
+        if (pendingTobaccoItem) {
+            addItemToCart(pendingTobaccoItem);
+            setPendingTobaccoItem(null);
+        }
+    };
+
+    const handleAgeCancel = () => {
+        setShowAgeModal(false);
+        setPendingTobaccoItem(null);
+    };
 
     const { data: restaurantData, loading: restaurantLoading, error: restaurantError, refresh: refreshRestaurants } = useCachedGet("/restaurants", {
         params: {
@@ -230,6 +265,11 @@ export default function RestaurantChooser() {
     const activeSearchError = catalogError || "";
 
     const addItemToCart = (item) => {
+        if (isTobaccoItem(item) && !isTobaccoAgeConfirmed()) {
+            setPendingTobaccoItem(item);
+            setShowAgeModal(true);
+            return;
+        }
         const slug = String(item?.restaurant?.slug || "").trim();
         if (slug) {
             setRestaurantContext({
@@ -397,6 +437,13 @@ export default function RestaurantChooser() {
                             onSelectCategory={setSelectedCategory}
                         />
 
+                        {isTobaccoSearch && (
+                            <TobaccoBanner
+                                onViewItems={handleViewTobaccoItems}
+                                className="mb-4"
+                            />
+                        )}
+
                         {backendState === "checking" ? (
                             <InitialBrowseLoadingCard />
                         ) : backendState === "down" ? (
@@ -479,6 +526,12 @@ export default function RestaurantChooser() {
                     setActiveAddress(addr);
                     setStoredActiveAddress(addr);
                 }}
+            />
+
+            <TobaccoAgeVerificationModal
+                isOpen={showAgeModal}
+                onConfirm={handleAgeConfirm}
+                onCancel={handleAgeCancel}
             />
 
             <Footer />
