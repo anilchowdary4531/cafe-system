@@ -452,7 +452,19 @@ export default function OwnerLayout() {
         [effectiveRole, user?.access]
     );
 
-    // logout is provided by AuthContext (clears cache + navigates with replace).
+    const [isTobaccoApproved, setIsTobaccoApproved] = useState(false);
+
+    useEffect(() => {
+        if (!restaurantId) return;
+        axios.get(`${API}/owner/${restaurantId}/settings`)
+            .then((res) => {
+                const rest = res.data?.restaurant || res.data;
+                if (rest?.tobaccoApproved === true) {
+                    setIsTobaccoApproved(true);
+                }
+            })
+            .catch(() => {});
+    }, [restaurantId]);
 
     const navItems = [
         {
@@ -485,6 +497,12 @@ export default function OwnerLayout() {
             icon: <UtensilsCrossed size={18} />,
             accessKey: "menu",
         },
+        ...(isTobaccoApproved ? [{
+            label: "Tobacco Studio",
+            path: "/owner/menu?tobacco=true",
+            icon: <span className="text-base leading-none">🚬</span>,
+            accessKey: "menu",
+        }] : []),
         {
             label: "Tables & QR",
             path: "/owner/tables",

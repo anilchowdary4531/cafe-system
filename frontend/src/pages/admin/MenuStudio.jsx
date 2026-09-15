@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { MoreVertical } from "lucide-react";
 import { API } from "../../config";
@@ -34,6 +35,9 @@ const getDiscountedPrice = (originalPrice, discountPercent) => {
 };
 
 export default function MenuStudio() {
+    const [searchParams] = useSearchParams();
+    const isTobaccoParam = searchParams.get("tobacco") === "true";
+
     const [items, setItems] = useState([]);
     const [restaurantInfo, setRestaurantInfo] = useState(null);
     const [search, setSearch] = useState("");
@@ -112,6 +116,21 @@ export default function MenuStudio() {
     useEffect(() => {
         loadMenu();
     }, [restaurantId]);
+
+    useEffect(() => {
+        if (isTobaccoParam && restaurantInfo?.tobaccoApproved === true) {
+            setFormOpen(true);
+            setForm({
+                name: "",
+                description: "",
+                category: "Cigarettes",
+                image: "",
+                originalPrice: "",
+                discountPercent: "",
+                isAvailable: true,
+            });
+        }
+    }, [isTobaccoParam, restaurantInfo?.tobaccoApproved]);
 
     useEffect(() => {
         if (!openActionMenuId) return undefined;
