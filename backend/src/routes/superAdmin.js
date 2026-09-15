@@ -669,9 +669,7 @@ export default async function superAdminRoutes(app, deps) {
       } catch (dbErr) {
         console.warn("[SuperAdmin] Prisma update failed, executing raw SQL update:", dbErr.message);
         await prisma.$executeRawUnsafe(
-          `UPDATE "Restaurant" SET "tobacco_approved" = $1 WHERE id = $2;`,
-          tobaccoApproved,
-          restaurantId
+          `UPDATE "Restaurant" SET "tobacco_approved" = ${tobaccoApproved ? "true" : "false"} WHERE id = ${restaurantId};`
         );
         restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
       }
@@ -713,9 +711,7 @@ export default async function superAdminRoutes(app, deps) {
         console.warn("[SuperAdmin] Prisma update failed, executing raw SQL update:", dbErr.message);
         if (updateData.tobaccoApproved !== undefined) {
           await prisma.$executeRawUnsafe(
-            `UPDATE "Restaurant" SET "tobacco_approved" = $1 WHERE id = $2;`,
-            updateData.tobaccoApproved,
-            restaurantId
+            `UPDATE "Restaurant" SET "tobacco_approved" = ${updateData.tobaccoApproved ? "true" : "false"} WHERE id = ${restaurantId};`
           );
         }
         restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
