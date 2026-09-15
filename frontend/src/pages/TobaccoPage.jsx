@@ -22,6 +22,7 @@ export default function TobaccoPage() {
     const [showAgeModal, setShowAgeModal] = useState(false);
     const [cartOpen, setCartOpen] = useState(false);
     const [pendingItem, setPendingItem] = useState(null);
+    const itemsSectionRef = React.useRef(null);
 
     // Verify age confirmation on initial load
     useEffect(() => {
@@ -39,12 +40,22 @@ export default function TobaccoPage() {
 
     const items = Array.isArray(data?.items) ? data.items : [];
 
+    const handleViewItems = () => {
+        if (!isTobaccoAgeConfirmed()) {
+            setShowAgeModal(true);
+        } else {
+            itemsSectionRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
+    };
+
     const handleAgeConfirm = () => {
         setTobaccoAgeConfirmed();
         setShowAgeModal(false);
         if (pendingItem) {
             addToCart(pendingItem);
             setPendingItem(null);
+        } else {
+            itemsSectionRef.current?.scrollIntoView({ behavior: "smooth" });
         }
     };
 
@@ -112,11 +123,7 @@ export default function TobaccoPage() {
             {/* Main Content */}
             <main className="mx-auto max-w-7xl px-3 py-6 sm:px-6 md:px-8 flex-1 w-full space-y-6">
                 {/* Tobacco Banner */}
-                <TobaccoBanner
-                    onViewItems={() => {
-                        if (!isTobaccoAgeConfirmed()) setShowAgeModal(true);
-                    }}
-                />
+                <TobaccoBanner onViewItems={handleViewItems} />
 
                 {/* Quick Tag Pills */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -124,7 +131,10 @@ export default function TobaccoPage() {
                         <button
                             key={tag}
                             type="button"
-                            onClick={() => setSearch(tag)}
+                            onClick={() => {
+                                setSearch(tag);
+                                itemsSectionRef.current?.scrollIntoView({ behavior: "smooth" });
+                            }}
                             className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition active:scale-95 shadow-2xs ${
                                 search.toLowerCase() === tag.toLowerCase()
                                     ? "bg-emerald-700 text-white border-emerald-800"
@@ -147,7 +157,7 @@ export default function TobaccoPage() {
                 </div>
 
                 {/* Section Title */}
-                <div className="flex items-center justify-between">
+                <div ref={itemsSectionRef} className="flex items-center justify-between pt-2">
                     <h2 className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white tracking-tight">
                         {search ? `Results for "${search}"` : "Cigarettes & Tobacco Products"}
                     </h2>
