@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { api } from "../../utils/apiClient";
+import { api, invalidateGetCache } from "../../utils/apiClient";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import SuperAdminSidebar from "../../components/super-admin/SuperAdminSidebar";
 
@@ -90,6 +90,9 @@ export default function SuperAdminRestaurantProfiles() {
                     tobaccoApproved: nextStatus,
                 });
             }
+
+            invalidateGetCache({ urlStartsWith: "/owner" });
+            invalidateGetCache({ urlStartsWith: "/super-admin" });
 
             const updated = res?.data?.restaurant || res?.restaurant;
             if (updated && updated.tobaccoApproved !== undefined) {

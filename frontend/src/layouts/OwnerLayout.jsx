@@ -35,6 +35,7 @@ import {
     subscribeOwnerNotifications,
 } from "../utils/ownerNotifications";
 import { API } from "../config";
+import { api } from "../utils/apiClient";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import { playNotificationSound } from "../utils/soundPlayer";
 
@@ -456,11 +457,14 @@ export default function OwnerLayout() {
 
     useEffect(() => {
         if (!restaurantId) return;
-        axios.get(`${API}/owner/${restaurantId}/settings`)
+        api.get(`/owner/${restaurantId}/settings`)
             .then((res) => {
-                const rest = res.data?.restaurant || res.data;
+                const data = res?.data || res;
+                const rest = data?.restaurant || data;
                 if (rest?.tobaccoApproved === true) {
                     setIsTobaccoApproved(true);
+                } else {
+                    setIsTobaccoApproved(false);
                 }
             })
             .catch(() => {});

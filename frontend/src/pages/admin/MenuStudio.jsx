@@ -5,7 +5,7 @@ import { MoreVertical } from "lucide-react";
 import { API } from "../../config";
 import { uploadToS3Presigned } from "../../utils/s3Upload";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
-import { invalidateGetCache } from "../../utils/apiClient";
+import { api, invalidateGetCache } from "../../utils/apiClient";
 
 const emptyForm = {
     name: "",
@@ -98,12 +98,15 @@ export default function MenuStudio() {
             setLoading(true);
             setError("");
             const [menuRes, settingsRes] = await Promise.all([
-                axios.get(`${API}/owner/${restaurantId}/menu`),
-                axios.get(`${API}/owner/${restaurantId}/settings`).catch(() => null),
+                api.get(`/owner/${restaurantId}/menu`),
+                api.get(`/owner/${restaurantId}/settings`).catch(() => null),
             ]);
-            setItems(menuRes.data || []);
-            if (settingsRes?.data) {
-                setRestaurantInfo(settingsRes.data.restaurant || settingsRes.data);
+            const menuData = menuRes?.data || menuRes;
+            setItems(Array.isArray(menuData) ? menuData : (menuData?.items || []));
+
+            const settingsData = settingsRes?.data || settingsRes;
+            if (settingsData) {
+                setRestaurantInfo(settingsData.restaurant || settingsData);
             }
         } catch (err) {
             console.log(err);
