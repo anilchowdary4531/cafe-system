@@ -100,7 +100,6 @@ export default function SuperAdminRestaurantProfiles() {
         } catch (err) {
             console.error("Failed to toggle tobacco status:", err);
             setError("Failed to update tobacco sales approval");
-            loadRestaurants();
         }
     };
 
@@ -217,7 +216,7 @@ export default function SuperAdminRestaurantProfiles() {
                                                     }`}
                                                     title={isTobaccoApproved ? "Tobacco Sales Approved by Super Admin" : "Click to Approve Tobacco Sales"}
                                                 >
-                                                    <span>🚬</span>
+                                                    <span>{isTobaccoApproved ? "✓" : "🚬"}</span>
                                                     <span>{isTobaccoApproved ? "Tobacco Approved" : "Approve Tobacco"}</span>
                                                 </button>
                                                 <button
