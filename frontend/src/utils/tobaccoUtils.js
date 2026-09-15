@@ -1,7 +1,14 @@
 export const TOBACCO_KEYWORDS = [
+    "cig",
+    "ciga",
+    "cigar",
+    "cigars",
     "cigarette",
     "cigarettes",
+    "tob",
+    "toba",
     "tobacco",
+    "marl",
     "marlboro",
     "gold flake",
     "goldflake",
@@ -16,14 +23,12 @@ export const TOBACCO_KEYWORDS = [
     "paan",
     "smoke",
     "smokes",
-    "cigar",
-    "cigars",
 ];
 
 export const isTobaccoText = (text = "") => {
     const clean = String(text || "").trim().toLowerCase();
-    if (!clean) return false;
-    return TOBACCO_KEYWORDS.some((kw) => clean.includes(kw));
+    if (!clean || clean.length < 2) return false;
+    return TOBACCO_KEYWORDS.some((kw) => clean.includes(kw) || (clean.length >= 3 && kw.includes(clean)));
 };
 
 export const isTobaccoItem = (item) => {
