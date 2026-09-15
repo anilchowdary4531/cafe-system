@@ -218,12 +218,6 @@ export default function RestaurantChooser() {
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [selectedItem]);
 
-    useEffect(() => {
-        if (isTobaccoSearch) {
-            navigate("/tobacco");
-        }
-    }, [isTobaccoSearch, navigate]);
-
     const searchEnabled = deferredSearch.length >= MIN_SEARCH_LENGTH;
     const { data: catalogData, loading: catalogLoading, error: catalogError, refresh: refreshCatalog } = useCachedGet("/catalog/search", {
         params: {
