@@ -77,11 +77,18 @@ export default function SuperAdminRestaurantProfiles() {
             setRestaurants((prev) =>
                 prev.map((r) => (r.id === restaurant.id ? { ...r, tobaccoApproved: nextStatus } : r))
             );
-            await api.patch(`/super-admin/restaurants/${restaurant.id}/tobacco-status`, {
+            const res = await api.patch(`/super-admin/restaurants/${restaurant.id}/tobacco-status`, {
                 tobaccoApproved: nextStatus,
             });
+            const updated = res?.data?.restaurant || res?.restaurant;
+            if (updated && typeof updated.tobaccoApproved === "boolean") {
+                setRestaurants((prev) =>
+                    prev.map((r) => (r.id === restaurant.id ? { ...r, tobaccoApproved: updated.tobaccoApproved } : r))
+                );
+            }
         } catch (err) {
             console.error("Failed to toggle tobacco status:", err);
+            setError("Failed to update tobacco sales approval");
             loadRestaurants();
         }
     };

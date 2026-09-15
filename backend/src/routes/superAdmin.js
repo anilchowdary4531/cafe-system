@@ -59,6 +59,7 @@ export default async function superAdminRoutes(app, deps) {
       invoicePrefix: restaurant.invoicePrefix || "INV",
       defaultTaxPercent: restaurant.defaultTaxPercent || 5,
       isActive: restaurant.isActive,
+      tobaccoApproved: Boolean(restaurant.tobaccoApproved),
       createdAt: restaurant.createdAt,
       updatedAt: restaurant.updatedAt,
       owner: owners[0]
@@ -662,6 +663,42 @@ export default async function superAdminRoutes(app, deps) {
     } catch (err) {
       console.error("[SuperAdmin] update tobacco status error:", err);
       return reply.code(500).send({ message: "Failed to update tobacco sales approval" });
+    }
+  });
+
+  app.patch("/super-admin/restaurants/:restaurantId", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
+
+      const updateData = {};
+      if (req.body?.isActive !== undefined) updateData.isActive = Boolean(req.body.isActive);
+      if (req.body?.tobaccoApproved !== undefined) updateData.tobaccoApproved = Boolean(req.body.tobaccoApproved);
+
+      const restaurant = await prisma.restaurant.update({
+        where: { id: restaurantId },
+        data: updateData,
+      });
+
+      if (updateData.isActive !== undefined) {
+        await prisma.user.updateMany({
+          where: { restaurantId, role: { not: "SUPER_ADMIN" } },
+          data: { isActive: updateData.isActive },
+        }).catch(() => {});
+      }
+
+      return {
+        message: `Restaurant updated`,
+        restaurant: {
+          id: restaurant.id,
+          name: restaurant.name,
+          isActive: restaurant.isActive,
+          tobaccoApproved: restaurant.tobaccoApproved,
+        },
+      };
+    } catch (err) {
+      console.error("[SuperAdmin] update restaurant error:", err);
+      return reply.code(500).send({ message: "Failed to update restaurant" });
     }
   });
 

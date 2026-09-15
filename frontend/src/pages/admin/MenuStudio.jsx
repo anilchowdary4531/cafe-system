@@ -99,7 +99,7 @@ export default function MenuStudio() {
             ]);
             setItems(menuRes.data || []);
             if (settingsRes?.data) {
-                setRestaurantInfo(settingsRes.data);
+                setRestaurantInfo(settingsRes.data.restaurant || settingsRes.data);
             }
         } catch (err) {
             console.log(err);
@@ -314,13 +314,13 @@ export default function MenuStudio() {
                 </div>
                 {restaurantInfo && (
                     <div className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold border ${
-                        restaurantInfo.tobaccoApproved !== false
+                        restaurantInfo.tobaccoApproved === true
                             ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
                             : "border-gray-600/40 bg-gray-800/60 text-gray-400"
                     }`}>
                         <span>🚬</span>
                         <span>
-                            {restaurantInfo.tobaccoApproved !== false
+                            {restaurantInfo.tobaccoApproved === true
                                 ? "Tobacco Products Sales: APPROVED by Super Admin"
                                 : "Tobacco Products Sales: DISABLED by Super Admin"}
                         </span>
@@ -335,7 +335,7 @@ export default function MenuStudio() {
                     placeholder="Search by item name or category..."
                     className="theme-input flex-1 min-w-[200px] rounded-xl px-4 py-3 outline-none"
                 />
-                {restaurantInfo?.tobaccoApproved !== false && (
+                {restaurantInfo?.tobaccoApproved === true && (
                     <button
                         type="button"
                         onClick={() => {
