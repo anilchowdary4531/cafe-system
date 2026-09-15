@@ -166,23 +166,19 @@ export default function TobaccoPage() {
                     </span>
                 </div>
 
-                {/* Loading / Error States */}
-                {loading ? (
+                {/* Loading / Empty / Products Grid */}
+                {loading && items.length === 0 ? (
                     <div className="py-16 text-center text-zinc-400 flex items-center justify-center gap-2">
                         <Sparkles className="animate-spin text-amber-500" size={20} /> Loading tobacco products...
                     </div>
-                ) : error ? (
-                    <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-center text-xs font-bold text-red-400">
-                        {error}
-                    </div>
                 ) : items.length === 0 ? (
-                    <div className="py-16 text-center space-y-3 rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 p-8">
-                        <ShieldAlert className="mx-auto text-amber-500" size={40} />
-                        <h3 className="text-base font-bold text-zinc-800 dark:text-zinc-200">
+                    <div className="py-16 text-center space-y-3 rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 p-8 shadow-xs">
+                        <ShieldAlert className="mx-auto text-amber-500" size={44} />
+                        <h3 className="text-base sm:text-lg font-bold text-zinc-800 dark:text-zinc-200">
                             No Tobacco Products Available
                         </h3>
-                        <p className="text-xs text-zinc-500 max-w-md mx-auto">
-                            Tobacco items are only listed from Super Admin approved restaurants. Ask your local store/admin to enable tobacco sales.
+                        <p className="text-xs sm:text-sm text-zinc-500 max-w-md mx-auto leading-relaxed">
+                            No tobacco items have been added yet by Super Admin approved restaurants. Ask your local store/admin to enable tobacco sales.
                         </p>
                     </div>
                 ) : (
