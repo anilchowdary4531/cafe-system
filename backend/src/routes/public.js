@@ -403,11 +403,23 @@ export default async function publicRoutes(app, deps) {
       const search = normalizeQuery(req.query?.q || req.query?.query || req.query?.search);
       const isTobaccoTerm = (s = "") => /cigarette|tobacco|marlboro|gold flake|classic|cigar|pan|hookah/i.test(s);
 
+      let rawTobaccoMap = {};
+      try {
+        const rawList = await prisma.$queryRawUnsafe(`SELECT id, tobacco_approved FROM "restaurants";`)
+          .catch(() => prisma.$queryRawUnsafe(`SELECT id, tobacco_approved FROM "Restaurant";`));
+        if (Array.isArray(rawList)) {
+          rawList.forEach((r) => {
+            if (r.id !== undefined && r.tobacco_approved !== undefined && r.tobacco_approved !== null) {
+              rawTobaccoMap[r.id] = Boolean(r.tobacco_approved);
+            }
+          });
+        }
+      } catch {}
+
       const itemWhere = {
         isAvailable: true,
         restaurant: {
           isActive: true,
-          tobaccoApproved: true,
         },
       };
 
@@ -441,7 +453,8 @@ export default async function publicRoutes(app, deps) {
 
       const items = rawItems
         .filter((item) => {
-          if (!item?.restaurant || item.restaurant.isActive === false || item.restaurant.tobaccoApproved === false) {
+          const isAppr = item.restaurant?.tobaccoApproved === true || rawTobaccoMap[item.restaurant?.id] === true;
+          if (!item?.restaurant || item.restaurant.isActive === false || !isAppr) {
             return false;
           }
           if (!search) {
