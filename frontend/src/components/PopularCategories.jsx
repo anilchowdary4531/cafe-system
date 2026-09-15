@@ -42,7 +42,6 @@ const DEFAULT_FALLBACK_CATEGORIES = [
     { name: "Pizza" },
     { name: "Burger" },
     { name: "Coffee" },
-    { name: "Cigarettes" },
     { name: "Fast Food" },
     { name: "Desserts" },
     { name: "Beverages" },
@@ -112,12 +111,13 @@ export default function PopularCategories({
     const categoriesList = useMemo(() => {
         const dynamicCategories = [];
         const seenNames = new Set();
+        const isTobaccoCategory = (name = "") => /cigarette|tobacco|paan corner|cigar|hookah/i.test(String(name || ""));
 
         // 1. Add global categories from server
         for (const cat of globalCategories) {
             const rawName = String(cat?.name || "").trim();
             const name = normalizeCategoryName(rawName);
-            if (name && !seenNames.has(name.toLowerCase())) {
+            if (name && !isTobaccoCategory(name) && !seenNames.has(name.toLowerCase())) {
                 seenNames.add(name.toLowerCase());
                 dynamicCategories.push({
                     name,
@@ -131,7 +131,7 @@ export default function PopularCategories({
             for (const item of items) {
                 const rawName = String(item?.category || "").trim();
                 const name = normalizeCategoryName(rawName);
-                if (name && !seenNames.has(name.toLowerCase())) {
+                if (name && !isTobaccoCategory(name) && !seenNames.has(name.toLowerCase())) {
                     seenNames.add(name.toLowerCase());
                     dynamicCategories.push({
                         name,
@@ -145,7 +145,7 @@ export default function PopularCategories({
         if (!globalCategories || globalCategories.length === 0) {
             for (const fb of DEFAULT_FALLBACK_CATEGORIES) {
                 const name = normalizeCategoryName(fb.name);
-                if (!seenNames.has(name.toLowerCase())) {
+                if (!isTobaccoCategory(name) && !seenNames.has(name.toLowerCase())) {
                     seenNames.add(name.toLowerCase());
                     dynamicCategories.push({
                         name,

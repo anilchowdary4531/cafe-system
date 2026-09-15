@@ -218,6 +218,12 @@ export default function RestaurantChooser() {
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [selectedItem]);
 
+    useEffect(() => {
+        if (isTobaccoSearch) {
+            navigate("/tobacco");
+        }
+    }, [isTobaccoSearch, navigate]);
+
     const searchEnabled = deferredSearch.length >= MIN_SEARCH_LENGTH;
     const { data: catalogData, loading: catalogLoading, error: catalogError, refresh: refreshCatalog } = useCachedGet("/catalog/search", {
         params: {
@@ -243,12 +249,9 @@ export default function RestaurantChooser() {
             });
         }
 
-        if (isTobaccoSearch) {
-            return items.filter(isTobaccoItem);
-        }
-
-        return items;
-    }, [catalogData?.items, vegModeEnabled, selectedCategory, isTobaccoSearch]);
+        // STRICT RULE: Never display tobacco products on the general customer home page feed.
+        return items.filter((item) => !isTobaccoItem(item));
+    }, [catalogData?.items, vegModeEnabled, selectedCategory]);
     const itemSections = useMemo(() => {
         const groups = new Map();
 

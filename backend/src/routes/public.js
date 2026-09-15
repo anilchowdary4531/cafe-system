@@ -115,6 +115,11 @@ export default async function publicRoutes(app, deps) {
     return s.charAt(0).toUpperCase() + s.slice(1);
   };
 
+  const isTobaccoProduct = (item) => {
+    const isTerm = (s = "") => /cigarette|tobacco|marlboro|gold flake|classic|cigar|pan|hookah/i.test(String(s || ""));
+    return isTerm(item?.name) || isTerm(item?.category) || isTerm(item?.description);
+  };
+
   app.get("/global-categories", async () => {
     try {
       let categories = [];
@@ -132,11 +137,12 @@ export default async function publicRoutes(app, deps) {
       if (!categories || categories.length === 0) {
         const menuItems = await prisma.menuItem.findMany({
           where: { isAvailable: true },
-          select: { category: true },
+          select: { category: true, name: true },
         }).catch(() => []);
 
         const discovered = new Set();
         for (const item of menuItems) {
+          if (isTobaccoProduct(item)) continue;
           const cat = normalizePublicCat(item.category);
           if (cat) discovered.add(cat);
         }
@@ -152,11 +158,12 @@ export default async function publicRoutes(app, deps) {
         }));
       }
 
-      // Deduplicate by normalized name
+      // Deduplicate by normalized name and filter out tobacco categories
       const deduplicatedMap = new Map();
       for (const cat of categories) {
         const normName = normalizePublicCat(cat.name);
         const lowerKey = normName.toLowerCase();
+        if (/cigarette|tobacco|paan corner|cigar|hookah/i.test(lowerKey)) continue;
         if (!deduplicatedMap.has(lowerKey)) {
           deduplicatedMap.set(lowerKey, {
             ...cat,
@@ -304,10 +311,7 @@ export default async function publicRoutes(app, deps) {
         const items = rawItems
           .filter((item) => {
             if (!item?.restaurant || item.restaurant.isActive === false) return false;
-            const isTobacco = (s = "") => /cigarette|tobacco|marlboro|gold flake|classic/i.test(s);
-            if ((isTobacco(item.name) || isTobacco(item.category)) && item.restaurant.tobaccoApproved === false) {
-              return false;
-            }
+            if (isTobaccoProduct(item)) return false;
             return true;
           })
           .map(mapItem);
@@ -375,7 +379,11 @@ export default async function publicRoutes(app, deps) {
       const restaurants = restaurantRows.map((r) => ({ ...r, logo: r.logoUrl || "", logoUrl: undefined }));
 
       const items = rawItems
-        .filter((item) => item?.restaurant?.isActive !== false)
+        .filter((item) => {
+          if (!item?.restaurant || item.restaurant.isActive === false) return false;
+          if (isTobaccoProduct(item)) return false;
+          return true;
+        })
         .slice(0, itemLimit)
         .map(mapItem);
 
