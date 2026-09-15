@@ -646,7 +646,7 @@ export default async function superAdminRoutes(app, deps) {
       const restaurantId = Number(req.params.restaurantId);
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
 
-      const tobaccoApproved = Boolean(req.body?.tobaccoApproved);
+      const tobaccoApproved = req.body?.tobaccoApproved === true || req.body?.tobaccoApproved === "true";
       const restaurant = await prisma.restaurant.update({
         where: { id: restaurantId },
         data: { tobaccoApproved },
@@ -657,7 +657,7 @@ export default async function superAdminRoutes(app, deps) {
         restaurant: {
           id: restaurant.id,
           name: restaurant.name,
-          tobaccoApproved: restaurant.tobaccoApproved,
+          tobaccoApproved: Boolean(restaurant.tobaccoApproved),
         },
       };
     } catch (err) {
@@ -673,7 +673,7 @@ export default async function superAdminRoutes(app, deps) {
 
       const updateData = {};
       if (req.body?.isActive !== undefined) updateData.isActive = Boolean(req.body.isActive);
-      if (req.body?.tobaccoApproved !== undefined) updateData.tobaccoApproved = Boolean(req.body.tobaccoApproved);
+      if (req.body?.tobaccoApproved !== undefined) updateData.tobaccoApproved = req.body.tobaccoApproved === true || req.body.tobaccoApproved === "true";
 
       const restaurant = await prisma.restaurant.update({
         where: { id: restaurantId },
