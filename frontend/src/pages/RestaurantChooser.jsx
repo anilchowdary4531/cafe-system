@@ -35,6 +35,8 @@ import PromoBannerSlider from "../components/PromoBannerSlider";
 import PopularCategories, { normalizeCategoryName } from "../components/PopularCategories";
 import {
     TOBACCO_KEYWORDS,
+    TOBACCO_QUICK_TAGS,
+    DEFAULT_TOBACCO_ITEMS,
     isTobaccoItem,
     isTobaccoText,
     isTobaccoAgeConfirmed,
@@ -42,6 +44,7 @@ import {
 } from "../utils/tobaccoUtils";
 import TobaccoBanner from "../components/tobacco/TobaccoBanner";
 import TobaccoAgeVerificationModal from "../components/tobacco/TobaccoAgeVerificationModal";
+import BlinkitTobaccoCard from "../components/tobacco/BlinkitTobaccoCard";
 import CustomerAddressModal, {
     formatAddressLine,
     getStoredActiveAddress,
@@ -131,7 +134,7 @@ const getCurrentPosition = () =>
 
 export default function RestaurantChooser() {
     const { customer } = useAuth();
-    const { addToCart, cart, total } = useCart();
+    const { addToCart, removeFromCart, cart, total } = useCart();
     const { restaurantContext, setRestaurantContext } = useRestaurantContext();
     const [search, setSearch] = useState("");
     const deferredSearch = useDeferredValue(normalizeSearch(search));
@@ -239,8 +242,17 @@ export default function RestaurantChooser() {
                 return cat.includes(target) || target.includes(cat) || name.includes(target);
             });
         }
+
+        if (isTobaccoSearch) {
+            const matches = items.filter(isTobaccoItem);
+            if (matches.length > 0) {
+                return matches;
+            }
+            return DEFAULT_TOBACCO_ITEMS;
+        }
+
         return items;
-    }, [catalogData?.items, vegModeEnabled, selectedCategory]);
+    }, [catalogData?.items, vegModeEnabled, selectedCategory, isTobaccoSearch]);
     const itemSections = useMemo(() => {
         const groups = new Map();
 
@@ -438,10 +450,32 @@ export default function RestaurantChooser() {
                         />
 
                         {isTobaccoSearch && (
-                            <TobaccoBanner
-                                onViewItems={handleViewTobaccoItems}
-                                className="mb-4"
-                            />
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                    {TOBACCO_QUICK_TAGS.map((tag) => (
+                                        <button
+                                            key={tag}
+                                            type="button"
+                                            onClick={() => setSearch(tag)}
+                                            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-rose-200/60 bg-[#fff5f5] dark:bg-zinc-900 dark:border-zinc-800 px-3 py-1.5 text-xs font-bold text-zinc-900 dark:text-zinc-200 transition hover:bg-rose-100/70 active:scale-95 shadow-2xs"
+                                        >
+                                            <span className="text-xs">🚬</span>
+                                            <span>{tag}</span>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {search.trim() && (
+                                    <h2 className="text-base font-extrabold tracking-tight text-[color:var(--app-text)] sm:text-lg">
+                                        Showing results for "{search}"
+                                    </h2>
+                                )}
+
+                                <TobaccoBanner
+                                    onViewItems={handleViewTobaccoItems}
+                                    className="mb-2"
+                                />
+                            </div>
                         )}
 
                         {backendState === "checking" ? (
@@ -465,7 +499,7 @@ export default function RestaurantChooser() {
                                     </div>
                                 ) : null}
 
-                                {visibleItems.length === 0 && !catalogLoading ? (
+                                {visibleItems.length === 0 && !catalogLoading && !isTobaccoSearch ? (
                                     <div className="py-8 text-center">
                                         <h2 className="text-lg font-bold">No matches found</h2>
                                         <p className="theme-muted mt-2 text-sm">
@@ -474,22 +508,40 @@ export default function RestaurantChooser() {
                                     </div>
                                 ) : null}
 
-                                <div className="space-y-2.5">
-                                    <div className="space-y-4">
-                                        {itemSections.map((section) => (
-                                            <ItemSectionRow
-                                                key={section.key}
-                                                section={section}
-                                                cart={cart}
-                                                selectedItem={selectedItem}
-                                                closeItemDetails={closeItemDetails}
-                                                setSelectedItem={setSelectedItem}
-                                                setPopupAnchor={setPopupAnchor}
-                                                addItemToCart={addItemToCart}
-                                            />
-                                        ))}
+                                {isTobaccoSearch ? (
+                                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 pt-1">
+                                        {visibleItems.map((item) => {
+                                            const cartItem = cart.find((c) => c.id === item.id);
+                                            const qty = cartItem ? cartItem.quantity : 0;
+                                            return (
+                                                <BlinkitTobaccoCard
+                                                    key={item.id || item.name}
+                                                    item={item}
+                                                    quantity={qty}
+                                                    onAdd={addItemToCart}
+                                                    onRemove={(i) => removeFromCart && removeFromCart(i.id)}
+                                                />
+                                            );
+                                        })}
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="space-y-2.5">
+                                        <div className="space-y-4">
+                                            {itemSections.map((section) => (
+                                                <ItemSectionRow
+                                                    key={section.key}
+                                                    section={section}
+                                                    cart={cart}
+                                                    selectedItem={selectedItem}
+                                                    closeItemDetails={closeItemDetails}
+                                                    setSelectedItem={setSelectedItem}
+                                                    setPopupAnchor={setPopupAnchor}
+                                                    addItemToCart={addItemToCart}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </>
                         )}
                         <PlatformCapabilitiesSection />
