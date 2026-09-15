@@ -71,6 +71,21 @@ export default function SuperAdminRestaurantProfiles() {
         }
     };
 
+    const toggleTobaccoStatus = async (restaurant) => {
+        try {
+            const nextStatus = restaurant.tobaccoApproved === false ? true : false;
+            setRestaurants((prev) =>
+                prev.map((r) => (r.id === restaurant.id ? { ...r, tobaccoApproved: nextStatus } : r))
+            );
+            await api.patch(`/super-admin/restaurants/${restaurant.id}/tobacco-status`, {
+                tobaccoApproved: nextStatus,
+            });
+        } catch (err) {
+            console.error("Failed to toggle tobacco status:", err);
+            loadRestaurants();
+        }
+    };
+
     const handleCopy = (text, key) => {
         if (!text) return;
         navigator.clipboard.writeText(text);
@@ -173,13 +188,31 @@ export default function SuperAdminRestaurantProfiles() {
                                                 </div>
                                             </div>
 
-                                            <button
-                                                onClick={() => toggleStatus(restaurant)}
-                                                className={`p-2.5 rounded-xl border transition-all ${restaurant.isActive ? "border-red-500/30 text-red-400 hover:bg-red-500/10" : "border-green-500/30 text-green-400 hover:bg-green-500/10"}`}
-                                                title={restaurant.isActive ? "Disable Restaurant" : "Activate Restaurant"}
-                                            >
-                                                <Power size={18} />
-                                            </button>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => toggleTobaccoStatus(restaurant)}
+                                                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border transition ${
+                                                            restaurant.tobaccoApproved !== false
+                                                                ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
+                                                                : "border-gray-600 bg-gray-800 text-gray-400"
+                                                        }`}
+                                                        title={restaurant.tobaccoApproved !== false ? "Tobacco Sales Approved by Super Admin" : "Tobacco Sales Disabled"}
+                                                    >
+                                                        <span>🚬</span>
+                                                        <span>{restaurant.tobaccoApproved !== false ? "Tobacco Approved" : "Tobacco Disabled"}</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => toggleStatus(restaurant)}
+                                                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border transition ${
+                                                            restaurant.isActive
+                                                                ? "border-green-500/30 bg-green-500/10 text-green-400"
+                                                                : "border-red-500/30 bg-red-500/10 text-red-400"
+                                                        }`}
+                                                    >
+                                                        <Power size={12} />
+                                                        {restaurant.isActive ? "Active" : "Inactive"}
+                                                    </button>
+                                                </div>
                                         </div>
 
                                         {/* Details Grid */}

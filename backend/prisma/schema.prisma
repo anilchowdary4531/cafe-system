@@ -66,6 +66,7 @@ model Restaurant {
 
   // STATUS
   isActive Boolean @default(true) @map("is_active")
+  tobaccoApproved Boolean @default(true) @map("tobacco_approved")
 
   // TIMESTAMPS
   createdAt DateTime @default(now()) @map("created_at")

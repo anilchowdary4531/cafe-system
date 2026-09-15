@@ -1,5 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
     BarChart3,
     ChefHat,
@@ -133,6 +133,7 @@ const getCurrentPosition = () =>
     });
 
 export default function RestaurantChooser() {
+    const navigate = useNavigate();
     const { customer } = useAuth();
     const { addToCart, removeFromCart, cart, total } = useCart();
     const { restaurantContext, setRestaurantContext } = useRestaurantContext();
@@ -160,16 +161,15 @@ export default function RestaurantChooser() {
     const handleViewTobaccoItems = () => {
         if (!isTobaccoAgeConfirmed()) {
             setShowAgeModal(true);
+        } else {
+            navigate("/tobacco");
         }
     };
 
     const handleAgeConfirm = () => {
         setTobaccoAgeConfirmed();
         setShowAgeModal(false);
-        if (pendingTobaccoItem) {
-            addItemToCart(pendingTobaccoItem);
-            setPendingTobaccoItem(null);
-        }
+        navigate("/tobacco");
     };
 
     const handleAgeCancel = () => {
@@ -244,11 +244,7 @@ export default function RestaurantChooser() {
         }
 
         if (isTobaccoSearch) {
-            const matches = items.filter(isTobaccoItem);
-            if (matches.length > 0) {
-                return matches;
-            }
-            return DEFAULT_TOBACCO_ITEMS;
+            return items.filter(isTobaccoItem);
         }
 
         return items;
@@ -508,40 +504,22 @@ export default function RestaurantChooser() {
                                     </div>
                                 ) : null}
 
-                                {isTobaccoSearch ? (
-                                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 pt-1">
-                                        {visibleItems.map((item) => {
-                                            const cartItem = cart.find((c) => c.id === item.id);
-                                            const qty = cartItem ? cartItem.quantity : 0;
-                                            return (
-                                                <BlinkitTobaccoCard
-                                                    key={item.id || item.name}
-                                                    item={item}
-                                                    quantity={qty}
-                                                    onAdd={addItemToCart}
-                                                    onRemove={(i) => removeFromCart && removeFromCart(i.id)}
-                                                />
-                                            );
-                                        })}
+                                <div className="space-y-2.5">
+                                    <div className="space-y-4">
+                                        {itemSections.map((section) => (
+                                            <ItemSectionRow
+                                                key={section.key}
+                                                section={section}
+                                                cart={cart}
+                                                selectedItem={selectedItem}
+                                                closeItemDetails={closeItemDetails}
+                                                setSelectedItem={setSelectedItem}
+                                                setPopupAnchor={setPopupAnchor}
+                                                addItemToCart={addItemToCart}
+                                            />
+                                        ))}
                                     </div>
-                                ) : (
-                                    <div className="space-y-2.5">
-                                        <div className="space-y-4">
-                                            {itemSections.map((section) => (
-                                                <ItemSectionRow
-                                                    key={section.key}
-                                                    section={section}
-                                                    cart={cart}
-                                                    selectedItem={selectedItem}
-                                                    closeItemDetails={closeItemDetails}
-                                                    setSelectedItem={setSelectedItem}
-                                                    setPopupAnchor={setPopupAnchor}
-                                                    addItemToCart={addItemToCart}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                                </div>
                             </>
                         )}
                         <PlatformCapabilitiesSection />

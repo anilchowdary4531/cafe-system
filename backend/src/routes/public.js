@@ -302,7 +302,14 @@ export default async function publicRoutes(app, deps) {
         ]);
 
         const items = rawItems
-          .filter((item) => item?.restaurant?.isActive !== false)
+          .filter((item) => {
+            if (!item?.restaurant || item.restaurant.isActive === false) return false;
+            const isTobacco = (s = "") => /cigarette|tobacco|marlboro|gold flake|classic/i.test(s);
+            if ((isTobacco(item.name) || isTobacco(item.category)) && item.restaurant.tobaccoApproved === false) {
+              return false;
+            }
+            return true;
+          })
           .map(mapItem);
 
         return {

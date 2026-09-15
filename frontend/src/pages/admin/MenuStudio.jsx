@@ -370,6 +370,11 @@ export default function MenuStudio() {
                             {formatMoney(getDiscountedPrice(form.originalPrice, form.discountPercent))}
                         </p>
                     </div>
+                    {/cigarette|tobacco|paan/i.test(form.category) && (
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs font-semibold text-amber-400 md:col-span-2">
+                            <span>🚬 <strong>Tobacco Item:</strong> This item will be listed on the Tiffzy Tobacco Store page once Super Admin approves tobacco sales for your restaurant.</span>
+                        </div>
+                    )}
                     <div className="flex flex-col gap-2 md:col-span-2">
                         <div className="flex flex-col gap-2 md:flex-row md:items-center">
                             <input

@@ -20,6 +20,23 @@ test("Tiffzy Supply Chain Application — Full End-to-End System Audit", async (
     let productId = null;
     let orderId = null;
 
+    let testRestaurantId = 1;
+
+    t.before(async () => {
+        const rest = await prisma.restaurant.findFirst();
+        if (rest) {
+            testRestaurantId = rest.id;
+        } else {
+            const newRest = await prisma.restaurant.create({
+                data: {
+                    name: "Audit Test Restaurant",
+                    slug: `audit-test-rest-${Date.now()}`,
+                },
+            });
+            testRestaurantId = newRest.id;
+        }
+    });
+
     t.after(async () => {
         if (orderId) {
             await prisma.supplyOrderItem.deleteMany({ where: { orderId } }).catch(() => {});
@@ -153,7 +170,7 @@ test("Tiffzy Supply Chain Application — Full End-to-End System Audit", async (
             payload: {
                 productId,
                 quantity: 10,
-                restaurantId: 1,
+                restaurantId: testRestaurantId,
             },
         });
 
@@ -169,7 +186,7 @@ test("Tiffzy Supply Chain Application — Full End-to-End System Audit", async (
             url: "/supply-orders",
             headers: { authorization: `Bearer ${supplierToken}` },
             payload: {
-                restaurantId: 1,
+                restaurantId: testRestaurantId,
                 deliveryAddress: "Restaurant Central Kitchen",
                 notes: "Fast delivery required",
             },

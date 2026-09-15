@@ -640,6 +640,31 @@ export default async function superAdminRoutes(app, deps) {
     }
   });
 
+  app.patch("/super-admin/restaurants/:restaurantId/tobacco-status", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
+
+      const tobaccoApproved = Boolean(req.body?.tobaccoApproved);
+      const restaurant = await prisma.restaurant.update({
+        where: { id: restaurantId },
+        data: { tobaccoApproved },
+      });
+
+      return {
+        message: `Tobacco sales ${tobaccoApproved ? "approved" : "disabled"} for ${restaurant.name}`,
+        restaurant: {
+          id: restaurant.id,
+          name: restaurant.name,
+          tobaccoApproved: restaurant.tobaccoApproved,
+        },
+      };
+    } catch (err) {
+      console.error("[SuperAdmin] update tobacco status error:", err);
+      return reply.code(500).send({ message: "Failed to update tobacco sales approval" });
+    }
+  });
+
   app.patch("/super-admin/restaurants/:restaurantId/status", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);

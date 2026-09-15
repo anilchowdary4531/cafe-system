@@ -22,6 +22,7 @@ import LegalDisclosure from "./pages/LegalDisclosure";
 import DeleteAccount from "./pages/DeleteAccount";
 import JekkaRameshProfile from "./pages/JekkaRameshProfile";
 import ThamineniAnilKumarProfile from "./pages/ThamineniAnilKumarProfile";
+import TobaccoPage from "./pages/TobaccoPage";
 
 import Cart from "./pages/Cart";
 import Login from "./pages/Login";
@@ -268,6 +269,8 @@ export default function App() {
                             </>
                         }
                     />
+
+                    <Route path="/tobacco" element={<TobaccoPage />} />
 
                     {/* ================================= */}
                     {/* STAFF REAL-TIME PAGES */}
