@@ -956,6 +956,12 @@ export default async function ownerRoutes(app, deps) {
       const restaurantId = Number(req.params.restaurantId);
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
 
+      try {
+        await prisma.$executeRawUnsafe(
+          `ALTER TABLE "Restaurant" ADD COLUMN IF NOT EXISTS "tobacco_approved" BOOLEAN DEFAULT false;`
+        );
+      } catch {}
+
       let restaurant = null;
       try {
         restaurant = await prisma.restaurant.findUnique({
@@ -973,24 +979,32 @@ export default async function ownerRoutes(app, deps) {
           },
         });
       } catch (err) {
-        console.warn("[OwnerSettings] Detailed select failed, trying basic select:", err.message);
+        console.warn("[OwnerSettings] Detailed select failed, trying fallback findUnique:", err.message);
         restaurant = await prisma.restaurant.findUnique({
           where: { id: restaurantId },
-          select: {
-            id: true, name: true, legalName: true, slug: true, ownerName: true, email: true, phone: true,
-            addressLine1: true, city: true, state: true, country: true, pincode: true,
-            latitude: true, longitude: true,
-            gstNumber: true, logoUrl: true,
-            bannerUrl: true, brandColor: true, faviconUrl: true,
-            timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
-            serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
-            isActive: true, tobaccoApproved: true, updatedAt: true,
-          },
         });
       }
 
       if (!restaurant) return reply.code(404).send({ message: "Restaurant not found" });
-      return { restaurant: { ...restaurant, logo: restaurant.logoUrl || "", logoUrl: undefined } };
+
+      let tobaccoApproved = Boolean(restaurant.tobaccoApproved);
+      try {
+        const rawRes = await prisma.$queryRawUnsafe(`SELECT tobacco_approved FROM "Restaurant" WHERE id = ${Number(restaurantId)}`);
+        if (Array.isArray(rawRes) && rawRes[0] && rawRes[0].tobacco_approved !== null && rawRes[0].tobacco_approved !== undefined) {
+          tobaccoApproved = Boolean(rawRes[0].tobacco_approved);
+        }
+      } catch (rawErr) {
+        console.warn("[OwnerSettings] Raw query for tobacco_approved fallback failed:", rawErr.message);
+      }
+
+      return {
+        restaurant: {
+          ...restaurant,
+          tobaccoApproved,
+          logo: restaurant.logoUrl || "",
+          logoUrl: undefined,
+        },
+      };
     } catch (err) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to fetch restaurant settings" });

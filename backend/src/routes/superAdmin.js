@@ -117,7 +117,26 @@ export default async function superAdminRoutes(app, deps) {
         orderBy: { createdAt: "desc" },
       });
 
-      const items = restaurants.map(serializeRestaurant);
+      let rawTobaccoMap = {};
+      try {
+        const rawList = await prisma.$queryRawUnsafe(`SELECT id, tobacco_approved FROM "Restaurant";`);
+        if (Array.isArray(rawList)) {
+          rawList.forEach((r) => {
+            if (r.id !== undefined && r.tobacco_approved !== undefined && r.tobacco_approved !== null) {
+              rawTobaccoMap[r.id] = Boolean(r.tobacco_approved);
+            }
+          });
+        }
+      } catch {}
+
+      const items = restaurants.map((r) => {
+        const serialized = serializeRestaurant(r);
+        if (rawTobaccoMap[r.id] !== undefined) {
+          serialized.tobaccoApproved = rawTobaccoMap[r.id];
+        }
+        return serialized;
+      });
+
       return {
         restaurants: items,
         summary: {

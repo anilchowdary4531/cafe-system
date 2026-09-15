@@ -143,7 +143,7 @@ export const invalidateGetCache = ({ urlStartsWith } = {}) => {
     for (let i = 0; i < localStorage.length; i++) {
         const fullKey = localStorage.key(i);
         if (!fullKey || !fullKey.startsWith(prefix)) continue;
-        if (fullKey.includes(`:${API}:${urlStartsWith}`)) {
+        if (fullKey.includes(`${API}${urlStartsWith}`) || fullKey.includes(urlStartsWith)) {
             toDelete.push(fullKey);
         }
     }
