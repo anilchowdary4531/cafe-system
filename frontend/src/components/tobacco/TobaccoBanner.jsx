@@ -4,7 +4,7 @@ import { ChevronRight, ShieldAlert } from "lucide-react";
 export default function TobaccoBanner({ onViewItems, className = "" }) {
     return (
         <div
-            className={`relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#fcd34d] via-[#f59e0b] to-[#d97706] p-5 sm:p-6 text-zinc-950 shadow-lg border border-amber-300/40 ${className}`}
+            className={`relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#fcd34d] via-[#f59e0b] to-[#d97706] p-4 sm:p-5 text-zinc-950 shadow-lg border border-amber-300/40 w-full sm:w-1/2 sm:max-w-lg ${className}`}
         >
             <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="max-w-md space-y-3">
