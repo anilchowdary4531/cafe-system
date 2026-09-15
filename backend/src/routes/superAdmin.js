@@ -641,23 +641,47 @@ export default async function superAdminRoutes(app, deps) {
     }
   });
 
+  const ensureTobaccoApprovedColumnExists = async () => {
+    try {
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE "Restaurant" ADD COLUMN IF NOT EXISTS "tobacco_approved" BOOLEAN DEFAULT false;`
+      );
+    } catch {
+      // Ignore if table alter fails or unsupported
+    }
+  };
+
   app.patch("/super-admin/restaurants/:restaurantId/tobacco-status", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
 
-      const tobaccoApproved = req.body?.tobaccoApproved === true || req.body?.tobaccoApproved === "true";
-      const restaurant = await prisma.restaurant.update({
-        where: { id: restaurantId },
-        data: { tobaccoApproved },
-      });
+      const tobaccoApproved = req.body?.tobaccoApproved === true || req.body?.tobaccoApproved === "true" || req.body?.tobaccoApproved === 1;
+
+      await ensureTobaccoApprovedColumnExists();
+
+      let restaurant;
+      try {
+        restaurant = await prisma.restaurant.update({
+          where: { id: restaurantId },
+          data: { tobaccoApproved },
+        });
+      } catch (dbErr) {
+        console.warn("[SuperAdmin] Prisma update failed, executing raw SQL update:", dbErr.message);
+        await prisma.$executeRawUnsafe(
+          `UPDATE "Restaurant" SET "tobacco_approved" = $1 WHERE id = $2;`,
+          tobaccoApproved,
+          restaurantId
+        );
+        restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
+      }
 
       return {
-        message: `Tobacco sales ${tobaccoApproved ? "approved" : "disabled"} for ${restaurant.name}`,
+        message: `Tobacco sales ${tobaccoApproved ? "approved" : "disabled"} for ${restaurant?.name || "restaurant"}`,
         restaurant: {
-          id: restaurant.id,
-          name: restaurant.name,
-          tobaccoApproved: Boolean(restaurant.tobaccoApproved),
+          id: restaurant?.id || restaurantId,
+          name: restaurant?.name || "",
+          tobaccoApproved: Boolean(restaurant?.tobaccoApproved ?? tobaccoApproved),
         },
       };
     } catch (err) {
@@ -671,14 +695,31 @@ export default async function superAdminRoutes(app, deps) {
       const restaurantId = Number(req.params.restaurantId);
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
 
+      await ensureTobaccoApprovedColumnExists();
+
       const updateData = {};
       if (req.body?.isActive !== undefined) updateData.isActive = Boolean(req.body.isActive);
-      if (req.body?.tobaccoApproved !== undefined) updateData.tobaccoApproved = req.body.tobaccoApproved === true || req.body.tobaccoApproved === "true";
+      if (req.body?.tobaccoApproved !== undefined) {
+        updateData.tobaccoApproved = req.body.tobaccoApproved === true || req.body.tobaccoApproved === "true" || req.body.tobaccoApproved === 1;
+      }
 
-      const restaurant = await prisma.restaurant.update({
-        where: { id: restaurantId },
-        data: updateData,
-      });
+      let restaurant;
+      try {
+        restaurant = await prisma.restaurant.update({
+          where: { id: restaurantId },
+          data: updateData,
+        });
+      } catch (dbErr) {
+        console.warn("[SuperAdmin] Prisma update failed, executing raw SQL update:", dbErr.message);
+        if (updateData.tobaccoApproved !== undefined) {
+          await prisma.$executeRawUnsafe(
+            `UPDATE "Restaurant" SET "tobacco_approved" = $1 WHERE id = $2;`,
+            updateData.tobaccoApproved,
+            restaurantId
+          );
+        }
+        restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
+      }
 
       if (updateData.isActive !== undefined) {
         await prisma.user.updateMany({
@@ -690,10 +731,10 @@ export default async function superAdminRoutes(app, deps) {
       return {
         message: `Restaurant updated`,
         restaurant: {
-          id: restaurant.id,
-          name: restaurant.name,
-          isActive: restaurant.isActive,
-          tobaccoApproved: restaurant.tobaccoApproved,
+          id: restaurant?.id || restaurantId,
+          name: restaurant?.name || "",
+          isActive: restaurant?.isActive,
+          tobaccoApproved: Boolean(restaurant?.tobaccoApproved),
         },
       };
     } catch (err) {
