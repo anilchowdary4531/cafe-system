@@ -73,17 +73,28 @@ export default function SuperAdminRestaurantProfiles() {
 
     const toggleTobaccoStatus = async (restaurant) => {
         try {
-            const nextStatus = restaurant.tobaccoApproved === true ? false : true;
+            const currentStatus = Boolean(restaurant.tobaccoApproved);
+            const nextStatus = !currentStatus;
+
             setRestaurants((prev) =>
                 prev.map((r) => (r.id === restaurant.id ? { ...r, tobaccoApproved: nextStatus } : r))
             );
-            const res = await api.patch(`/super-admin/restaurants/${restaurant.id}/tobacco-status`, {
-                tobaccoApproved: nextStatus,
-            });
+
+            let res;
+            try {
+                res = await api.patch(`/super-admin/restaurants/${restaurant.id}/tobacco-status`, {
+                    tobaccoApproved: nextStatus,
+                });
+            } catch {
+                res = await api.patch(`/super-admin/restaurants/${restaurant.id}`, {
+                    tobaccoApproved: nextStatus,
+                });
+            }
+
             const updated = res?.data?.restaurant || res?.restaurant;
-            if (updated && typeof updated.tobaccoApproved === "boolean") {
+            if (updated && updated.tobaccoApproved !== undefined) {
                 setRestaurants((prev) =>
-                    prev.map((r) => (r.id === restaurant.id ? { ...r, tobaccoApproved: updated.tobaccoApproved } : r))
+                    prev.map((r) => (r.id === restaurant.id ? { ...r, tobaccoApproved: Boolean(updated.tobaccoApproved) } : r))
                 );
             }
         } catch (err) {
@@ -169,7 +180,7 @@ export default function SuperAdminRestaurantProfiles() {
                             const ownerEmail = restaurant.owner?.email || restaurant.email || "Not set";
                             const ownerPhone = restaurant.owner?.phone || restaurant.phone || "Not set";
                             const upi = restaurant.upiId || `${restaurant.slug}@upi`;
-                            const isTobaccoApproved = restaurant.tobaccoApproved === true;
+                            const isTobaccoApproved = Boolean(restaurant.tobaccoApproved);
 
                             return (
                                 <div key={restaurant.id} className="theme-panel rounded-3xl border theme-border p-6 shadow-xl relative flex flex-col justify-between">
