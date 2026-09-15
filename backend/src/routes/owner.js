@@ -958,8 +958,8 @@ export default async function ownerRoutes(app, deps) {
 
       try {
         await prisma.$executeRawUnsafe(
-          `ALTER TABLE "Restaurant" ADD COLUMN IF NOT EXISTS "tobacco_approved" BOOLEAN DEFAULT false;`
-        );
+          `ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "tobacco_approved" BOOLEAN DEFAULT false;`
+        ).catch(() => prisma.$executeRawUnsafe(`ALTER TABLE "Restaurant" ADD COLUMN IF NOT EXISTS "tobacco_approved" BOOLEAN DEFAULT false;`));
       } catch {}
 
       let restaurant = null;
@@ -989,7 +989,8 @@ export default async function ownerRoutes(app, deps) {
 
       let tobaccoApproved = Boolean(restaurant.tobaccoApproved);
       try {
-        const rawRes = await prisma.$queryRawUnsafe(`SELECT tobacco_approved FROM "Restaurant" WHERE id = ${Number(restaurantId)}`);
+        const rawRes = await prisma.$queryRawUnsafe(`SELECT tobacco_approved FROM "restaurants" WHERE id = ${Number(restaurantId)}`)
+          .catch(() => prisma.$queryRawUnsafe(`SELECT tobacco_approved FROM "Restaurant" WHERE id = ${Number(restaurantId)}`));
         if (Array.isArray(rawRes) && rawRes[0] && rawRes[0].tobacco_approved !== null && rawRes[0].tobacco_approved !== undefined) {
           tobaccoApproved = Boolean(rawRes[0].tobacco_approved);
         }

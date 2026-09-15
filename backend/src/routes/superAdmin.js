@@ -119,7 +119,8 @@ export default async function superAdminRoutes(app, deps) {
 
       let rawTobaccoMap = {};
       try {
-        const rawList = await prisma.$queryRawUnsafe(`SELECT id, tobacco_approved FROM "Restaurant";`);
+        const rawList = await prisma.$queryRawUnsafe(`SELECT id, tobacco_approved FROM "restaurants";`)
+          .catch(() => prisma.$queryRawUnsafe(`SELECT id, tobacco_approved FROM "Restaurant";`));
         if (Array.isArray(rawList)) {
           rawList.forEach((r) => {
             if (r.id !== undefined && r.tobacco_approved !== undefined && r.tobacco_approved !== null) {
@@ -663,8 +664,8 @@ export default async function superAdminRoutes(app, deps) {
   const ensureTobaccoApprovedColumnExists = async () => {
     try {
       await prisma.$executeRawUnsafe(
-        `ALTER TABLE "Restaurant" ADD COLUMN IF NOT EXISTS "tobacco_approved" BOOLEAN DEFAULT false;`
-      );
+        `ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "tobacco_approved" BOOLEAN DEFAULT false;`
+      ).catch(() => prisma.$executeRawUnsafe(`ALTER TABLE "Restaurant" ADD COLUMN IF NOT EXISTS "tobacco_approved" BOOLEAN DEFAULT false;`));
     } catch {
       // Ignore if table alter fails or unsupported
     }
@@ -688,8 +689,10 @@ export default async function superAdminRoutes(app, deps) {
       } catch (dbErr) {
         console.warn("[SuperAdmin] Prisma update failed, executing raw SQL update:", dbErr.message);
         await prisma.$executeRawUnsafe(
+          `UPDATE "restaurants" SET "tobacco_approved" = ${tobaccoApproved ? "true" : "false"} WHERE id = ${restaurantId};`
+        ).catch(() => prisma.$executeRawUnsafe(
           `UPDATE "Restaurant" SET "tobacco_approved" = ${tobaccoApproved ? "true" : "false"} WHERE id = ${restaurantId};`
-        );
+        ));
         restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
       }
 
@@ -730,8 +733,10 @@ export default async function superAdminRoutes(app, deps) {
         console.warn("[SuperAdmin] Prisma update failed, executing raw SQL update:", dbErr.message);
         if (updateData.tobaccoApproved !== undefined) {
           await prisma.$executeRawUnsafe(
+            `UPDATE "restaurants" SET "tobacco_approved" = ${updateData.tobaccoApproved ? "true" : "false"} WHERE id = ${restaurantId};`
+          ).catch(() => prisma.$executeRawUnsafe(
             `UPDATE "Restaurant" SET "tobacco_approved" = ${updateData.tobaccoApproved ? "true" : "false"} WHERE id = ${restaurantId};`
-          );
+          ));
         }
         restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
       }
