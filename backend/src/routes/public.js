@@ -398,6 +398,96 @@ export default async function publicRoutes(app, deps) {
     }
   });
 
+  const handleTobaccoItems = async (req, reply) => {
+    try {
+      const search = normalizeQuery(req.query?.q || req.query?.query || req.query?.search);
+      const isTobaccoTerm = (s = "") => /cigarette|tobacco|marlboro|gold flake|classic|cigar|pan|hookah/i.test(s);
+
+      const itemWhere = {
+        isAvailable: true,
+        restaurant: {
+          isActive: true,
+          tobaccoApproved: true,
+        },
+      };
+
+      if (search) {
+        itemWhere.OR = [
+          { name: { contains: search, mode: "insensitive" } },
+          { description: { contains: search, mode: "insensitive" } },
+          { category: { contains: search, mode: "insensitive" } },
+        ];
+      }
+
+      const rawItems = await prisma.menuItem.findMany({
+        where: itemWhere,
+        include: {
+          restaurant: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              city: true,
+              state: true,
+              logoUrl: true,
+              isActive: true,
+              tobaccoApproved: true,
+            },
+          },
+        },
+        orderBy: [{ isFeatured: "desc" }, { id: "desc" }],
+        take: 100,
+      });
+
+      const items = rawItems
+        .filter((item) => {
+          if (!item?.restaurant || item.restaurant.isActive === false || item.restaurant.tobaccoApproved === false) {
+            return false;
+          }
+          if (!search) {
+            return isTobaccoTerm(item.name) || isTobaccoTerm(item.category) || isTobaccoTerm(item.description);
+          }
+          return true;
+        })
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          category: item.category,
+          image: item.image,
+          price: item.price,
+          rating: item.rating,
+          reviewCount: item.reviewCount,
+          orderCount: item.orderCount,
+          isFeatured: item.isFeatured,
+          restaurant: {
+            id: item.restaurant?.id || null,
+            name: item.restaurant?.name || "",
+            slug: item.restaurant?.slug || "",
+            city: item.restaurant?.city || "",
+            state: item.restaurant?.state || "",
+            logo: item.restaurant?.logoUrl || "",
+          },
+        }));
+
+      return {
+        items,
+        total: items.length,
+      };
+    } catch (err) {
+      req.log.error({ err: err?.message || err }, "tobacco_items_fetch_failed");
+      return reply.code(500).send({
+        message: "Failed to fetch tobacco items",
+        items: [],
+        total: 0,
+      });
+    }
+  };
+
+  app.get("/tobacco/items", handleTobaccoItems);
+  app.get("/api/tobacco/items", handleTobaccoItems);
+  app.get("/api/v1/tobacco/items", handleTobaccoItems);
+
   app.post("/login", async (req, reply) => {
     try {
       const body = req.body || {};

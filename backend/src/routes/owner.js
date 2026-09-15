@@ -969,7 +969,7 @@ export default async function ownerRoutes(app, deps) {
             bannerUrl: true, brandColor: true, faviconUrl: true,
             timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
             serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
-            isActive: true, updatedAt: true,
+            isActive: true, tobaccoApproved: true, updatedAt: true,
           },
         });
       } catch (err) {
@@ -984,7 +984,7 @@ export default async function ownerRoutes(app, deps) {
             bannerUrl: true, brandColor: true, faviconUrl: true,
             timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
             serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
-            isActive: true, updatedAt: true,
+            isActive: true, tobaccoApproved: true, updatedAt: true,
           },
         });
       }

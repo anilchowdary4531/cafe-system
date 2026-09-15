@@ -35,6 +35,7 @@ const getDiscountedPrice = (originalPrice, discountPercent) => {
 
 export default function MenuStudio() {
     const [items, setItems] = useState([]);
+    const [restaurantInfo, setRestaurantInfo] = useState(null);
     const [search, setSearch] = useState("");
     const [form, setForm] = useState(emptyForm);
     const [formOpen, setFormOpen] = useState(false);
@@ -92,8 +93,14 @@ export default function MenuStudio() {
         try {
             setLoading(true);
             setError("");
-            const res = await axios.get(`${API}/owner/${restaurantId}/menu`);
-            setItems(res.data || []);
+            const [menuRes, settingsRes] = await Promise.all([
+                axios.get(`${API}/owner/${restaurantId}/menu`),
+                axios.get(`${API}/owner/${restaurantId}/settings`).catch(() => null),
+            ]);
+            setItems(menuRes.data || []);
+            if (settingsRes?.data) {
+                setRestaurantInfo(settingsRes.data);
+            }
         } catch (err) {
             console.log(err);
             setError(getErrorMessage(err, "Unable to load menu. Please try again."));
@@ -298,18 +305,56 @@ export default function MenuStudio() {
 
     return (
         <section className="text-[color:var(--app-text)]">
-            <h3 className="text-3xl font-bold">Menu Studio</h3>
-            <p className="mt-1 text-sm text-[color:var(--app-muted)]">
-                Create, edit, and control item availability for your restaurant menu.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 className="text-3xl font-bold">Menu Studio</h3>
+                    <p className="mt-1 text-sm text-[color:var(--app-muted)]">
+                        Create, edit, and control item availability for your restaurant menu.
+                    </p>
+                </div>
+                {restaurantInfo && (
+                    <div className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold border ${
+                        restaurantInfo.tobaccoApproved !== false
+                            ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
+                            : "border-gray-600/40 bg-gray-800/60 text-gray-400"
+                    }`}>
+                        <span>🚬</span>
+                        <span>
+                            {restaurantInfo.tobaccoApproved !== false
+                                ? "Tobacco Products Sales: APPROVED by Super Admin"
+                                : "Tobacco Products Sales: DISABLED by Super Admin"}
+                        </span>
+                    </div>
+                )}
+            </div>
 
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-4 flex flex-wrap items-center gap-3">
                 <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search by item name or category..."
-                    className="theme-input w-full rounded-xl px-4 py-3 outline-none"
+                    className="theme-input flex-1 min-w-[200px] rounded-xl px-4 py-3 outline-none"
                 />
+                {restaurantInfo?.tobaccoApproved !== false && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setFormOpen(true);
+                            setForm({
+                                name: "",
+                                description: "",
+                                category: "Cigarettes",
+                                image: "",
+                                originalPrice: "",
+                                discountPercent: "",
+                                isAvailable: true,
+                            });
+                        }}
+                        className="theme-soft-button shrink-0 rounded-xl px-4 py-3 text-xs font-bold border border-amber-500/30 text-amber-300 flex items-center gap-1.5"
+                    >
+                        <span>🚬</span> + Add Tobacco Item
+                    </button>
+                )}
                 <button
                     type="button"
                     onClick={() => {
