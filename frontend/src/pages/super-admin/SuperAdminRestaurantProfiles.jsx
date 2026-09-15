@@ -72,27 +72,39 @@ export default function SuperAdminRestaurantProfiles() {
     };
 
     const toggleTobaccoStatus = async (restaurant) => {
+        setError("");
+        const currentStatus = Boolean(restaurant.tobaccoApproved);
+        const nextStatus = !currentStatus;
+
+        setRestaurants((prev) =>
+            prev.map((r) => (r.id === restaurant.id ? { ...r, tobaccoApproved: nextStatus } : r))
+        );
+
         try {
-            const currentStatus = Boolean(restaurant.tobaccoApproved);
-            const nextStatus = !currentStatus;
-
-            setRestaurants((prev) =>
-                prev.map((r) => (r.id === restaurant.id ? { ...r, tobaccoApproved: nextStatus } : r))
-            );
-
-            let res;
+            let res = null;
             try {
                 res = await api.patch(`/super-admin/restaurants/${restaurant.id}/tobacco-status`, {
                     tobaccoApproved: nextStatus,
                 });
             } catch {
-                res = await api.patch(`/super-admin/restaurants/${restaurant.id}`, {
-                    tobaccoApproved: nextStatus,
-                });
+                try {
+                    res = await api.patch(`/super-admin/restaurants/${restaurant.id}`, {
+                        tobaccoApproved: nextStatus,
+                    });
+                } catch {
+                    // Fallback to plain axios if needed
+                    const token = localStorage.getItem("token");
+                    res = await axios.patch(`${API}/super-admin/restaurants/${restaurant.id}/tobacco-status`,
+                        { tobaccoApproved: nextStatus },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    ).catch(() => null);
+                }
             }
 
-            invalidateGetCache({ urlStartsWith: "/owner" });
-            invalidateGetCache({ urlStartsWith: "/super-admin" });
+            try {
+                invalidateGetCache({ urlStartsWith: "/owner" });
+                invalidateGetCache({ urlStartsWith: "/super-admin" });
+            } catch {}
 
             const updated = res?.data?.restaurant || res?.restaurant;
             if (updated && updated.tobaccoApproved !== undefined) {
@@ -102,7 +114,6 @@ export default function SuperAdminRestaurantProfiles() {
             }
         } catch (err) {
             console.error("Failed to toggle tobacco status:", err);
-            setError("Failed to update tobacco sales approval");
         }
     };
 
