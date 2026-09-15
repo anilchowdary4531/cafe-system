@@ -122,9 +122,6 @@ export default function TobaccoPage() {
 
             {/* Main Content */}
             <main className="mx-auto max-w-7xl px-3 py-6 sm:px-6 md:px-8 flex-1 w-full space-y-6">
-                {/* Tobacco Banner */}
-                <TobaccoBanner onViewItems={handleViewItems} />
-
                 {/* Quick Tag Pills */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {TOBACCO_QUICK_TAGS.map((tag) => (
