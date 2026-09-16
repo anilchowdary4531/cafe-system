@@ -97,7 +97,7 @@ export const createCoupon = async (req, res) => {
  * Get Restaurant Coupons Endpoint
  * GET /api/coupons
  */
-export const getCoupons = async (req, res) => {
+export const getCoupons = async (req, reply) => {
   try {
     const defaultCoupons = [
       { id: 1, code: 'TIFFZY50', type: 'FLAT', discountValue: 50, minOrderAmount: 249, maxDiscount: 50, isActive: true },
@@ -105,8 +105,8 @@ export const getCoupons = async (req, res) => {
       { id: 3, code: 'FREEDEL', type: 'FREE_DELIVERY', discountValue: 40, minOrderAmount: 149, maxDiscount: 40, isActive: true }
     ];
 
-    return res.json({ coupons: defaultCoupons });
+    return reply.send({ coupons: defaultCoupons });
   } catch (error) {
-    return res.status(500).json({ success: false, message: 'Server error fetching coupons' });
+    return reply.code(500).send({ success: false, message: 'Server error fetching coupons' });
   }
 };
