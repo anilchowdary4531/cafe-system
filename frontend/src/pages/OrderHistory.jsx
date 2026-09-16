@@ -207,13 +207,11 @@ export default function OrderHistory({ embedded = false } = {}) {
         return { totalOrders, totalSpend, averageOrderValue, activeOrders };
     }, [filteredOrders]);
 
+    const [trendDays, setTrendDays] = useState(30);
+
     const spendTrendData = useMemo(() => {
-        const days = 14;
-        const datedOrders = filteredOrders
-            .map((order) => new Date(order?.createdAt))
-            .filter((date) => !Number.isNaN(date.getTime()))
-            .sort((a, b) => a.getTime() - b.getTime());
-        const anchorDate = datedOrders.length ? datedOrders[datedOrders.length - 1] : new Date();
+        const days = Number(trendDays || 30);
+        const anchorDate = new Date();
         const start = new Date(anchorDate.getFullYear(), anchorDate.getMonth(), anchorDate.getDate() - (days - 1));
         const buckets = new Map();
 
@@ -232,6 +230,60 @@ export default function OrderHistory({ embedded = false } = {}) {
         });
 
         return [...buckets.values()];
+    }, [filteredOrders, trendDays]);
+
+    const customerFavoriteDishes = useMemo(() => {
+        const map = new Map();
+        filteredOrders.forEach((o) => {
+            (o?.items || []).forEach((item) => {
+                const name = String(item?.itemName || "Item").trim();
+                const menuItemId = item?.menuItemId;
+                const price = Number(item?.price || 0);
+                const qty = Math.max(1, Number(item?.qty || 1));
+                const total = Number(item?.total || price * qty);
+                const prev = map.get(name) || { name, menuItemId, price, qty: 0, total: 0, orderCount: 0 };
+                prev.qty += qty;
+                prev.total += total;
+                prev.orderCount += 1;
+                map.set(name, prev);
+            });
+        });
+        return [...map.values()].sort((a, b) => b.qty - a.qty).slice(0, 4);
+    }, [filteredOrders]);
+
+    const diningHabits = useMemo(() => {
+        let dineIn = 0;
+        let takeaway = 0;
+        let delivery = 0;
+        let lunch = 0;
+        let dinner = 0;
+        let breakfast = 0;
+
+        filteredOrders.forEach((o) => {
+            const flow = getOrderFlowLabel(o);
+            if (flow.includes("Table") || flow === "Dine In") dineIn += 1;
+            else if (flow === "Delivery") delivery += 1;
+            else takeaway += 1;
+
+            const h = new Date(o?.createdAt).getHours();
+            if (h < 11) breakfast += 1;
+            else if (h < 16) lunch += 1;
+            else dinner += 1;
+        });
+
+        const total = Math.max(1, filteredOrders.length);
+        return {
+            dineInPct: Math.round((dineIn / total) * 100),
+            takeawayPct: Math.round((takeaway / total) * 100),
+            deliveryPct: Math.round((delivery / total) * 100),
+            dineInCount: dineIn,
+            takeawayCount: takeaway,
+            deliveryCount: delivery,
+            lunchCount: lunch,
+            dinnerCount: dinner,
+            breakfastCount: breakfast,
+            topSlot: dinner >= lunch ? "Evening & Dinner" : "Lunch Rush",
+        };
     }, [filteredOrders]);
 
     const restaurantBreakdown = useMemo(() => {
@@ -516,101 +568,251 @@ export default function OrderHistory({ embedded = false } = {}) {
                                 </div>
                             )}
 
-                            <div className={embedded ? "mt-5" : "mt-6 grid gap-4 lg:grid-cols-2"}>
-                                    <div className="theme-card rounded-2xl p-5">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                            {/* 30-Day Spend Trend & Dining Habits */}
+                            <div className={embedded ? "mt-5 space-y-4" : "mt-6 grid gap-4 lg:grid-cols-2"}>
+                                {/* Spend Trend AreaChart */}
+                                <div className="theme-card rounded-2xl p-5">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
                                         <div>
-                                            <p className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">Order insights</p>
-                                            <p className="mt-2 text-lg font-semibold">Orders vs spend</p>
+                                            <p className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">Dining Trend</p>
+                                            <p className="mt-1 text-lg font-bold">Spending & Visit Trajectory</p>
                                         </div>
-                                        <div className="flex items-center gap-2 text-xs">
-                                            <span className="theme-soft-button rounded-xl px-3 py-1.5 font-semibold">{derivedStats.totalOrders} orders</span>
-                                            <span className="theme-soft-button rounded-xl px-3 py-1.5 font-semibold">{formatMoney(derivedStats.totalSpend)}</span>
+                                        <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/20 p-1 text-xs">
+                                            {[7, 14, 30].map((d) => (
+                                                <button
+                                                    key={d}
+                                                    type="button"
+                                                    onClick={() => setTrendDays(d)}
+                                                    className={`rounded-lg px-2.5 py-1 font-bold transition-all ${
+                                                        trendDays === d
+                                                            ? "bg-[var(--app-primary)] text-[var(--app-primary-text)] shadow-sm"
+                                                            : "text-[var(--app-muted)] hover:text-white"
+                                                    }`}
+                                                >
+                                                    {d}D
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
 
                                     {spendTrendData.length === 0 ? (
-                                        <div className="theme-empty mt-4 rounded-2xl p-6">No data yet.</div>
+                                        <div className="theme-empty mt-4 rounded-2xl p-6">No data in this window.</div>
                                     ) : (
-                                        <div className="mt-4 overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,rgba(255,250,238,0.06),rgba(255,248,232,0.035)),repeating-linear-gradient(0deg,rgba(255,255,255,0.03)_0px,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_44px),repeating-linear-gradient(90deg,rgba(255,255,255,0.02)_0px,rgba(255,255,255,0.02)_1px,transparent_1px,transparent_64px)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                                            <div className="mb-4 flex flex-wrap items-center gap-2">
+                                        <div className="mt-4 overflow-hidden rounded-[24px] bg-[linear-gradient(180deg,rgba(255,250,238,0.06),rgba(255,248,232,0.035))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                                            <div className="mb-3 flex flex-wrap items-center gap-2">
                                                 <span className="rounded-full border border-[#dfc07b]/30 bg-[#dfc07b]/10 px-3 py-1 text-[11px] font-semibold text-[#f3d78d]">
-                                                    Avg {formatMoney(derivedStats.averageOrderValue)}
+                                                    Avg Ticket: {formatMoney(derivedStats.averageOrderValue)}
                                                 </span>
                                                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/80">
-                                                    Peak {formatMoney(Math.max(...spendTrendData.map((item) => Number(item.spend || 0)), 0))}
+                                                    Peak Day: {formatMoney(Math.max(...spendTrendData.map((item) => Number(item.spend || 0)), 0))}
+                                                </span>
+                                                <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-[11px] font-semibold text-sky-300">
+                                                    {spendTrendData.reduce((sum, item) => sum + Number(item.orders || 0), 0)} visits in {trendDays}d
                                                 </span>
                                             </div>
-                                        <div className="h-56">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <AreaChart data={spendTrendData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-                                                    <defs>
-                                                        <linearGradient id="historySpendGradient" x1="0" y1="0" x2="0" y2="1">
-                                                            <stop offset="0%" stopColor="#dfc07b" stopOpacity={0.42} />
-                                                            <stop offset="50%" stopColor="#dfc07b" stopOpacity={0.16} />
-                                                            <stop offset="100%" stopColor="#dfc07b" stopOpacity={0.02} />
-                                                        </linearGradient>
-                                                    </defs>
-                                                    <CartesianGrid stroke="rgba(255,248,232,0.08)" vertical={false} strokeDasharray="2 8" />
-                                                    <XAxis dataKey="day" tick={{ fill: "var(--app-muted)", fontSize: 12 }} axisLine={false} tickLine={false} />
-                                                    <YAxis
-                                                        yAxisId="left"
-                                                        tick={{ fill: "var(--app-muted)", fontSize: 12 }}
-                                                        axisLine={false}
-                                                        tickLine={false}
-                                                        width={40}
-                                                        tickFormatter={(v) => String(Math.round(Number(v || 0)))}
-                                                    />
-                                                    <YAxis
-                                                        yAxisId="right"
-                                                        orientation="right"
-                                                        tick={{ fill: "var(--app-muted)", fontSize: 12 }}
-                                                        axisLine={false}
-                                                        tickLine={false}
-                                                        width={40}
-                                                        tickFormatter={(v) => String(Math.round(Number(v || 0)))}
-                                                    />
-                                                    <Tooltip
-                                                        contentStyle={{
-                                                            background: "var(--app-surface)",
-                                                            border: "1px solid var(--app-border)",
-                                                            borderRadius: 16,
-                                                            boxShadow: "var(--app-shadow)",
-                                                        }}
-                                                        labelStyle={{ color: "var(--app-text)", fontWeight: 700 }}
-                                                        formatter={(value, name) => {
-                                                            if (name === "Orders") return [String(value), "Orders"];
-                                                            return [formatMoney(value), "Spend"];
-                                                        }}
-                                                    />
-                                                    <Area
-                                                        yAxisId="right"
-                                                        type="monotone"
-                                                        dataKey="spend"
-                                                        stroke="#dfc07b"
-                                                        strokeWidth={3}
-                                                        fill="url(#historySpendGradient)"
-                                                        fillOpacity={1}
-                                                        name="Spend"
-                                                        activeDot={{ r: 6, fill: "#dfc07b", stroke: "#1b1b20", strokeWidth: 2 }}
-                                                    />
-                                                    <Line
-                                                        yAxisId="left"
-                                                        type="monotone"
-                                                        dataKey="orders"
-                                                        name="Orders"
-                                                        stroke="rgba(255,255,255,0.88)"
-                                                        strokeWidth={2}
-                                                        dot={{ r: 3, fill: "#ffffff", stroke: "#1b1b20", strokeWidth: 1.5 }}
-                                                        activeDot={{ r: 5, fill: "#ffffff", stroke: "#1b1b20", strokeWidth: 2 }}
-                                                    />
-                                                </AreaChart>
-                                            </ResponsiveContainer>
-                                        </div>
+                                            <div className="h-56">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <AreaChart data={spendTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                                        <defs>
+                                                            <linearGradient id="historySpendGradient" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="0%" stopColor="#dfc07b" stopOpacity={0.42} />
+                                                                <stop offset="50%" stopColor="#dfc07b" stopOpacity={0.16} />
+                                                                <stop offset="100%" stopColor="#dfc07b" stopOpacity={0.02} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid stroke="rgba(255,248,232,0.08)" vertical={false} strokeDasharray="2 8" />
+                                                        <XAxis
+                                                            dataKey="day"
+                                                            tick={{ fill: "var(--app-muted)", fontSize: 11 }}
+                                                            axisLine={false}
+                                                            tickLine={false}
+                                                            interval={trendDays === 30 ? 4 : trendDays === 14 ? 2 : 0}
+                                                        />
+                                                        <YAxis
+                                                            yAxisId="left"
+                                                            tick={{ fill: "var(--app-muted)", fontSize: 11 }}
+                                                            axisLine={false}
+                                                            tickLine={false}
+                                                            width={38}
+                                                            tickFormatter={(v) => String(Math.round(Number(v || 0)))}
+                                                        />
+                                                        <YAxis
+                                                            yAxisId="right"
+                                                            orientation="right"
+                                                            tick={{ fill: "var(--app-muted)", fontSize: 11 }}
+                                                            axisLine={false}
+                                                            tickLine={false}
+                                                            width={38}
+                                                            tickFormatter={(v) => String(Math.round(Number(v || 0)))}
+                                                        />
+                                                        <Tooltip
+                                                            contentStyle={{
+                                                                background: "var(--app-surface)",
+                                                                border: "1px solid var(--app-border)",
+                                                                borderRadius: 16,
+                                                                boxShadow: "var(--app-shadow)",
+                                                            }}
+                                                            labelStyle={{ color: "var(--app-text)", fontWeight: 700 }}
+                                                            formatter={(value, name) => {
+                                                                if (name === "Orders") return [String(value), "Orders"];
+                                                                return [formatMoney(value), "Spend"];
+                                                            }}
+                                                        />
+                                                        <Area
+                                                            yAxisId="right"
+                                                            type="monotone"
+                                                            dataKey="spend"
+                                                            stroke="#dfc07b"
+                                                            strokeWidth={3}
+                                                            fill="url(#historySpendGradient)"
+                                                            fillOpacity={1}
+                                                            name="Spend"
+                                                            activeDot={{ r: 5, fill: "#dfc07b", stroke: "#1b1b20", strokeWidth: 2 }}
+                                                        />
+                                                        <Line
+                                                            yAxisId="left"
+                                                            type="monotone"
+                                                            dataKey="orders"
+                                                            name="Orders"
+                                                            stroke="rgba(255,255,255,0.88)"
+                                                            strokeWidth={2}
+                                                            dot={{ r: 2.5, fill: "#ffffff", stroke: "#1b1b20", strokeWidth: 1.5 }}
+                                                            activeDot={{ r: 4, fill: "#ffffff", stroke: "#1b1b20", strokeWidth: 2 }}
+                                                        />
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Dining Habits & Timing */}
+                                <div className="theme-card rounded-2xl p-5">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">Habits & Preferences</p>
+                                            <p className="mt-1 text-lg font-bold">How & When You Dine</p>
+                                        </div>
+                                        <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-300">
+                                            {diningHabits.topSlot}
+                                        </span>
+                                    </div>
+
+                                    <div className="mt-4 space-y-4">
+                                        <div>
+                                            <div className="flex items-center justify-between text-xs font-semibold">
+                                                <span className="theme-muted">Dine-in vs Delivery vs Takeaway</span>
+                                                <span className="text-amber-300 font-bold">{diningHabits.dineInPct}% Dine-in</span>
+                                            </div>
+                                            <div className="mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+                                                <div
+                                                    className="bg-amber-400 transition-all duration-500"
+                                                    style={{ width: `${diningHabits.dineInPct}%` }}
+                                                    title={`Dine-in: ${diningHabits.dineInCount}`}
+                                                />
+                                                <div
+                                                    className="bg-sky-400 transition-all duration-500"
+                                                    style={{ width: `${diningHabits.takeawayPct}%` }}
+                                                    title={`Takeaway: ${diningHabits.takeawayCount}`}
+                                                />
+                                                <div
+                                                    className="bg-emerald-400 transition-all duration-500"
+                                                    style={{ width: `${diningHabits.deliveryPct}%` }}
+                                                    title={`Delivery: ${diningHabits.deliveryCount}`}
+                                                />
+                                            </div>
+                                            <div className="mt-2 flex items-center justify-between text-[11px] theme-muted">
+                                                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-400" /> Dine-in ({diningHabits.dineInCount})</span>
+                                                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sky-400" /> Takeaway ({diningHabits.takeawayCount})</span>
+                                                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Delivery ({diningHabits.deliveryCount})</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-2 border-t border-white/10">
+                                            <p className="theme-muted text-xs font-semibold">Time of Day Distribution</p>
+                                            <div className="mt-2 grid grid-cols-3 gap-2">
+                                                <div className="rounded-xl border border-white/10 bg-black/20 p-2.5 text-center">
+                                                    <span className="theme-muted text-[11px] block">Breakfast</span>
+                                                    <span className="text-sm font-bold text-amber-200">{diningHabits.breakfastCount} meals</span>
+                                                </div>
+                                                <div className="rounded-xl border border-white/10 bg-black/20 p-2.5 text-center">
+                                                    <span className="theme-muted text-[11px] block">Lunch</span>
+                                                    <span className="text-sm font-bold text-amber-200">{diningHabits.lunchCount} meals</span>
+                                                </div>
+                                                <div className="rounded-xl border border-white/10 bg-black/20 p-2.5 text-center">
+                                                    <span className="theme-muted text-[11px] block">Dinner</span>
+                                                    <span className="text-sm font-bold text-amber-200">{diningHabits.dinnerCount} meals</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-200">
+                                            You've placed <span className="font-bold text-white">{derivedStats.totalOrders} orders</span> totalling <span className="font-bold text-white">{formatMoney(derivedStats.totalSpend)}</span>. Your average ticket is <span className="font-bold text-white">{formatMoney(derivedStats.averageOrderValue)}</span>.
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+
+                            {/* Most Loved Dishes Showcase */}
+                            {customerFavoriteDishes.length > 0 && (
+                                <div className="mt-4 theme-card rounded-2xl p-5">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">Personal Favorites</p>
+                                            <p className="mt-1 text-lg font-bold">Your Most Ordered Dishes</p>
+                                        </div>
+                                        <span className="theme-muted text-xs">Based on 30-day order frequency</span>
+                                    </div>
+
+                                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                        {customerFavoriteDishes.map((dish, idx) => (
+                                            <div
+                                                key={dish.name}
+                                                className="flex flex-col justify-between rounded-xl border border-white/10 bg-black/20 p-3.5 transition-all hover:border-amber-500/40"
+                                            >
+                                                <div>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+                                                            #{idx + 1} Favorite
+                                                        </span>
+                                                        <span className="text-xs font-bold text-white">{dish.qty}x ordered</span>
+                                                    </div>
+                                                    <p className="mt-2 text-sm font-bold truncate text-white" title={dish.name}>
+                                                        {dish.name}
+                                                    </p>
+                                                    <p className="theme-muted mt-0.5 text-xs">
+                                                        Total: <span className="font-semibold text-amber-300">{formatMoney(dish.total)}</span>
+                                                    </p>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const firstGroup = visibleGroups[0];
+                                                        const rSlug = firstGroup?.restaurant?.slug || selectedSlug;
+                                                        if (rSlug) {
+                                                            addToCart({
+                                                                id: dish.menuItemId || -Date.now(),
+                                                                name: dish.name,
+                                                                price: dish.price || (dish.total / Math.max(1, dish.qty)),
+                                                                image: FALLBACK_IMAGE,
+                                                            });
+                                                            showToast({
+                                                                title: "Added to cart",
+                                                                message: `${dish.name} added to your tray!`,
+                                                                variant: "success",
+                                                            });
+                                                        }
+                                                    }}
+                                                    className="mt-3 w-full rounded-lg border border-amber-500/30 bg-amber-500/10 py-1.5 text-xs font-bold text-amber-300 transition-all hover:bg-amber-500/20"
+                                                >
+                                                    + Re-order Dish
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {!embedded && restaurantBreakdown.length > 0 && (
                                 <div className="mt-4 overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(245,185,78,0.16),transparent_34%),linear-gradient(180deg,rgba(255,248,232,0.05),rgba(255,248,232,0.02))] p-5 shadow-[0_16px_50px_rgba(0,0,0,0.18)]">

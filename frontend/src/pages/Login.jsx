@@ -721,6 +721,16 @@ export default function Login() {
                                                 onChange={(e) => setCustomerOtp(e.target.value)}
                                                 className="theme-input w-full rounded-xl px-4 py-3 text-center text-xl tracking-widest font-mono outline-none transition"
                                             />
+                                            {customerDevOtp && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCustomerOtp(customerDevOtp)}
+                                                    className="mt-2.5 w-full cursor-pointer p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs flex items-center justify-between transition hover:bg-amber-500/20"
+                                                >
+                                                    <span>🔑 <strong>Dev Mode OTP:</strong> <span className="font-mono font-bold tracking-wider">{customerDevOtp}</span></span>
+                                                    <span className="text-[11px] underline font-medium">Click to auto-fill</span>
+                                                </button>
+                                            )}
                                         </div>
 
                                         {!hasExistingName && (

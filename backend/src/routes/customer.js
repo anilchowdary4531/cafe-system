@@ -1,4 +1,4 @@
-import { normalizePhone, isValidPhone } from "../services/phoneService.js";
+import { normalizePhone, isValidPhone, getPhoneVariants } from "../services/phoneService.js";
 import { buildReadableOrderNo } from "../services/orderService.js";
 import { requireCustomerPhoneFromJwt } from "../services/customerProfileService.js";
 import { buildCustomerOtpController } from "../controllers/customerOtpController.js";
@@ -73,11 +73,14 @@ export default async function customerRoutes(app, deps) {
         tokenPhone = "";
       }
 
-      const phone = normalizePhone(req.query?.phone || tokenPhone || "");
-      if (!phone) return reply.code(400).send({ message: "Phone number is required" });
+      const rawPhone = String(req.query?.phone || tokenPhone || "").trim();
+      if (!rawPhone) return reply.code(400).send({ message: "Phone number is required" });
+      const phoneVariants = getPhoneVariants(rawPhone);
+      const phone = normalizePhone(rawPhone);
+      const queryPhones = phoneVariants.length ? phoneVariants : [phone];
 
       const orders = await prisma.order.findMany({
-        where: { phone },
+        where: { phone: { in: queryPhones } },
         include: {
           restaurant: { select: { id: true, name: true, slug: true, city: true, state: true, logoUrl: true } },
           items: true,

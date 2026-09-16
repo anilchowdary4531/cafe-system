@@ -3,49 +3,65 @@ import axios from "axios";
 import {
     Activity,
     AlarmClockCheck,
+    AlertCircle,
+    ArrowDownRight,
+    ArrowUpRight,
     Bot,
     BrainCircuit,
-    ChartColumnIncreasing,
+    CheckCircle2,
+    Clock,
+    CreditCard,
+    Flame,
+    Layers,
     LoaderCircle,
     RefreshCcw,
+    ShoppingBag,
     Sparkles,
     TrendingUp,
+    Users,
+    UtensilsCrossed,
+    Wallet,
 } from "lucide-react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import {
+    Area,
+    AreaChart,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from "recharts";
 import { API } from "../../config";
 
-const RANGE_OPTIONS = ["24h", "7d", "30d"];
-const REFRESH_MS = 15000;
+const RANGE_CONFIG = [
+    { key: "24h", label: "Today (24h)", sublabel: "Hourly breakdown" },
+    { key: "7d", label: "Last 7 Days", sublabel: "Daily performance" },
+    { key: "30d", label: "Last 30 Days", sublabel: "Monthly trajectory" },
+];
 
-const formatMoney = (value) => `\u20B9${Number(value || 0).toFixed(2)}`;
+const REFRESH_MS = 20000;
+
+const formatMoney = (value) => `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 const formatPct = (value) => `${Number(value || 0).toFixed(1)}%`;
 
-const insightClasses = {
-    warning: "border-amber-300/40 bg-amber-400/10",
-    success: "border-emerald-300/40 bg-emerald-400/10",
-    info: "border-cyan-300/40 bg-cyan-400/10",
-};
-
-const statusColors = {
-    PLACED: "from-sky-400 to-blue-500",
-    ACCEPTED: "from-indigo-400 to-indigo-500",
-    PREPARING: "from-amber-400 to-orange-500",
-    READY: "from-lime-400 to-emerald-500",
-    DELIVERED: "from-emerald-400 to-teal-500",
-    CANCELLED: "from-rose-400 to-rose-500",
-};
-
-const panelClass = "theme-card rounded-[20px] border p-4 sm:p-5";
-const subPanelClass = "rounded-[14px] border p-3.5 sm:p-4";
-
 const PIE_COLORS = [
-    "var(--app-primary)",
-    "var(--app-accent)",
-    "var(--app-primary-hover)",
-    "#60a5fa",
-    "#a78bfa",
-    "#f472b6",
+    "#f59e0b",
+    "#ec4899",
+    "#8b5cf6",
+    "#3b82f6",
+    "#10b981",
+    "#06b6d4",
+    "#f97316",
+    "#6366f1",
 ];
+
+const panelClass = "theme-card rounded-[24px] border p-5 sm:p-6 transition-all duration-300";
+const subPanelClass = "rounded-[16px] border p-4 transition-all duration-200";
 
 const subPanelStyle = {
     borderColor: "var(--app-border)",
@@ -57,46 +73,22 @@ const chartTrackStyle = {
     background: "var(--app-border)",
 };
 
-const controlRailStyle = {
-    borderColor: "var(--app-border)",
-    background: "color-mix(in srgb, var(--app-surface) 72%, transparent)",
-    boxShadow: "0 8px 24px color-mix(in srgb, var(--app-bg) 28%, transparent)",
-};
-
 const getRangeButtonStyle = (active) =>
     active
         ? {
               background: "var(--app-primary)",
               color: "var(--app-primary-text)",
-              boxShadow: "0 8px 18px color-mix(in srgb, var(--app-primary) 30%, transparent)",
+              boxShadow: "0 4px 14px color-mix(in srgb, var(--app-primary) 35%, transparent)",
           }
         : {
               background: "transparent",
               color: "var(--app-muted-strong)",
           };
 
-const getLiveButtonStyle = (active) =>
-    active
-        ? {
-              borderColor: "color-mix(in srgb, var(--app-primary) 70%, var(--app-border) 30%)",
-              background: "color-mix(in srgb, var(--app-primary) 20%, transparent)",
-              color: "var(--app-text)",
-          }
-        : {
-              borderColor: "var(--app-border)",
-              background: "color-mix(in srgb, var(--app-surface) 72%, transparent)",
-              color: "var(--app-muted-strong)",
-          };
-
-const refreshButtonStyle = {
-    borderColor: "color-mix(in srgb, var(--app-primary) 45%, var(--app-border) 55%)",
-    background: "color-mix(in srgb, var(--app-primary) 12%, transparent)",
-    color: "var(--app-text)",
-};
-
 export default function OwnerAnalytics() {
     const [data, setData] = useState(null);
     const [range, setRange] = useState("7d");
+    const [activeTab, setActiveTab] = useState("overview"); // overview, sales, operations, menu
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [autoRefresh, setAutoRefresh] = useState(true);
@@ -115,7 +107,7 @@ export default function OwnerAnalytics() {
     const fetchAnalytics = async ({ silent = false } = {}) => {
         if (!restaurantId) {
             setLoading(false);
-            setError("Restaurant id missing for current owner.");
+            setError("Restaurant ID is missing for the current logged-in account.");
             return;
         }
 
@@ -129,8 +121,8 @@ export default function OwnerAnalytics() {
             setData(res.data || null);
             setError("");
         } catch (err) {
-            console.log(err);
-            setError(err?.response?.data?.message || "Failed to load analytics.");
+            console.error(err);
+            setError(err?.response?.data?.message || "Failed to load analytics engine.");
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -149,86 +141,94 @@ export default function OwnerAnalytics() {
         return () => clearInterval(timer);
     }, [autoRefresh, restaurantId, range]);
 
-    const peakSlot = data?.charts?.peakWindows?.[0];
-    const series = (data?.charts?.timeseries || []).slice(-12);
+    const timeseries = data?.charts?.timeseries || [];
+    const hourlyRush = data?.charts?.hourlyRush || [];
     const topItems = data?.charts?.topItems || [];
-    const categories = (data?.charts?.categories || []).slice(0, 6);
+    const categories = data?.charts?.categories || [];
     const tableHeatmap = data?.charts?.tableHeatmap || [];
+    const paymentModes = data?.charts?.paymentModes || [];
+    const channels = data?.charts?.channels || [];
+    const peakWindows = data?.charts?.peakWindows || [];
+    const insights = data?.insights || [];
+    const overview = data?.overview || {};
+    const forecast = data?.forecast || {};
+    const realtime = data?.realtime || {};
 
-    const categoryPieData = categories.map((cat, index) => ({
-        name: cat.name,
-        value: Number(cat.revenue || 0),
-        color: PIE_COLORS[index % PIE_COLORS.length],
-    }));
+    const categoryPieData = useMemo(() => {
+        return categories.map((cat, index) => ({
+            name: cat.name,
+            value: Number(cat.revenue || 0),
+            color: PIE_COLORS[index % PIE_COLORS.length],
+        }));
+    }, [categories]);
 
-    const maxSeriesOrders = Math.max(
-        1,
-        ...series.map((point) => Number(point.orders || 0))
-    );
-    const maxTopQty = Math.max(
-        1,
-        ...topItems.map((item) => Number(item.qty || 0))
-    );
-    const maxCategoryRevenue = Math.max(
-        1,
-        ...categories.map((item) => Number(item.revenue || 0))
-    );
-    const maxTableOrders = Math.max(
-        1,
-        ...tableHeatmap.map((table) => Number(table.orders || 0))
-    );
-    const totalOrders = Math.max(1, Number(data?.overview?.totalOrders || 0));
-
-    const totalCategoryRevenue = categoryPieData.reduce(
-        (sum, item) => sum + Number(item.value || 0),
-        0
-    );
+    const totalCategoryRevenue = categoryPieData.reduce((sum, item) => sum + Number(item.value || 0), 0);
     const hasCategoryPieData = categoryPieData.some((item) => Number(item.value || 0) > 0);
     const renderedPieData = hasCategoryPieData
         ? categoryPieData
-        : [{ name: "No Data", value: 1, color: "var(--app-border-strong)" }];
+        : [{ name: "No Data", value: 1, color: "var(--app-border)" }];
+
+    const maxHourlyOrders = Math.max(1, ...hourlyRush.map((h) => Number(h.orders || 0)));
+    const maxTopQty = Math.max(1, ...topItems.map((item) => Number(item.qty || 0)));
+    const maxCategoryRevenue = Math.max(1, ...categories.map((c) => Number(c.revenue || 0)));
+    const maxTableOrders = Math.max(1, ...tableHeatmap.map((t) => Number(t.orders || 0)));
 
     if (loading) {
         return (
-            <div className={panelClass}>
-                <p className="text-sm theme-muted-strong">Loading analytics engine...</p>
+            <div className={`${panelClass} flex min-h-[420px] flex-col items-center justify-center gap-4`}>
+                <LoaderCircle size={36} className="animate-spin text-[var(--app-primary)]" />
+                <p className="text-sm font-semibold tracking-wide text-[var(--app-muted-strong)]">
+                    Synthesizing restaurant intelligence...
+                </p>
             </div>
         );
     }
 
     return (
-        <section className="space-y-4 text-[15px]" style={{ color: "var(--app-text)" }}>
-            <article className="theme-hero-band relative overflow-hidden rounded-[28px] px-5 py-6 sm:px-7">
-                <div className="pointer-events-none absolute -right-20 -top-20 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
-                <div className="pointer-events-none absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-black/15 blur-3xl" />
+        <section className="space-y-6 text-[15px]" style={{ color: "var(--app-text)" }}>
+            {/* Header Hero Banner */}
+            <article className="theme-hero-band relative overflow-hidden rounded-[28px] border border-amber-500/20 px-6 py-7 shadow-lg">
+                <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-amber-500/10 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-20 -left-12 h-56 w-56 rounded-full bg-orange-600/10 blur-3xl" />
 
-                <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                        <p className="theme-price text-[11px] uppercase tracking-[0.26em]">
-                            Neural Analytics Grid
-                        </p>
-                        <h3 className="mt-1.5 text-2xl font-extrabold sm:text-3xl">
-                            {data?.restaurant?.name || "Restaurant"} Intelligence
-                        </h3>
-                        <p className="theme-muted-strong mt-2 text-sm sm:text-base">
-                            Real-time operations, demand prediction, and kitchen risk monitoring.
+                        <div className="flex items-center gap-2">
+                            <span className="flex h-2.5 w-2.5 relative">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                            </span>
+                            <p className="theme-price text-xs font-bold uppercase tracking-[0.24em]">
+                                Executive Operations Engine
+                            </p>
+                        </div>
+                        <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
+                            {data?.restaurant?.name || "Restaurant"} Business Intelligence
+                        </h2>
+                        <p className="theme-muted-strong mt-1.5 max-w-2xl text-xs sm:text-sm">
+                            Real-time order throughput, peak rush forecasting, menu popularity, and operational metrics.
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-end gap-2.5">
+                    {/* Frame Selectors & Controls */}
+                    <div className="flex flex-wrap items-center gap-2.5">
                         <div
                             className="inline-flex items-center gap-1 rounded-2xl border p-1"
-                            style={controlRailStyle}
+                            style={{
+                                borderColor: "var(--app-border)",
+                                background: "color-mix(in srgb, var(--app-surface) 80%, transparent)",
+                            }}
                         >
-                            {RANGE_OPTIONS.map((option) => (
+                            {RANGE_CONFIG.map((opt) => (
                                 <button
-                                    key={option}
+                                    key={opt.key}
                                     type="button"
-                                    onClick={() => setRange(option)}
-                                    className="min-w-[52px] whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-200"
-                                    style={getRangeButtonStyle(range === option)}
+                                    onClick={() => setRange(opt.key)}
+                                    className="min-w-[64px] whitespace-nowrap rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all duration-200"
+                                    style={getRangeButtonStyle(range === opt.key)}
+                                    title={opt.sublabel}
                                 >
-                                    {option}
+                                    {opt.label}
                                 </button>
                             ))}
                         </div>
@@ -237,12 +237,16 @@ export default function OwnerAnalytics() {
                             type="button"
                             onClick={() => setAutoRefresh((prev) => !prev)}
                             className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all duration-200"
-                            style={getLiveButtonStyle(autoRefresh)}
+                            style={{
+                                borderColor: "var(--app-border)",
+                                background: autoRefresh
+                                    ? "color-mix(in srgb, var(--app-primary) 15%, transparent)"
+                                    : "transparent",
+                                color: autoRefresh ? "var(--app-primary-hover)" : "var(--app-muted)",
+                            }}
                         >
-                            <span
-                                className={`h-2 w-2 rounded-full ${autoRefresh ? "bg-emerald-400" : "bg-slate-400"}`}
-                            />
-                            {autoRefresh ? "Live ON" : "Live OFF"}
+                            <span className={`h-2 w-2 rounded-full ${autoRefresh ? "bg-emerald-500" : "bg-slate-400"}`} />
+                            {autoRefresh ? "Live Sync ON" : "Live Sync OFF"}
                         </button>
 
                         <button
@@ -250,13 +254,13 @@ export default function OwnerAnalytics() {
                             onClick={() => fetchAnalytics({ silent: true })}
                             disabled={refreshing}
                             className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all duration-200 disabled:opacity-60"
-                            style={refreshButtonStyle}
+                            style={{
+                                borderColor: "var(--app-border)",
+                                background: "color-mix(in srgb, var(--app-primary) 10%, transparent)",
+                                color: "var(--app-text)",
+                            }}
                         >
-                            {refreshing ? (
-                                <LoaderCircle size={14} className="animate-spin" />
-                            ) : (
-                                <RefreshCcw size={14} />
-                            )}
+                            {refreshing ? <LoaderCircle size={14} className="animate-spin" /> : <RefreshCcw size={14} />}
                             Refresh
                         </button>
                     </div>
@@ -264,214 +268,306 @@ export default function OwnerAnalytics() {
             </article>
 
             {error && (
-                <div className="rounded-xl border border-red-300/40 bg-red-500/10 p-3 text-sm text-red-200">
+                <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
                     {error}
                 </div>
             )}
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {/* Core KPI Metrics Grid */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <article className={panelClass}>
-                    <p className="theme-muted-strong text-lg sm:text-xl">Total Revenue</p>
-                    <p className="mt-2 text-[30px] font-black leading-none sm:text-[34px]">
-                        {formatMoney(data?.overview?.totalRevenue)}
-                    </p>
-                    <p className="theme-price mt-3 text-sm">
-                        <TrendingUp size={12} className="mr-1 inline" />
-                        Avg ticket {formatMoney(data?.overview?.avgOrderValue)}
-                    </p>
-                </article>
-
-                <article className={panelClass}>
-                    <p className="theme-muted-strong text-lg sm:text-xl">Kitchen Queue</p>
-                    <p className="mt-2 text-[30px] font-black leading-none sm:text-[34px]">
-                        {data?.realtime?.activeQueue || 0}
-                    </p>
-                    <p className="theme-price mt-3 text-sm">
-                        <AlarmClockCheck size={12} className="mr-1 inline" />
-                        Delayed {data?.realtime?.delayedTickets || 0}
-                    </p>
-                </article>
-
-                <article className={panelClass}>
-                    <p className="theme-muted-strong text-lg sm:text-xl">Completion Rate</p>
-                    <p className="mt-2 text-[30px] font-black leading-none sm:text-[34px]">
-                        {formatPct(data?.overview?.completionRate)}
-                    </p>
-                    <p className="mt-3 text-sm text-rose-300">
-                        Cancel {formatPct(data?.overview?.cancellationRate)}
-                    </p>
-                </article>
-
-                <article className={panelClass}>
-                    <p className="theme-muted-strong text-lg sm:text-xl">Forecast EOD</p>
-                    <p className="mt-2 text-[30px] font-black leading-none sm:text-[34px]">
-                        {formatMoney(data?.forecast?.projectedEodRevenue)}
-                    </p>
-                    <p className="mt-3 text-sm text-violet-300">
-                        Confidence: {String(data?.forecast?.confidence || "low").toUpperCase()}
-                    </p>
-                </article>
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-3">
-                <article className={`${panelClass} xl:col-span-2`}>
                     <div className="flex items-center justify-between">
-                        <h4 className="text-2xl font-extrabold sm:text-[28px]">Demand Waveform</h4>
-                        <span className="theme-muted-strong text-sm">{range} window</span>
+                        <span className="theme-muted text-xs font-semibold uppercase tracking-wider">Revenue</span>
+                        <Wallet size={18} className="theme-price" />
                     </div>
-                    <div className="mt-5 flex flex-wrap gap-x-3 gap-y-4">
-                        {series.map((point) => {
-                            const pct = Math.min(
-                                100,
-                                Math.max(
-                                    18,
-                                    Math.round((Number(point.orders || 0) / maxSeriesOrders) * 100)
-                                )
-                            );
-
-                            return (
-                                <div key={point.ts} className="w-[80px]">
-                                    <div className="h-3 rounded-full p-[1px]" style={chartTrackStyle}>
-                                        <div
-                                            className="h-full rounded-full bg-[var(--app-primary)]"
-                                            style={{ width: `${pct}%` }}
-                                            title={`${point.label}: ${point.orders} order(s), ${formatMoney(point.revenue)}`}
-                                        />
-                                    </div>
-                                    <p className="theme-muted mt-2 text-center text-xs">{point.label}</p>
-                                </div>
-                            );
-                        })}
-                        {series.length === 0 && (
-                            <p className="theme-muted text-sm">No demand data in this window.</p>
+                    <p className="mt-2 text-2xl font-black sm:text-[28px]">{formatMoney(overview.totalRevenue)}</p>
+                    <div className="mt-2 flex items-center gap-1.5 text-xs">
+                        {overview.revenueGrowthPct >= 0 ? (
+                            <span className="inline-flex items-center font-bold text-emerald-400">
+                                <ArrowUpRight size={14} />+{overview.revenueGrowthPct}%
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center font-bold text-rose-400">
+                                <ArrowDownRight size={14} />{overview.revenueGrowthPct}%
+                            </span>
                         )}
+                        <span className="theme-muted">vs prev period</span>
                     </div>
                 </article>
 
                 <article className={panelClass}>
-                    <h4 className="flex items-center gap-2 text-2xl font-extrabold sm:text-[28px]">
-                        <BrainCircuit size={18} className="theme-price" />
-                        AI Radar
-                    </h4>
-                    <div className="mt-5 space-y-3">
-                        <div className={subPanelClass} style={subPanelStyle}>
-                            <p className="theme-muted-strong text-lg">Today Revenue</p>
-                            <p className="mt-1.5 text-[28px] font-black leading-none sm:text-[32px]">
-                                {formatMoney(data?.forecast?.todayRevenue)}
-                            </p>
-                            <p className="theme-muted mt-2 text-sm">
-                                Run-rate {formatMoney(data?.forecast?.runRatePerHour)}/hr
-                            </p>
-                        </div>
-
-                        <div className={subPanelClass} style={subPanelStyle}>
-                            <p className="theme-muted-strong text-lg">Peak Demand Window</p>
-                            <p className="theme-price mt-1.5 text-xl font-bold sm:text-2xl">
-                                {peakSlot ? peakSlot.label : "No peak yet"}
-                            </p>
-                            <p className="theme-muted mt-2 text-sm">
-                                {peakSlot ? `${peakSlot.orders} orders` : "Insufficient data"}
-                            </p>
-                        </div>
+                    <div className="flex items-center justify-between">
+                        <span className="theme-muted text-xs font-semibold uppercase tracking-wider">Orders</span>
+                        <ShoppingBag size={18} className="theme-price" />
                     </div>
+                    <p className="mt-2 text-2xl font-black sm:text-[28px]">{overview.totalOrders || 0}</p>
+                    <div className="mt-2 flex items-center gap-1.5 text-xs">
+                        {overview.ordersGrowthPct >= 0 ? (
+                            <span className="inline-flex items-center font-bold text-emerald-400">
+                                <ArrowUpRight size={14} />+{overview.ordersGrowthPct}%
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center font-bold text-rose-400">
+                                <ArrowDownRight size={14} />{overview.ordersGrowthPct}%
+                            </span>
+                        )}
+                        <span className="theme-muted">volume growth</span>
+                    </div>
+                </article>
+
+                <article className={panelClass}>
+                    <div className="flex items-center justify-between">
+                        <span className="theme-muted text-xs font-semibold uppercase tracking-wider">Avg Ticket</span>
+                        <TrendingUp size={18} className="theme-price" />
+                    </div>
+                    <p className="mt-2 text-2xl font-black sm:text-[28px]">{formatMoney(overview.avgOrderValue)}</p>
+                    <p className="theme-muted mt-2 text-xs">Average basket size</p>
+                </article>
+
+                <article className={panelClass}>
+                    <div className="flex items-center justify-between">
+                        <span className="theme-muted text-xs font-semibold uppercase tracking-wider">Kitchen Queue</span>
+                        <Clock size={18} className="theme-price" />
+                    </div>
+                    <p className="mt-2 text-2xl font-black sm:text-[28px]">{realtime.activeQueue || 0}</p>
+                    <p className="theme-price mt-2 text-xs font-semibold">
+                        Avg prep: {realtime.avgPrepMinutes || 16} mins
+                    </p>
+                </article>
+
+                <article className={panelClass}>
+                    <div className="flex items-center justify-between">
+                        <span className="theme-muted text-xs font-semibold uppercase tracking-wider">Completion</span>
+                        <CheckCircle2 size={18} className="text-emerald-400" />
+                    </div>
+                    <p className="mt-2 text-2xl font-black sm:text-[28px]">{formatPct(overview.completionRate)}</p>
+                    <p className="mt-2 text-xs text-rose-300">
+                        Cancel: {formatPct(overview.cancellationRate)}
+                    </p>
+                </article>
+
+                <article className={panelClass}>
+                    <div className="flex items-center justify-between">
+                        <span className="theme-muted text-xs font-semibold uppercase tracking-wider">Customers</span>
+                        <Users size={18} className="theme-price" />
+                    </div>
+                    <p className="mt-2 text-2xl font-black sm:text-[28px]">{overview.uniqueCustomers || 0}</p>
+                    <p className="theme-muted mt-2 text-xs">
+                        Repeat rate: <span className="font-bold text-amber-400">{overview.repeatCustomerPct}%</span>
+                    </p>
                 </article>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-3">
-                <article className={panelClass}>
-                    <h4 className="flex items-center gap-2 text-2xl font-extrabold sm:text-[28px]">
-                        <Activity size={18} className="theme-price" />
-                        Kitchen Flow
-                    </h4>
-                    <div className="mt-5 space-y-3.5">
-                        {(data?.statusFunnel || []).map((row) => {
-                            const pct = (Number(row.count || 0) / totalOrders) * 100;
-                            const gradient = statusColors[row.status] || "from-slate-400 to-slate-500";
-
-                            return (
-                                <div key={row.status}>
-                                    <div className="mb-1.5 flex items-center justify-between text-sm sm:text-base">
-                                        <span>{row.status}</span>
-                                        <span>{row.count}</span>
-                                    </div>
-                                    <div className="h-2.5 rounded-full" style={chartTrackStyle}>
-                                        <div
-                                            className={`h-2.5 rounded-full bg-gradient-to-r ${gradient}`}
-                                            style={{ width: `${Math.max(6, pct)}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        {(data?.statusFunnel || []).length === 0 && (
-                            <p className="theme-muted text-sm">No order flow yet.</p>
-                        )}
-                    </div>
-                </article>
-
+            {/* Waveform Chart & Peak Rush Window */}
+            <div className="grid gap-6 xl:grid-cols-3">
+                {/* Demand & Revenue Trajectory Area Chart */}
                 <article className={`${panelClass} xl:col-span-2`}>
-                    <h4 className="flex items-center gap-2 text-2xl font-extrabold sm:text-[28px]">
-                        <ChartColumnIncreasing size={18} className="theme-price" />
-                        Top Movers
-                    </h4>
-                    <div className="mt-5 grid gap-3 md:grid-cols-2">
-                        {topItems.map((item, index) => {
-                            const width = (Number(item.qty || 0) / maxTopQty) * 100;
-                            return (
-                                <div key={item.name} className={subPanelClass} style={subPanelStyle}>
-                                    <div className="flex items-center justify-between gap-2">
-                                        <p className="text-sm font-semibold sm:text-base">
-                                            {index + 1}. {item.name}
-                                        </p>
-                                        <p className="theme-price text-sm">{formatMoney(item.revenue)}</p>
-                                    </div>
-                                    <div className="mt-2.5 h-2.5 rounded-full" style={chartTrackStyle}>
-                                        <div
-                                            className="h-2.5 rounded-full bg-[var(--app-primary)]"
-                                            style={{ width: `${Math.max(8, width)}%` }}
-                                        />
-                                    </div>
-                                    <p className="theme-muted mt-2 text-sm">{item.qty} qty sold</p>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 className="text-xl font-black tracking-tight sm:text-2xl">
+                                Demand & Revenue Waveform
+                            </h3>
+                            <p className="theme-muted mt-1 text-xs">
+                                Showing order velocity and gross revenue across the {range} window.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs">
+                            <span className="flex items-center gap-1.5 font-semibold text-amber-400">
+                                <span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Revenue
+                            </span>
+                            <span className="flex items-center gap-1.5 font-semibold text-sky-400">
+                                <span className="h-2.5 w-2.5 rounded-full bg-sky-400" /> Orders
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 h-[280px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={timeseries} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
+                                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+                                    </linearGradient>
+                                    <linearGradient id="orderGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#38bdf8" stopOpacity={0.0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--app-border)" opacity={0.6} />
+                                <XAxis
+                                    dataKey="label"
+                                    stroke="var(--app-muted)"
+                                    fontSize={11}
+                                    tickLine={false}
+                                    interval={range === "30d" ? 3 : range === "24h" ? 2 : 0}
+                                />
+                                <YAxis yAxisId="left" stroke="var(--app-muted)" fontSize={11} tickLine={false} />
+                                <YAxis yAxisId="right" orientation="right" stroke="var(--app-muted)" fontSize={11} tickLine={false} />
+                                <Tooltip
+                                    contentStyle={{
+                                        borderRadius: "14px",
+                                        border: "1px solid var(--app-border)",
+                                        background: "var(--app-surface)",
+                                        color: "var(--app-text)",
+                                        boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+                                    }}
+                                    formatter={(value, name) => {
+                                        if (name === "Revenue") return [formatMoney(value), "Revenue"];
+                                        return [value, "Orders"];
+                                    }}
+                                />
+                                <Area
+                                    yAxisId="left"
+                                    type="monotone"
+                                    dataKey="revenue"
+                                    name="Revenue"
+                                    stroke="#f59e0b"
+                                    strokeWidth={3}
+                                    fillOpacity={1}
+                                    fill="url(#revenueGrad)"
+                                />
+                                <Area
+                                    yAxisId="right"
+                                    type="monotone"
+                                    dataKey="orders"
+                                    name="Orders"
+                                    stroke="#38bdf8"
+                                    strokeWidth={2}
+                                    fillOpacity={1}
+                                    fill="url(#orderGrad)"
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </article>
+
+                {/* AI Radar & Demand Forecast */}
+                <article className={panelClass}>
+                    <div className="flex items-center gap-2">
+                        <BrainCircuit size={20} className="theme-price" />
+                        <h3 className="text-xl font-black tracking-tight">AI Demand Radar</h3>
+                    </div>
+                    <p className="theme-muted mt-1 text-xs">
+                        Intelligent end-of-day projection and operational rush windows.
+                    </p>
+
+                    <div className="mt-5 space-y-3.5">
+                        <div className={subPanelClass} style={subPanelStyle}>
+                            <span className="theme-muted text-xs uppercase tracking-wider">Today Run-Rate</span>
+                            <div className="mt-1 flex items-baseline justify-between">
+                                <p className="text-2xl font-black">{formatMoney(forecast.todayRevenue)}</p>
+                                <span className="theme-price text-xs font-bold">
+                                    {formatMoney(forecast.runRatePerHour)}/hr
+                                </span>
+                            </div>
+                            <div className="mt-2 text-xs theme-muted">
+                                Today's orders so far: <span className="font-bold">{forecast.todayOrdersCount || 0}</span>
+                            </div>
+                        </div>
+
+                        <div className={subPanelClass} style={subPanelStyle}>
+                            <span className="theme-muted text-xs uppercase tracking-wider">EOD Projection</span>
+                            <div className="mt-1 flex items-baseline justify-between">
+                                <p className="text-2xl font-black text-amber-400">
+                                    {formatMoney(forecast.projectedEodRevenue)}
+                                </p>
+                                <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[11px] font-bold text-amber-300">
+                                    {String(forecast.confidence || "MEDIUM").toUpperCase()} CONFIDENCE
+                                </span>
+                            </div>
+                            <p className="theme-muted mt-2 text-xs">
+                                Based on historic hourly velocity and remaining service hours.
+                            </p>
+                        </div>
+
+                        {peakWindows.length > 0 && (
+                            <div className={subPanelClass} style={subPanelStyle}>
+                                <div className="flex items-center gap-1.5 text-xs font-bold text-rose-400">
+                                    <Flame size={14} /> Peak Rush Window
                                 </div>
-                            );
-                        })}
-                        {topItems.length === 0 && (
-                        <p className="theme-muted text-sm">No item movement data yet.</p>
+                                <p className="mt-1 text-lg font-bold">{peakWindows[0].label}</p>
+                                <p className="theme-muted text-xs">
+                                    {peakWindows[0].orders} orders concentrated ({formatMoney(peakWindows[0].revenue)})
+                                </p>
+                            </div>
                         )}
                     </div>
                 </article>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-2">
-                <article className={panelClass}>
-                    <h4 className="flex items-center gap-2 text-xl font-extrabold sm:text-2xl">
-                        <Bot size={17} className="theme-price" />
-                        Smart Alerts
-                    </h4>
-                    <div className="mt-4 space-y-3">
-                        {(data?.insights || []).map((insight) => (
-                            <div
-                                key={`${insight.level}-${insight.title}`}
-                                className={`rounded-xl border p-3 ${insightClasses[insight.level] || insightClasses.info}`}
-                            >
-                                <p className="text-sm font-semibold">{insight.title}</p>
-                                <p className="theme-muted mt-1 text-xs">{insight.description}</p>
-                            </div>
-                        ))}
-                        {(data?.insights || []).length === 0 && (
-                            <div className="rounded-xl border border-emerald-300/40 bg-emerald-400/10 p-3 text-sm">
-                                No major risks detected right now.
-                            </div>
-                        )}
+            {/* Peak Rush Hours Heatmap & Operations Schedule */}
+            <article className={panelClass}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h3 className="text-xl font-black tracking-tight sm:text-2xl">
+                            Peak Hours & Service Load Heatmap
+                        </h3>
+                        <p className="theme-muted mt-1 text-xs">
+                            Order density across operational hours (08:00 to 23:00) to optimize kitchen staffing & stations.
+                        </p>
                     </div>
-                </article>
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                        {peakWindows.map((pw, i) => (
+                            <span
+                                key={pw.label}
+                                className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 font-bold text-amber-300"
+                            >
+                                #{i + 1} {pw.label} ({pw.orders} orders)
+                            </span>
+                        ))}
+                    </div>
+                </div>
 
+                <div className="mt-6 h-[220px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={hourlyRush} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--app-border)" opacity={0.5} />
+                            <XAxis dataKey="label" stroke="var(--app-muted)" fontSize={11} tickLine={false} />
+                            <YAxis stroke="var(--app-muted)" fontSize={11} tickLine={false} />
+                            <Tooltip
+                                contentStyle={{
+                                    borderRadius: "14px",
+                                    border: "1px solid var(--app-border)",
+                                    background: "var(--app-surface)",
+                                    color: "var(--app-text)",
+                                }}
+                                formatter={(value, name) => [
+                                    name === "orders" ? `${value} orders` : formatMoney(value),
+                                    name === "orders" ? "Volume" : "Revenue",
+                                ]}
+                            />
+                            <Bar dataKey="orders" name="orders" radius={[6, 6, 0, 0]}>
+                                {hourlyRush.map((entry, index) => {
+                                    const isPeak = (Number(entry.orders || 0) / maxHourlyOrders) > 0.7;
+                                    return (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={isPeak ? "var(--app-primary)" : "color-mix(in srgb, var(--app-primary) 35%, var(--app-border))"}
+                                        />
+                                    );
+                                })}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </article>
+
+            {/* Category Intelligence & Payment Breakdown */}
+            <div className="grid gap-6 xl:grid-cols-2">
+                {/* Category Donut & Breakdown */}
                 <article className={panelClass}>
-                    <h4 className="flex items-center gap-2 text-xl font-extrabold sm:text-2xl">
-                        <Sparkles size={17} className="theme-price" />
-                        Category Intelligence
-                    </h4>
-                    <div className={`${subPanelClass} mt-4`} style={subPanelStyle}>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-xl font-black tracking-tight sm:text-2xl">
+                                Category Revenue Mix
+                            </h3>
+                            <p className="theme-muted mt-1 text-xs">Gross sales contribution by food & beverage section.</p>
+                        </div>
+                        <Sparkles size={18} className="theme-price" />
+                    </div>
+
+                    <div className="mt-5 grid items-center gap-6 sm:grid-cols-2">
                         <div className="relative h-[220px]">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
@@ -481,9 +577,9 @@ export default function OwnerAnalytics() {
                                         nameKey="name"
                                         cx="50%"
                                         cy="50%"
-                                        innerRadius={52}
-                                        outerRadius={84}
-                                        paddingAngle={hasCategoryPieData ? 2 : 0}
+                                        innerRadius={55}
+                                        outerRadius={85}
+                                        paddingAngle={hasCategoryPieData ? 3 : 0}
                                         stroke="var(--app-surface)"
                                         strokeWidth={3}
                                     >
@@ -495,12 +591,9 @@ export default function OwnerAnalytics() {
                                         ))}
                                     </Pie>
                                     <Tooltip
-                                        formatter={(value, name) => {
-                                            if (!hasCategoryPieData) return ["No revenue yet", name];
-                                            return [formatMoney(value), name];
-                                        }}
+                                        formatter={(value, name) => [formatMoney(value), name]}
                                         contentStyle={{
-                                            borderRadius: "10px",
+                                            borderRadius: "12px",
                                             border: "1px solid var(--app-border)",
                                             background: "var(--app-surface)",
                                             color: "var(--app-text)",
@@ -510,64 +603,213 @@ export default function OwnerAnalytics() {
                             </ResponsiveContainer>
                             <div className="pointer-events-none absolute inset-0 grid place-items-center">
                                 <div className="text-center">
-                                    <p className="theme-muted text-[11px] uppercase tracking-[0.12em]">
-                                        {hasCategoryPieData ? "Revenue Mix" : "Awaiting Data"}
+                                    <p className="theme-muted text-[10px] font-bold uppercase tracking-widest">
+                                        Total Sales
                                     </p>
-                                    <p className="mt-1 text-sm font-semibold">
+                                    <p className="mt-1 text-base font-black">
                                         {hasCategoryPieData ? formatMoney(totalCategoryRevenue) : "--"}
                                     </p>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <div className="mt-4 space-y-3">
-                        {categories.map((cat) => {
-                            const width = (Number(cat.revenue || 0) / maxCategoryRevenue) * 100;
-                            return (
-                                <div key={cat.name}>
-                                    <div className="mb-1.5 flex items-center justify-between text-sm">
-                                        <span>{cat.name}</span>
-                                        <span className="theme-price">{formatMoney(cat.revenue)}</span>
+
+                        <div className="space-y-2.5">
+                            {categories.slice(0, 6).map((cat, idx) => {
+                                const width = (Number(cat.revenue || 0) / maxCategoryRevenue) * 100;
+                                return (
+                                    <div key={cat.name} className="text-xs">
+                                        <div className="flex items-center justify-between font-semibold">
+                                            <span className="flex items-center gap-1.5">
+                                                <span
+                                                    className="h-2 w-2 rounded-full"
+                                                    style={{ background: PIE_COLORS[idx % PIE_COLORS.length] }}
+                                                />
+                                                {cat.name}
+                                            </span>
+                                            <span className="font-bold theme-price">{formatMoney(cat.revenue)}</span>
+                                        </div>
+                                        <div className="mt-1 h-1.5 w-full rounded-full" style={chartTrackStyle}>
+                                            <div
+                                                className="h-full rounded-full"
+                                                style={{
+                                                    width: `${Math.max(6, width)}%`,
+                                                    background: PIE_COLORS[idx % PIE_COLORS.length],
+                                                }}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="h-2.5 rounded-full" style={chartTrackStyle}>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </article>
+
+                {/* Payment Methods & Channels */}
+                <article className={panelClass}>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-xl font-black tracking-tight sm:text-2xl">
+                                Payments & Fulfillment Channels
+                            </h3>
+                            <p className="theme-muted mt-1 text-xs">Payment method preference and dining style split.</p>
+                        </div>
+                        <CreditCard size={18} className="theme-price" />
+                    </div>
+
+                    <div className="mt-5 space-y-4">
+                        <div>
+                            <p className="theme-muted text-xs font-bold uppercase tracking-wider">Payment Mode Share</p>
+                            <div className="mt-2.5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                {paymentModes.map((pm) => (
+                                    <div key={pm.mode} className={subPanelClass} style={subPanelStyle}>
+                                        <span className="text-xs font-semibold">{pm.mode}</span>
+                                        <p className="mt-1 text-lg font-black">{pm.pct}%</p>
+                                        <p className="theme-muted text-[11px]">{pm.count} orders</p>
+                                        <p className="theme-price mt-0.5 text-xs font-bold">{formatMoney(pm.revenue)}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="pt-2">
+                            <p className="theme-muted text-xs font-bold uppercase tracking-wider">Dining Channels</p>
+                            <div className="mt-2.5 grid grid-cols-3 gap-3">
+                                {channels.map((ch) => (
+                                    <div key={ch.channel} className={subPanelClass} style={subPanelStyle}>
+                                        <span className="text-xs font-semibold">{ch.channel}</span>
+                                        <p className="mt-1 text-lg font-black">{ch.pct}%</p>
+                                        <p className="theme-muted text-[11px]">{ch.count} orders</p>
+                                        <p className="theme-price mt-0.5 text-xs font-bold">{formatMoney(ch.revenue)}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            {/* Top Items & Table Turn Heatmap */}
+            <div className="grid gap-6 xl:grid-cols-3">
+                {/* Top Moving Menu Items */}
+                <article className={`${panelClass} xl:col-span-2`}>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-xl font-black tracking-tight sm:text-2xl">
+                                Top Moving Menu Items
+                            </h3>
+                            <p className="theme-muted mt-1 text-xs">Ranked by unit velocity and revenue contribution.</p>
+                        </div>
+                        <UtensilsCrossed size={18} className="theme-price" />
+                    </div>
+
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                        {topItems.map((item, index) => {
+                            const width = (Number(item.qty || 0) / maxTopQty) * 100;
+                            return (
+                                <div key={item.name} className={subPanelClass} style={subPanelStyle}>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="text-sm font-bold truncate">
+                                            <span className="theme-price mr-1.5">#{index + 1}</span>
+                                            {item.name}
+                                        </p>
+                                        <p className="theme-price text-sm font-black whitespace-nowrap">
+                                            {formatMoney(item.revenue)}
+                                        </p>
+                                    </div>
+                                    <div className="mt-2.5 h-2 rounded-full" style={chartTrackStyle}>
                                         <div
-                                            className="h-2.5 rounded-full bg-[var(--app-primary)]"
+                                            className="h-full rounded-full bg-[var(--app-primary)]"
                                             style={{ width: `${Math.max(8, width)}%` }}
                                         />
+                                    </div>
+                                    <div className="mt-1.5 flex items-center justify-between text-xs theme-muted">
+                                        <span>{item.qty} units sold</span>
+                                        <span>Avg: {formatMoney(item.revenue / Math.max(1, item.qty))}</span>
                                     </div>
                                 </div>
                             );
                         })}
-                        {categories.length === 0 && (
-                            <p className="theme-muted text-sm">No category analytics yet.</p>
+                    </div>
+                </article>
+
+                {/* Table Turn & Utilization Heatmap */}
+                <article className={panelClass}>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-xl font-black tracking-tight sm:text-2xl">
+                                Table Turn Heatmap
+                            </h3>
+                            <p className="theme-muted mt-1 text-xs">Dining table seatings & gross yield.</p>
+                        </div>
+                        <Layers size={18} className="theme-price" />
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-2 gap-3">
+                        {tableHeatmap.map((tbl) => {
+                            const glow = (Number(tbl.orders || 0) / maxTableOrders) * 100;
+                            return (
+                                <div
+                                    key={tbl.tableNo}
+                                    className={subPanelClass}
+                                    style={{
+                                        ...subPanelStyle,
+                                        boxShadow: `inset 0 0 ${Math.max(6, glow / 4)}px color-mix(in srgb, var(--app-primary) 30%, transparent)`,
+                                    }}
+                                >
+                                    <p className="text-sm font-black">{tbl.tableNo}</p>
+                                    <p className="theme-muted mt-1 text-xs">{tbl.orders} turn(s)</p>
+                                    <p className="theme-price mt-0.5 text-xs font-bold">{formatMoney(tbl.revenue)}</p>
+                                </div>
+                            );
+                        })}
+                        {tableHeatmap.length === 0 && (
+                            <p className="col-span-2 text-center text-xs theme-muted py-6">
+                                No dining table turns recorded for this period.
+                            </p>
                         )}
                     </div>
                 </article>
             </div>
 
+            {/* Smart Alerts & Actionable Operational Guidance */}
             <article className={panelClass}>
-                <h4 className="text-xl font-extrabold sm:text-2xl">Table Heatmap</h4>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    {tableHeatmap.map((table) => {
-                        const glow = (Number(table.orders || 0) / maxTableOrders) * 100;
+                <div className="flex items-center gap-2">
+                    <Bot size={20} className="theme-price" />
+                    <h3 className="text-xl font-black tracking-tight">Smart Operational Intelligence Alerts</h3>
+                </div>
+                <p className="theme-muted mt-1 text-xs">
+                    Automated anomaly detection and actionable suggestions based on customer ordering trends.
+                </p>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                    {insights.map((alert, i) => {
+                        const isWarn = alert.level === "warning";
+                        const isSuccess = alert.level === "success";
                         return (
                             <div
-                                key={table.tableNo}
-                                className={subPanelClass}
-                                style={{
-                                    ...subPanelStyle,
-                                    boxShadow: `inset 0 0 ${Math.max(8, glow / 3)}px color-mix(in srgb, var(--app-primary) 24%, transparent)`,
-                                }}
+                                key={i}
+                                className={`rounded-2xl border p-4 transition-all duration-200 ${
+                                    isWarn
+                                        ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                                        : isSuccess
+                                        ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200"
+                                        : "border-sky-400/40 bg-sky-400/10 text-sky-200"
+                                }`}
                             >
-                                <p className="text-sm font-semibold sm:text-base">{table.tableNo}</p>
-                                <p className="theme-muted mt-1 text-sm">{table.orders} orders</p>
-                                <p className="theme-price text-sm">{formatMoney(table.revenue)} revenue</p>
+                                <div className="flex items-center gap-2">
+                                    {isWarn ? (
+                                        <AlertCircle size={16} className="text-amber-400" />
+                                    ) : isSuccess ? (
+                                        <CheckCircle2 size={16} className="text-emerald-400" />
+                                    ) : (
+                                        <Sparkles size={16} className="text-sky-400" />
+                                    )}
+                                    <h4 className="text-sm font-bold">{alert.title}</h4>
+                                </div>
+                                <p className="mt-2 text-xs leading-relaxed opacity-90">{alert.description}</p>
                             </div>
                         );
                     })}
-                    {tableHeatmap.length === 0 && (
-                        <p className="theme-muted text-sm">No table usage data for selected range.</p>
-                    )}
                 </div>
             </article>
         </section>

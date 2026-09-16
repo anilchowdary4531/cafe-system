@@ -13,6 +13,7 @@ import {
     UserRoundX,
 } from "lucide-react";
 import { API } from "../../config";
+import { setStoredAccessForUser } from "../../utils/accessControl";
 import { showToast } from "../../utils/toast";
 
 const DESIGNATION_OPTIONS = [
@@ -32,18 +33,7 @@ const DEFAULT_DESIGNATION_BY_ROLE = {
     CASHIER: "Cashier",
     STAFF: "Staff",
 };
-const ACCESS_LABELS = {
-    dashboard: "Dashboard",
-    orders: "Orders",
-    menu: "Menu",
-    tables: "Tables",
-    kitchen: "Kitchen",
-    analytics: "Analytics",
-    finance: "Finance",
-    staff: "Staff",
-    settings: "Settings",
-    notifications: "Notifications",
-};
+import { ACCESS_LABELS } from "../../constants/accessModules";
 
 const defaultAccessByRole = (role) => {
     const normalizedRole = String(role || "STAFF").toUpperCase();
@@ -379,6 +369,8 @@ export default function OwnerStaff() {
             await axios.put(`${API}/owner/${restaurantId}/staff/${staffUserId}/access`, {
                 access: accessDraft,
             });
+            // Persist the updated access in local storage for immediate UI consistency
+            setStoredAccessForUser(staffUserId, accessDraft);
             await loadStaff({ silent: true });
         } catch (err) {
             console.log(err);

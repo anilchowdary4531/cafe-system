@@ -53,23 +53,40 @@
         { "name": "Cafe King Cashier", "email": "cashier.cafeking@tiffzy.com", "phone": "9000000012", "passwordKey": "cafeKingCashier", "role": "CASHIER" }
       ],
       "menuItems": [
-        { "name": "Veg Biryani", "price": 150, "category": "Food", "image": "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d", "rating": 4.7, "reviewCount": 122, "orderCount": 820 },
-        { "name": "Pizza", "price": 220, "category": "Food", "image": "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3", "rating": 4.8, "reviewCount": 154, "orderCount": 960 },
-        { "name": "Burger", "price": 140, "category": "Food", "image": "https://images.unsplash.com/photo-1550547660-d9450f859349", "rating": 4.6, "reviewCount": 99, "orderCount": 720 },
-        { "name": "Cold Coffee", "price": 180, "category": "Coffee", "image": "https://images.unsplash.com/photo-1461023058943-07fcbe16d735", "rating": 4.9, "reviewCount": 188, "orderCount": 1400 },
-        { "name": "Cappuccino", "price": 160, "category": "Coffee", "image": "https://images.unsplash.com/photo-1509042239860-f550ce710b93", "rating": 4.8, "reviewCount": 143, "orderCount": 1100 }
+        { "name": "Hyderabadi Dum Biryani", "price": 220, "category": "Biryani", "image": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8", "rating": 4.9, "reviewCount": 240, "orderCount": 1650, "description": "Fragrant basmati rice layered with aromatic spices and slow-cooked to perfection" },
+        { "name": "Paneer Tikka Biryani", "price": 190, "category": "Biryani", "image": "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d", "rating": 4.8, "reviewCount": 182, "orderCount": 1120, "description": "Charcoal-grilled cottage cheese cubes layered with saffron spiced rice" },
+        { "name": "Veg Dum Biryani Special", "price": 170, "category": "Biryani", "image": "https://images.unsplash.com/photo-1589302168068-964664d93dc0", "rating": 4.7, "reviewCount": 130, "orderCount": 940, "description": "Traditional garden fresh vegetables and golden basmati rice" },
+        { "name": "Paneer Butter Masala", "price": 230, "category": "Main Course", "image": "https://images.unsplash.com/photo-1631452180519-c014fe946bc7", "rating": 4.9, "reviewCount": 310, "orderCount": 1920, "description": "Velvety butter-tomato gravy with melt-in-mouth cottage cheese" },
+        { "name": "Dal Makhani Royale", "price": 190, "category": "Main Course", "image": "https://images.unsplash.com/photo-1546833999-b9f581a1996d", "rating": 4.8, "reviewCount": 195, "orderCount": 1280, "description": "Slow-simmered black lentils cooked overnight with butter and fresh cream" },
+        { "name": "Kadhai Chicken with Herbs", "price": 260, "category": "Main Course", "image": "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398", "rating": 4.8, "reviewCount": 215, "orderCount": 1410, "description": "Tender chicken cooked with bell peppers in a freshly ground spice blend" },
+        { "name": "Butter Garlic Naan Basket", "price": 80, "category": "Main Course", "image": "https://images.unsplash.com/photo-1601050690597-df0568f70950", "rating": 4.7, "reviewCount": 160, "orderCount": 2100, "description": "Clay-oven baked leavened bread brushed with melted garlic butter" },
+        { "name": "Margherita Gourmet Pizza", "price": 240, "category": "Italian & Fast Food", "image": "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3", "rating": 4.8, "reviewCount": 220, "orderCount": 1350, "description": "San Marzano tomato sauce, fresh mozzarella, and sweet basil leaves" },
+        { "name": "Farmhouse Supreme Pizza", "price": 290, "category": "Italian & Fast Food", "image": "https://images.unsplash.com/photo-1513104890138-7c749659a591", "rating": 4.8, "reviewCount": 190, "orderCount": 1180, "description": "Loaded with grilled mushrooms, peppers, sweet corn, and black olives" },
+        { "name": "Crispy Peri Peri Burger", "price": 160, "category": "Italian & Fast Food", "image": "https://images.unsplash.com/photo-1550547660-d9450f859349", "rating": 4.6, "reviewCount": 140, "orderCount": 980, "description": "Golden crispy patty tossed in fiery peri peri seasoning with cheese" },
+        { "name": "Double Patty Smash Burger", "price": 210, "category": "Italian & Fast Food", "image": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd", "rating": 4.9, "reviewCount": 175, "orderCount": 890, "description": "Two seared patties with caramelized onions and cheddar glaze" },
+        { "name": "Paneer Tikka Angara", "price": 210, "category": "Starters", "image": "https://images.unsplash.com/photo-1599488615731-7e5c2823ff28", "rating": 4.8, "reviewCount": 210, "orderCount": 1520, "description": "Spicy tandoori cottage cheese cubes served with mint dip and onion rings" },
+        { "name": "Crispy Chilli Paneer", "price": 190, "category": "Starters", "image": "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8", "rating": 4.7, "reviewCount": 165, "orderCount": 1240, "description": "Wok-tossed paneer cubes in spicy Indo-Chinese garlic soy glaze" },
+        { "name": "Crispy Pepper Corns", "price": 150, "category": "Starters", "image": "https://images.unsplash.com/photo-1541544741938-0af808871cc0", "rating": 4.6, "reviewCount": 115, "orderCount": 860, "description": "Golden fried corn kernels with crushed black pepper and spring onion" },
+        { "name": "Loaded Nachos Grande", "price": 180, "category": "Starters", "image": "https://images.unsplash.com/photo-1513456852971-30c0b8199d4d", "rating": 4.7, "reviewCount": 142, "orderCount": 910, "description": "Crisp corn tortilla chips smothered in warm cheese sauce and fresh salsa" },
+        { "name": "Masala Dosa with Sambar", "price": 100, "category": "Breakfast", "image": "https://images.unsplash.com/photo-1589301760014-d929f3979dbc", "rating": 4.9, "reviewCount": 290, "orderCount": 2450, "description": "Golden crispy crepe folded with spiced potato masala, coconut & tomato chutneys" },
+        { "name": "Chole Bhature Platter", "price": 150, "category": "Breakfast", "image": "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46", "rating": 4.8, "reviewCount": 198, "orderCount": 1600, "description": "Puffed golden bhature served with rich Amritsari spiced chickpeas and pickles" },
+        { "name": "Cold Coffee Deluxe", "price": 170, "category": "Beverages", "image": "https://images.unsplash.com/photo-1461023058943-07fcbe16d735", "rating": 4.9, "reviewCount": 310, "orderCount": 2600, "description": "Signature thick blended espresso with dark chocolate drizzle and cream" },
+        { "name": "Cappuccino Dolce", "price": 150, "category": "Beverages", "image": "https://images.unsplash.com/photo-1509042239860-f550ce710b93", "rating": 4.8, "reviewCount": 180, "orderCount": 1450, "description": "Rich espresso topped with a thick velvety layer of microfoam" },
+        { "name": "Iced Caramel Macchiato", "price": 180, "category": "Beverages", "image": "https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5", "rating": 4.8, "reviewCount": 160, "orderCount": 1150, "description": "Espresso layered over chilled vanilla milk and rich caramel swirl" },
+        { "name": "Fresh Mint Mojito", "price": 130, "category": "Beverages", "image": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd", "rating": 4.7, "reviewCount": 140, "orderCount": 1020, "description": "Crushed garden mint, fresh lime, and sparkling soda on crushed ice" },
+        { "name": "Belgian Chocolate Waffle", "price": 190, "category": "Desserts", "image": "https://images.unsplash.com/photo-1562376552-0d160a2f238d", "rating": 4.9, "reviewCount": 220, "orderCount": 1300, "description": "Warm crispy waffle topped with melted Belgian dark chocolate and hazelnuts" },
+        { "name": "Sizzling Walnut Brownie", "price": 200, "category": "Desserts", "image": "https://images.unsplash.com/photo-1606313564200-e75d5e30476c", "rating": 4.9, "reviewCount": 265, "orderCount": 1780, "description": "Gooey chocolate walnut brownie served on a smoking sizzler plate with vanilla scoop" },
+        { "name": "Gulab Jamun with Rabri", "price": 120, "category": "Desserts", "image": "https://images.unsplash.com/photo-1541832676-9b763b0239ab", "rating": 4.8, "reviewCount": 150, "orderCount": 1100, "description": "Soft warm milk dumplings served with saffron-infused thickened cream" }
       ],
       "tables": [
         { "tableNo": "T1", "seats": 4 },
         { "tableNo": "T2", "seats": 4 },
         { "tableNo": "T3", "seats": 2 },
-        { "tableNo": "T4", "seats": 6 }
-      ],
-      "orders": [
-        { "orderNo": "ORD-CK-1001", "invoiceNo": "CK-1001", "customerName": "Rahul", "phone": "9000000001", "tableNo": "T1", "notes": "Less spicy", "status": "PLACED", "minutesAgo": 3, "items": [{ "name": "Veg Biryani", "qty": 1 }, { "name": "Cold Coffee", "qty": 1 }] },
-        { "orderNo": "ORD-CK-1002", "invoiceNo": "CK-1002", "customerName": "Nisha", "phone": "9000000002", "tableNo": "T2", "notes": "No onion", "status": "PREPARING", "minutesAgo": 9, "items": [{ "name": "Pizza", "qty": 1 }, { "name": "Burger", "qty": 2 }] },
-        { "orderNo": "ORD-CK-1003", "invoiceNo": "CK-1003", "customerName": "Arjun", "phone": "9000000003", "tableNo": "T3", "notes": "", "status": "READY", "minutesAgo": 14, "items": [{ "name": "Cappuccino", "qty": 2 }] },
-        { "orderNo": "ORD-CK-1004", "invoiceNo": "CK-1004", "customerName": "Priya", "phone": "9000000004", "tableNo": "T4", "notes": "", "status": "DELIVERED", "minutesAgo": 24, "items": [{ "name": "Veg Biryani", "qty": 2 }] }
+        { "tableNo": "T4", "seats": 6 },
+        { "tableNo": "T5", "seats": 2 },
+        { "tableNo": "T6", "seats": 4 },
+        { "tableNo": "T7", "seats": 8 },
+        { "tableNo": "T8", "seats": 4 }
       ]
     },
     {
@@ -87,6 +104,8 @@
       "taxEnabled": true,
       "taxType": "INCLUSIVE",
       "defaultTaxPercent": 5,
+      "serviceChargeEnabled": false,
+      "serviceChargePercent": 0,
       "invoicePrefix": "BH",
       "nextInvoiceNumber": 1001,
       "users": [
@@ -96,18 +115,39 @@
         { "name": "Bean House Waiter", "email": "waiter.beanhouse@tiffzy.com", "phone": "9000000022", "passwordKey": "beanHouseWaiter", "role": "WAITER" }
       ],
       "menuItems": [
-        { "name": "Latte", "price": 170, "category": "Coffee", "image": "https://images.unsplash.com/photo-1461023058943-07fcbe16d735", "rating": 4.8, "reviewCount": 140, "orderCount": 870 },
-        { "name": "Espresso", "price": 130, "category": "Coffee", "image": "https://images.unsplash.com/photo-1511920170033-f8396924c348", "rating": 4.7, "reviewCount": 102, "orderCount": 620 },
-        { "name": "Brownie", "price": 190, "category": "Dessert", "image": "https://images.unsplash.com/photo-1606313564200-e75d5e30476c", "rating": 4.9, "reviewCount": 118, "orderCount": 540 }
+        { "name": "Classic Cafe Latte", "price": 160, "category": "Artisanal Coffee", "image": "https://images.unsplash.com/photo-1570968915860-54d5c301fa9f", "rating": 4.8, "reviewCount": 190, "orderCount": 1420, "description": "Double espresso shot combined with steamed whole milk and light foam" },
+        { "name": "Single Origin Espresso", "price": 120, "category": "Artisanal Coffee", "image": "https://images.unsplash.com/photo-1511920170033-f8396924c348", "rating": 4.7, "reviewCount": 130, "orderCount": 890, "description": "Intense and aromatic single origin roast with rich golden crema" },
+        { "name": "Spanish Sweet Latte", "price": 190, "category": "Artisanal Coffee", "image": "https://images.unsplash.com/photo-1534778101976-62847782c213", "rating": 4.9, "reviewCount": 210, "orderCount": 1680, "description": "Espresso balanced with silky steamed milk and sweetened condensed milk" },
+        { "name": "Dark Chocolate Mocha", "price": 180, "category": "Artisanal Coffee", "image": "https://images.unsplash.com/photo-1578314675249-a6910f80cc4e", "rating": 4.8, "reviewCount": 175, "orderCount": 1150, "description": "Artisan dark cacao melted into espresso and velvety textured milk" },
+        { "name": "Aussie Flat White", "price": 160, "category": "Artisanal Coffee", "image": "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd", "rating": 4.8, "reviewCount": 145, "orderCount": 970, "description": "Pure ristretto shots poured over silky micro-textured milk" },
+        { "name": "Nitro Cold Brew", "price": 190, "category": "Cold Brews", "image": "https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5", "rating": 4.9, "reviewCount": 230, "orderCount": 1540, "description": "18-hour cold steeped brew infused with nitrogen for a creamy Guinness-like head" },
+        { "name": "Vanilla Cream Cold Brew", "price": 180, "category": "Cold Brews", "image": "https://images.unsplash.com/photo-1461023058943-07fcbe16d735", "rating": 4.8, "reviewCount": 165, "orderCount": 1210, "description": "Slow steep brew topped with house-made vanilla sweet cream float" },
+        { "name": "Japanese Ceremonial Matcha", "price": 210, "category": "Specialty Teas", "image": "https://images.unsplash.com/photo-1536256263959-770b48d82b0a", "rating": 4.8, "reviewCount": 140, "orderCount": 850, "description": "Uji ceremonial grade green tea whisked with creamy oat milk" },
+        { "name": "Peach Cascara Iced Tea", "price": 140, "category": "Specialty Teas", "image": "https://images.unsplash.com/photo-1556679343-c7306c1976bc", "rating": 4.7, "reviewCount": 110, "orderCount": 780, "description": "Brewed from coffee cherry husk with fresh peach puree and crushed ice" },
+        { "name": "Earl Grey Bergamot Tea", "price": 130, "category": "Specialty Teas", "image": "https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9", "rating": 4.6, "reviewCount": 88, "orderCount": 560, "description": "Black tea infused with Italian bergamot citrus essential oils" },
+        { "name": "Artisan Butter Croissant", "price": 130, "category": "Bakery & Viennoiserie", "image": "https://images.unsplash.com/photo-1555507036-ab1f4038808a", "rating": 4.9, "reviewCount": 260, "orderCount": 2300, "description": "Flaky 27-layered golden pastry made with 100% Normandy French butter" },
+        { "name": "Almond Frangipane Croissant", "price": 170, "category": "Bakery & Viennoiserie", "image": "https://images.unsplash.com/photo-1509440159596-0249088772ff", "rating": 4.9, "reviewCount": 195, "orderCount": 1480, "description": "Twice-baked croissant stuffed with almond cream and toasted almond slivers" },
+        { "name": "Wild Blueberry Muffin", "price": 120, "category": "Bakery & Viennoiserie", "image": "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e", "rating": 4.7, "reviewCount": 120, "orderCount": 940, "description": "Moist butter cake bursting with blueberries and crunchy crumble topping" },
+        { "name": "Sourdough Avocado Toast", "price": 220, "category": "All-Day Brunch", "image": "https://images.unsplash.com/photo-1525351484163-7529414344d8", "rating": 4.8, "reviewCount": 210, "orderCount": 1620, "description": "Toasted rustic sourdough topped with smashed Hass avocado, feta, and chilli flakes" },
+        { "name": "Truffle Mushroom Toastie", "price": 210, "category": "All-Day Brunch", "image": "https://images.unsplash.com/photo-1554433607-66b5efe9d304", "rating": 4.9, "reviewCount": 170, "orderCount": 1190, "description": "Pan-seared cremini mushrooms with black truffle oil and melted gruyere" },
+        { "name": "Smoked Chicken Ciabatta", "price": 250, "category": "Gourmet Sandwiches", "image": "https://images.unsplash.com/photo-1528735602780-2552fd46c7af", "rating": 4.8, "reviewCount": 185, "orderCount": 1340, "description": "Hickory smoked chicken breast, aged cheddar, arugula, and grain mustard mayo" },
+        { "name": "Pesto Mozzarella Panini", "price": 200, "category": "Gourmet Sandwiches", "image": "https://images.unsplash.com/photo-1509722747041-616f39b57569", "rating": 4.7, "reviewCount": 145, "orderCount": 1050, "description": "Fresh buffalo mozzarella, Roma tomatoes, and genovese basil pesto on crusty bread" },
+        { "name": "Grilled Cheese Jalapeno", "price": 170, "category": "Gourmet Sandwiches", "image": "https://images.unsplash.com/photo-1528736235302-52922df5c122", "rating": 4.7, "reviewCount": 130, "orderCount": 990, "description": "Triple blend cheddar and pepper jack grilled on buttered country white bread" },
+        { "name": "Fudge Brownie with Sea Salt", "price": 160, "category": "Desserts", "image": "https://images.unsplash.com/photo-1606313564200-e75d5e30476c", "rating": 4.9, "reviewCount": 240, "orderCount": 1820, "description": "Decadent dark chocolate brownie sprinkled with Maldon sea salt crystals" },
+        { "name": "New York Style Cheesecake", "price": 240, "category": "Desserts", "image": "https://images.unsplash.com/photo-1533134242443-d4fd215305ad", "rating": 4.9, "reviewCount": 215, "orderCount": 1490, "description": "Creamy baked cheesecake on buttery graham cracker crust with berry compote" },
+        { "name": "Basque Burnt Cheesecake", "price": 260, "category": "Desserts", "image": "https://images.unsplash.com/photo-1508737027454-e6454ef45afd", "rating": 4.9, "reviewCount": 180, "orderCount": 1210, "description": "Caramelized crust with a smooth custard-like molten center" },
+        { "name": "Traditional Tiramisu Cup", "price": 220, "category": "Desserts", "image": "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9", "rating": 4.9, "reviewCount": 195, "orderCount": 1360, "description": "Espresso soaked ladyfingers layered with whipped mascarpone cream and cocoa" },
+        { "name": "Matcha White Chocolate Cookie", "price": 95, "category": "Bakery & Viennoiserie", "image": "https://images.unsplash.com/photo-1499636136210-6f4ee915583e", "rating": 4.7, "reviewCount": 110, "orderCount": 820, "description": "Chewy Japanese matcha green tea cookie embedded with Belgian white chocolate chips" }
       ],
       "tables": [
         { "tableNo": "A1", "seats": 2 },
         { "tableNo": "A2", "seats": 4 },
-        { "tableNo": "A3", "seats": 4 }
-      ],
-      "orders": [
-        { "orderNo": "ORD-BH-1001", "invoiceNo": "BH-1001", "customerName": "Kiran", "phone": "9111111111", "tableNo": "A1", "notes": "Extra hot", "status": "PLACED", "minutesAgo": 4, "items": [{ "name": "Latte", "qty": 1 }, { "name": "Brownie", "qty": 1 }] },
-        { "orderNo": "ORD-BH-1002", "invoiceNo": "BH-1002", "customerName": "Meera", "phone": "9222222222", "tableNo": "A2", "notes": "", "status": "PREPARING", "minutesAgo": 11, "items": [{ "name": "Espresso", "qty": 2 }] }
+        { "tableNo": "A3", "seats": 4 },
+        { "tableNo": "A4", "seats": 2 },
+        { "tableNo": "A5", "seats": 6 },
+        { "tableNo": "A6", "seats": 2 },
+        { "tableNo": "A7", "seats": 4 },
+        { "tableNo": "A8", "seats": 4 }
       ]
     }
   ]

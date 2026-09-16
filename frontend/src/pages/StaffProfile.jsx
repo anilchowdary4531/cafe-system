@@ -27,8 +27,9 @@ import {
     getKitchenMinutesSince,
     isLiveKitchenStatus,
     readKitchenAssignmentHistory,
-    readKitchenAssignments,
+    readKitchenAssignments
 } from "../utils/kitchenBoardStorage";
+import { ACCESS_LABELS } from "../constants/accessModules";
 
 const ACTION_STYLES = {
     ASSIGNED: {
@@ -53,18 +54,7 @@ const ACTION_STYLES = {
     },
 };
 
-const ACCESS_LABELS = {
-    dashboard: "Dashboard",
-    orders: "Orders",
-    menu: "Menu",
-    tables: "Tables",
-    kitchen: "Kitchen",
-    analytics: "Analytics",
-    finance: "Finance",
-    staff: "Staff",
-    settings: "Settings",
-    notifications: "Notifications",
-};
+
 
 const formatLabel = (value) =>
     String(value || "")

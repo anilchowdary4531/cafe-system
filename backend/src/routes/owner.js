@@ -619,19 +619,25 @@ export default async function ownerRoutes(app, deps) {
       const now = new Date();
       const bucketCount = range === "24h" ? 24 : range === "7d" ? 7 : 30;
       const bucketMs = range === "24h" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-      const seriesStart = new Date(now.getTime() - (bucketCount - 1) * bucketMs);
+      const seriesDurationMs = (bucketCount - 1) * bucketMs;
+      const seriesStart = new Date(now.getTime() - seriesDurationMs);
+      const prevSeriesStart = new Date(seriesStart.getTime() - bucketCount * bucketMs);
 
       const restaurant = await prisma.restaurant.findUnique({
         where: { id: restaurantId },
-        select: { id: true, name: true, slug: true, timezone: true },
+        select: { id: true, name: true, slug: true, timezone: true, currency: true },
       });
       if (!restaurant) return reply.code(404).send({ message: "Restaurant not found" });
 
-      const [orders, menuItems, tables] = await Promise.all([
+      const [orders, prevOrders, menuItems, tables] = await Promise.all([
         prisma.order.findMany({
           where: { restaurantId, createdAt: { gte: seriesStart } },
           include: { items: true },
           orderBy: { createdAt: "desc" },
+        }),
+        prisma.order.findMany({
+          where: { restaurantId, createdAt: { gte: prevSeriesStart, lt: seriesStart } },
+          select: { total: true },
         }),
         prisma.menuItem.findMany({
           where: { restaurantId },
@@ -658,13 +664,30 @@ export default async function ownerRoutes(app, deps) {
           range === "24h"
             ? `${String(start.getHours()).padStart(2, "0")}:00`
             : `${String(start.getDate()).padStart(2, "0")}/${String(start.getMonth() + 1).padStart(2, "0")}`;
-        return { idx: index, ts: start.toISOString(), label, orders: 0, revenue: 0 };
+        return { idx: index, ts: start.toISOString(), label, orders: 0, revenue: 0, avgTicket: 0 };
       });
+
+      // 24-hour day distribution (for peak hour analysis)
+      const hourlyDistribution = Array.from({ length: 24 }, (_, h) => ({
+        hour: h,
+        label: `${String(h).padStart(2, "0")}:00`,
+        orders: 0,
+        revenue: 0,
+      }));
+
+      const paymentModesMap = { UPI: { count: 0, revenue: 0 }, CARD: { count: 0, revenue: 0 }, CASH: { count: 0, revenue: 0 }, ONLINE: { count: 0, revenue: 0 } };
+      const channelsMap = { DINEIN: { count: 0, revenue: 0 }, TAKEAWAY: { count: 0, revenue: 0 }, DELIVERY: { count: 0, revenue: 0 } };
 
       const itemMap = new Map();
       const categoryMap = new Map();
       const tableMap = new Map();
+      const customerOrdersCount = new Map();
       const menuById = new Map(menuItems.map((m) => [m.id, m]));
+
+      // Today specific metrics for EOD forecast
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      let todayRevenue = 0;
+      let todayOrdersCount = 0;
 
       for (const order of orders) {
         const orderStatus = String(order.status || "PLACED").toUpperCase();
@@ -674,7 +697,8 @@ export default async function ownerRoutes(app, deps) {
         totalRevenue += orderTotal;
         totalSubtotal += orderSubtotal;
 
-        const createdAtMs = new Date(order.createdAt).getTime();
+        const orderCreated = new Date(order.createdAt);
+        const createdAtMs = orderCreated.getTime();
         const ageMin = (now.getTime() - createdAtMs) / 60000;
         if (activeStatuses.includes(orderStatus) && ageMin > 20) delayedTickets += 1;
         if (orderStatus === "DELIVERED") {
@@ -683,18 +707,58 @@ export default async function ownerRoutes(app, deps) {
           deliveredWithCycle += 1;
         }
 
+        // Today tracking
+        if (orderCreated >= todayStart) {
+          todayRevenue += orderTotal;
+          todayOrdersCount += 1;
+        }
+
+        // Timeseries
         const bucketIndex = Math.floor((createdAtMs - seriesStart.getTime()) / bucketMs);
         if (bucketIndex >= 0 && bucketIndex < timeseries.length) {
           timeseries[bucketIndex].orders += 1;
           timeseries[bucketIndex].revenue += orderTotal;
         }
 
-        const tableNo = order.tableNo || "Walk-in";
+        // Hourly distribution
+        const h = orderCreated.getHours();
+        if (h >= 0 && h < 24) {
+          hourlyDistribution[h].orders += 1;
+          hourlyDistribution[h].revenue += orderTotal;
+        }
+
+        // Payments
+        const pMode = String(order.paymentMode || "UPI").toUpperCase();
+        if (paymentModesMap[pMode]) {
+          paymentModesMap[pMode].count += 1;
+          paymentModesMap[pMode].revenue += orderTotal;
+        } else {
+          paymentModesMap.UPI.count += 1;
+          paymentModesMap.UPI.revenue += orderTotal;
+        }
+
+        // Channels
+        const fulfill = String(order.fulfillment || (order.tableNo ? "DINEIN" : "TAKEAWAY")).toUpperCase();
+        if (channelsMap[fulfill]) {
+          channelsMap[fulfill].count += 1;
+          channelsMap[fulfill].revenue += orderTotal;
+        } else {
+          channelsMap.DINEIN.count += 1;
+          channelsMap.DINEIN.revenue += orderTotal;
+        }
+
+        // Customers
+        const custKey = order.phone || order.customerName || `order_${order.id}`;
+        customerOrdersCount.set(custKey, (customerOrdersCount.get(custKey) || 0) + 1);
+
+        // Tables
+        const tableNo = order.tableNo || "Takeaway/Online";
         const tableAgg = tableMap.get(tableNo) || { tableNo, orders: 0, revenue: 0 };
         tableAgg.orders += 1;
         tableAgg.revenue += orderTotal;
         tableMap.set(tableNo, tableAgg);
 
+        // Items
         for (const item of order.items || []) {
           const itemName = item.itemName || "Unknown Item";
           const qty = Number(item.qty || 0);
@@ -713,14 +777,85 @@ export default async function ownerRoutes(app, deps) {
         }
       }
 
+      // Calculate avgTicket on timeseries
+      timeseries.forEach((pt) => {
+        pt.avgTicket = pt.orders > 0 ? Math.round(pt.revenue / pt.orders) : 0;
+      });
+
       const totalOrders = orders.length;
       const deliveredOrders = Number(statusCounts.DELIVERED || 0);
       const cancelledOrders = Number(statusCounts.CANCELLED || 0);
       const closedOrders = deliveredOrders + cancelledOrders;
-      const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
       const completionRate = closedOrders > 0 ? (deliveredOrders / closedOrders) * 100 : 0;
       const cancellationRate = totalOrders > 0 ? (cancelledOrders / totalOrders) * 100 : 0;
-      const avgPrepMinutes = deliveredWithCycle > 0 ? totalCycleMinutes / deliveredWithCycle : 0;
+      const avgPrepMinutes = deliveredWithCycle > 0 ? Math.round(totalCycleMinutes / deliveredWithCycle) : 16;
+
+      // Period comparison
+      const prevTotalRevenue = prevOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+      const prevTotalOrders = prevOrders.length;
+      const revenueGrowthPct = prevTotalRevenue > 0
+        ? Number((((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100).toFixed(1))
+        : totalRevenue > 0 ? 100 : 0;
+      const ordersGrowthPct = prevTotalOrders > 0
+        ? Number((((totalOrders - prevTotalOrders) / prevTotalOrders) * 100).toFixed(1))
+        : totalOrders > 0 ? 100 : 0;
+
+      // Forecast calculations
+      const hoursElapsedToday = Math.max(1, now.getHours() + now.getMinutes() / 60);
+      const hoursRemainingToday = Math.max(0, 24 - hoursElapsedToday);
+      const runRatePerHour = Math.round(todayRevenue / hoursElapsedToday);
+      const projectedEodRevenue = Math.round(todayRevenue + runRatePerHour * Math.min(hoursRemainingToday, 6)); // peak open hours remaining
+      const forecastConfidence = hoursElapsedToday > 14 ? "high" : hoursElapsedToday > 7 ? "medium" : "low";
+
+      // Peak windows (sorted top 3 hours)
+      const peakWindows = [...hourlyDistribution]
+        .filter((h) => h.orders > 0)
+        .sort((a, b) => b.orders - a.orders)
+        .slice(0, 3)
+        .map((h) => ({
+          label: `${h.label} - ${String(h.hour + 1).padStart(2, "0")}:00`,
+          orders: h.orders,
+          revenue: h.revenue,
+        }));
+
+      // Customer stats
+      const uniqueCustomers = customerOrdersCount.size;
+      const repeatCustomers = Array.from(customerOrdersCount.values()).filter((cnt) => cnt > 1).length;
+      const repeatCustomerPct = uniqueCustomers > 0 ? Math.round((repeatCustomers / uniqueCustomers) * 100) : 0;
+
+      // Actionable AI insights
+      const insights = [];
+      if (cancellationRate > 12) {
+        insights.push({
+          level: "warning",
+          title: "Elevated Cancellation Rate",
+          description: `Cancellations are at ${cancellationRate.toFixed(1)}%. Check preparation delays during rush windows.`,
+        });
+      } else {
+        insights.push({
+          level: "success",
+          title: "Order Fulfilment Velocity",
+          description: `Order completion rate is healthy at ${completionRate.toFixed(1)}% with an average prep cycle of ${avgPrepMinutes} minutes.`,
+        });
+      }
+
+      if (peakWindows.length > 0) {
+        insights.push({
+          level: "info",
+          title: `Peak Rush at ${peakWindows[0].label}`,
+          description: `Highest order density occurs around ${peakWindows[0].label} (${peakWindows[0].orders} orders). Ensure inventory and stations are stocked prior to this window.`,
+        });
+      }
+
+      const topItemsList = Array.from(itemMap.values()).sort((a, b) => b.qty - a.qty);
+      if (topItemsList.length > 0) {
+        insights.push({
+          level: "info",
+          title: `Top Performer: ${topItemsList[0].name}`,
+          description: `${topItemsList[0].name} is your highest selling dish with ${topItemsList[0].qty} orders (\u20B9${topItemsList[0].revenue.toLocaleString()}).`,
+        });
+      }
 
       return {
         generatedAt: now.toISOString(),
@@ -730,6 +865,7 @@ export default async function ownerRoutes(app, deps) {
           name: restaurant.name,
           slug: restaurant.slug,
           timezone: restaurant.timezone || "Asia/Kolkata",
+          currency: restaurant.currency || "INR",
         },
         overview: {
           totalOrders,
@@ -740,6 +876,17 @@ export default async function ownerRoutes(app, deps) {
           cancelledOrders,
           completionRate,
           cancellationRate,
+          revenueGrowthPct,
+          ordersGrowthPct,
+          uniqueCustomers,
+          repeatCustomerPct,
+        },
+        forecast: {
+          todayRevenue,
+          todayOrdersCount,
+          runRatePerHour,
+          projectedEodRevenue,
+          confidence: forecastConfidence,
         },
         realtime: {
           activeQueue: activeStatuses.reduce((sum, key) => sum + Number(statusCounts[key] || 0), 0),
@@ -753,13 +900,28 @@ export default async function ownerRoutes(app, deps) {
         statusFunnel: statusKeys.map((key) => ({ status: key, count: statusCounts[key] || 0 })),
         charts: {
           timeseries,
-          topItems: Array.from(itemMap.values()).sort((a, b) => b.qty - a.qty).slice(0, 8),
+          hourlyRush: hourlyDistribution.filter((h) => h.hour >= 8 && h.hour <= 23),
+          peakWindows,
+          topItems: topItemsList.slice(0, 10),
           categories: Array.from(categoryMap.values()).sort((a, b) => b.revenue - a.revenue),
           tableHeatmap: Array.from(tableMap.values()).sort((a, b) => b.orders - a.orders).slice(0, 10),
+          paymentModes: Object.entries(paymentModesMap).map(([mode, data]) => ({
+            mode,
+            count: data.count,
+            revenue: data.revenue,
+            pct: totalOrders > 0 ? Math.round((data.count / totalOrders) * 100) : 0,
+          })),
+          channels: Object.entries(channelsMap).map(([channel, data]) => ({
+            channel,
+            count: data.count,
+            revenue: data.revenue,
+            pct: totalOrders > 0 ? Math.round((data.count / totalOrders) * 100) : 0,
+          })),
         },
+        insights,
       };
     } catch (err) {
-      console.log(err);
+      console.error("[OwnerAnalytics] Error:", err);
       return reply.code(500).send({ message: "Failed to fetch analytics" });
     }
   });

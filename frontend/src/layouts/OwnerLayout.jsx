@@ -21,6 +21,7 @@ import {
     Truck,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { getStoredAccessForUser } from "../utils/accessControl";
 import axios from "axios";
 import { resolveRestaurantName } from "../utils/restaurantContext";
 import BrandLogo from "../components/BrandLogo";
@@ -36,19 +37,7 @@ import {
 } from "../utils/ownerNotifications";
 import { API } from "../config";
 
-const MODULES = [
-    "dashboard",
-    "orders",
-    "menu",
-    "tables",
-    "kitchen",
-    "analytics",
-    "finance",
-    "staff",
-    "settings",
-    "notifications",
-    "supply",
-];
+import { MODULES } from "../constants/accessModules";
 
 const defaultAccessByRole = (role) => {
     const r = String(role || "OWNER").toUpperCase();
@@ -446,8 +435,12 @@ export default function OwnerLayout() {
     );
 
     const access = useMemo(
-        () => normalizeAccess(user?.access, effectiveRole),
-        [effectiveRole, user?.access]
+        () => {
+            const stored = getStoredAccessForUser(user?.id);
+            const rawAccess = stored !== null ? stored : user?.access;
+            return normalizeAccess(rawAccess, effectiveRole);
+        },
+        [effectiveRole, user?.access, user?.id]
     );
 
     // logout is provided by AuthContext (clears cache + navigates with replace).
