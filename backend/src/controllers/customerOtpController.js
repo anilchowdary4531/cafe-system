@@ -6,6 +6,18 @@ import { sendWhatsAppOtp } from "../services/msg91WhatsAppService.js";
 import { upsertCustomerAccount } from "../services/customerProfileService.js";
 import { extractVerifiedIdentifier, verifyMsg91AccessToken } from "../services/msg91OtpWidgetService.js";
 
+const isPlayReviewAccount = (phone) => {
+  if (String(process.env.PLAY_REVIEW_ACCOUNT_ENABLED).toLowerCase() !== "true") {
+    return false;
+  }
+
+  const configuredPhone = normalizePhone(
+    String(process.env.PLAY_REVIEW_PHONE || "").trim()
+  );
+
+  return Boolean(configuredPhone && phone === configuredPhone);
+};
+
 export const buildCustomerOtpController = ({ prisma, app }) => {
   const sendOtp = async (req, reply) => {
     console.log("========== AUTH REQUEST ==========");
@@ -52,6 +64,31 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
 
       if (!phone) return reply.code(400).send({ message: "Phone number or Email is required" });
 
+      if (isPlayReviewAccount(phone)) {
+        let existingName = null;
+        if (account) {
+          if (isValidName(account.name)) {
+            existingName = account.name.trim();
+          } else if (isValidName(account.username)) {
+            existingName = account.username.trim();
+          }
+        }
+
+        return {
+          message: "OTP sent",
+          phone,
+          email: email || null,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+          hasName: Boolean(existingName),
+          existingName,
+          delivery: {
+            whatsApp: { ok: true, simulated: true },
+            sms: { ok: true, simulated: true },
+            email: null,
+          },
+        };
+      }
+
       const otpRes = await requestOtp({ prisma, phone });
       if (!otpRes.ok) return reply.code(otpRes.status).send(otpRes.payload);
 
@@ -85,7 +122,7 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
       if (!delivered) {
         const waErr = whatsAppRes && whatsAppRes.ok === false ? whatsAppRes.error : null;
         const smsErr = smsRes && smsRes.ok === false ? smsRes.error : null;
-        const emailErr = emailRes && emailRes.ok === false ? emailRes.error : null;
+        const emailErr = emailRes && emailErr.ok === false ? emailErr.error : null;
         const primaryErr = waErr || smsErr || emailErr || "Failed to send OTP";
         const hint = email
           ? "Please retry after a moment."
@@ -189,7 +226,12 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
       if (!phone) return reply.code(400).send({ message: "Phone number or Email is required" });
       if (!accessToken && !otp) return reply.code(400).send({ message: "OTP (or accessToken) is required" });
 
-      if (accessToken) {
+      if (isPlayReviewAccount(phone)) {
+        const configuredOtp = String(process.env.PLAY_REVIEW_OTP || "").trim();
+        if (!configuredOtp || otp !== configuredOtp) {
+          return reply.code(401).send({ message: "Invalid OTP" });
+        }
+      } else if (accessToken) {
         const verified = await verifyMsg91AccessToken({ accessToken });
         if (!verified.ok) return reply.code(verified.status).send(verified.payload);
 
