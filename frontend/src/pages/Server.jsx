@@ -923,13 +923,32 @@ export default function Server() {
             refreshTables({ force: true }).catch(() => {});
         };
 
+        const onKotStatusUpdated = (data) => {
+            const kot = data?.kot || data;
+            const status = String(kot?.status || "").toUpperCase();
+            if (status === "READY") {
+                playNotificationSound();
+                showToast({
+                    title: `👨‍🍳 KOT Ready! (${kot?.kotNumber || 'Ticket'})`,
+                    message: `Table ${kot?.order?.tableNo || kot?.tableNo || '--'} items are ready in ${kot?.station?.name || 'Kitchen'}!`,
+                    variant: "success",
+                    durationMs: 4000,
+                });
+            }
+            loadOrders({ silent: true });
+        };
+
         socket.on("order:created", onCreated);
         socket.on("order:updated", onUpdated);
         socket.on("table:session_updated", onSessionUpdated);
+        socket.on("kot:created", () => loadOrders({ silent: true }));
+        socket.on("kot:status_updated", onKotStatusUpdated);
         return () => {
             socket.off("order:created", onCreated);
             socket.off("order:updated", onUpdated);
             socket.off("table:session_updated", onSessionUpdated);
+            socket.off("kot:created");
+            socket.off("kot:status_updated", onKotStatusUpdated);
         };
     }, [refreshTables, socket]);
 

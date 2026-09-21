@@ -63,6 +63,7 @@ model Restaurant {
   // BILLING
   invoicePrefix     String? @default("INV") @map("invoice_prefix")
   nextInvoiceNumber Int     @default(1001) @map("next_invoice_number")
+  nextKotNumber     Int     @default(101)  @map("next_kot_number")
 
   // STATUS
   isActive Boolean @default(true) @map("is_active")
@@ -89,6 +90,9 @@ model Restaurant {
   customerNotifications CustomerNotification[]
   supplyCarts          SupplyCart[]
   supplyOrders         SupplyOrder[]
+  printers             Printer[]
+  kitchenStations      KitchenStation[]
+  kots                 KitchenOrderTicket[]
 
   @@map("restaurants")
 }
@@ -177,6 +181,9 @@ model MenuItem {
   restaurantId Int        @map("restaurant_id")
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
+  kitchenStationId Int?            @map("kitchen_station_id")
+  kitchenStation   KitchenStation? @relation(fields: [kitchenStationId], references: [id], onDelete: SetNull)
+
   inventory InventoryStock[]
   variants  MenuItemVariant[]
   modifierGroups MenuItemModifierGroup[]
@@ -185,6 +192,7 @@ model MenuItem {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@index([restaurantId, category, isAvailable])
+  @@index([restaurantId, kitchenStationId])
   @@map("menu_items")
 }
 
@@ -313,6 +321,7 @@ model Order {
   statusEvents OrderStatusEvent[]
   payments     Payment[]
   payLaterTransactions PayLaterTransaction[]
+  kots         KitchenOrderTicket[]
 
   @@unique([restaurantId, orderNo])
   @@index([restaurantId, customerId, createdAt])
@@ -554,6 +563,7 @@ model TableSession {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   orders Order[]
+  kots   KitchenOrderTicket[]
 
   @@index([restaurantId, tableId, status])
   @@index([restaurantId, status, createdAt])
@@ -1354,4 +1364,134 @@ model SupplyAnalyticsEvent {
   @@index([actorType, actorId])
   @@map("supply_analytics_events")
 }
+
+///////////////////////////////////////////////////////////
+// PRINTERS & KITCHEN STATIONS
+///////////////////////////////////////////////////////////
+
+model Printer {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  name             String
+  connectionType   String  @default("NETWORK") @map("connection_type") // NETWORK / ESC_POS_DIRECT
+  ipAddress        String? @map("ip_address")
+  port             Int     @default(9100)
+  paperWidth       String  @default("80mm") @map("paper_width") // 58mm / 80mm
+  isBillingPrinter Boolean @default(false) @map("is_billing_printer")
+  isDefault        Boolean @default(false) @map("is_default")
+  isActive         Boolean @default(true) @map("is_active")
+
+  stations KitchenStation[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([restaurantId, isActive])
+  @@map("printers")
+}
+
+model KitchenStation {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  name        String
+  code        String?
+  description String?
+  isDefault   Boolean @default(false) @map("is_default")
+  isActive    Boolean @default(true) @map("is_active")
+
+  printerId Int?     @map("printer_id")
+  printer   Printer? @relation(fields: [printerId], references: [id], onDelete: SetNull)
+
+  menuItems MenuItem[]
+  kots      KitchenOrderTicket[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId, isActive])
+  @@map("kitchen_stations")
+}
+
+model KitchenOrderTicket {
+  id Int @id @default(autoincrement())
+
+  kotNo          String @map("kot_no")
+  sequenceNumber Int    @map("sequence_number")
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  tableSessionId Int?          @map("table_session_id")
+  tableSession   TableSession? @relation(fields: [tableSessionId], references: [id], onDelete: SetNull)
+
+  orderId Int   @map("order_id")
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  stationId Int?            @map("station_id")
+  station   KitchenStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  stationName String? @map("station_name")
+  tableNo     String? @map("table_no")
+
+  waiterId   Int?    @map("waiter_id")
+  waiterName String? @map("waiter_name")
+
+  // TYPE: NEW / MODIFICATION / CANCELLATION
+  type String @default("NEW")
+
+  // STATUS: PENDING / PRINTED / PRINT_FAILED / PREPARING / READY / SERVED / CANCELLED
+  status String @default("PENDING")
+
+  printed      Boolean   @default(false)
+  printedAt    DateTime? @map("printed_at")
+  printError   String?   @map("print_error")
+  reprintCount Int       @default(0) @map("reprint_count")
+
+  notes          String?
+  idempotencyKey String? @map("idempotency_key")
+
+  items KitchenOrderTicketItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([restaurantId, kotNo])
+  @@index([restaurantId, status, createdAt])
+  @@index([restaurantId, tableSessionId])
+  @@index([restaurantId, orderId])
+  @@index([restaurantId, stationId])
+  @@map("kitchen_order_tickets")
+}
+
+model KitchenOrderTicketItem {
+  id Int @id @default(autoincrement())
+
+  kotId Int                @map("kot_id")
+  kot   KitchenOrderTicket @relation(fields: [kotId], references: [id], onDelete: Cascade)
+
+  orderItemId Int?   @map("order_item_id")
+  menuItemId  Int?   @map("menu_item_id")
+  itemName    String @map("item_name")
+
+  variantId         Int?    @map("variant_id")
+  variantName       String? @map("variant_name")
+  variantPrice      Float?  @map("variant_price")
+  selectedModifiers Json?   @map("selected_modifiers")
+  notes             String?
+
+  qty    Int    @map("quantity")
+  status String @default("PENDING")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("kitchen_order_ticket_items")
+}
+
 

@@ -10,6 +10,19 @@ import {
 import { resolveMenuPricing } from "../services/menuPricingService.js";
 import { buildPayLaterController } from "../controllers/payLaterController.js";
 import { buildSettlementController } from "../controllers/settlementController.js";
+import {
+  createPrinter,
+  createStation,
+  deletePrinter,
+  getKots,
+  getPrinters,
+  getStations,
+  testPrinter,
+  triggerReprint,
+  updatePrinter,
+  updateStation,
+  updateStatus as updateKotStatusController,
+} from "../controllers/kot.controller.js";
 
 export default async function ownerRoutes(app, deps) {
   const { prisma, buildQrTargetUrl, FRONTEND_URL, STAFF_ACCESS_MODULES, STAFF_ALLOWED_ROLES, normalizeAccess, normalizeDbPermissions, serializeAccess, realtime } = deps;
@@ -1735,4 +1748,19 @@ export default async function ownerRoutes(app, deps) {
   app.post("/owner/:restaurantId/pay-later/customers/:customerId/points", payLaterController.adjustPoints);
   app.post("/owner/:restaurantId/pay-later/customers/:customerId/reminder", payLaterController.sendReminder);
   app.get("/owner/:restaurantId/pay-later/accounts/:accountId/details", payLaterController.getDetails);
+
+  // KOT & THERMAL PRINTER ROUTES
+  app.get("/owner/:restaurantId/kots", getKots);
+  app.put("/owner/:restaurantId/kots/:kotId/status", updateKotStatusController);
+  app.post("/owner/:restaurantId/kots/:kotId/reprint", triggerReprint);
+
+  app.get("/owner/:restaurantId/printers", getPrinters);
+  app.post("/owner/:restaurantId/printers", createPrinter);
+  app.put("/owner/:restaurantId/printers/:printerId", updatePrinter);
+  app.delete("/owner/:restaurantId/printers/:printerId", deletePrinter);
+  app.post("/owner/:restaurantId/printers/:printerId/test", testPrinter);
+
+  app.get("/owner/:restaurantId/stations", getStations);
+  app.post("/owner/:restaurantId/stations", createStation);
+  app.put("/owner/:restaurantId/stations/:stationId", updateStation);
 }

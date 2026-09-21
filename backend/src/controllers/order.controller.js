@@ -20,7 +20,12 @@ export async function getLiveOrders(req) {
                 in: ['PLACED', 'ACCEPTED', 'PREPARING', 'READY'],
             },
         },
-        include: { items: true },
+        include: {
+            items: true,
+            kots: {
+                include: { station: true, items: true }
+            }
+        },
         orderBy: { createdAt: 'desc' },
     });
 }
@@ -36,7 +41,12 @@ export async function getKitchenQueue(req) {
                 in: ['ACCEPTED', 'PREPARING'],
             },
         },
-        include: { items: true },
+        include: {
+            items: true,
+            kots: {
+                include: { station: true, items: true }
+            }
+        },
         orderBy: { createdAt: 'asc' },
     });
 }

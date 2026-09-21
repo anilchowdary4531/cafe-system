@@ -2,6 +2,7 @@ import { computeBill, toPriceSubunitItems } from "./billingService.js";
 import { reserveStockForOrder, restoreStockForOrder } from "./inventoryService.js";
 import { normalizePhone } from "./phoneService.js";
 import { createAndDispatchNotification } from "./notificationService.js";
+import { createKotsForOrder, dispatchKotPrint } from "./kotService.js";
 
 const SAFE_STATUSES = ["PLACED", "ACCEPTED", "PREPARING", "READY", "DELIVERED", "CANCELLED"];
 
@@ -298,6 +299,15 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
         },
       });
     }
+
+    const kots = await createKotsForOrder({
+      prisma,
+      tx,
+      order,
+      actor,
+      idempotencyKey: body.idempotencyKey || null,
+    });
+    order.kots = kots;
 
     return order;
   });

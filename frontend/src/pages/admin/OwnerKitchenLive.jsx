@@ -283,9 +283,16 @@ export default function OwnerKitchenLive() {
                                     >
                                         <div className="flex items-start justify-between gap-2">
                                             <div>
-                                                <p className="text-sm font-semibold">
-                                                    {order.orderNo || `Order #${order.id}`}
-                                                </p>
+                                                <div className="flex items-center gap-1.5">
+                                                    <p className="text-sm font-semibold">
+                                                        {order.orderNo || `Order #${order.id}`}
+                                                    </p>
+                                                    {Array.isArray(order.kots) && order.kots.length > 0 && (
+                                                        <span className="rounded-md bg-orange-500/20 text-orange-300 px-1.5 py-0.5 text-[10px] font-bold font-mono">
+                                                            {order.kots.map(k => k.kotNumber).join(", ")}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="theme-muted text-xs">
                                                     Table {order.tableNo || "-"}
                                                     {order.customerName ? ` • ${order.customerName}` : ""}
@@ -300,20 +307,43 @@ export default function OwnerKitchenLive() {
                                             </span>
                                         </div>
 
-                                        <div className="mt-3 space-y-1">
-                                            {(order.items || []).map((item) => (
-                                                <div
-                                                    key={`${order.id}-${item.id || item.itemName}`}
-                                                    className="flex items-center justify-between text-xs"
-                                                >
-                                                    <span className="theme-muted-strong">
-                                                        {item.qty}x {item.itemName}
-                                                    </span>
-                                                    <span className="theme-muted">
-                                                        {formatCurrency(item.total)}
-                                                    </span>
-                                                </div>
-                                            ))}
+                                        <div className="mt-3 space-y-2">
+                                            {(order.items || []).map((item) => {
+                                                const variantLabel = item.variantName || item.variant?.name || "";
+                                                const addons = Array.isArray(item.selectedAddons)
+                                                    ? item.selectedAddons
+                                                    : (Array.isArray(item.modifiers) ? item.modifiers : []);
+
+                                                return (
+                                                    <div
+                                                        key={`${order.id}-${item.id || item.itemName}`}
+                                                        className="space-y-0.5 text-xs"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="theme-muted-strong font-medium">
+                                                                <strong className="text-orange-400 font-bold">{item.qty || item.quantity || 1}x</strong> {item.itemName || item.name}
+                                                            </span>
+                                                            <span className="theme-muted">
+                                                                {formatCurrency(item.total || item.price * (item.qty || 1))}
+                                                            </span>
+                                                        </div>
+
+                                                        {/* Variants & Add-ons breakdown */}
+                                                        {(variantLabel || (addons && addons.length > 0)) && (
+                                                            <div className="pl-3.5 text-[11px] text-slate-400 space-y-0.5 border-l-2 border-orange-500/40">
+                                                                {variantLabel && (
+                                                                    <div>Size/Portion: <span className="text-slate-200 font-medium">{variantLabel}</span></div>
+                                                                )}
+                                                                {addons && addons.map((add, idx) => (
+                                                                    <div key={idx}>
+                                                                        + {add.groupName ? `${add.groupName}: ` : ""}<span className="text-slate-200">{add.name || add.optionName}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
 
                                         <div className="theme-muted-strong mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-xs">

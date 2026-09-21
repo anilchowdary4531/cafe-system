@@ -81,6 +81,8 @@ import KitchenChefDetail from "./pages/KitchenChefDetail.jsx";
 import StaffProfile from "./pages/StaffProfile.jsx";
 import Server from "./pages/Server.jsx";
 
+import PrinterSettings from "./pages/admin/PrinterSettings.jsx";
+import KotHistoryPage from "./pages/admin/KotHistoryPage.jsx";
 import OwnerLayout from "./layouts/OwnerLayout.jsx";
 
 export default function App() {
@@ -465,6 +467,8 @@ export default function App() {
                         <Route path="menu" element={<MenuStudio />} />
                         <Route path="tables" element={<OwnerTables />} />
                         <Route path="kitchen" element={<OwnerKitchenLive />} />
+                        <Route path="printers" element={<PrinterSettings />} />
+                        <Route path="kot-history" element={<KotHistoryPage />} />
                         <Route path="analytics" element={<OwnerAnalytics />} />
                         <Route path="finance" element={<OwnerFinance />} />
                         <Route path="pay-later" element={<OwnerPayLater />} />

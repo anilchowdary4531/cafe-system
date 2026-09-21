@@ -2,6 +2,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { createOrderByStaff, updateOrderStatus } from "../services/orderService.js";
 import { createAndDispatchNotification } from "../services/notificationService.js";
 import { RECIPIENT_TYPES, NOTIFICATION_TYPES } from "../constants/notificationTypes.js";
+import { dispatchKotPrint } from "../services/kotService.js";
 
 const restaurantRoom = (restaurantId) => `restaurant:${Number(restaurantId || 0)}`;
 const branchRoom = (restaurantId, branchId) => `branch:${Number(restaurantId || 0)}:${Number(branchId || 0)}`;
@@ -104,6 +105,27 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     if (io) {
       io.to(`restaurant_${rid}`).emit("new_order", order);
       io.to(`restaurant:${rid}`).emit("new_order", order);
+    }
+
+    // Broadcast station KOTs to kitchen & trigger thermal print dispatch
+    const kots = Array.isArray(order?.kots) ? order.kots : [];
+    for (const kot of kots) {
+      chain.emit("kot:created", kot);
+      if (io) {
+        io.to(`restaurant_${rid}`).emit("kot:created", kot);
+        io.to(`restaurant:${rid}`).emit("kot:created", kot);
+      }
+      dispatchKotPrint({ prisma, kotId: kot.id })
+        .then((res) => {
+          if (res?.kot) {
+            chain.emit("kot:printed", res.kot);
+            if (io) {
+              io.to(`restaurant_${rid}`).emit("kot:printed", res.kot);
+              io.to(`restaurant:${rid}`).emit("kot:printed", res.kot);
+            }
+          }
+        })
+        .catch(() => {});
     }
 
     // Dispatch notification to DB & realtime notification event for restaurant/owner

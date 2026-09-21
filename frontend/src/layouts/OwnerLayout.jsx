@@ -17,6 +17,7 @@ import {
     X,
     MoreHorizontal,
     Printer,
+    FileText,
     IndianRupee,
     Truck,
 } from "lucide-react";
@@ -517,6 +518,18 @@ export default function OwnerLayout() {
             label: "Kitchen Live",
             path: "/owner/kitchen",
             icon: <ChefHat size={18} />,
+            accessKey: "kitchen",
+        },
+        {
+            label: "KOT Logs",
+            path: "/owner/kot-history",
+            icon: <FileText size={18} />,
+            accessKey: "kitchen",
+        },
+        {
+            label: "Printers",
+            path: "/owner/printers",
+            icon: <Printer size={18} />,
             accessKey: "kitchen",
         },
         {
