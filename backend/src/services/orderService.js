@@ -174,10 +174,43 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
   return prisma.$transaction(async (tx) => {
     await reserveStockForOrder({ tx, restaurantId, items: normalizedItems });
 
+    let inputTableSessionId = body.tableSessionId ? Number(body.tableSessionId) : null;
+    if (!inputTableSessionId && tableNo) {
+      const dTable = await tx.diningTable.findFirst({
+        where: { restaurantId, tableNo: String(tableNo).trim() },
+        select: { id: true, tableNo: true },
+      });
+      if (dTable) {
+        let activeSession = await tx.tableSession.findFirst({
+          where: {
+            tableId: dTable.id,
+            restaurantId,
+            status: { in: ["OPEN", "BILLING", "PAID"] },
+          },
+        });
+        if (!activeSession) {
+          activeSession = await tx.tableSession.create({
+            data: {
+              restaurantId,
+              tableId: dTable.id,
+              tableNo: dTable.tableNo,
+              waiterId: actor?.userId || null,
+              waiterName: actor?.userName || null,
+              guestCount: Math.max(1, Number(body.guestCount || 1)),
+              status: "OPEN",
+              openedAt: new Date(),
+            },
+          });
+        }
+        inputTableSessionId = activeSession.id;
+      }
+    }
+
     const order = await tx.order.create({
       data: {
         restaurantId,
         branchId,
+        tableSessionId: inputTableSessionId,
         orderNo,
         invoiceNo,
         orderSource: "POS",
@@ -226,6 +259,30 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
       where: { id: restaurantId },
       data: { nextInvoiceNumber: { increment: 1 } },
     });
+
+    if (inputTableSessionId) {
+      const sessionOrders = await tx.order.findMany({
+        where: { tableSessionId: inputTableSessionId, status: { not: "CANCELLED" } },
+        select: { subtotal: true, taxAmount: true, serviceChargeAmount: true, discountAmount: true, total: true },
+      });
+
+      const sessionSubtotal = sessionOrders.reduce((sum, o) => sum + Number(o.subtotal || 0), 0);
+      const sessionTax = sessionOrders.reduce((sum, o) => sum + Number(o.taxAmount || 0), 0);
+      const sessionService = sessionOrders.reduce((sum, o) => sum + Number(o.serviceChargeAmount || 0), 0);
+      const sessionDiscount = sessionOrders.reduce((sum, o) => sum + Number(o.discountAmount || 0), 0);
+      const sessionTotal = sessionOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+
+      await tx.tableSession.update({
+        where: { id: inputTableSessionId },
+        data: {
+          subtotal: sessionSubtotal,
+          taxAmount: sessionTax,
+          serviceChargeAmount: sessionService,
+          discountAmount: sessionDiscount,
+          total: sessionTotal,
+        },
+      });
+    }
 
     return order;
   });

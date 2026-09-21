@@ -388,7 +388,7 @@ export default async function ownerRoutes(app, deps) {
       });
       if (!restaurant) return reply.code(404).send({ message: "Restaurant not found" });
       const activeStatuses = ["PLACED", "ACCEPTED", "PREPARING", "READY"];
-      const [tables, activeOrders, latestTableOrders] = await Promise.all([
+      const [tables, activeOrders, latestTableOrders, activeSessions] = await Promise.all([
         prisma.diningTable.findMany({
           where: { restaurantId },
           orderBy: { id: "desc" },
@@ -435,7 +435,19 @@ export default async function ownerRoutes(app, deps) {
           },
           orderBy: { createdAt: "desc" },
         }),
+        prisma.tableSession.findMany({
+          where: {
+            restaurantId,
+            status: { in: ["OPEN", "BILLING", "PAID"] },
+          },
+        }),
       ]);
+
+      const activeSessionsByTable = activeSessions.reduce((acc, session) => {
+        const tableKey = String(session.tableNo || "").trim().toLowerCase();
+        if (tableKey) acc[tableKey] = session;
+        return acc;
+      }, {});
 
       const activeOrdersByTable = activeOrders.reduce((acc, order) => {
         const tableKey = String(order.tableNo || "").trim().toLowerCase();
@@ -476,6 +488,7 @@ export default async function ownerRoutes(app, deps) {
           const tableKey = String(table.tableNo || "").trim().toLowerCase();
           const tableActiveOrders = activeOrdersByTable[tableKey] || [];
           const latestOrder = latestOrderByTable[tableKey] || null;
+          const activeSession = activeSessionsByTable[tableKey] || null;
           const activeItemCount = tableActiveOrders.reduce(
             (sum, order) =>
               sum +
@@ -489,11 +502,20 @@ export default async function ownerRoutes(app, deps) {
           );
 
           return {
-            isOccupied: tableActiveOrders.length > 0,
-            occupiedSince: tableActiveOrders[0]?.createdAt || null,
+            isOccupied: Boolean(activeSession) || tableActiveOrders.length > 0,
+            occupiedSince: activeSession?.openedAt || tableActiveOrders[0]?.createdAt || null,
             activeOrderCount: tableActiveOrders.length,
             activeItemCount,
             activeOrders: tableActiveOrders,
+            activeSession: activeSession ? {
+              id: activeSession.id,
+              status: activeSession.status,
+              guestCount: activeSession.guestCount,
+              waiterName: activeSession.waiterName,
+              subtotal: activeSession.subtotal,
+              total: activeSession.total,
+              openedAt: activeSession.openedAt,
+            } : null,
             lastOrderStatus: latestOrder?.status || null,
             lastPaymentStatus: latestOrder?.paymentStatus || null,
             lastOrderNo: latestOrder?.orderNo || null,

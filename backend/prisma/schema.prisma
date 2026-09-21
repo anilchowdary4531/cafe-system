@@ -79,6 +79,7 @@ model Restaurant {
   menuItems     MenuItem[]
   orders        Order[]
   tables        DiningTable[]
+  tableSessions TableSession[]
   expenses      Expense[]
   branches      Branch[]
   payments      Payment[]
@@ -223,6 +224,8 @@ model Order {
   email        String?
 
   tableNo String? @map("table_no")
+  tableSessionId Int?          @map("table_session_id")
+  tableSession   TableSession? @relation(fields: [tableSessionId], references: [id], onDelete: SetNull)
   notes   String?
   deliveryAddress String? @map("delivery_address")
   deliveryLatitude Float? @map("delivery_latitude")
@@ -254,6 +257,7 @@ model Order {
   @@unique([restaurantId, orderNo])
   @@index([restaurantId, customerId, createdAt])
   @@index([restaurantId, status, createdAt])
+  @@index([restaurantId, tableSessionId])
   @@index([restaurantId, branchId, createdAt])
   @@index([phone, createdAt])
   @@map("orders")
@@ -442,9 +446,51 @@ model DiningTable {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
+  tableSessions TableSession[]
+
   @@unique([restaurantId, tableNo])
   @@index([restaurantId, isActive])
   @@map("dining_tables")
+}
+
+model TableSession {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  tableId Int         @map("table_id")
+  table   DiningTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  tableNo String @map("table_no")
+
+  waiterId   Int?    @map("waiter_id")
+  waiterName String? @map("waiter_name")
+
+  guestCount Int @default(1) @map("guest_count")
+
+  // STATUS: OPEN / BILLING / PAID / CLOSED / CANCELLED
+  status String @default("OPEN")
+
+  subtotal            Float @default(0)
+  taxAmount           Float @default(0) @map("tax_amount")
+  serviceChargeAmount Float @default(0) @map("service_charge_amount")
+  discountAmount      Float @default(0) @map("discount_amount")
+  total               Float @default(0)
+
+  openedAt DateTime  @default(now()) @map("opened_at")
+  billedAt DateTime? @map("billed_at")
+  paidAt   DateTime? @map("paid_at")
+  closedAt DateTime? @map("closed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  orders Order[]
+
+  @@index([restaurantId, tableId, status])
+  @@index([restaurantId, status, createdAt])
+  @@map("table_sessions")
 }
 
 model Expense {

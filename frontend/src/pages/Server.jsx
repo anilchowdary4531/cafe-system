@@ -817,13 +817,19 @@ export default function Server() {
             });
         };
 
+        const onSessionUpdated = () => {
+            refreshTables({ force: true }).catch(() => {});
+        };
+
         socket.on("order:created", onCreated);
         socket.on("order:updated", onUpdated);
+        socket.on("table:session_updated", onSessionUpdated);
         return () => {
             socket.off("order:created", onCreated);
             socket.off("order:updated", onUpdated);
+            socket.off("table:session_updated", onSessionUpdated);
         };
-    }, [socket]);
+    }, [refreshTables, socket]);
 
     const refreshAll = useCallback(async () => {
         syncTableAssignments();

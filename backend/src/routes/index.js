@@ -18,6 +18,7 @@ import superAdminSupplyRoutes from "./superAdminSupply.routes.js";
 import supplyChatRoutes from "./supplyChat.routes.js";
 
 import ppiWalletRoutes from "./ppiWallet.routes.js";
+import tableSessionRoutes from "./tableSessions.js";
 
 // Single route entrypoint to keep server.js simple.
 export default async function routes(app, deps) {
@@ -40,4 +41,5 @@ export default async function routes(app, deps) {
   await walletRoutes(app, deps);
   await ppiWalletRoutes(app, deps);
   await notificationRoutes(app, deps);
+  await tableSessionRoutes(app, deps);
 }

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
+import { useStaffSocket } from "../../context/StaffSocketContext";
+import { showToast } from "../../utils/toast";
 
 const emptyForm = {
     tableNo: "",
@@ -46,8 +49,28 @@ const escapeHtml = (value) =>
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
 
+const formatMoney = (value) => {
+    const amount = Number(value || 0);
+    if (!Number.isFinite(amount)) return "₹0.00";
+    return `₹${amount.toFixed(2)}`;
+};
+
+const formatAge = (isoDate) => {
+    if (!isoDate) return "-";
+    const minutes = Math.max(0, Math.floor((Date.now() - new Date(isoDate).getTime()) / 60000));
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const rem = minutes % 60;
+    return rem ? `${hours}h ${rem}m` : `${hours}h`;
+};
+
 export default function OwnerTables() {
+    const navigate = useNavigate();
+    const { socket } = useStaffSocket();
+
     const [tables, setTables] = useState([]);
+    const [activeSessions, setActiveSessions] = useState({});
     const [form, setForm] = useState(emptyForm);
     const [editingId, setEditingId] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -59,6 +82,13 @@ export default function OwnerTables() {
     const [groupCatalog, setGroupCatalog] = useState([]);
     const [newGroupName, setNewGroupName] = useState("");
     const [activeGroupFilter, setActiveGroupFilter] = useState(ALL_GROUPS_FILTER);
+
+    // Session Modals
+    const [openSessionTable, setOpenSessionTable] = useState(null);
+    const [sessionGuestCount, setSessionGuestCount] = useState(4);
+    const [sessionWaiterName, setSessionWaiterName] = useState("");
+    const [viewSessionDetail, setViewSessionDetail] = useState(null);
+    const [, setNowTick] = useState(Date.now());
 
     const user = useMemo(() => {
         try {
@@ -116,9 +146,61 @@ export default function OwnerTables() {
         }
     };
 
+    const loadActiveSessions = async () => {
+        if (!restaurantId) return;
+        try {
+            const res = await axios.get(`${API}/owner/${restaurantId}/tables/sessions/active`);
+            const list = Array.isArray(res?.data?.sessions) ? res.data.sessions : [];
+            const map = {};
+            list.forEach((session) => {
+                if (session && session.tableId) {
+                    map[String(session.tableId)] = session;
+                }
+            });
+            setActiveSessions(map);
+        } catch (err) {
+            console.log("Error loading active sessions:", err);
+        }
+    };
+
     useEffect(() => {
         loadTables();
+        loadActiveSessions();
     }, [restaurantId]);
+
+    // Live 30-sec timer tick for table occupancy duration
+    useEffect(() => {
+        const timer = setInterval(() => setNowTick(Date.now()), 30000);
+        return () => clearInterval(timer);
+    }, []);
+
+    // Socket.IO Real-time Sync
+    useEffect(() => {
+        if (!socket) return undefined;
+
+        const onSessionUpdated = (session) => {
+            if (!session || !session.tableId) return;
+            setActiveSessions((prev) => {
+                const next = { ...prev };
+                if (session.status === "CLOSED" || session.status === "CANCELLED") {
+                    delete next[String(session.tableId)];
+                } else {
+                    next[String(session.tableId)] = session;
+                }
+                return next;
+            });
+        };
+
+        socket.on("table:session_updated", onSessionUpdated);
+        socket.on("order:created", loadActiveSessions);
+        socket.on("order:updated", loadActiveSessions);
+
+        return () => {
+            socket.off("table:session_updated", onSessionUpdated);
+            socket.off("order:created", loadActiveSessions);
+            socket.off("order:updated", loadActiveSessions);
+        };
+    }, [socket]);
 
     useEffect(() => {
         if (!tableGroupStorageKey) {
@@ -400,35 +482,11 @@ export default function OwnerTables() {
                     <meta charset="utf-8" />
                     <title>Print QR - ${safeTableNo}</title>
                     <style>
-                        body {
-                            margin: 0;
-                            padding: 24px;
-                            font-family: Arial, sans-serif;
-                            color: #111827;
-                        }
-                        .sheet {
-                            max-width: 420px;
-                            margin: 0 auto;
-                            text-align: center;
-                        }
-                        h1 {
-                            margin: 0 0 8px;
-                            font-size: 28px;
-                        }
-                        p {
-                            margin: 0 0 14px;
-                            font-size: 13px;
-                            color: #4b5563;
-                            word-break: break-word;
-                        }
-                        img {
-                            width: 260px;
-                            height: 260px;
-                            padding: 12px;
-                            border: 1px solid #d1d5db;
-                            border-radius: 12px;
-                            background: #ffffff;
-                        }
+                        body { margin: 0; padding: 24px; font-family: Arial, sans-serif; color: #111827; }
+                        .sheet { max-width: 420px; margin: 0 auto; text-align: center; }
+                        h1 { margin: 0 0 8px; font-size: 28px; }
+                        p { margin: 0 0 14px; font-size: 13px; color: #4b5563; word-break: break-word; }
+                        img { width: 260px; height: 260px; padding: 12px; border: 1px solid #d1d5db; border-radius: 12px; background: #ffffff; }
                     </style>
                 </head>
                 <body>
@@ -438,15 +496,86 @@ export default function OwnerTables() {
                         <p>${safeTarget}</p>
                     </div>
                     <script>
-                        window.onload = function () {
-                            window.print();
-                            window.close();
-                        };
+                        window.onload = function () { window.print(); window.close(); };
                     </script>
                 </body>
             </html>
         `);
         printWindow.document.close();
+    };
+
+    // Table Session Action Handlers
+    const handleOpenSessionSubmit = async (e) => {
+        e.preventDefault();
+        if (!openSessionTable) return;
+        try {
+            const payload = {
+                restaurantId,
+                guestCount: Number(sessionGuestCount || 1),
+                waiterName: sessionWaiterName,
+            };
+            const res = await axios.post(`${API}/tables/${openSessionTable.id}/session`, payload);
+            const created = res.data?.session;
+            if (created) {
+                setActiveSessions((prev) => ({
+                    ...prev,
+                    [String(openSessionTable.id)]: created,
+                }));
+            }
+            const tableNo = openSessionTable.tableNo;
+            setOpenSessionTable(null);
+            showToast({
+                title: "Table Session Opened",
+                message: `Session started for Table ${tableNo}`,
+                variant: "success",
+            });
+            navigate(`/admin/new-order?table=${encodeURIComponent(tableNo)}`);
+        } catch (err) {
+            setError(getErrorMessage(err, "Failed to open table session."));
+        }
+    };
+
+    const handleGenerateBill = async (session) => {
+        if (!session) return;
+        try {
+            const res = await axios.post(`${API}/tables/sessions/${session.id}/bill`);
+            const updated = res.data?.session;
+            if (updated) {
+                setActiveSessions((prev) => ({
+                    ...prev,
+                    [String(updated.tableId)]: updated,
+                }));
+            }
+            showToast({
+                title: "Bill Generated",
+                message: `Bill calculated for Table ${session.tableNo}`,
+                variant: "success",
+            });
+        } catch (err) {
+            setError(getErrorMessage(err, "Failed to generate bill."));
+        }
+    };
+
+    const handleCloseSession = async (session) => {
+        if (!session) return;
+        const confirmed = window.confirm(`Close session and free Table ${session.tableNo}?`);
+        if (!confirmed) return;
+        try {
+            await axios.post(`${API}/tables/sessions/${session.id}/close`);
+            setActiveSessions((prev) => {
+                const next = { ...prev };
+                delete next[String(session.tableId)];
+                return next;
+            });
+            setViewSessionDetail(null);
+            showToast({
+                title: "Table Session Closed",
+                message: `Table ${session.tableNo} is now AVAILABLE.`,
+                variant: "info",
+            });
+        } catch (err) {
+            setError(getErrorMessage(err, "Failed to close table session."));
+        }
     };
 
     const toggleActionsMenu = (tableId) => {
@@ -518,16 +647,13 @@ export default function OwnerTables() {
         }
 
         if (noKey) {
-            if (/^\d+$/.test(noKey)) {
-                return "Main Hall";
-            }
+            if (/^\d+$/.test(noKey)) return "Main Hall";
             const letterMatch = noKey.match(/^([A-Za-z]+)\s*\d+$/);
             if (letterMatch) {
                 const prefix = letterMatch[1].toUpperCase();
                 return prefix === "T" ? "Section T" : `Section ${prefix}`;
             }
         }
-
         return "Main Area";
     };
 
@@ -581,10 +707,14 @@ export default function OwnerTables() {
 
     return (
         <section>
-            <h3 className="text-3xl font-bold">Tables & QR</h3>
-            <p className="mt-1 text-sm text-gray-400">
-                Add tables, manage active status, and share QR links for customer ordering.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 className="text-3xl font-bold">Tables & Live Sessions</h3>
+                    <p className="mt-1 text-sm text-gray-400">
+                        Manage live table sessions, running KOT totals, guest counts, and share QR ordering links.
+                    </p>
+                </div>
+            </div>
 
             {error && (
                 <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
@@ -680,9 +810,6 @@ export default function OwnerTables() {
                     </div>
                 </form>
             </div>
-            <p className="mx-auto mt-2 w-full max-w-5xl text-xs text-gray-400">
-                Create your own group names, then assign each table to a group.
-            </p>
 
             <div className="mx-auto mt-3 flex w-full max-w-5xl flex-wrap items-center gap-2">
                 <button
@@ -731,7 +858,7 @@ export default function OwnerTables() {
 
             {loading ? (
                 <div className="mt-6 rounded-2xl border border-white/10 bg-[#111827] p-5 text-gray-300">
-                    Loading tables...
+                    Loading live table sessions...
                 </div>
             ) : filteredTables.length === 0 ? (
                 <div className="mt-6 flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-[#111827] p-6 text-center text-gray-300">
@@ -742,25 +869,13 @@ export default function OwnerTables() {
                                   activeGroupFilter !== ALL_GROUPS_FILTER ? ` ("${activeGroupFilter}")` : ""
                               }.`}
                     </p>
-                    {activeGroupFilter !== ALL_GROUPS_FILTER && tables.length > 0 && (
-                        <button
-                            type="button"
-                            onClick={() => setActiveGroupFilter(ALL_GROUPS_FILTER)}
-                            className="rounded-xl border border-orange-500/40 bg-orange-500/10 px-4 py-2 text-xs font-semibold text-orange-400 hover:bg-orange-500/20"
-                        >
-                            View All Tables ({tables.length})
-                        </button>
-                    )}
                 </div>
             ) : (
                 <div className="mt-4 flex flex-col gap-3">
                     {groupedTableEntries.map(([groupName, groupTables]) => {
                         const activeCount = groupTables.filter((t) => t.isActive).length;
                         return (
-                            <section
-                                key={groupName}
-                                className="flex flex-col gap-2 py-0.5"
-                            >
+                            <section key={groupName} className="flex flex-col gap-2 py-0.5">
                                 <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
                                     <div className="flex items-center gap-2.5">
                                         <span className="text-sm font-extrabold uppercase tracking-widest text-orange-400">
@@ -775,21 +890,38 @@ export default function OwnerTables() {
                                     </span>
                                 </div>
 
-                                <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(250px,1fr))]">
+                                <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(270px,1fr))]">
                                     {groupTables.map((table) => {
                                         const target = table.qrCodeUrl || buildTargetUrl(table.tableNo);
                                         const debugTarget = buildDebugTargetUrl(table.tableNo);
                                         const image = qrImageUrl(target);
                                         const tableGroup = getTableGroup(table);
+                                        const session = activeSessions[String(table.id)];
+                                        const sessionStatus = session ? session.status : "AVAILABLE";
+                                        const isOccupied = sessionStatus === "OPEN";
+                                        const isBilling = sessionStatus === "BILLING";
+                                        const isPaid = sessionStatus === "PAID";
+                                        const isAvailable = !session;
 
                                         return (
                                             <article
                                                 key={table.id}
-                                                className="rounded-2xl border border-white/10 bg-[#0f172a] p-3 transition hover:-translate-y-0.5 hover:border-orange-400/30"
+                                                className={`relative flex flex-col justify-between rounded-2xl border p-4 transition ${
+                                                    isOccupied
+                                                        ? "border-amber-500/50 bg-gradient-to-b from-amber-500/10 to-[#0f172a]"
+                                                        : isBilling
+                                                        ? "border-purple-500/50 bg-gradient-to-b from-purple-500/10 to-[#0f172a]"
+                                                        : isPaid
+                                                        ? "border-cyan-500/50 bg-gradient-to-b from-cyan-500/10 to-[#0f172a]"
+                                                        : "border-white/10 bg-[#0f172a] hover:border-orange-400/30"
+                                                }`}
                                             >
-                                                <div className="flex items-center justify-between">
+                                                <div className="flex items-start justify-between">
                                                     <div>
-                                                        <p className="text-xl font-semibold">{table.tableNo}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-2xl font-bold">{table.tableNo}</p>
+                                                            <span className="text-xs text-gray-400">({table.seats} seats)</span>
+                                                        </div>
                                                         <select
                                                             value={tableGroup}
                                                             onChange={(e) => {
@@ -799,7 +931,7 @@ export default function OwnerTables() {
                                                                     [String(table.id)]: newGrp,
                                                                 }));
                                                             }}
-                                                            className="mt-1 rounded-lg border border-white/10 bg-[#111827] px-2 py-0.5 text-[11px] text-orange-300 outline-none focus:border-orange-400"
+                                                            className="mt-1 rounded-lg border border-white/10 bg-[#111827] px-2 py-0.5 text-[11px] text-orange-300 outline-none"
                                                             title="Change Table Group"
                                                         >
                                                             {groupOptions.map((g) => (
@@ -809,110 +941,60 @@ export default function OwnerTables() {
                                                             ))}
                                                         </select>
                                                     </div>
-                                                    <div className="flex items-center gap-2">
+
+                                                    <div className="flex items-center gap-1.5">
                                                         <span
-                                                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                                                                table.isActive
-                                                                    ? "border-emerald-500/40 bg-emerald-100 text-emerald-700 shadow-sm"
-                                                                    : "border-gray-400/40 bg-gray-100 text-gray-600"
+                                                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                                                                isOccupied
+                                                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                                                    : isBilling
+                                                                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
+                                                                    : isPaid
+                                                                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                                                                    : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                                                             }`}
                                                         >
-                                                            <span
-                                                                className={`h-1.5 w-1.5 rounded-full ${
-                                                                    table.isActive ? "bg-emerald-600" : "bg-gray-500"
-                                                                }`}
-                                                            />
-                                                            {table.isActive ? "Active" : "Inactive"}
+                                                            <span className={`h-1.5 w-1.5 rounded-full ${isOccupied ? "bg-amber-400" : isBilling ? "bg-purple-400" : isPaid ? "bg-cyan-400" : "bg-emerald-400"}`} />
+                                                            {sessionStatus}
                                                         </span>
+
                                                         <div className="relative" data-table-actions-menu>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => toggleActionsMenu(table.id)}
                                                                 className="rounded-lg border border-white/10 px-2 py-0.5 text-lg leading-none text-gray-200 hover:bg-white/10"
-                                                                aria-label={`Open actions for ${table.tableNo}`}
                                                             >
                                                                 &#8942;
                                                             </button>
                                                             {openMenuId === table.id && (
-                                                                <div className="absolute right-0 z-30 mt-2 w-40 max-h-52 overflow-y-auto rounded-xl border border-white/10 bg-[#0b1220] p-1.5 shadow-2xl">
+                                                                <div className="absolute right-0 z-30 mt-2 w-44 rounded-xl border border-white/10 bg-[#0b1220] p-1.5 shadow-2xl">
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => {
-                                                                            startEdit(table);
-                                                                            setOpenMenuId(null);
-                                                                        }}
+                                                                        onClick={() => { startEdit(table); setOpenMenuId(null); }}
                                                                         className={actionMenuItemClass}
                                                                     >
-                                                                        Edit
+                                                                        Edit Table Config
                                                                     </button>
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => {
-                                                                            setActiveState(table, true);
-                                                                            setOpenMenuId(null);
-                                                                        }}
-                                                                        disabled={table.isActive}
-                                                                        className={`${actionMenuItemClass} disabled:cursor-not-allowed disabled:opacity-50`}
-                                                                    >
-                                                                        Enable
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setActiveState(table, false);
-                                                                            setOpenMenuId(null);
-                                                                        }}
-                                                                        disabled={!table.isActive}
-                                                                        className={`${actionMenuItemClass} disabled:cursor-not-allowed disabled:opacity-50`}
-                                                                    >
-                                                                        Disable
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            copyQrLink(table);
-                                                                            setOpenMenuId(null);
-                                                                        }}
+                                                                        onClick={() => { copyQrLink(table); setOpenMenuId(null); }}
                                                                         className={actionMenuItemClass}
                                                                     >
-                                                                        Copy Link
-                                                                    </button>
-                                                                    <a
-                                                                        href={target}
-                                                                        target="_blank"
-                                                                        rel="noreferrer"
-                                                                        onClick={() => setOpenMenuId(null)}
-                                                                        className={`block ${actionMenuItemClass}`}
-                                                                    >
-                                                                        Open Menu
-                                                                    </a>
-                                                                    <a
-                                                                        href={image}
-                                                                        download={`${table.tableNo}-qr.png`}
-                                                                        onClick={() => setOpenMenuId(null)}
-                                                                        className={`block ${actionMenuItemClass}`}
-                                                                    >
-                                                                        Download QR
-                                                                    </a>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            printQr(table);
-                                                                            setOpenMenuId(null);
-                                                                        }}
-                                                                        className={actionMenuItemClass}
-                                                                    >
-                                                                        Print QR
+                                                                        Copy QR Link
                                                                     </button>
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => {
-                                                                            handleDelete(table.id);
-                                                                            setOpenMenuId(null);
-                                                                        }}
+                                                                        onClick={() => { printQr(table); setOpenMenuId(null); }}
                                                                         className={actionMenuItemClass}
                                                                     >
-                                                                        Delete
+                                                                        Print QR Sheet
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => { handleDelete(table.id); setOpenMenuId(null); }}
+                                                                        className={actionMenuItemClass}
+                                                                    >
+                                                                        Delete Table
                                                                     </button>
                                                                 </div>
                                                             )}
@@ -920,18 +1002,87 @@ export default function OwnerTables() {
                                                     </div>
                                                 </div>
 
-                                                <p className="mt-1 text-sm text-gray-400">{table.seats} seats</p>
+                                                {/* Live Session Body Info */}
+                                                {session ? (
+                                                    <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-2.5 text-xs space-y-1">
+                                                        <div className="flex items-center justify-between text-gray-300">
+                                                            <span>Occupied Time:</span>
+                                                            <strong className="text-amber-300 tabular-nums">{formatAge(session.openedAt)}</strong>
+                                                        </div>
+                                                        <div className="flex items-center justify-between text-gray-300">
+                                                            <span>Running Total:</span>
+                                                            <strong className="text-lg font-extrabold text-emerald-400 tabular-nums">{formatMoney(session.total)}</strong>
+                                                        </div>
+                                                        <div className="flex items-center justify-between text-gray-400 text-[11px]">
+                                                            <span>Guests: {session.guestCount || 1}</span>
+                                                            {session.waiterName && <span>Server: {session.waiterName}</span>}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="mt-3 rounded-xl border border-dashed border-white/10 p-3 text-center text-xs text-gray-400">
+                                                        Table is currently available for seating.
+                                                    </div>
+                                                )}
 
-                                                <img src={image} alt={`${table.tableNo} QR`} className="mt-3 h-32 w-32 rounded-xl bg-white p-1.5 sm:h-36 sm:w-36" />
+                                                {/* Action Buttons */}
+                                                <div className="mt-3 flex flex-wrap gap-1.5">
+                                                    {isAvailable && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setOpenSessionTable(table)}
+                                                            className="w-full rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-500"
+                                                        >
+                                                            + Open Table Session
+                                                        </button>
+                                                    )}
 
-                                                <a
-                                                    href={debugTarget}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-orange-400/30 bg-orange-500/10 px-3 py-2 text-xs font-semibold text-orange-200 transition hover:bg-orange-500/20"
-                                                >
-                                                    Open debug link
-                                                </a>
+                                                    {isOccupied && (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => navigate(`/admin/new-order?table=${encodeURIComponent(table.tableNo)}`)}
+                                                                className="flex-1 rounded-xl bg-orange-500 px-3 py-2 text-xs font-bold text-black hover:bg-orange-400"
+                                                            >
+                                                                + Add Items
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleGenerateBill(session)}
+                                                                className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-300 hover:bg-amber-500/20"
+                                                            >
+                                                                Generate Bill
+                                                            </button>
+                                                        </>
+                                                    )}
+
+                                                    {(isBilling || isPaid) && (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => navigate(`/admin/new-order?table=${encodeURIComponent(table.tableNo)}`)}
+                                                                className="flex-1 rounded-xl bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-500"
+                                                            >
+                                                                View Order / Pay
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleCloseSession(session)}
+                                                                className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-300 hover:bg-red-500/20"
+                                                            >
+                                                                Close Session
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+
+                                                <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
+                                                    <a href={target} target="_blank" rel="noreferrer" className="hover:text-orange-400 underline">
+                                                        QR Link
+                                                    </a>
+                                                    <a href={debugTarget} target="_blank" rel="noreferrer" className="hover:text-orange-400 underline">
+                                                        Debug Link
+                                                    </a>
+                                                </div>
                                             </article>
                                         );
                                     })}
@@ -939,6 +1090,47 @@ export default function OwnerTables() {
                             </section>
                         );
                     })}
+                </div>
+            )}
+
+            {/* OPEN SESSION MODAL */}
+            {openSessionTable && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+                    <form onSubmit={handleOpenSessionSubmit} className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0f172a] p-6 shadow-2xl space-y-4">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                            <h4 className="text-xl font-bold">Open Table {openSessionTable.tableNo}</h4>
+                            <button type="button" onClick={() => setOpenSessionTable(null)} className="text-gray-400 hover:text-white">✕</button>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-300 mb-1">Number of Guests</label>
+                            <input
+                                type="number"
+                                min="1"
+                                max={openSessionTable.seats || 20}
+                                value={sessionGuestCount}
+                                onChange={(e) => setSessionGuestCount(e.target.value)}
+                                className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-2.5 text-sm outline-none focus:border-orange-400"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-300 mb-1">Server / Waiter Name (Optional)</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Ramesh"
+                                value={sessionWaiterName}
+                                onChange={(e) => setSessionWaiterName(e.target.value)}
+                                className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-2.5 text-sm outline-none focus:border-orange-400"
+                            />
+                        </div>
+                        <div className="flex gap-2 justify-end pt-2">
+                            <button type="button" onClick={() => setOpenSessionTable(null)} className="rounded-xl border border-white/20 px-4 py-2.5 text-sm">
+                                Cancel
+                            </button>
+                            <button type="submit" className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-500">
+                                Start Session & Take Order
+                            </button>
+                        </div>
+                    </form>
                 </div>
             )}
         </section>

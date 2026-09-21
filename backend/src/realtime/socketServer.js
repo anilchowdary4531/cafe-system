@@ -140,11 +140,22 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     chain.emit("order:updated", order);
   };
 
+  const emitTableSessionUpdated = (session) => {
+    const rid = Number(session?.restaurantId || 0);
+    if (!rid) return;
+    staff.to(restaurantRoom(rid)).emit("table:session_updated", session);
+    if (io) {
+      io.to(`restaurant_${rid}`).emit("table:session_updated", session);
+      io.to(`restaurant:${rid}`).emit("table:session_updated", session);
+    }
+  };
+
   return {
     io,
     staff,
     emitOrderCreated,
     emitOrderUpdated,
+    emitTableSessionUpdated,
   };
 };
 

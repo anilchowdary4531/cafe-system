@@ -334,20 +334,6 @@ export default function MenuStudio() {
                         Create, edit, and control item availability for your restaurant menu.
                     </p>
                 </div>
-                {restaurantInfo && (
-                    <div className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold border ${
-                        restaurantInfo.tobaccoApproved === true
-                            ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
-                            : "border-gray-600/40 bg-gray-800/60 text-gray-400"
-                    }`}>
-                        <span>🚬</span>
-                        <span>
-                            {restaurantInfo.tobaccoApproved === true
-                                ? "Tobacco Products Sales: APPROVED by Super Admin"
-                                : "Tobacco Products Sales: DISABLED by Super Admin"}
-                        </span>
-                    </div>
-                )}
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -374,7 +360,7 @@ export default function MenuStudio() {
                         }}
                         className="theme-soft-button shrink-0 rounded-xl px-4 py-3 text-xs font-bold border border-amber-500/30 text-amber-300 flex items-center gap-1.5"
                     >
-                        <span>🚬</span> + Add Tobacco Item
+                        <span>🚬</span> + Add Tobacco Product
                     </button>
                 )}
                 <button
@@ -437,11 +423,7 @@ export default function MenuStudio() {
                             {formatMoney(getDiscountedPrice(form.originalPrice, form.discountPercent))}
                         </p>
                     </div>
-                    {/cigarette|tobacco|paan/i.test(form.category) && (
-                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs font-semibold text-amber-400 md:col-span-2">
-                            <span>🚬 <strong>Tobacco Item:</strong> This item will be listed on the Tiffzy Tobacco Store page once Super Admin approves tobacco sales for your restaurant.</span>
-                        </div>
-                    )}
+
                     <div className="flex flex-col gap-2 md:col-span-2">
                         <div className="flex flex-col gap-2 md:flex-row md:items-center">
                             <input
