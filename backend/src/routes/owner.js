@@ -288,6 +288,19 @@ export default async function ownerRoutes(app, deps) {
       if (!id) return reply.code(400).send({ message: "Invalid restaurant id" });
       return await prisma.menuItem.findMany({
         where: { restaurantId: id },
+        include: {
+          variants: {
+            orderBy: { sortOrder: "asc" },
+          },
+          modifierGroups: {
+            orderBy: { sortOrder: "asc" },
+            include: {
+              modifiers: {
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+          },
+        },
         orderBy: { id: "desc" },
       });
     } catch (err) {
@@ -299,25 +312,71 @@ export default async function ownerRoutes(app, deps) {
   app.post("/owner/:restaurantId/menu", async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
-      const { name, description, category, image, price, originalPrice, discountPercent, isAvailable } = req.body || {};
+      const { name, description, category, image, price, originalPrice, discountPercent, isAvailable, variants, modifierGroups } = req.body || {};
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
-      if (!name || !category || (price === undefined && originalPrice === undefined)) {
+
+      const hasVariants = Array.isArray(variants) && variants.length > 0;
+      let effectivePrice = price;
+      if ((effectivePrice === undefined || effectivePrice === null) && hasVariants) {
+        effectivePrice = Number(variants[0].price || 0);
+      }
+
+      if (!name || !category || (effectivePrice === undefined && originalPrice === undefined)) {
         return reply.code(400).send({ message: "Missing required fields" });
       }
 
-      const pricing = resolveMenuPricing({ price, originalPrice, discountPercent });
+      const pricing = resolveMenuPricing({ price: effectivePrice, originalPrice, discountPercent });
 
       return await prisma.menuItem.create({
         data: {
           restaurantId,
-          name,
+          name: String(name).trim(),
           description: description || "",
-          category,
+          category: String(category).trim(),
           image: image || "",
           price: pricing.price,
           originalPrice: pricing.originalPrice,
           discountPercent: pricing.discountPercent,
           isAvailable: isAvailable ?? true,
+          ...(hasVariants ? {
+            variants: {
+              create: variants.map((v, idx) => ({
+                name: String(v.name).trim(),
+                price: Number(v.price || 0),
+                isDefault: Boolean(v.isDefault || idx === 0),
+                isActive: v.isActive !== false,
+                sortOrder: Number(v.sortOrder || idx),
+              })),
+            },
+          } : {}),
+          ...(Array.isArray(modifierGroups) && modifierGroups.length > 0 ? {
+            modifierGroups: {
+              create: modifierGroups.map((g, gIdx) => ({
+                name: String(g.name).trim(),
+                isRequired: Boolean(g.isRequired),
+                minSelect: Number(g.minSelect || 0),
+                maxSelect: Number(g.maxSelect || 1),
+                sortOrder: Number(g.sortOrder || gIdx),
+                ...(Array.isArray(g.options || g.modifiers) ? {
+                  modifiers: {
+                    create: (g.options || g.modifiers).map((m, mIdx) => ({
+                      name: String(m.name).trim(),
+                      price: Number(m.price || 0),
+                      isAvailable: m.isAvailable !== false,
+                      sortOrder: Number(m.sortOrder || mIdx),
+                    })),
+                  },
+                } : {}),
+              })),
+            },
+          } : {}),
+        },
+        include: {
+          variants: { orderBy: { sortOrder: "asc" } },
+          modifierGroups: {
+            orderBy: { sortOrder: "asc" },
+            include: { modifiers: { orderBy: { sortOrder: "asc" } } },
+          },
         },
       });
     } catch (err) {
@@ -330,7 +389,7 @@ export default async function ownerRoutes(app, deps) {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const menuId = Number(req.params.menuId);
-      const { name, description, category, image, price, originalPrice, discountPercent, isAvailable } = req.body || {};
+      const { name, description, category, image, price, originalPrice, discountPercent, isAvailable, variants, modifierGroups } = req.body || {};
       if (!restaurantId || !menuId) return reply.code(400).send({ message: "Invalid id values" });
 
       const item = await prisma.menuItem.findUnique({ where: { id: menuId } });
@@ -338,20 +397,84 @@ export default async function ownerRoutes(app, deps) {
         return reply.code(404).send({ message: "Menu item not found" });
       }
 
-      const pricing = resolveMenuPricing({ price, originalPrice, discountPercent }, item);
+      const hasVariants = Array.isArray(variants);
+      let effectivePrice = price;
+      if (hasVariants && variants.length > 0 && (effectivePrice === undefined || effectivePrice === null)) {
+        effectivePrice = Number(variants[0].price || 0);
+      }
 
-      return await prisma.menuItem.update({
-        where: { id: menuId },
-        data: {
-          name: name ?? item.name,
-          description: description ?? item.description,
-          category: category ?? item.category,
-          image: image ?? item.image,
-          price: pricing.price,
-          originalPrice: pricing.originalPrice,
-          discountPercent: pricing.discountPercent,
-          isAvailable: isAvailable ?? item.isAvailable,
-        },
+      const pricing = resolveMenuPricing({ price: effectivePrice, originalPrice, discountPercent }, item);
+
+      return await prisma.$transaction(async (tx) => {
+        await tx.menuItem.update({
+          where: { id: menuId },
+          data: {
+            name: name !== undefined ? String(name).trim() : item.name,
+            description: description !== undefined ? description : item.description,
+            category: category !== undefined ? String(category).trim() : item.category,
+            image: image !== undefined ? image : item.image,
+            price: pricing.price,
+            originalPrice: pricing.originalPrice,
+            discountPercent: pricing.discountPercent,
+            isAvailable: isAvailable ?? item.isAvailable,
+          },
+        });
+
+        if (hasVariants) {
+          await tx.menuItemVariant.deleteMany({ where: { menuItemId: menuId } });
+          if (variants.length > 0) {
+            await tx.menuItemVariant.createMany({
+              data: variants.map((v, idx) => ({
+                menuItemId: menuId,
+                name: String(v.name).trim(),
+                price: Number(v.price || 0),
+                isDefault: Boolean(v.isDefault || idx === 0),
+                isActive: v.isActive !== false,
+                sortOrder: Number(v.sortOrder || idx),
+              })),
+            });
+          }
+        }
+
+        if (Array.isArray(modifierGroups)) {
+          await tx.menuItemModifierGroup.deleteMany({ where: { menuItemId: menuId } });
+          for (let gIdx = 0; gIdx < modifierGroups.length; gIdx++) {
+            const g = modifierGroups[gIdx];
+            const groupCreated = await tx.menuItemModifierGroup.create({
+              data: {
+                menuItemId: menuId,
+                name: String(g.name).trim(),
+                isRequired: Boolean(g.isRequired),
+                minSelect: Number(g.minSelect || 0),
+                maxSelect: Number(g.maxSelect || 1),
+                sortOrder: Number(g.sortOrder || gIdx),
+              },
+            });
+            const opts = Array.isArray(g.options) ? g.options : Array.isArray(g.modifiers) ? g.modifiers : [];
+            if (opts.length > 0) {
+              await tx.menuItemModifier.createMany({
+                data: opts.map((m, mIdx) => ({
+                  modifierGroupId: groupCreated.id,
+                  name: String(m.name).trim(),
+                  price: Number(m.price || 0),
+                  isAvailable: m.isAvailable !== false,
+                  sortOrder: Number(m.sortOrder || mIdx),
+                })),
+              });
+            }
+          }
+        }
+
+        return tx.menuItem.findUnique({
+          where: { id: menuId },
+          include: {
+            variants: { orderBy: { sortOrder: "asc" } },
+            modifierGroups: {
+              orderBy: { sortOrder: "asc" },
+              include: { modifiers: { orderBy: { sortOrder: "asc" } } },
+            },
+          },
+        });
       });
     } catch (err) {
       console.log(err);

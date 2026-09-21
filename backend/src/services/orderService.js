@@ -130,13 +130,23 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
         ...(itemNames.length > 0 ? [{ name: { in: itemNames } }] : []),
       ],
     },
-    select: { id: true, name: true, price: true },
+    include: {
+      variants: true,
+      modifierGroups: {
+        include: { modifiers: true },
+      },
+    },
   });
 
   if (!menuItems.length) {
     menuItems = await prisma.menuItem.findMany({
       where: { restaurantId, isAvailable: true },
-      select: { id: true, name: true, price: true },
+      include: {
+        variants: true,
+        modifierGroups: {
+          include: { modifiers: true },
+        },
+      },
     });
   }
 
@@ -234,6 +244,11 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
             menuItemId: item.menuItemId,
             itemName: item.itemName,
             preparedByName: item.preparedByName || null,
+            variantId: item.variantId || null,
+            variantName: item.variantName || null,
+            variantPrice: item.variantPrice || null,
+            selectedModifiers: item.selectedModifiers || null,
+            notes: item.notes || null,
             qty: item.qty,
             price: item.priceSubunit / 100,
             total: (item.priceSubunit * item.qty) / 100,

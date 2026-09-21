@@ -259,6 +259,20 @@ export default function MenuStudio() {
             originalPrice: item.originalPrice ?? item.price ?? "",
             discountPercent: item.discountPercent ?? 0,
             isAvailable: item.isAvailable ?? true,
+            variants: Array.isArray(item.variants)
+                ? item.variants.map((v) => ({ name: v.name, price: v.price, isDefault: Boolean(v.isDefault), isActive: v.isActive !== false }))
+                : [],
+            modifierGroups: Array.isArray(item.modifierGroups)
+                ? item.modifierGroups.map((g) => ({
+                    name: g.name,
+                    isRequired: Boolean(g.isRequired),
+                    minSelect: g.minSelect || 0,
+                    maxSelect: g.maxSelect || 1,
+                    options: Array.isArray(g.modifiers)
+                        ? g.modifiers.map((m) => ({ name: m.name, price: m.price, isAvailable: m.isAvailable !== false }))
+                        : [],
+                }))
+                : [],
         });
         setEditingId(item.id);
         setFormOpen(true);
@@ -306,6 +320,83 @@ export default function MenuStudio() {
         }
     };
 
+    // Variant Helper methods
+    const addVariantRow = () => {
+        setForm((prev) => ({
+            ...prev,
+            variants: [...(prev.variants || []), { name: "", price: "" }],
+        }));
+    };
+
+    const updateVariantRow = (index, field, value) => {
+        setForm((prev) => {
+            const list = [...(prev.variants || [])];
+            list[index] = { ...list[index], [field]: value };
+            return { ...prev, variants: list };
+        });
+    };
+
+    const removeVariantRow = (index) => {
+        setForm((prev) => ({
+            ...prev,
+            variants: (prev.variants || []).filter((_, idx) => idx !== index),
+        }));
+    };
+
+    // Modifier Group Helper methods
+    const addModifierGroupRow = () => {
+        setForm((prev) => ({
+            ...prev,
+            modifierGroups: [
+                ...(prev.modifierGroups || []),
+                { name: "", isRequired: false, minSelect: 0, maxSelect: 1, options: [{ name: "", price: 0 }] },
+            ],
+        }));
+    };
+
+    const updateModifierGroupRow = (gIndex, field, value) => {
+        setForm((prev) => {
+            const groups = [...(prev.modifierGroups || [])];
+            groups[gIndex] = { ...groups[gIndex], [field]: value };
+            return { ...prev, modifierGroups: groups };
+        });
+    };
+
+    const removeModifierGroupRow = (gIndex) => {
+        setForm((prev) => ({
+            ...prev,
+            modifierGroups: (prev.modifierGroups || []).filter((_, idx) => idx !== gIndex),
+        }));
+    };
+
+    const addGroupOption = (gIndex) => {
+        setForm((prev) => {
+            const groups = [...(prev.modifierGroups || [])];
+            const opts = [...(groups[gIndex].options || []), { name: "", price: 0 }];
+            groups[gIndex] = { ...groups[gIndex], options: opts };
+            return { ...prev, modifierGroups: groups };
+        });
+    };
+
+    const updateGroupOption = (gIndex, oIndex, field, value) => {
+        setForm((prev) => {
+            const groups = [...(prev.modifierGroups || [])];
+            const opts = [...(groups[gIndex].options || [])];
+            opts[oIndex] = { ...opts[oIndex], [field]: value };
+            groups[gIndex] = { ...groups[gIndex], options: opts };
+            return { ...prev, modifierGroups: groups };
+        });
+    };
+
+    const removeGroupOption = (gIndex, oIndex) => {
+        setForm((prev) => {
+            const groups = [...(prev.modifierGroups || [])];
+            const opts = (groups[gIndex].options || []).filter((_, idx) => idx !== oIndex);
+            groups[gIndex] = { ...groups[gIndex], options: opts };
+            return { ...prev, modifierGroups: groups };
+        });
+    };
+
     const filteredItems = items.filter((item) => {
         const q = search.trim().toLowerCase();
         if (!q) return true;
@@ -326,28 +417,31 @@ export default function MenuStudio() {
     }, [filteredItems]);
 
     return (
-        <section className="text-[color:var(--app-text)]">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="theme-page min-h-screen px-4 py-6 md:px-8">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h3 className="text-3xl font-bold">Menu Studio</h3>
-                    <p className="mt-1 text-sm text-[color:var(--app-muted)]">
-                        Create, edit, and control item availability for your restaurant menu.
+                    <h1 className="text-2xl font-bold tracking-tight text-[color:var(--app-heading)]">Menu Studio</h1>
+                    <p className="mt-1 text-xs text-[color:var(--app-muted)]">
+                        Create, edit, and control item availability, variants, and add-ons for your restaurant menu.
                     </p>
                 </div>
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
-                <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search by item name or category..."
-                    className="theme-input flex-1 min-w-[200px] rounded-xl px-4 py-3 outline-none"
-                />
+                <div className="relative min-w-[220px] flex-1">
+                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[color:var(--app-muted)]" />
+                    <input
+                        className="theme-input w-full rounded-xl py-2 pr-3 pl-9 outline-none"
+                        placeholder="Search menu items..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                </div>
                 {restaurantInfo?.tobaccoApproved === true && (
                     <button
                         type="button"
                         onClick={() => {
-                            setFormOpen(true);
+                            setEditingId(null);
                             setForm({
                                 name: "",
                                 description: "",
@@ -356,7 +450,10 @@ export default function MenuStudio() {
                                 originalPrice: "",
                                 discountPercent: "",
                                 isAvailable: true,
+                                variants: [],
+                                modifierGroups: [],
                             });
+                            setFormOpen(true);
                         }}
                         className="theme-soft-button shrink-0 rounded-xl px-4 py-3 text-xs font-bold border border-amber-500/30 text-amber-300 flex items-center gap-1.5"
                     >
@@ -366,17 +463,21 @@ export default function MenuStudio() {
                 <button
                     type="button"
                     onClick={() => {
-                        setFormOpen((prev) => !prev);
                         if (formOpen && !editingId) resetForm();
+                        else {
+                            setEditingId(null);
+                            setForm(emptyForm);
+                            setFormOpen(true);
+                        }
                     }}
-                    className="theme-button shrink-0 rounded-xl px-4 py-3 font-semibold"
+                    className="theme-button rounded-xl px-4 py-3 font-semibold"
                 >
                     {formOpen ? "Hide Form" : "Add Item"}
                 </button>
             </div>
 
             {error && (
-                <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+                <div className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-xs text-rose-300">
                     {error}
                 </div>
             )}
@@ -384,7 +485,7 @@ export default function MenuStudio() {
             {formOpen && (
                 <form
                     onSubmit={handleSubmit}
-                    className="theme-panel mt-6 grid gap-3 rounded-2xl p-5 md:grid-cols-2"
+                    className="theme-panel mt-6 grid gap-4 rounded-2xl p-5 md:grid-cols-2"
                 >
                     <input
                         className="theme-input rounded-xl px-3 py-2 outline-none"
@@ -400,7 +501,7 @@ export default function MenuStudio() {
                     />
                     <input
                         className="theme-input rounded-xl px-3 py-2 outline-none"
-                        placeholder="Original price"
+                        placeholder="Original base price (₹)"
                         type="number"
                         min="0"
                         step="0.01"
@@ -448,6 +549,173 @@ export default function MenuStudio() {
                         value={form.description}
                         onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                     />
+
+                    {/* VARIANTS SECTION */}
+                    <div className="rounded-2xl border border-[color:var(--app-border)] bg-zinc-900/40 p-4 md:col-span-2 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                                    Item Portion / Size Variants (Optional)
+                                </h3>
+                                <p className="text-[11px] text-[color:var(--app-muted)]">
+                                    e.g., Small ₹200, Medium ₹300, Large ₹400
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={addVariantRow}
+                                className="theme-soft-button rounded-xl px-3 py-1.5 text-xs font-semibold text-amber-300 border border-amber-500/30"
+                            >
+                                + Add Variant
+                            </button>
+                        </div>
+
+                        {Array.isArray(form.variants) && form.variants.length > 0 && (
+                            <div className="space-y-2">
+                                {form.variants.map((v, vIdx) => (
+                                    <div key={vIdx} className="flex items-center gap-2">
+                                        <input
+                                            className="theme-input flex-1 rounded-xl px-3 py-1.5 text-xs outline-none"
+                                            placeholder="Variant Name (e.g. Large / Half)"
+                                            value={v.name}
+                                            onChange={(e) => updateVariantRow(vIdx, "name", e.target.value)}
+                                        />
+                                        <input
+                                            className="theme-input w-28 rounded-xl px-3 py-1.5 text-xs outline-none"
+                                            placeholder="Price (₹)"
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={v.price}
+                                            onChange={(e) => updateVariantRow(vIdx, "price", e.target.value)}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => removeVariantRow(vIdx)}
+                                            className="rounded-xl p-2 text-rose-400 hover:bg-rose-500/10 transition"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* MODIFIER GROUPS SECTION */}
+                    <div className="rounded-2xl border border-[color:var(--app-border)] bg-zinc-900/40 p-4 md:col-span-2 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                                    Modifier Groups & Add-ons (Optional)
+                                </h3>
+                                <p className="text-[11px] text-[color:var(--app-muted)]">
+                                    e.g., Crust (Normal, Cheese Burst +₹80) or Toppings (Extra Cheese +₹50)
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={addModifierGroupRow}
+                                className="theme-soft-button rounded-xl px-3 py-1.5 text-xs font-semibold text-amber-300 border border-amber-500/30"
+                            >
+                                + Add Modifier Group
+                            </button>
+                        </div>
+
+                        {Array.isArray(form.modifierGroups) && form.modifierGroups.length > 0 && (
+                            <div className="space-y-4">
+                                {form.modifierGroups.map((group, gIdx) => (
+                                    <div key={gIdx} className="rounded-xl border border-[color:var(--app-border)] bg-zinc-950/60 p-3 space-y-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <input
+                                                className="theme-input flex-1 min-w-[180px] rounded-xl px-3 py-1.5 text-xs font-semibold outline-none"
+                                                placeholder="Group Name (e.g. Crust / Toppings)"
+                                                value={group.name}
+                                                onChange={(e) => updateModifierGroupRow(gIdx, "name", e.target.value)}
+                                            />
+                                            <div className="flex items-center gap-3">
+                                                <label className="flex items-center gap-1.5 text-xs text-zinc-300">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={group.isRequired}
+                                                        onChange={(e) => updateModifierGroupRow(gIdx, "isRequired", e.target.checked)}
+                                                    />
+                                                    Required
+                                                </label>
+                                                <div className="flex items-center gap-1 text-xs text-zinc-400">
+                                                    <span>Min:</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        className="theme-input w-12 rounded-lg px-1.5 py-1 text-xs outline-none text-center"
+                                                        value={group.minSelect}
+                                                        onChange={(e) => updateModifierGroupRow(gIdx, "minSelect", Number(e.target.value))}
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-1 text-xs text-zinc-400">
+                                                    <span>Max:</span>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        className="theme-input w-12 rounded-lg px-1.5 py-1 text-xs outline-none text-center"
+                                                        value={group.maxSelect}
+                                                        onChange={(e) => updateModifierGroupRow(gIdx, "maxSelect", Number(e.target.value))}
+                                                    />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeModifierGroupRow(gIdx)}
+                                                    className="rounded-xl p-1.5 text-rose-400 hover:bg-rose-500/10 transition"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Group Options */}
+                                        <div className="space-y-2 pl-3 border-l-2 border-amber-500/30">
+                                            <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400">
+                                                <span>Options / Add-ons</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => addGroupOption(gIdx)}
+                                                    className="text-amber-400 hover:underline"
+                                                >
+                                                    + Add Option
+                                                </button>
+                                            </div>
+                                            {Array.isArray(group.options) && group.options.map((opt, oIdx) => (
+                                                <div key={oIdx} className="flex items-center gap-2">
+                                                    <input
+                                                        className="theme-input flex-1 rounded-xl px-3 py-1 text-xs outline-none"
+                                                        placeholder="Option Name (e.g. Cheese Burst / Extra Cheese)"
+                                                        value={opt.name}
+                                                        onChange={(e) => updateGroupOption(gIdx, oIdx, "name", e.target.value)}
+                                                    />
+                                                    <input
+                                                        className="theme-input w-28 rounded-xl px-3 py-1 text-xs outline-none"
+                                                        placeholder="Price (+₹)"
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={opt.price}
+                                                        onChange={(e) => updateGroupOption(gIdx, oIdx, "price", e.target.value)}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeGroupOption(gIdx, oIdx)}
+                                                        className="rounded-lg p-1 text-zinc-500 hover:text-rose-400 transition"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
                     <label className="flex items-center gap-2 text-sm text-[color:var(--app-muted-strong)]">
                         <input
@@ -638,6 +906,6 @@ export default function MenuStudio() {
                         : "No items match your search."}
                 </div>
             )}
-        </section>
+        </div>
     );
 }

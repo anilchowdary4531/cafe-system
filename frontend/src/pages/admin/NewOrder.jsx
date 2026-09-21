@@ -31,6 +31,7 @@ import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { showToast } from "../../utils/toast";
 import { playNotificationSound } from "../../utils/soundPlayer";
 import { appendOwnerNotification } from "../../utils/ownerNotifications";
+import ItemCustomizationModal from "../../components/ItemCustomizationModal";
 
 const toInr = (value) => {
     const n = Number(value || 0);
@@ -108,7 +109,7 @@ const loadStoredBills = (slug) => {
 
 const mergeQty = (prev, menuItem, delta) => {
     const next = { ...(prev || {}) };
-    const id = Number(menuItem?.id || 0);
+    const id = menuItem?.cartKey || menuItem?.id || Number(menuItem?.id || 0);
     if (!id) return next;
 
     const existing = next[id] || null;
@@ -120,8 +121,9 @@ const mergeQty = (prev, menuItem, delta) => {
     }
 
     next[id] = {
+        ...(existing || {}),
         id,
-        menuItemId: id,
+        menuItemId: menuItem.menuItemId || Number(menuItem?.id || 0),
         name: String(menuItem?.name || "").trim(),
         price: Number(menuItem?.price || 0),
         qty,
@@ -433,7 +435,7 @@ const ItemCard = memo(function ItemCard({ item, qty, onAdd }) {
     );
 });
 
-const CartRow = memo(function CartRow({ item, onAdd, onSub, onRemove, onSetQty }) {
+const CartRow = memo(function CartRow({ item, onAdd, onSub, onRemove, onSetQty, onEdit }) {
     const qty = Math.max(0, Number(item?.qty || 0));
     const [draftQty, setDraftQty] = useState(String(qty));
 
@@ -459,11 +461,38 @@ const CartRow = memo(function CartRow({ item, onAdd, onSub, onRemove, onSetQty }
         onSetQty?.(item, draftQty);
     }, [draftQty, item, onSetQty, qty]);
 
+    const variantLabel = item?.variantName || item?.variant?.name || null;
+    const modifiersList = Array.isArray(item?.selectedModifiers) ? item.selectedModifiers : [];
+
     return (
         <div className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] px-3.5 py-3">
-            <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3">
+            <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3">
                 <div className="min-w-0">
-                    <p className="truncate text-[15px] font-bold text-[color:var(--app-text)] leading-tight">{item?.name || "Item"}</p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="truncate text-[15px] font-bold text-[color:var(--app-text)] leading-tight">{item?.name || "Item"}</p>
+                        {variantLabel && (
+                            <span className="rounded-md bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30">
+                                {variantLabel}
+                            </span>
+                        )}
+                        {(variantLabel || modifiersList.length > 0) && onEdit && (
+                            <button
+                                type="button"
+                                onClick={() => onEdit(item)}
+                                className="text-[10px] font-semibold text-amber-400 hover:underline"
+                            >
+                                Edit
+                            </button>
+                        )}
+                    </div>
+                    {modifiersList.length > 0 && (
+                        <p className="mt-0.5 text-[11px] font-medium text-amber-300/90 truncate">
+                            + {modifiersList.map((m) => m.name).join(", ")}
+                        </p>
+                    )}
+                    {item?.notes && (
+                        <p className="mt-0.5 text-[11px] italic text-[color:var(--app-muted)] truncate">Note: {item.notes}</p>
+                    )}
                     <p className="theme-muted mt-0.5 text-[11px] font-semibold">
                         Rs {toInr(item?.price)} - Qty {qty}
                     </p>
@@ -666,6 +695,10 @@ export default function NewOrder() {
         updateActiveBill({ notes: n });
     }, [updateActiveBill]);
 
+    const [customizingItem, setCustomizingItem] = useState(null);
+    const [editingCartItemConfig, setEditingCartItemConfig] = useState(null);
+    const [customizationModalOpen, setCustomizationModalOpen] = useState(false);
+
     const { data: menuData, loading: menuLoading, error: menuError } = useCachedGet(
         slug ? `/r/${slug}/menu` : "/r/_/menu",
         {
@@ -677,13 +710,16 @@ export default function NewOrder() {
     );
 
     const menu = useMemo(() => {
-        const list = Array.isArray(menuData?.menu) ? menuData.menu : [];
+        const list = Array.isArray(menuData?.menu) ? menuData.menu : Array.isArray(menuData) ? menuData : [];
         return list.map((m) => ({
             id: Number(m.id),
             name: String(m.name || "").trim(),
             category: String(m.category || "").trim() || "General",
             price: Number(m.price || 0),
             image: m.image || "",
+            description: m.description || "",
+            variants: Array.isArray(m.variants) ? m.variants : [],
+            modifierGroups: Array.isArray(m.modifierGroups) ? m.modifierGroups : [],
         }));
     }, [menuData]);
 
@@ -717,6 +753,51 @@ export default function NewOrder() {
         }));
     }, [updateActiveBill]);
 
+    const handleItemClick = useCallback((item) => {
+        const hasVariants = Array.isArray(item.variants) && item.variants.length > 0;
+        const hasModifiers = Array.isArray(item.modifierGroups) && item.modifierGroups.length > 0;
+        if (hasVariants || hasModifiers) {
+            setCustomizingItem(item);
+            setEditingCartItemConfig(null);
+            setCustomizationModalOpen(true);
+        } else {
+            add(item);
+        }
+    }, [add]);
+
+    const handleSaveCustomization = useCallback((payload) => {
+        updateActiveBill((bill) => {
+            const cartKey = payload.cartKey || `custom_${payload.menuItemId}_${Date.now()}`;
+            const nextCart = { ...(bill.cart || {}) };
+
+            if (editingCartItemConfig?.cartKey && editingCartItemConfig.cartKey !== cartKey) {
+                delete nextCart[editingCartItemConfig.cartKey];
+            }
+
+            const existing = nextCart[cartKey];
+            const qty = existing ? existing.qty + payload.qty : payload.qty;
+
+            nextCart[cartKey] = {
+                id: cartKey,
+                cartKey,
+                menuItemId: payload.menuItemId,
+                name: payload.name,
+                variant: payload.variant,
+                variantId: payload.variantId,
+                variantName: payload.variantName,
+                variantPrice: payload.variantPrice,
+                selectedModifiers: payload.selectedModifiers || [],
+                notes: payload.notes || "",
+                price: payload.unitPrice,
+                qty,
+            };
+            return { ...bill, cart: nextCart };
+        });
+        setCustomizationModalOpen(false);
+        setCustomizingItem(null);
+        setEditingCartItemConfig(null);
+    }, [editingCartItemConfig, updateActiveBill]);
+
     const sub = useCallback((item) => {
         updateActiveBill((bill) => ({
             ...bill,
@@ -726,33 +807,37 @@ export default function NewOrder() {
 
     const setQty = useCallback((item, nextQty) => {
         updateActiveBill((bill) => {
-            const id = Number(item?.id || 0);
+            const id = item?.cartKey || item?.id || Number(item?.id || 0);
             if (!id) return bill;
 
             const parsed = Number(nextQty);
             const qty = Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : 1;
             const nextCart = { ...(bill.cart || {}) };
-            nextCart[id] = {
-                ...(nextCart[id] || {}),
-                id,
-                menuItemId: Number(item?.menuItemId || id),
-                name: String(item?.name || "").trim(),
-                price: Number(item?.price || 0),
-                qty,
-            };
+            if (nextCart[id]) {
+                nextCart[id] = { ...nextCart[id], qty };
+            }
             return { ...bill, cart: nextCart };
         });
     }, [updateActiveBill]);
 
     const removeItem = useCallback((item) => {
         updateActiveBill((bill) => {
-            const id = Number(item?.id || 0);
+            const id = item?.cartKey || item?.id || Number(item?.id || 0);
             if (!id) return bill;
             const nextCart = { ...(bill.cart || {}) };
             delete nextCart[id];
             return { ...bill, cart: nextCart };
         });
     }, [updateActiveBill]);
+
+    const handleEditCartItem = useCallback((cartItem) => {
+        const menuItem = menu.find((m) => m.id === cartItem.menuItemId);
+        if (menuItem) {
+            setCustomizingItem(menuItem);
+            setEditingCartItemConfig(cartItem);
+            setCustomizationModalOpen(true);
+        }
+    }, [menu]);
 
     const clear = useCallback(() => {
         updateActiveBill({
@@ -890,7 +975,13 @@ export default function NewOrder() {
                 notes: finalNotes,
                 customerName: customerName ? String(customerName).trim() : null,
                 phone: phone ? String(phone).trim() : null,
-                items: cartItems.map((it) => ({ menuItemId: it.menuItemId, qty: it.qty })),
+                items: cartItems.map((it) => ({
+                    menuItemId: it.menuItemId,
+                    qty: it.qty,
+                    variantId: it.variantId || null,
+                    selectedModifiers: it.selectedModifiers || [],
+                    notes: it.notes || null,
+                })),
                 paymentMethod,
                 cashGiven: cashGivenNum,
                 changeReturned: changeReturnedNum,
@@ -1125,7 +1216,7 @@ export default function NewOrder() {
                                         key={item.id}
                                         item={item}
                                         qty={Number(cart?.[item.id]?.qty || 0)}
-                                        onAdd={add}
+                                        onAdd={handleItemClick}
                                     />
                                 ))
                             )}
@@ -1177,7 +1268,7 @@ export default function NewOrder() {
                             </div>
                         ) : (
                             cartItems.map((it) => (
-                                <CartRow key={it.id} item={it} onAdd={add} onSub={sub} onRemove={removeItem} onSetQty={setQty} />
+                                <CartRow key={it.id} item={it} onAdd={add} onSub={sub} onRemove={removeItem} onSetQty={setQty} onEdit={handleEditCartItem} />
                             ))
                         )}
                     </div>
@@ -1509,6 +1600,20 @@ export default function NewOrder() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {customizationModalOpen && (
+                <ItemCustomizationModal
+                    isOpen={customizationModalOpen}
+                    onClose={() => {
+                        setCustomizationModalOpen(false);
+                        setCustomizingItem(null);
+                        setEditingCartItemConfig(null);
+                    }}
+                    onSave={handleSaveCustomization}
+                    item={customizingItem}
+                    existingConfig={editingCartItemConfig}
+                />
             )}
         </div>
     );

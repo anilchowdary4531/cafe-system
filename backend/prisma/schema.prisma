@@ -178,12 +178,72 @@ model MenuItem {
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   inventory InventoryStock[]
+  variants  MenuItemVariant[]
+  modifierGroups MenuItemModifierGroup[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@index([restaurantId, category, isAvailable])
   @@map("menu_items")
+}
+
+model MenuItemVariant {
+  id Int @id @default(autoincrement())
+
+  menuItemId Int      @map("menu_item_id")
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  name      String
+  price     Float
+  isDefault Boolean @default(false) @map("is_default")
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([menuItemId, isActive])
+  @@map("menu_item_variants")
+}
+
+model MenuItemModifierGroup {
+  id Int @id @default(autoincrement())
+
+  menuItemId Int      @map("menu_item_id")
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  name       String
+  isRequired Boolean @default(false) @map("is_required")
+  minSelect  Int     @default(0) @map("min_select")
+  maxSelect  Int     @default(1) @map("max_select")
+  sortOrder  Int     @default(0) @map("sort_order")
+
+  modifiers MenuItemModifier[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([menuItemId])
+  @@map("menu_item_modifier_groups")
+}
+
+model MenuItemModifier {
+  id Int @id @default(autoincrement())
+
+  modifierGroupId Int                   @map("modifier_group_id")
+  modifierGroup   MenuItemModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+
+  name        String
+  price       Float   @default(0)
+  isAvailable Boolean @default(true) @map("is_available")
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([modifierGroupId, isAvailable])
+  @@map("menu_item_modifiers")
 }
 
 ///////////////////////////////////////////////////////////
@@ -276,6 +336,13 @@ model OrderItem {
   menuItemId Int?   @map("menu_item_id")
   itemName   String @map("item_name")
   preparedByName String? @map("prepared_by_name")
+
+  // SNAPSHOT FIELDS FOR VARIANTS, MODIFIERS & NOTES
+  variantId         Int?    @map("variant_id")
+  variantName       String? @map("variant_name")
+  variantPrice      Float?  @map("variant_price")
+  selectedModifiers Json?   @map("selected_modifiers")
+  notes             String?
 
   qty   Int   @map("quantity")
   price Float

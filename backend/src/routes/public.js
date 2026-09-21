@@ -717,6 +717,21 @@ export default async function publicRoutes(app, deps) {
             orderBy: {
               id: "desc",
             },
+            include: {
+              variants: {
+                where: { isActive: true },
+                orderBy: { sortOrder: "asc" },
+              },
+              modifierGroups: {
+                orderBy: { sortOrder: "asc" },
+                include: {
+                  modifiers: {
+                    where: { isAvailable: true },
+                    orderBy: { sortOrder: "asc" },
+                  },
+                },
+              },
+            },
           },
         },
       });

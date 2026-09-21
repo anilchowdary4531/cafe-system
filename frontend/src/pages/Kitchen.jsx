@@ -293,9 +293,19 @@ function TicketRow({
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                        <p className="truncate text-[14px] font-semibold leading-tight text-[var(--kitchen-ink)]">
-                            {ticket.itemName}
-                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="truncate text-[14px] font-semibold leading-tight text-[var(--kitchen-ink)]">{ticket.itemName}</span>
+                            {ticket.variantName && (
+                                <span className="rounded-md bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-500/30">
+                                    {ticket.variantName}
+                                </span>
+                            )}
+                        </div>
+                        {Array.isArray(ticket.selectedModifiers) && ticket.selectedModifiers.length > 0 && (
+                            <p className="mt-0.5 text-[11px] font-medium text-amber-900/90">
+                                + {ticket.selectedModifiers.map((m) => m.name).join(", ")}
+                            </p>
+                        )}
                         <p className="mt-0.5 text-[11px] text-[var(--kitchen-muted)]">
                             {ticket.qty} plate{ticket.qty === 1 ? "" : "s"} - {ticket.orderRef} - {ticket.ageText}
                         </p>
@@ -319,8 +329,8 @@ function TicketRow({
                     </div>
                 </div>
 
-                {ticket.notes ? (
-                    <p className="mt-1 text-[11px] italic text-[var(--kitchen-muted)]">{ticket.notes}</p>
+                {(ticket.itemNotes || ticket.notes) ? (
+                    <p className="mt-1 text-[11px] italic font-medium text-amber-800">Note: {ticket.itemNotes || ticket.notes}</p>
                 ) : null}
             </div>
         </div>
@@ -643,6 +653,9 @@ export default function Kitchen() {
                     orderStatus: normalizeStatus(order?.status),
                     orderLabel: getEmptyOrderLabel(order),
                     itemName: String(item?.itemName || "Item").trim() || "Item",
+                    variantName: item?.variantName || null,
+                    selectedModifiers: Array.isArray(item?.selectedModifiers) ? item.selectedModifiers : [],
+                    itemNotes: String(item?.notes || "").trim(),
                     qty,
                     lineTotal,
                     notes: String(order?.notes || "").trim(),

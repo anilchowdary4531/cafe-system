@@ -17,6 +17,7 @@ import { resolveImageUrl } from "../utils/resolveImageUrl";
 import { showToast } from "../utils/toast";
 import { playNotificationSound } from "../utils/soundPlayer";
 import { appendOwnerNotification } from "../utils/ownerNotifications";
+import ItemCustomizationModal from "../components/ItemCustomizationModal";
 
 const ACTIVE_STATUSES = new Set(["PLACED", "ACCEPTED", "PREPARING", "READY"]);
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
@@ -91,7 +92,7 @@ const categoryIconFor = (category) => {
 
 const mergeQty = (prev, menuItem, delta, defaultChefName = "") => {
     const next = { ...(prev || {}) };
-    const id = Number(menuItem?.id || 0);
+    const id = menuItem?.cartKey || menuItem?.id || Number(menuItem?.id || 0);
     if (!id) return next;
 
     const existing = next[id] || null;
@@ -103,8 +104,9 @@ const mergeQty = (prev, menuItem, delta, defaultChefName = "") => {
     }
 
     next[id] = {
+        ...(existing || {}),
         id,
-        menuItemId: id,
+        menuItemId: menuItem.menuItemId || Number(menuItem?.id || 0),
         name: String(menuItem?.name || "").trim(),
         category: String(menuItem?.category || "").trim() || "General",
         price: Number(menuItem?.price || 0),
@@ -166,8 +168,10 @@ function MenuCard({ item, qty, disabled, onAdd }) {
     );
 }
 
-function CartRow({ item, chefOptions, onAdd, onSub, onRemove, onSetChef }) {
+function CartRow({ item, chefOptions, onAdd, onSub, onRemove, onSetChef, onEdit }) {
     const qty = Math.max(0, Number(item?.qty || 0));
+    const variantLabel = item?.variantName || item?.variant?.name || null;
+    const modifiersList = Array.isArray(item?.selectedModifiers) ? item.selectedModifiers : [];
 
     return (
         <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface)_58%,transparent)] px-3 py-3">
@@ -175,7 +179,31 @@ function CartRow({ item, chefOptions, onAdd, onSub, onRemove, onSetChef }) {
                 <div className="min-w-0">
                     <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold leading-tight">{item?.name || "Item"}</p>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <p className="truncate text-sm font-semibold leading-tight">{item?.name || "Item"}</p>
+                                {variantLabel && (
+                                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30">
+                                        {variantLabel}
+                                    </span>
+                                )}
+                                {(variantLabel || modifiersList.length > 0) && onEdit && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onEdit(item)}
+                                        className="text-[10px] font-semibold text-amber-400 hover:underline"
+                                    >
+                                        Edit
+                                    </button>
+                                )}
+                            </div>
+                            {modifiersList.length > 0 && (
+                                <p className="mt-0.5 text-[11px] font-medium text-amber-300/90 truncate">
+                                    + {modifiersList.map((m) => m.name).join(", ")}
+                                </p>
+                            )}
+                            {item?.notes && (
+                                <p className="mt-0.5 text-[11px] italic text-[color:var(--app-muted)] truncate">Note: {item.notes}</p>
+                            )}
                             <p className="theme-muted mt-0.5 text-[11px]">
                                 {item?.category || "General"} - {formatMoney(item?.price)}
                             </p>
@@ -219,7 +247,7 @@ function CartRow({ item, chefOptions, onAdd, onSub, onRemove, onSetChef }) {
                     </div>
                 </div>
 
-                    <div className="flex flex-col items-end gap-2 sm:items-end">
+                <div className="flex flex-col items-end gap-2 sm:items-end">
                     <div className="inline-flex items-center gap-1 rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2)_70%,transparent)] p-0.5">
                         <button
                             type="button"
@@ -546,6 +574,10 @@ export default function Server() {
 
     const defaultChefName = chefs[0]?.value || "";
 
+    const [customizingItem, setCustomizingItem] = useState(null);
+    const [editingCartItemConfig, setEditingCartItemConfig] = useState(null);
+    const [customizationModalOpen, setCustomizationModalOpen] = useState(false);
+
     const menu = useMemo(() => {
         const list = Array.isArray(menuData) ? menuData : Array.isArray(menuData?.menu) ? menuData.menu : [];
         return list
@@ -556,6 +588,8 @@ export default function Server() {
                 category: String(item.category || "").trim() || "General",
                 price: Number(item.price || 0),
                 image: item.image || "",
+                variants: Array.isArray(item.variants) ? item.variants : [],
+                modifierGroups: Array.isArray(item.modifierGroups) ? item.modifierGroups : [],
             }))
             .filter((item) => item.id)
             .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
@@ -702,13 +736,81 @@ export default function Server() {
         [assignServerToTable, defaultChefName, selectedTableNo]
     );
 
+    const handleItemClick = useCallback(
+        (item) => {
+            if (!selectedTableNo) {
+                showToast({
+                    title: "Pick a table",
+                    message: "Select a table first before adding items.",
+                    variant: "error",
+                });
+                return;
+            }
+            const hasVariants = Array.isArray(item.variants) && item.variants.length > 0;
+            const hasModifiers = Array.isArray(item.modifierGroups) && item.modifierGroups.length > 0;
+            if (hasVariants || hasModifiers) {
+                setCustomizingItem(item);
+                setEditingCartItemConfig(null);
+                setCustomizationModalOpen(true);
+            } else {
+                addItem(item);
+            }
+        },
+        [addItem, selectedTableNo]
+    );
+
+    const handleSaveCustomization = useCallback((payload) => {
+        if (!selectedTableNo) return;
+        assignServerToTable(selectedTableNo);
+        setCart((prev) => {
+            const cartKey = payload.cartKey || `custom_${payload.menuItemId}_${Date.now()}`;
+            const nextCart = { ...(prev || {}) };
+
+            if (editingCartItemConfig?.cartKey && editingCartItemConfig.cartKey !== cartKey) {
+                delete nextCart[editingCartItemConfig.cartKey];
+            }
+
+            const existing = nextCart[cartKey];
+            const qty = existing ? existing.qty + payload.qty : payload.qty;
+
+            nextCart[cartKey] = {
+                id: cartKey,
+                cartKey,
+                menuItemId: payload.menuItemId,
+                name: payload.name,
+                variant: payload.variant,
+                variantId: payload.variantId,
+                variantName: payload.variantName,
+                variantPrice: payload.variantPrice,
+                selectedModifiers: payload.selectedModifiers || [],
+                notes: payload.notes || "",
+                price: payload.unitPrice,
+                qty,
+                chefName: String(existing?.chefName || payload.chefName || defaultChefName || "").trim(),
+            };
+            return nextCart;
+        });
+        setCustomizationModalOpen(false);
+        setCustomizingItem(null);
+        setEditingCartItemConfig(null);
+    }, [assignServerToTable, defaultChefName, editingCartItemConfig, selectedTableNo]);
+
+    const handleEditCartItem = useCallback((cartItem) => {
+        const menuItem = menu.find((m) => m.id === cartItem.menuItemId);
+        if (menuItem) {
+            setCustomizingItem(menuItem);
+            setEditingCartItemConfig(cartItem);
+            setCustomizationModalOpen(true);
+        }
+    }, [menu]);
+
     const subItem = useCallback((item) => {
         setCart((prev) => mergeQty(prev, item, -1));
     }, []);
 
     const removeItem = useCallback((item) => {
         setCart((prev) => {
-            const id = Number(item?.id || 0);
+            const id = item?.cartKey || item?.id || Number(item?.id || 0);
             if (!id) return prev || {};
             const next = { ...(prev || {}) };
             delete next[id];
@@ -718,7 +820,7 @@ export default function Server() {
 
     const setItemChef = useCallback((item, chefName) => {
         setCart((prev) => {
-            const id = Number(item?.id || 0);
+            const id = item?.cartKey || item?.id || Number(item?.id || 0);
             if (!id) return prev || {};
             const next = { ...(prev || {}) };
             if (!next[id]) return next;
@@ -917,6 +1019,9 @@ export default function Server() {
                     menuItemId: item.menuItemId,
                     qty: item.qty,
                     preparedByName: item.chefName || null,
+                    variantId: item.variantId || null,
+                    selectedModifiers: item.selectedModifiers || [],
+                    notes: item.notes || null,
                 })),
             },
             async (ack) => {
@@ -1376,7 +1481,7 @@ export default function Server() {
                                                     item={item}
                                                     qty={cart[item.id]?.qty || 0}
                                                     disabled={!selectedTableNo}
-                                                    onAdd={addItem}
+                                                    onAdd={handleItemClick}
                                                 />
                                             ))}
                                         </div>
@@ -1440,6 +1545,7 @@ export default function Server() {
                                                 onSub={subItem}
                                                 onRemove={removeItem}
                                                 onSetChef={setItemChef}
+                                                onEdit={handleEditCartItem}
                                             />
                                         ))
                                     )}
@@ -1490,6 +1596,20 @@ export default function Server() {
                     ) : null}
                 </section>
             </main>
+
+            {customizationModalOpen && (
+                <ItemCustomizationModal
+                    isOpen={customizationModalOpen}
+                    onClose={() => {
+                        setCustomizationModalOpen(false);
+                        setCustomizingItem(null);
+                        setEditingCartItemConfig(null);
+                    }}
+                    onSave={handleSaveCustomization}
+                    item={customizingItem}
+                    existingConfig={editingCartItemConfig}
+                />
+            )}
         </div>
     );
 }
