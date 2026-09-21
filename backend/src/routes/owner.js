@@ -23,6 +23,11 @@ import {
   updateStation,
   updateStatus as updateKotStatusController,
 } from "../controllers/kot.controller.js";
+import {
+  moveTable,
+  mergeTables,
+  splitTableOrTransferItems,
+} from "../controllers/tableOperationController.js";
 
 export default async function ownerRoutes(app, deps) {
   const { prisma, buildQrTargetUrl, FRONTEND_URL, STAFF_ACCESS_MODULES, STAFF_ALLOWED_ROLES, normalizeAccess, normalizeDbPermissions, serializeAccess, realtime } = deps;
@@ -665,10 +670,79 @@ export default async function ownerRoutes(app, deps) {
     }
   });
 
+  // Table Operations: Move, Merge, Split / Transfer Items
+  app.post("/owner/:restaurantId/tables/:tableId/move", moveTable);
+  app.post("/owner/:restaurantId/tables/:tableId/merge", mergeTables);
+  app.post("/owner/:restaurantId/tables/:tableId/split", splitTableOrTransferItems);
+  app.post("/owner/:restaurantId/tables/:tableId/transfer-items", splitTableOrTransferItems);
+
+  // Bulk Floor Plan Layout Update
+  app.put("/owner/:restaurantId/tables/layout", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const tablesLayout = Array.isArray(req.body?.tables) ? req.body.tables : [];
+
+      if (!restaurantId || !tablesLayout.length) {
+        return reply.code(400).send({ message: "restaurantId and non-empty tables array are required" });
+      }
+
+      const updatedTables = await prisma.$transaction(
+        tablesLayout.map((item) => {
+          const tableId = Number(item.id || item.tableId);
+          return prisma.diningTable.update({
+            where: { id: tableId },
+            data: {
+              section: item.section !== undefined ? String(item.section) : undefined,
+              positionX: item.positionX !== undefined ? (item.positionX === null ? null : Number(item.positionX)) : undefined,
+              positionY: item.positionY !== undefined ? (item.positionY === null ? null : Number(item.positionY)) : undefined,
+              width: item.width !== undefined ? Number(item.width) : undefined,
+              height: item.height !== undefined ? Number(item.height) : undefined,
+              shape: item.shape !== undefined ? String(item.shape) : undefined,
+              rotation: item.rotation !== undefined ? Number(item.rotation) : undefined,
+            },
+          });
+        })
+      );
+
+      // Audit Log
+      await prisma.tableOperationLog.create({
+        data: {
+          restaurantId,
+          operationType: "LAYOUT_UPDATED",
+          performedByUserId: req.user?.id || req.user?.userId || null,
+          performedByName: req.user?.name || req.user?.userName || "Staff",
+          performedByUserRole: req.user?.role || "OWNER",
+          details: { count: updatedTables.length },
+        },
+      });
+
+      // Broadcast realtime event
+      if (realtime?.io) {
+        realtime.io.to(`restaurant:${restaurantId}`).emit("table:layout_updated", {
+          restaurantId,
+          tables: updatedTables,
+        });
+        realtime.io.to(`restaurant_${restaurantId}`).emit("table:layout_updated", {
+          restaurantId,
+          tables: updatedTables,
+        });
+      }
+
+      return reply.send({
+        success: true,
+        message: `Successfully updated layout for ${updatedTables.length} tables`,
+        tables: updatedTables,
+      });
+    } catch (err) {
+      console.error("Error updating floor plan layout:", err);
+      return reply.code(500).send({ message: err.message || "Failed to save floor plan layout" });
+    }
+  });
+
   app.post("/owner/:restaurantId/tables", async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
-      const { tableNo, seats, isActive } = req.body || {};
+      const { tableNo, seats, isActive, section, positionX, positionY, width, height, shape, rotation } = req.body || {};
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
       if (!tableNo) return reply.code(400).send({ message: "Table number is required" });
 
@@ -690,6 +764,13 @@ export default async function ownerRoutes(app, deps) {
           restaurantId,
           tableNo,
           seats: Number(seats || 4),
+          section: section ? String(section) : "Main Floor",
+          positionX: positionX !== undefined && positionX !== null ? Number(positionX) : null,
+          positionY: positionY !== undefined && positionY !== null ? Number(positionY) : null,
+          width: width ? Number(width) : 120,
+          height: height ? Number(height) : 100,
+          shape: shape || "RECTANGLE",
+          rotation: rotation ? Number(rotation) : 0,
           isActive: isActive ?? true,
           qrCodeUrl: targetUrl,
         },
@@ -704,7 +785,7 @@ export default async function ownerRoutes(app, deps) {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const tableId = Number(req.params.tableId);
-      const { tableNo, seats, isActive } = req.body || {};
+      const { tableNo, seats, isActive, section, positionX, positionY, width, height, shape, rotation } = req.body || {};
       if (!restaurantId || !tableId) return reply.code(400).send({ message: "Invalid id values" });
 
       const restaurant = await prisma.restaurant.findUnique({
@@ -731,6 +812,13 @@ export default async function ownerRoutes(app, deps) {
         data: {
           tableNo: nextTableNo,
           seats: seats === undefined ? existing.seats : Number(seats),
+          section: section !== undefined ? String(section) : existing.section,
+          positionX: positionX !== undefined ? (positionX === null ? null : Number(positionX)) : existing.positionX,
+          positionY: positionY !== undefined ? (positionY === null ? null : Number(positionY)) : existing.positionY,
+          width: width !== undefined ? Number(width) : existing.width,
+          height: height !== undefined ? Number(height) : existing.height,
+          shape: shape !== undefined ? String(shape) : existing.shape,
+          rotation: rotation !== undefined ? Number(rotation) : existing.rotation,
           isActive: isActive ?? existing.isActive,
           qrCodeUrl: buildQrTargetUrl(restaurant.slug, nextTableNo),
         },

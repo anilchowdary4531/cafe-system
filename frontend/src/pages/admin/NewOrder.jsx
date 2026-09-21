@@ -32,6 +32,10 @@ import { showToast } from "../../utils/toast";
 import { playNotificationSound } from "../../utils/soundPlayer";
 import { appendOwnerNotification } from "../../utils/ownerNotifications";
 import ItemCustomizationModal from "../../components/ItemCustomizationModal";
+import OfflineStatusBar from "../../components/OfflineStatusBar";
+import OfflineConflictModal from "../../components/OfflineConflictModal";
+import { cacheMenuOffline, getOfflineMenu, queueOfflineOperation, saveOfflineOrder } from "../../utils/offline/offlineDb";
+import { connectivityService } from "../../utils/offline/connectivityService";
 
 const toInr = (value) => {
     const n = Number(value || 0);
@@ -699,6 +703,8 @@ export default function NewOrder() {
     const [editingCartItemConfig, setEditingCartItemConfig] = useState(null);
     const [customizationModalOpen, setCustomizationModalOpen] = useState(false);
 
+    const [fallbackOfflineMenu, setFallbackOfflineMenu] = useState([]);
+
     const { data: menuData, loading: menuLoading, error: menuError } = useCachedGet(
         slug ? `/r/${slug}/menu` : "/r/_/menu",
         {
@@ -709,8 +715,19 @@ export default function NewOrder() {
         }
     );
 
+    useEffect(() => {
+        if (menuData) {
+            cacheMenuOffline(slug || "default", menuData);
+        } else {
+            getOfflineMenu(slug || "default").then((cached) => {
+                if (cached) setFallbackOfflineMenu(cached);
+            });
+        }
+    }, [menuData, slug]);
+
     const menu = useMemo(() => {
-        const list = Array.isArray(menuData?.menu) ? menuData.menu : Array.isArray(menuData) ? menuData : [];
+        const raw = menuData || fallbackOfflineMenu;
+        const list = Array.isArray(raw?.menu) ? raw.menu : Array.isArray(raw) ? raw : [];
         return list.map((m) => ({
             id: Number(m.id),
             name: String(m.name || "").trim(),
@@ -721,7 +738,7 @@ export default function NewOrder() {
             variants: Array.isArray(m.variants) ? m.variants : [],
             modifierGroups: Array.isArray(m.modifierGroups) ? m.modifierGroups : [],
         }));
-    }, [menuData]);
+    }, [menuData, fallbackOfflineMenu]);
 
     const filteredMenu = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -919,10 +936,6 @@ export default function NewOrder() {
     }, [restaurantName]);
 
     const handleOpenCheckoutModal = useCallback(() => {
-        if (!socket || !connected) {
-            showToast({ title: "Offline", message: "Socket not connected", variant: "error" });
-            return;
-        }
         if (placing) return;
         if (cartItems.length === 0) {
             showToast({ title: "Cart empty", message: "Add at least one item", variant: "error" });
@@ -935,16 +948,24 @@ export default function NewOrder() {
 
         setCashGiven(String(subtotal));
         setShowCheckoutModal(true);
-    }, [cartItems.length, connected, orderType, placing, socket, subtotal, tableNo]);
+    }, [cartItems.length, orderType, placing, subtotal, tableNo]);
 
-    const handleCompleteOrder = useCallback(({ printReceipt = true } = {}) => {
-        if (!socket || !connected) {
-            showToast({ title: "Offline", message: "Socket not connected", variant: "error" });
-            return;
-        }
+    const handleCompleteOrder = useCallback(async ({ printReceipt = true } = {}) => {
         if (placing) return;
         if (cartItems.length === 0) {
             showToast({ title: "Cart empty", message: "Add at least one item", variant: "error" });
+            return;
+        }
+
+        const isOnline = connectivityService.isReachable && socket && connected;
+
+        // Offline guard for non-cash online payments
+        if (!isOnline && paymentMethod !== "CASH") {
+            showToast({
+                title: "Internet Required",
+                message: "Online payments (UPI/Card/Cashfree) require an active internet connection. Please use Cash or reconnect.",
+                variant: "warning",
+            });
             return;
         }
 
@@ -966,6 +987,67 @@ export default function NewOrder() {
 
         const finalNotes = [notes ? String(notes).trim() : null, paymentNotes].filter(Boolean).join(" | ");
 
+        // IF OFFLINE -> QUEUE IN INDEXEDDB
+        if (!isOnline) {
+            try {
+                setPlacing(true);
+                const tempOrderNo = `#OFF-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+                const offlineOrderPayload = {
+                    tableNo: String(orderType || "").toUpperCase() === "DINE_IN" ? tableNo : null,
+                    notes: finalNotes,
+                    customerName: customerName ? String(customerName).trim() : null,
+                    phone: phone ? String(phone).trim() : null,
+                    items: cartItems.map((it) => ({
+                        menuItemId: it.menuItemId,
+                        itemName: it.name,
+                        price: it.price,
+                        qty: it.qty,
+                        variantId: it.variantId || null,
+                        selectedModifiers: it.selectedModifiers || [],
+                        notes: it.notes || null,
+                    })),
+                    paymentMethod,
+                    subtotal,
+                    total: subtotal,
+                    isOffline: true,
+                };
+
+                await queueOfflineOperation({
+                    type: "ADD_ITEMS_TO_SESSION",
+                    restaurantId: 1,
+                    payload: offlineOrderPayload,
+                });
+
+                await saveOfflineOrder({
+                    localOrderId: tempOrderNo,
+                    orderNo: tempOrderNo,
+                    tableNo,
+                    subtotal,
+                    total: subtotal,
+                    status: "PENDING_SYNC",
+                    createdAt: new Date().toISOString(),
+                });
+
+                playNotificationSound();
+                showToast({
+                    title: "Order Saved Offline",
+                    message: `Order ${tempOrderNo} saved locally. Will sync when connection returns.`,
+                    variant: "info",
+                });
+
+                setShowCheckoutModal(false);
+                setCashGiven("");
+                removeCompletedBill(activeBill.id);
+            } catch (err) {
+                showToast({ title: "Offline Save Error", message: err.message, variant: "error" });
+            } finally {
+                setPlacing(false);
+            }
+            return;
+        }
+
+        // ONLINE PATH (SOCKET.IO)
         setPlacing(true);
         socket.emit(
             "order:create",
@@ -1036,8 +1118,10 @@ export default function NewOrder() {
 
     return (
         <div className="theme-page min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_430px]">
+            <OfflineConflictModal />
             <div className="lg:min-h-screen lg:flex lg:flex-col">
                 <header className="theme-nav border-b border-[color:var(--app-border)]">
+                    <OfflineStatusBar />
                     <div className="px-4 py-3 space-y-3">
                         <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] lg:items-center">
                             <div className="min-w-0">

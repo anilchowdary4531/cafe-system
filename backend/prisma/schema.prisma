@@ -93,6 +93,8 @@ model Restaurant {
   printers             Printer[]
   kitchenStations      KitchenStation[]
   kots                 KitchenOrderTicket[]
+  tableOperationLogs   TableOperationLog[]
+  billSplits           BillSplit[]
 
   @@map("restaurants")
 }
@@ -314,6 +316,8 @@ model Order {
   status String @default("PLACED")
   // PLACED / ACCEPTED / PREPARING / READY / DELIVERED / CANCELLED
 
+  clientOperationId String? @unique @map("client_operation_id")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -322,6 +326,7 @@ model Order {
   payments     Payment[]
   payLaterTransactions PayLaterTransaction[]
   kots         KitchenOrderTicket[]
+  billSplits   BillSplit[]
 
   @@unique([restaurantId, orderNo])
   @@index([restaurantId, customerId, createdAt])
@@ -358,6 +363,8 @@ model OrderItem {
   total Float
 
   createdAt DateTime @default(now()) @map("created_at")
+
+  billSplitItems BillSplitItem[]
 
   @@map("order_items")
 }
@@ -516,6 +523,15 @@ model DiningTable {
   tableNo String @map("table_no")
   seats   Int    @default(4)
 
+  // FLOOR PLAN LAYOUT PROPERTIES
+  section   String? @default("Main Floor")
+  positionX Float?  @map("position_x")
+  positionY Float?  @map("position_y")
+  width     Int?    @default(120)
+  height    Int?    @default(100)
+  shape     String? @default("RECTANGLE") // RECTANGLE | ROUND | SQUARE
+  rotation  Int?    @default(0) // 0 | 90 | 180 | 270
+
   qrCodeUrl String? @map("qr_code_url")
   isActive  Boolean @default(true) @map("is_active")
 
@@ -526,6 +542,7 @@ model DiningTable {
 
   @@unique([restaurantId, tableNo])
   @@index([restaurantId, isActive])
+  @@index([restaurantId, section])
   @@map("dining_tables")
 }
 
@@ -545,7 +562,7 @@ model TableSession {
 
   guestCount Int @default(1) @map("guest_count")
 
-  // STATUS: OPEN / BILLING / PAID / CLOSED / CANCELLED
+  // STATUS: OPEN / BILLING / PAID / CLOSED / MERGED / CANCELLED
   status String @default("OPEN")
 
   subtotal            Float @default(0)
@@ -554,20 +571,59 @@ model TableSession {
   discountAmount      Float @default(0) @map("discount_amount")
   total               Float @default(0)
 
+  mergedIntoSessionId Int?          @map("merged_into_session_id")
+  mergedIntoSession   TableSession? @relation("MergedSessions", fields: [mergedIntoSessionId], references: [id], onDelete: SetNull)
+  mergedSessions      TableSession[] @relation("MergedSessions")
+
   openedAt DateTime  @default(now()) @map("opened_at")
   billedAt DateTime? @map("billed_at")
   paidAt   DateTime? @map("paid_at")
   closedAt DateTime? @map("closed_at")
+
+  clientOperationId String? @unique @map("client_operation_id")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   orders Order[]
   kots   KitchenOrderTicket[]
+  billSplits BillSplit[]
+  payments   Payment[]
 
   @@index([restaurantId, tableId, status])
   @@index([restaurantId, status, createdAt])
   @@map("table_sessions")
+}
+
+model TableOperationLog {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  operationType String @map("operation_type") // MOVE_TABLE | MERGE_TABLE | SPLIT_TABLE | ITEM_TRANSFER
+
+  sourceSessionId Int? @map("source_session_id")
+  targetSessionId Int? @map("target_session_id")
+
+  sourceTableId Int?    @map("source_table_id")
+  sourceTableNo String? @map("source_table_no")
+
+  targetTableId Int?    @map("target_table_id")
+  targetTableNo String? @map("target_table_no")
+
+  performedByUserId   Int?    @map("performed_by_user_id")
+  performedByName     String? @map("performed_by_name")
+  performedByUserRole String? @map("performed_by_user_role")
+
+  details Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([restaurantId, operationType, createdAt])
+  @@index([sourceSessionId])
+  @@index([targetSessionId])
+  @@map("table_operation_logs")
 }
 
 model Expense {
@@ -638,27 +694,98 @@ model Payment {
   orderId      Int?             @map("order_id")
   order        Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
-  amount        Float   @default(0)
-  amountSubunit Int?    @map("amount_subunit")
-  currency      String  @default("INR")
+  tableSessionId Int?          @map("table_session_id")
+  tableSession   TableSession? @relation(fields: [tableSessionId], references: [id], onDelete: SetNull)
 
-  status        String  @default("PENDING")
-  transactionId String? @map("transaction_id")
-  paymentMethod String? @map("payment_method")
-  method        String?
-  provider      String? @default("CASHFREE")
+  billSplitId Int?        @map("bill_split_id")
+  billSplit   BillSplit?  @relation(fields: [billSplitId], references: [id], onDelete: SetNull)
 
-  providerOrderId  String? @map("provider_order_id")
-  providerMetadata Json?   @map("provider_metadata")
+  amount          Float   @default(0)
+  amountSubunit   Int?    @map("amount_subunit")
+  amountDue       Float?  @map("amount_due")
+  amountReceived  Float?  @map("amount_received")
+  changeAmount    Float?  @map("change_amount")
+  currency        String  @default("INR")
+
+  status          String  @default("PENDING")
+  transactionId   String? @map("transaction_id")
+  paymentMethod   String? @map("payment_method")
+  method          String?
+  provider        String? @default("CASHFREE")
+
+  providerOrderId String? @map("provider_order_id")
+  providerMetadata Json?  @map("provider_metadata")
+  idempotencyKey  String? @unique @map("idempotency_key")
+  performedByName String? @map("performed_by_name")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@index([restaurantId, createdAt])
   @@index([orderId])
+  @@index([tableSessionId])
+  @@index([billSplitId])
   @@index([cashfreeOrderId])
   @@index([paymentSessionId])
   @@map("payments")
+}
+
+model BillSplit {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  tableSessionId Int?          @map("table_session_id")
+  tableSession   TableSession? @relation(fields: [tableSessionId], references: [id], onDelete: Cascade)
+
+  orderId Int?   @map("order_id")
+  order   Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  splitNo   Int     @default(1) @map("split_no")
+  label     String? @default("Split #1")
+  splitType String  @default("ITEM") @map("split_type") // ITEM | QUANTITY | EQUAL | CUSTOM
+
+  subtotal            Float @default(0)
+  taxAmount           Float @default(0) @map("tax_amount")
+  serviceChargeAmount Float @default(0) @map("service_charge_amount")
+  discountAmount      Float @default(0) @map("discount_amount")
+  total               Float @default(0)
+
+  paidAmount    Float @default(0) @map("paid_amount")
+  pendingAmount Float @default(0) @map("pending_amount")
+
+  status String @default("UNPAID") // UNPAID | PARTIALLY_PAID | PAID
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  items    BillSplitItem[]
+  payments Payment[]
+
+  @@index([restaurantId, tableSessionId])
+  @@index([restaurantId, status])
+  @@map("bill_splits")
+}
+
+model BillSplitItem {
+  id Int @id @default(autoincrement())
+
+  billSplitId Int       @map("bill_split_id")
+  billSplit   BillSplit @relation(fields: [billSplitId], references: [id], onDelete: Cascade)
+
+  orderItemId Int       @map("order_item_id")
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  qty   Int   @default(1)
+  price Float @default(0)
+  total Float @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([billSplitId])
+  @@index([orderItemId])
+  @@map("bill_split_items")
 }
 
 ///////////////////////////////////////////////////////////
@@ -1455,7 +1582,8 @@ model KitchenOrderTicket {
   reprintCount Int       @default(0) @map("reprint_count")
 
   notes          String?
-  idempotencyKey String? @map("idempotency_key")
+  idempotencyKey String? @unique @map("idempotency_key")
+  clientOperationId String? @unique @map("client_operation_id")
 
   items KitchenOrderTicketItem[]
 
