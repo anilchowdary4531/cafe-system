@@ -1,8 +1,10 @@
 import { computeBill, toPriceSubunitItems } from "./billingService.js";
-import { reserveStockForOrder, restoreStockForOrder } from "./inventoryService.js";
+import { reserveStockForOrder, restoreStockForOrder, deductStockForOrder, reverseStockForOrder } from "./inventoryService.js";
 import { normalizePhone } from "./phoneService.js";
 import { createAndDispatchNotification } from "./notificationService.js";
 import { createKotsForOrder, dispatchKotPrint } from "./kotService.js";
+import { validateAndCalculateDiscount, applyAutomaticOffers, incrementPromotionUsageTx } from "./promotionService.js";
+import { validateAndCalculateLoyaltyRedemption, redeemPointsForOrder, earnPointsForOrder, reversePointsForRefund } from "./loyaltyService.js";
 
 const SAFE_STATUSES = ["PLACED", "ACCEPTED", "PREPARING", "READY", "DELIVERED", "CANCELLED"];
 
@@ -112,6 +114,31 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
   const email = body.email ? String(body.email).trim().toLowerCase() : null;
   const customerType = body.customerType ? String(body.customerType).trim().toUpperCase() : phone ? "REGISTERED" : "WALK_IN";
 
+  let customerId = body.customerId ? Number(body.customerId) : null;
+  if (!customerId && phone) {
+    try {
+      const custRecord = await prisma.customer.upsert({
+        where: {
+          restaurantId_phone: {
+            restaurantId,
+            phone,
+          },
+        },
+        update: {
+          name: customerName || undefined,
+          email: email || undefined,
+        },
+        create: {
+          restaurantId,
+          name: customerName || null,
+          phone,
+          email: email || null,
+        },
+      });
+      customerId = custRecord.id;
+    } catch (_) {}
+  }
+
   const items = Array.isArray(body.items) ? body.items : [];
   if (!items.length) {
     const err = new Error("items_required");
@@ -152,13 +179,93 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
   }
 
   const normalizedItems = toPriceSubunitItems({ menuItems, items });
+  const subtotalSubunit = normalizedItems.reduce((sum, item) => sum + item.priceSubunit * item.qty, 0);
+  const subtotalFloat = subtotalSubunit / 100;
 
-  const discountSubunit =
-    body.discountSubunit !== undefined
-      ? Number(body.discountSubunit || 0)
-      : body.discountAmount !== undefined
-        ? Math.round(Number(body.discountAmount || 0) * 100)
-        : 0;
+  let appliedPromotionId = body.promotionId ? Number(body.promotionId) : null;
+  let appliedCouponCode = body.couponCode ? String(body.couponCode).trim().toUpperCase() : null;
+  let appliedDiscountType = body.discountType ? String(body.discountType).trim().toUpperCase() : null;
+  let appliedDiscountReason = body.discountReason ? String(body.discountReason).trim() : null;
+  let calculatedDiscountSubunit = 0;
+
+  if (appliedCouponCode || appliedPromotionId) {
+    const promoRes = await validateAndCalculateDiscount({
+      prisma,
+      restaurantId,
+      branchId: actor?.branchId ? Number(actor.branchId) : null,
+      couponCode: appliedCouponCode,
+      promotionId: appliedPromotionId,
+      items: normalizedItems,
+      orderType: String(body.orderType || body.fulfillment || "POS").toUpperCase(),
+      customerId,
+      subtotal: subtotalFloat,
+    });
+
+    if (promoRes.ok) {
+      calculatedDiscountSubunit = promoRes.discountSubunit;
+      appliedPromotionId = promoRes.promotion?.id || appliedPromotionId;
+      appliedCouponCode = promoRes.promotion?.code || appliedCouponCode;
+      appliedDiscountType = promoRes.promotion?.type || appliedDiscountType;
+      appliedDiscountReason = promoRes.promotion?.name || appliedDiscountReason;
+    }
+  } else if (subtotalFloat > 0) {
+    // Try applying automatic offer if no coupon explicitly entered
+    const autoRes = await applyAutomaticOffers({
+      prisma,
+      restaurantId,
+      branchId: actor?.branchId ? Number(actor.branchId) : null,
+      items: normalizedItems,
+      orderType: String(body.orderType || body.fulfillment || "POS").toUpperCase(),
+      customerId,
+      subtotal: subtotalFloat,
+    });
+    if (autoRes && autoRes.ok) {
+      calculatedDiscountSubunit = autoRes.discountSubunit;
+      appliedPromotionId = autoRes.promotion?.id;
+      appliedCouponCode = autoRes.promotion?.code;
+      appliedDiscountType = autoRes.promotion?.type;
+      appliedDiscountReason = autoRes.promotion?.name;
+    }
+  }
+
+  // Fallback to manual discount if supplied and no promotion applied
+  if (calculatedDiscountSubunit === 0) {
+    calculatedDiscountSubunit =
+      body.discountSubunit !== undefined
+        ? Number(body.discountSubunit || 0)
+        : body.discountAmount !== undefined
+          ? Math.round(Number(body.discountAmount || 0) * 100)
+          : 0;
+    if (calculatedDiscountSubunit > 0 && !appliedDiscountType) {
+      appliedDiscountType = "MANUAL";
+      appliedDiscountReason = appliedDiscountReason || "Manual Discount";
+    }
+  }
+
+  // Loyalty Points Redemption Validation
+  let loyaltyPointsToRedeem = Math.max(0, Math.floor(Number(body.loyaltyPointsToRedeem || body.loyaltyPointsRedeemed || 0)));
+  let loyaltyDiscountSubunit = 0;
+  let loyaltyDiscountAmount = 0;
+
+  if (loyaltyPointsToRedeem > 0 && customerId) {
+    const loyaltyVal = await validateAndCalculateLoyaltyRedemption({
+      db: prisma,
+      restaurantId,
+      customerId,
+      pointsToRedeem: loyaltyPointsToRedeem,
+      subtotal: subtotalFloat,
+      hasCoupon: Boolean(appliedCouponCode || appliedPromotionId),
+    });
+
+    if (loyaltyVal.valid) {
+      loyaltyDiscountSubunit = loyaltyVal.discountSubunit;
+      loyaltyDiscountAmount = loyaltyVal.discountAmount;
+      loyaltyPointsToRedeem = loyaltyVal.pointsToRedeem;
+    } else {
+      loyaltyPointsToRedeem = 0;
+    }
+  }
+
   const bill = computeBill({
     items: normalizedItems,
     taxEnabled: Boolean(restaurant.taxEnabled),
@@ -166,7 +273,8 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
     taxPercent: restaurant.defaultTaxPercent,
     serviceChargeEnabled: Boolean(restaurant.serviceChargeEnabled),
     serviceChargePercent: restaurant.serviceChargePercent,
-    discountSubunit,
+    discountSubunit: calculatedDiscountSubunit,
+    loyaltyDiscountSubunit,
   });
 
   const invoiceNumber = Number(restaurant.nextInvoiceNumber || 1001);
@@ -227,6 +335,7 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
         orderSource: "POS",
         createdByRole: createdByRoleFromStaffRole(actor?.role),
         createdByUserId: actor?.userId || null,
+        customerId,
         customerType,
         customerName,
         phone,
@@ -238,6 +347,13 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
         serviceChargeAmount: bill.serviceChargeAmount,
         discountAmount: bill.discountAmount,
         total: bill.total,
+        promotionId: appliedPromotionId,
+        couponCode: appliedCouponCode,
+        discountType: appliedDiscountType,
+        discountReason: appliedDiscountReason,
+        loyaltyPointsRedeemed: loyaltyPointsToRedeem,
+        loyaltyDiscountAmount,
+        loyaltyPointsEarned: 0,
         status: "PLACED",
         paymentStatus: "PENDING",
         items: {
@@ -270,6 +386,32 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
         statusEvents: { orderBy: { createdAt: "asc" } },
       },
     });
+
+    // Execute loyalty redemption ledger transaction
+    if (loyaltyPointsToRedeem > 0 && customerId) {
+      await redeemPointsForOrder({
+        db: tx,
+        restaurantId,
+        orderId: order.id,
+        customerId,
+        pointsToRedeem: loyaltyPointsToRedeem,
+        actor,
+      });
+    }
+
+    // Automatic recipe raw material stock deduction
+    await deductStockForOrder({
+      tx,
+      restaurantId,
+      orderId: order.id,
+      orderItems: order.items,
+      actor,
+    });
+
+    // Increment promotion usage count atomically
+    if (appliedPromotionId) {
+      await incrementPromotionUsageTx({ tx, promotionId: appliedPromotionId });
+    }
 
     await tx.restaurant.update({
       where: { id: restaurantId },
@@ -359,6 +501,28 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
         tx,
         restaurantId: order.restaurantId,
         items: (order.items || []).map((i) => ({ menuItemId: i.menuItemId, qty: i.qty })),
+      });
+      await reverseStockForOrder({
+        tx,
+        restaurantId: order.restaurantId,
+        orderId: order.id,
+        actor,
+      });
+      await reversePointsForRefund({
+        db: tx,
+        restaurantId: order.restaurantId,
+        orderId: order.id,
+        refundRatio: 1.0,
+        actor,
+      });
+    }
+
+    if (targetStatus === "DELIVERED") {
+      await earnPointsForOrder({
+        db: tx,
+        restaurantId: order.restaurantId,
+        orderId: order.id,
+        actor,
       });
     }
 

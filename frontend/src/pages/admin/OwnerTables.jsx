@@ -109,6 +109,10 @@ export default function OwnerTables() {
     const [submittingTransfer, setSubmittingTransfer] = useState(false);
     const [splitBillingSession, setSplitBillingSession] = useState(null);
 
+    // Reservation State
+    const [reservations, setReservations] = useState([]);
+    const [seatingReservationId, setSeatingReservationId] = useState(null);
+
     // Floor Plan Layout State
     const [viewMode, setViewMode] = useState("FLOOR_PLAN"); // "FLOOR_PLAN" | "GRID"
     const [isEditingLayout, setIsEditingLayout] = useState(false);
@@ -374,9 +378,46 @@ export default function OwnerTables() {
         }
     };
 
+    const loadReservations = async () => {
+        if (!restaurantId) return;
+        try {
+            const today = new Date().toISOString().slice(0, 10);
+            const res = await axios.get(`${API}/owner/${restaurantId}/reservations?date=${today}&status=CONFIRMED,CHECKED_IN`);
+            setReservations(res?.data?.reservations || []);
+        } catch (err) {
+            console.log("Error loading reservations:", err);
+        }
+    };
+
+    const handleSeatReservation = async (reservationId) => {
+        if (!reservationId || !restaurantId) return;
+        try {
+            setSeatingReservationId(reservationId);
+            const res = await axios.post(`${API}/owner/${restaurantId}/reservations/${reservationId}/seat`);
+            showToast({
+                title: "Guest Seated",
+                message: res.data?.message || "Reservation seated and table session opened.",
+                variant: "success",
+            });
+            await loadTables();
+            await loadActiveSessions();
+            await loadReservations();
+        } catch (err) {
+            console.error("Error seating reservation guest:", err);
+            showToast({
+                title: "Seating Error",
+                message: err?.response?.data?.message || "Failed to seat guest for reservation.",
+                variant: "error",
+            });
+        } finally {
+            setSeatingReservationId(null);
+        }
+    };
+
     useEffect(() => {
         loadTables();
         loadActiveSessions();
+        loadReservations();
     }, [restaurantId]);
 
     // Live 30-sec timer tick for table occupancy duration
@@ -407,6 +448,7 @@ export default function OwnerTables() {
         socket.on("table:layout_updated", loadTables);
         socket.on("order:created", loadActiveSessions);
         socket.on("order:updated", loadActiveSessions);
+        socket.on("reservation:updated", loadReservations);
 
         return () => {
             socket.off("table:session_updated", onSessionUpdated);
@@ -414,6 +456,7 @@ export default function OwnerTables() {
             socket.off("table:layout_updated", loadTables);
             socket.off("order:created", loadActiveSessions);
             socket.off("order:updated", loadActiveSessions);
+            socket.off("reservation:updated", loadReservations);
         };
     }, [socket]);
 
@@ -1067,12 +1110,21 @@ export default function OwnerTables() {
                     >
                         <span>📋</span> Grid List View
                     </button>
+                    <Link
+                        to="/admin/reservations"
+                        className="flex items-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-400 transition hover:bg-blue-500/20"
+                    >
+                        <span>📅</span> Reservations
+                    </Link>
                 </div>
 
                 {/* Status Legend */}
                 <div className="hidden sm:flex items-center gap-3 text-[11px] font-semibold text-gray-300">
                     <span className="flex items-center gap-1.5">
                         <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /> Available
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-blue-400" /> Reserved
                     </span>
                     <span className="flex items-center gap-1.5">
                         <span className="h-2.5 w-2.5 rounded-full bg-amber-400 animate-pulse" /> Occupied
@@ -1316,6 +1368,8 @@ export default function OwnerTables() {
                                         ? "rounded-2xl aspect-square"
                                         : "rounded-2xl";
 
+                                const resForTable = reservations.find((r) => Number(r.tableId) === Number(table.id));
+
                                 return (
                                     <div
                                         key={table.id}
@@ -1338,7 +1392,7 @@ export default function OwnerTables() {
                                                 offsetY: (e.clientY - rect.top) / zoomLevel,
                                             });
                                         }}
-                                        className={`group flex flex-col justify-between p-3 border transition-all cursor-pointer ${shapeClasses} ${
+                                        className={`group flex flex-col justify-between p-2.5 border transition-all cursor-pointer ${shapeClasses} ${
                                             isSelectedInEdit
                                                 ? "ring-2 ring-orange-500 shadow-orange-500/50 shadow-xl z-30"
                                                 : ""
@@ -1349,6 +1403,8 @@ export default function OwnerTables() {
                                                 ? "border-purple-500/80 bg-gradient-to-br from-purple-950/80 via-[#0f172a] to-purple-900/40 text-purple-200 shadow-purple-500/20 shadow-lg"
                                                 : isPaid
                                                 ? "border-cyan-500/80 bg-gradient-to-br from-cyan-950/80 via-[#0f172a] to-cyan-900/40 text-cyan-200"
+                                                : resForTable
+                                                ? "border-blue-500/60 bg-gradient-to-br from-[#0f172a] to-blue-950/30 text-gray-200 hover:border-blue-400"
                                                 : "border-emerald-500/40 bg-gradient-to-br from-[#0f172a] to-emerald-950/20 text-gray-200 hover:border-emerald-400"
                                         }`}
                                     >
@@ -1364,20 +1420,37 @@ export default function OwnerTables() {
                                                 <p className="text-sm font-black text-emerald-400 tabular-nums">{formatMoney(session.total)}</p>
                                                 <p className="text-[10px] text-amber-300">{formatAge(session.openedAt)}</p>
                                             </div>
+                                        ) : resForTable ? (
+                                            <div className="text-center my-0.5">
+                                                <span className="inline-block rounded bg-blue-500/20 px-1.5 py-0.5 text-[9px] font-bold text-blue-300">
+                                                    📅 {resForTable.guestName} ({resForTable.reservationTime})
+                                                </span>
+                                            </div>
                                         ) : (
                                             <p className="text-[10px] text-center text-emerald-400/80 font-semibold">Available</p>
                                         )}
 
                                         {!isEditingLayout && (
-                                            <div className="flex items-center justify-between text-[10px] pt-1 border-t border-white/10">
+                                            <div className="flex items-center justify-between text-[10px] pt-1 border-t border-white/10 gap-1">
                                                 {isAvailable ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => { e.stopPropagation(); setOpenSessionTable(table); }}
-                                                        className="w-full rounded bg-emerald-600/80 py-0.5 font-bold text-white hover:bg-emerald-500"
-                                                    >
-                                                        + Open
-                                                    </button>
+                                                    resForTable ? (
+                                                        <button
+                                                            type="button"
+                                                            disabled={seatingReservationId === resForTable.id}
+                                                            onClick={(e) => { e.stopPropagation(); handleSeatReservation(resForTable.id); }}
+                                                            className="w-full rounded bg-blue-600/90 py-0.5 font-bold text-white hover:bg-blue-500 disabled:opacity-50"
+                                                        >
+                                                            {seatingReservationId === resForTable.id ? "Seating..." : "Seat Guest"}
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => { e.stopPropagation(); setOpenSessionTable(table); }}
+                                                            className="w-full rounded bg-emerald-600/80 py-0.5 font-bold text-white hover:bg-emerald-500"
+                                                        >
+                                                            + Open
+                                                        </button>
+                                                    )
                                                 ) : (
                                                     <button
                                                         type="button"
@@ -1491,12 +1564,13 @@ export default function OwnerTables() {
                                                                     : isBilling
                                                                     ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
                                                                     : isPaid
-                                                                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                                                                    : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                                                                    ? "bg-cyan-400/20 text-cyan-300 border border-cyan-400/30"
+                                                                    : resForTable
+                                                                    ? "bg-blue-400/20 text-blue-300 border border-blue-400/30"
+                                                                    : "bg-emerald-400/20 text-emerald-300 border border-emerald-400/30"
                                                             }`}
                                                         >
-                                                            <span className={`h-1.5 w-1.5 rounded-full ${isOccupied ? "bg-amber-400" : isBilling ? "bg-purple-400" : isPaid ? "bg-cyan-400" : "bg-emerald-400"}`} />
-                                                            {sessionStatus}
+                                                            {isOccupied ? "Occupied" : isBilling ? "Billing" : isPaid ? "Paid" : resForTable ? "Reserved" : "Available"}
                                                         </span>
 
                                                         <div className="relative" data-table-actions-menu>
@@ -1585,6 +1659,15 @@ export default function OwnerTables() {
                                                             {session.waiterName && <span>Server: {session.waiterName}</span>}
                                                         </div>
                                                     </div>
+                                                ) : resForTable ? (
+                                                    <div className="mt-3 rounded-xl border border-blue-500/40 bg-blue-950/30 p-2.5 text-xs space-y-1.5">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="font-bold text-blue-300">📅 Reservation</span>
+                                                            <span className="rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-bold text-blue-200">{resForTable.reservationTime}</span>
+                                                        </div>
+                                                        <p className="font-semibold text-white">{resForTable.guestName} ({resForTable.phone})</p>
+                                                        <p className="text-[11px] text-gray-300">Guests: {resForTable.guestCount} • Status: <span className="font-bold text-blue-400">{resForTable.status}</span></p>
+                                                    </div>
                                                 ) : (
                                                     <div className="mt-3 rounded-xl border border-dashed border-white/10 p-3 text-center text-xs text-gray-400">
                                                         Table is currently available for seating.
@@ -1624,13 +1707,24 @@ export default function OwnerTables() {
                                                 {/* Action Buttons */}
                                                 <div className="mt-3 flex flex-wrap gap-1.5">
                                                     {isAvailable && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setOpenSessionTable(table)}
-                                                            className="w-full rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-500"
-                                                        >
-                                                            + Open Table Session
-                                                        </button>
+                                                        resForTable ? (
+                                                            <button
+                                                                type="button"
+                                                                disabled={seatingReservationId === resForTable.id}
+                                                                onClick={() => handleSeatReservation(resForTable.id)}
+                                                                className="w-full rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-50"
+                                                            >
+                                                                {seatingReservationId === resForTable.id ? "Seating Guest..." : "🪑 Seat Reserved Guest"}
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setOpenSessionTable(table)}
+                                                                className="w-full rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-500"
+                                                            >
+                                                                + Open Table Session
+                                                            </button>
+                                                        )
                                                     )}
 
                                                     {isOccupied && (

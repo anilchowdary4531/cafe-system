@@ -23,6 +23,8 @@ import {
     Trash2,
     UtensilsCrossed,
     X,
+    Tag,
+    Gift,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useStaffSocket } from "../../context/StaffSocketContext";
@@ -601,6 +603,115 @@ export default function NewOrder() {
     const notes = activeBill?.notes || "";
     const isCurrentHeld = activeBill?.status === "HELD";
 
+    const [customerSuggestions, setCustomerSuggestions] = useState([]);
+    const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+    const [selectedCustomerObj, setSelectedCustomerObj] = useState(null);
+    const [customerLoyaltyAccount, setCustomerLoyaltyAccount] = useState(null);
+    const [pointsInput, setPointsInput] = useState("");
+    const [loyaltyRedemption, setLoyaltyRedemption] = useState(null);
+    const [loyaltyError, setLoyaltyError] = useState("");
+    const [validatingLoyalty, setValidatingLoyalty] = useState(false);
+
+    const fetchCustomerLoyalty = async (cust) => {
+        if (!cust?.id) {
+            setCustomerLoyaltyAccount(null);
+            setLoyaltyRedemption(null);
+            return;
+        }
+        try {
+            const res = await api.get(`/owner/1/loyalty/customer/${cust.id}`);
+            const account = res.data?.account || res.data;
+            setCustomerLoyaltyAccount(account);
+        } catch {
+            setCustomerLoyaltyAccount(null);
+        }
+    };
+
+    const handleApplyLoyaltyPoints = async (ptsToApply) => {
+        const pts = Math.max(0, parseInt(ptsToApply || pointsInput || "0", 10));
+        if (!pts || !selectedCustomerObj?.id) return;
+        setLoyaltyError("");
+        setValidatingLoyalty(true);
+        try {
+            const res = await api.post(`/owner/1/loyalty/validate-redemption`, {
+                customerId: selectedCustomerObj.id,
+                pointsToRedeem: pts,
+                subtotal,
+                hasCoupon: Boolean(appliedCoupon),
+            });
+            if (res.data && res.data.valid) {
+                setLoyaltyRedemption({
+                    pointsToRedeem: res.data.pointsToRedeem,
+                    discountAmount: res.data.discountAmount,
+                    discountSubunit: res.data.discountSubunit,
+                });
+                setLoyaltyError("");
+                showToast.success(`Redeemed ${res.data.pointsToRedeem} loyalty points! Saved Rs ${res.data.discountAmount}`);
+            } else {
+                setLoyaltyError(res.data?.message || "Invalid redemption");
+                setLoyaltyRedemption(null);
+            }
+        } catch (err) {
+            const msg = err.response?.data?.message || "Failed to validate points redemption";
+            setLoyaltyError(msg);
+            setLoyaltyRedemption(null);
+        } finally {
+            setValidatingLoyalty(false);
+        }
+    };
+
+    const handleRemoveLoyaltyPoints = () => {
+        setLoyaltyRedemption(null);
+        setPointsInput("");
+        setLoyaltyError("");
+    };
+
+    const [couponCodeInput, setCouponCodeInput] = useState("");
+    const [appliedCoupon, setAppliedCoupon] = useState(null);
+    const [couponError, setCouponError] = useState("");
+    const [validatingCoupon, setValidatingCoupon] = useState(false);
+
+    const handleApplyCoupon = async (codeToApply) => {
+        const code = String(codeToApply || couponCodeInput || "").trim().toUpperCase();
+        if (!code) return;
+        setCouponError("");
+        setValidatingCoupon(true);
+        try {
+            const res = await api.post(`/owner/1/promotions/validate`, {
+                couponCode: code,
+                subtotal,
+                items: cartItems,
+                orderType,
+            });
+            if (res.data && res.data.ok) {
+                setAppliedCoupon({
+                    code: res.data.promotion?.code || code,
+                    name: res.data.promotion?.name,
+                    discountAmount: res.data.discountAmount,
+                    discountSubunit: res.data.discountSubunit,
+                    promotionId: res.data.promotion?.id,
+                    discountType: res.data.promotion?.type,
+                });
+                setCouponCodeInput("");
+                setCouponError("");
+                showToast.success(`Coupon '${code}' applied! Saved Rs ${res.data.discountAmount}`);
+            } else {
+                setCouponError(res.data?.message || "Invalid coupon");
+            }
+        } catch (err) {
+            const msg = err.response?.data?.message || "Invalid or expired coupon code";
+            setCouponError(msg);
+        } finally {
+            setValidatingCoupon(false);
+        }
+    };
+
+    const handleRemoveCoupon = () => {
+        setAppliedCoupon(null);
+        setCouponCodeInput("");
+        setCouponError("");
+    };
+
     const updateActiveBill = useCallback((updater) => {
         setBillState((prev) => {
             const activeId = prev.activeBillId;
@@ -1067,6 +1178,13 @@ export default function NewOrder() {
                 paymentMethod,
                 cashGiven: cashGivenNum,
                 changeReturned: changeReturnedNum,
+                couponCode: appliedCoupon?.code || null,
+                promotionId: appliedCoupon?.promotionId || null,
+                discountAmount: appliedCoupon?.discountAmount || 0,
+                discountSubunit: appliedCoupon?.discountSubunit || 0,
+                loyaltyPointsToRedeem: loyaltyRedemption?.pointsToRedeem || 0,
+                loyaltyDiscountAmount: loyaltyRedemption?.discountAmount || 0,
+                customerId: selectedCustomerObj?.id || null,
             },
             (ack) => {
                 try {
@@ -1326,22 +1444,81 @@ export default function NewOrder() {
                         <p className="theme-muted text-sm font-semibold tabular-nums">Rs {toInr(subtotal)}</p>
                     </div>
 
-                    {/* Optional Customer Information */}
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    {/* Optional Customer Information with Autocomplete */}
+                    <div className="relative mt-3 grid grid-cols-2 gap-2 text-xs">
                         <input
                             type="text"
                             placeholder="Customer Name"
                             value={customerName}
-                            onChange={(e) => setCustomerName(e.target.value)}
+                            onChange={(e) => {
+                                setCustomerName(e.target.value);
+                                if (e.target.value.length >= 2) {
+                                    api.get(`/owner/1/customers/search`, { params: { q: e.target.value } })
+                                        .then(res => {
+                                            if (Array.isArray(res.data) && res.data.length > 0) {
+                                                setCustomerSuggestions(res.data);
+                                                setShowCustomerDropdown(true);
+                                            } else {
+                                                setShowCustomerDropdown(false);
+                                            }
+                                        }).catch(() => setShowCustomerDropdown(false));
+                                } else {
+                                    setShowCustomerDropdown(false);
+                                }
+                            }}
                             className="rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] px-3 py-1.5 font-semibold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500/50"
                         />
                         <input
                             type="text"
                             placeholder="Phone Number"
                             value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
+                            onChange={(e) => {
+                                setPhone(e.target.value);
+                                if (e.target.value.length >= 2) {
+                                    api.get(`/owner/1/customers/search`, { params: { q: e.target.value } })
+                                        .then(res => {
+                                            if (Array.isArray(res.data) && res.data.length > 0) {
+                                                setCustomerSuggestions(res.data);
+                                                setShowCustomerDropdown(true);
+                                            } else {
+                                                setShowCustomerDropdown(false);
+                                            }
+                                        }).catch(() => setShowCustomerDropdown(false));
+                                } else {
+                                    setShowCustomerDropdown(false);
+                                }
+                            }}
                             className="rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] px-3 py-1.5 font-semibold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500/50"
                         />
+
+                        {/* Customer Autocomplete Dropdown */}
+                        {showCustomerDropdown && customerSuggestions.length > 0 && (
+                            <div className="absolute left-0 top-full z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-1.5 shadow-2xl divide-y divide-[color:var(--app-border)]">
+                                <div className="px-2 py-1 text-[10px] font-bold text-amber-500 uppercase tracking-wider">
+                                    Matching CRM Customers:
+                                </div>
+                                {customerSuggestions.map((c) => (
+                                    <button
+                                        key={c.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setCustomerName(c.name || "");
+                                            setPhone(c.phone || "");
+                                            setShowCustomerDropdown(false);
+                                        }}
+                                        className="w-full px-2.5 py-1.5 text-left hover:bg-amber-500/10 rounded-lg transition flex items-center justify-between"
+                                    >
+                                        <div>
+                                            <p className="font-semibold text-xs text-[color:var(--app-text)]">{c.name || "Guest Customer"}</p>
+                                            <p className="text-[10px] text-[color:var(--app-muted)]">{c.phone} {c.email ? `• ${c.email}` : ""}</p>
+                                        </div>
+                                        <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                                            {c.totalOrders || 0} orders
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="mt-4 flex min-h-0 flex-1 flex-col gap-1.5 overflow-auto pr-1 divide-y divide-[color:var(--app-border)]">
@@ -1358,14 +1535,126 @@ export default function NewOrder() {
                     </div>
 
                     <div className="mt-4 shrink-0 space-y-3 border-t border-[color:var(--app-border)] pt-4">
-                        <div className="new-order-dividerless mt-0 rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] p-3 text-[color:var(--app-text)]">
-                            <div className="flex items-center justify-between text-xs">
-                                <span className="theme-muted">Items</span>
-                                <span className="font-semibold tabular-nums">{totalItems}</span>
+                        {/* Coupon Code Input & Applied Coupon Badge */}
+                        <div className="new-order-dividerless mt-0 rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] p-3 text-[color:var(--app-text)] space-y-2">
+                            {appliedCoupon ? (
+                                <div className="flex items-center justify-between rounded-xl bg-amber-500/10 px-3 py-1.5 border border-amber-500/20 text-xs">
+                                    <div>
+                                        <p className="font-bold text-amber-500 flex items-center gap-1">
+                                            <Tag size={12} /> {appliedCoupon.code}
+                                        </p>
+                                        <p className="text-[10px] text-[color:var(--app-muted)]">{appliedCoupon.name || "Coupon Applied"}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-bold text-emerald-500">-Rs {toInr(appliedCoupon.discountAmount)}</p>
+                                        <button
+                                            type="button"
+                                            onClick={handleRemoveCoupon}
+                                            className="text-[10px] text-red-400 font-semibold hover:underline"
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-1.5">
+                                    <input
+                                        type="text"
+                                        placeholder="Coupon Code (e.g. WELCOME100)"
+                                        value={couponCodeInput}
+                                        onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+                                        className="flex-1 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] px-2.5 py-1.5 text-xs font-mono font-bold uppercase text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] placeholder:font-sans placeholder:font-normal outline-none focus:border-amber-500"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => handleApplyCoupon(couponCodeInput)}
+                                        disabled={validatingCoupon || !couponCodeInput.trim()}
+                                        className="rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-50"
+                                    >
+                                        {validatingCoupon ? "..." : "Apply"}
+                                    </button>
+                                </div>
+                            )}
+
+                            {couponError && (
+                                <p className="text-[10px] font-semibold text-red-400">{couponError}</p>
+                            )}
+
+                            {/* Loyalty Points Section */}
+                            {selectedCustomerObj ? (
+                                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-2.5 text-xs space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-bold text-amber-500 flex items-center gap-1">
+                                            <Gift size={12} /> Loyalty Balance: {customerLoyaltyAccount?.currentBalance || 0} pts
+                                        </span>
+                                        {loyaltyRedemption && (
+                                            <button
+                                                type="button"
+                                                onClick={handleRemoveLoyaltyPoints}
+                                                className="text-[10px] text-red-400 font-semibold hover:underline"
+                                            >
+                                                Remove Points
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {loyaltyRedemption ? (
+                                        <div className="flex items-center justify-between font-bold text-emerald-500 text-xs">
+                                            <span>Redeemed {loyaltyRedemption.pointsToRedeem} pts</span>
+                                            <span>-Rs {toInr(loyaltyRedemption.discountAmount)}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1.5 pt-1">
+                                            <input
+                                                type="number"
+                                                placeholder="Points to redeem (e.g. 100)"
+                                                value={pointsInput}
+                                                onChange={(e) => setPointsInput(e.target.value)}
+                                                className="flex-1 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] px-2 py-1 text-xs font-semibold text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleApplyLoyaltyPoints(pointsInput)}
+                                                disabled={validatingLoyalty || !pointsInput || Number(pointsInput) <= 0}
+                                                className="rounded-lg bg-amber-500 px-2.5 py-1 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-50"
+                                            >
+                                                {validatingLoyalty ? "..." : "Redeem"}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {loyaltyError && (
+                                        <p className="text-[10px] font-semibold text-red-400 leading-tight">{loyaltyError}</p>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-[10px] text-[color:var(--app-muted)] text-center py-0.5">Select a customer to redeem loyalty points</p>
+                            )}
+
+                            <div className="flex items-center justify-between text-xs pt-1 border-t border-[color:var(--app-border)]">
+                                <span className="theme-muted">Subtotal ({totalItems} items)</span>
+                                <span className="font-semibold tabular-nums">Rs {toInr(subtotal)}</span>
                             </div>
-                            <div className="mt-1 flex items-center justify-between text-sm">
-                                <span className="font-semibold">Total</span>
-                                <span className="font-bold tabular-nums">Rs {toInr(subtotal)}</span>
+
+                            {appliedCoupon && (
+                                <div className="flex items-center justify-between text-xs text-emerald-500 font-semibold">
+                                    <span>Coupon Discount ({appliedCoupon.code})</span>
+                                    <span className="tabular-nums">-Rs {toInr(appliedCoupon.discountAmount)}</span>
+                                </div>
+                            )}
+
+                            {loyaltyRedemption && (
+                                <div className="flex items-center justify-between text-xs text-amber-500 font-semibold">
+                                    <span>Loyalty Reward Discount</span>
+                                    <span className="tabular-nums">-Rs {toInr(loyaltyRedemption.discountAmount)}</span>
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-between text-sm font-bold pt-1 border-t border-[color:var(--app-border)]">
+                                <span>Payable Total</span>
+                                <span className="tabular-nums text-emerald-500">
+                                    Rs {toInr(Math.max(0, subtotal - (appliedCoupon?.discountAmount || 0) - (loyaltyRedemption?.discountAmount || 0)))}
+                                </span>
                             </div>
                         </div>
 

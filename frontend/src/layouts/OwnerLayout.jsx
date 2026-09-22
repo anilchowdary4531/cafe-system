@@ -20,6 +20,9 @@ import {
     FileText,
     IndianRupee,
     Truck,
+    Package,
+    Tag,
+    Award,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
@@ -48,10 +51,14 @@ const MODULES = [
     "kitchen",
     "analytics",
     "finance",
+    "customers",
+    "discounts",
+    "loyalty",
     "staff",
     "settings",
     "notifications",
     "supply",
+    "inventory",
 ];
 
 const defaultAccessByRole = (role) => {
@@ -69,6 +76,9 @@ const defaultAccessByRole = (role) => {
         kitchen: true,
         analytics: true,
         finance: false,
+        customers: true,
+        discounts: true,
+        loyalty: true,
         staff: false,
         settings: false,
         notifications: true,
@@ -502,6 +512,12 @@ export default function OwnerLayout() {
             icon: <UtensilsCrossed size={18} />,
             accessKey: "menu",
         },
+        {
+            label: "Inventory & BOM",
+            path: "/owner/inventory",
+            icon: <Package size={18} />,
+            accessKey: "inventory",
+        },
         ...(isTobaccoApproved ? [{
             label: "Tobacco Studio",
             path: "/owner/menu?tobacco=true",
@@ -539,9 +555,21 @@ export default function OwnerLayout() {
             accessKey: "analytics",
         },
         {
+            label: "Reports & Insights",
+            path: "/owner/reports",
+            icon: <FileText size={18} />,
+            accessKey: "analytics",
+        },
+        {
             label: "Pay Later",
             path: "/owner/pay-later",
             icon: <IndianRupee size={18} />,
+            accessKey: "finance",
+        },
+        {
+            label: "Shift & Day Close",
+            path: "/owner/shifts",
+            icon: <Wallet size={18} />,
             accessKey: "finance",
         },
         {
@@ -549,6 +577,24 @@ export default function OwnerLayout() {
             path: "/owner/supply",
             icon: <Truck size={18} />,
             accessKey: "supply",
+        },
+        {
+            label: "Customers",
+            path: "/owner/customers",
+            icon: <Users size={18} />,
+            accessKey: "customers",
+        },
+        {
+            label: "Discounts & Offers",
+            path: "/owner/discounts",
+            icon: <Tag size={18} />,
+            accessKey: "discounts",
+        },
+        {
+            label: "Loyalty & Rewards",
+            path: "/owner/loyalty",
+            icon: <Award size={18} />,
+            accessKey: "loyalty",
         },
         {
             label: "Staff",

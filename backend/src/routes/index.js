@@ -20,6 +20,10 @@ import supplyChatRoutes from "./supplyChat.routes.js";
 import ppiWalletRoutes from "./ppiWallet.routes.js";
 import tableSessionRoutes from "./tableSessions.js";
 import offlineSyncRoutes from "./offlineSync.js";
+import reservationRoutes from "./reservation.js";
+import inventoryRoutes from "./inventory.js";
+import shiftRoutes from "./shift.routes.js";
+import reportRoutes from "./report.routes.js";
 
 // Single route entrypoint to keep server.js simple.
 export default async function routes(app, deps) {
@@ -44,4 +48,8 @@ export default async function routes(app, deps) {
   await notificationRoutes(app, deps);
   await tableSessionRoutes(app, deps);
   await offlineSyncRoutes(app, deps);
+  await reservationRoutes(app, deps);
+  await inventoryRoutes(app, deps);
+  await shiftRoutes(app, deps);
+  await reportRoutes(app, deps);
 }

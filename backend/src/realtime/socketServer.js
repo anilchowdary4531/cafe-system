@@ -172,12 +172,52 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     }
   };
 
+  const emitReservationUpdated = (reservation) => {
+    const rid = Number(reservation?.restaurantId || 0);
+    if (!rid) return;
+    staff.to(restaurantRoom(rid)).emit("reservation:updated", reservation);
+    if (io) {
+      io.to(`restaurant_${rid}`).emit("reservation:updated", reservation);
+      io.to(`restaurant:${rid}`).emit("reservation:updated", reservation);
+    }
+  };
+
+  const emitInventoryUpdated = (restaurantId, data = {}) => {
+    const rid = Number(restaurantId || 0);
+    if (!rid) return;
+    staff.to(restaurantRoom(rid)).emit("inventory:stock-updated", data);
+    if (io) {
+      io.to(`restaurant_${rid}`).emit("inventory:stock-updated", data);
+      io.to(`restaurant:${rid}`).emit("inventory:stock-updated", data);
+    }
+  };
+
   return {
     io,
     staff,
     emitOrderCreated,
     emitOrderUpdated,
     emitTableSessionUpdated,
+    emitReservationUpdated,
+    emitInventoryUpdated,
   };
+};
+
+export const emitInventoryUpdated = (io, restaurantId, data = {}) => {
+  const rid = Number(restaurantId || 0);
+  if (!rid) return;
+  try {
+    if (io) {
+      if (typeof io.of === "function") {
+        io.of("/staff").to(`restaurant:${rid}`).emit("inventory:stock-updated", data);
+      }
+      if (typeof io.to === "function") {
+        io.to(`restaurant_${rid}`).emit("inventory:stock-updated", data);
+        io.to(`restaurant:${rid}`).emit("inventory:stock-updated", data);
+      }
+    }
+  } catch (err) {
+    console.log("Socket inventory broadcast error:", err?.message);
+  }
 };
 

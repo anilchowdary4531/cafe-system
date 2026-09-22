@@ -20,6 +20,7 @@ export const computeBill = ({
   serviceChargeEnabled = false,
   serviceChargePercent = 0,
   discountSubunit = 0,
+  loyaltyDiscountSubunit = 0,
 } = {}) => {
   const normalizedItems = Array.isArray(items) ? items : [];
 
@@ -29,7 +30,9 @@ export const computeBill = ({
     return sum + unit * qty;
   }, 0);
 
-  const discount = Math.max(0, clampSubunit(discountSubunit));
+  const promoDiscount = Math.max(0, clampSubunit(discountSubunit));
+  const loyaltyDiscount = Math.max(0, clampSubunit(loyaltyDiscountSubunit));
+  const totalDiscount = promoDiscount + loyaltyDiscount;
 
   let taxSubunit = 0;
   if (taxEnabled) {
@@ -45,19 +48,23 @@ export const computeBill = ({
   const totalBeforeDiscount =
     normalizedTaxType === "INCLUSIVE" ? subtotalSubunit + serviceChargeSubunit : subtotalSubunit + taxSubunit + serviceChargeSubunit;
 
-  const totalSubunit = Math.max(0, totalBeforeDiscount - discount);
+  const totalSubunit = Math.max(0, totalBeforeDiscount - totalDiscount);
 
   return {
     subtotalSubunit,
     taxSubunit,
     serviceChargeSubunit,
-    discountSubunit: discount,
+    discountSubunit: totalDiscount,
+    promoDiscountSubunit: promoDiscount,
+    loyaltyDiscountSubunit: loyaltyDiscount,
     totalSubunit,
     // Backward-compatible float fields for existing schema.
     subtotal: fromSubunit(subtotalSubunit),
     taxAmount: fromSubunit(taxSubunit),
     serviceChargeAmount: fromSubunit(serviceChargeSubunit),
-    discountAmount: fromSubunit(discount),
+    discountAmount: fromSubunit(totalDiscount),
+    promoDiscountAmount: fromSubunit(promoDiscount),
+    loyaltyDiscountAmount: fromSubunit(loyaltyDiscount),
     total: fromSubunit(totalSubunit),
   };
 };

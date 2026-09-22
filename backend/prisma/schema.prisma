@@ -68,6 +68,7 @@ model Restaurant {
   // STATUS
   isActive Boolean @default(true) @map("is_active")
   tobaccoApproved Boolean @default(false) @map("tobacco_approved")
+  allowNegativeStock Boolean @default(true) @map("allow_negative_stock")
 
   // TIMESTAMPS
   createdAt DateTime @default(now()) @map("created_at")
@@ -95,6 +96,17 @@ model Restaurant {
   kots                 KitchenOrderTicket[]
   tableOperationLogs   TableOperationLog[]
   billSplits           BillSplit[]
+  reservations         Reservation[]
+  rawMaterials         RawMaterial[]
+  recipes              Recipe[]
+  stockMovements       StockMovement[]
+  cashierShifts        CashierShift[]
+  cashMovements        CashMovement[]
+  dayClosings          DayClosing[]
+  promotions           Promotion[]
+  loyaltyAccounts      LoyaltyAccount[]
+  loyaltyTransactions  LoyaltyTransaction[]
+  loyaltyConfig        LoyaltyConfig?
 
   @@map("restaurants")
 }
@@ -124,6 +136,11 @@ model User {
   branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   isActive Boolean @default(true) @map("is_active")
+
+  openedShifts       CashierShift[] @relation("OpenedShifts")
+  closedShifts       CashierShift[] @relation("ClosedShifts")
+  approvedShifts     CashierShift[] @relation("ApprovedShifts")
+  closedDayClosings  DayClosing[]   @relation("ClosedDayClosings")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -189,6 +206,7 @@ model MenuItem {
   inventory InventoryStock[]
   variants  MenuItemVariant[]
   modifierGroups MenuItemModifierGroup[]
+  recipes   Recipe[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -209,6 +227,8 @@ model MenuItemVariant {
   isDefault Boolean @default(false) @map("is_default")
   isActive  Boolean @default(true) @map("is_active")
   sortOrder Int     @default(0) @map("sort_order")
+
+  recipes Recipe[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -248,6 +268,8 @@ model MenuItemModifier {
   price       Float   @default(0)
   isAvailable Boolean @default(true) @map("is_available")
   sortOrder   Int     @default(0) @map("sort_order")
+
+  recipes Recipe[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -308,6 +330,18 @@ model Order {
   discountAmount      Float @default(0) @map("discount_amount")
   total               Float
 
+  // PROMOTIONS & DISCOUNTS
+  promotionId    Int?       @map("promotion_id")
+  promotion      Promotion? @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  couponCode     String?    @map("coupon_code")
+  discountType   String?    @map("discount_type")
+  discountReason String?    @map("discount_reason")
+
+  // LOYALTY REWARDS SNAPSHOT
+  loyaltyPointsRedeemed Int   @default(0) @map("loyalty_points_redeemed")
+  loyaltyDiscountAmount Float @default(0) @map("loyalty_discount_amount")
+  loyaltyPointsEarned   Int   @default(0) @map("loyalty_points_earned")
+
   // PAYMENT
   paymentMode   String? @map("payment_mode") // CASH / CARD / UPI / ONLINE
   paymentStatus String  @default("PENDING") @map("payment_status")
@@ -327,6 +361,7 @@ model Order {
   payLaterTransactions PayLaterTransaction[]
   kots         KitchenOrderTicket[]
   billSplits   BillSplit[]
+  loyaltyTransactions LoyaltyTransaction[]
 
   @@unique([restaurantId, orderNo])
   @@index([restaurantId, customerId, createdAt])
@@ -365,6 +400,7 @@ model OrderItem {
   createdAt DateTime @default(now()) @map("created_at")
 
   billSplitItems BillSplitItem[]
+  stockMovements StockMovement[]
 
   @@map("order_items")
 }
@@ -379,19 +415,32 @@ model Customer {
   phone String
   email String?
 
+  notes       String?
+  status      String    @default("ACTIVE")
+  tags        String?
+  dateOfBirth DateTime? @map("date_of_birth")
+  gender      String?
+
   rewardPoints Int @default(0) @map("reward_points")
 
-  orders Order[]
-  payLaterAccounts     PayLaterAccount[]
-  payLaterTransactions PayLaterTransaction[]
+  orders                Order[]
+  payLaterAccounts      PayLaterAccount[]
+  payLaterTransactions  PayLaterTransaction[]
   customerNotifications CustomerNotification[]
+  reservations          Reservation[]
+  addresses             CustomerAddress[]
+  loyaltyAccounts       LoyaltyAccount[]
+  loyaltyTransactions   LoyaltyTransaction[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@unique([restaurantId, phone])
+  @@index([restaurantId, phone])
+  @@index([restaurantId, name])
   @@index([restaurantId, email])
   @@index([restaurantId, createdAt])
+  @@index([restaurantId, status])
   @@map("customers")
 }
 
@@ -423,8 +472,11 @@ model CustomerAccount {
 model CustomerAddress {
   id Int @id @default(autoincrement())
 
-  customerAccountId Int             @map("customer_account_id")
-  customerAccount   CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  customerAccountId Int?             @map("customer_account_id")
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+
+  customerId Int?      @map("customer_id")
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   label String @default("Home")
 
@@ -448,6 +500,8 @@ model CustomerAddress {
 
   @@index([customerAccountId])
   @@index([customerAccountId, isDefault])
+  @@index([customerId])
+  @@index([customerId, isDefault])
   @@map("customer_addresses")
 }
 
@@ -539,6 +593,7 @@ model DiningTable {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   tableSessions TableSession[]
+  reservations  Reservation[]
 
   @@unique([restaurantId, tableNo])
   @@index([restaurantId, isActive])
@@ -589,6 +644,7 @@ model TableSession {
   kots   KitchenOrderTicket[]
   billSplits BillSplit[]
   payments   Payment[]
+  reservations Reservation[]
 
   @@index([restaurantId, tableId, status])
   @@index([restaurantId, status, createdAt])
@@ -667,12 +723,68 @@ model Branch {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  users  User[]
-  orders Order[]
+  users               User[]
+  orders              Order[]
+  promotions          Promotion[]
+  loyaltyAccounts     LoyaltyAccount[]
+  loyaltyTransactions LoyaltyTransaction[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId, isActive])
   @@map("branches")
+}
+
+model Promotion {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  branchId Int?    @map("branch_id")
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  name        String
+  description String?
+  code        String?
+
+  // PERCENTAGE | FIXED_AMOUNT | ITEM_DISCOUNT | CATEGORY_DISCOUNT | COUPON | AUTOMATIC_OFFER
+  type String @default("PERCENTAGE")
+
+  value           Float
+  maximumDiscount Float? @map("maximum_discount")
+
+  minimumOrderAmount Float? @default(0) @map("minimum_order_amount")
+  minimumQuantity    Int?   @default(0) @map("minimum_quantity")
+
+  eligibleItems      String? @map("eligible_items")
+  eligibleCategories String? @map("eligible_categories")
+  eligibleOrderTypes String? @map("eligible_order_types")
+  eligibleCustomerId Int?    @map("eligible_customer_id")
+
+  startAt DateTime? @map("start_at")
+  endAt   DateTime? @map("end_at")
+
+  usageLimit            Int? @map("usage_limit")
+  usageLimitPerCustomer Int? @map("usage_limit_per_customer")
+  usageCount            Int  @default(0) @map("usage_count")
+
+  active    Boolean @default(true)
+  stackable Boolean @default(false)
+  priority  Int     @default(0)
+
+  createdById   Int?    @map("created_by_id")
+  createdByName String? @map("created_by_name")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  orders Order[]
+
+  @@unique([restaurantId, code])
+  @@index([restaurantId, active])
+  @@index([restaurantId, code])
+  @@index([restaurantId, startAt, endAt])
+  @@map("promotions")
 }
 
 ///////////////////////////////////////////////////////////
@@ -700,6 +812,9 @@ model Payment {
   billSplitId Int?        @map("bill_split_id")
   billSplit   BillSplit?  @relation(fields: [billSplitId], references: [id], onDelete: SetNull)
 
+  shiftId Int?          @map("shift_id")
+  shift   CashierShift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+
   amount          Float   @default(0)
   amountSubunit   Int?    @map("amount_subunit")
   amountDue       Float?  @map("amount_due")
@@ -721,10 +836,13 @@ model Payment {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
+  cashMovements CashMovement[]
+
   @@index([restaurantId, createdAt])
   @@index([orderId])
   @@index([tableSessionId])
   @@index([billSplitId])
+  @@index([shiftId])
   @@index([cashfreeOrderId])
   @@index([paymentSessionId])
   @@map("payments")
@@ -1621,5 +1739,424 @@ model KitchenOrderTicketItem {
 
   @@map("kitchen_order_ticket_items")
 }
+
+///////////////////////////////////////////////////////////
+// TABLE RESERVATIONS
+///////////////////////////////////////////////////////////
+
+model Reservation {
+  id Int @id @default(autoincrement())
+
+  reservationNo String @map("reservation_no")
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  tableId Int?         @map("table_id")
+  table   DiningTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  customerId Int?      @map("customer_id")
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  tableSessionId Int?          @map("table_session_id")
+  tableSession   TableSession? @relation(fields: [tableSessionId], references: [id], onDelete: SetNull)
+
+  reservationDate DateTime @map("reservation_date")
+  startTime       String   @map("start_time")
+  endTime         String   @map("end_time")
+  guestCount      Int      @default(1) @map("guest_count")
+  actualGuests    Int?     @map("actual_guests")
+
+  customerName  String  @map("customer_name")
+  customerPhone String  @map("customer_phone")
+  customerEmail String? @map("customer_email")
+  notes         String?
+
+  // PENDING | CONFIRMED | CHECKED_IN | SEATED | COMPLETED | CANCELLED | NO_SHOW
+  status String @default("CONFIRMED")
+
+  source String? @default("POS")
+
+  createdById   Int?    @map("created_by_id")
+  createdByName String? @map("created_by_name")
+
+  cancelledAt  DateTime? @map("cancelled_at")
+  cancelledBy  String?   @map("cancelled_by")
+  cancelReason String?   @map("cancel_reason")
+
+  checkedInAt DateTime? @map("checked_in_at")
+  seatedAt    DateTime? @map("seated_at")
+  completedAt DateTime? @map("completed_at")
+
+  clientOperationId String? @unique @map("client_operation_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([restaurantId, reservationNo])
+  @@index([restaurantId, reservationDate])
+  @@index([restaurantId, tableId, reservationDate])
+  @@index([restaurantId, customerId])
+  @@index([restaurantId, status])
+  @@map("reservations")
+}
+
+///////////////////////////////////////////////////////////
+// RAW MATERIAL INVENTORY & RECIPE BOM
+///////////////////////////////////////////////////////////
+
+model RawMaterial {
+  id              Int               @id @default(autoincrement())
+  restaurantId    Int               @map("restaurant_id")
+  restaurant      Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  name            String
+  code            String?           // SKU / Barcode
+  category        String            @default("General") // Produce, Meat, Dairy, Dry Goods, Beverages, Spices, Packaging
+
+  // Base Unit for internal calculations: "g", "ml", "pcs"
+  baseUnit        String            @map("base_unit")
+
+  // Display Unit for UI friendliness: "kg", "g", "L", "ml", "pcs", "dozen"
+  displayUnit     String?           @map("display_unit")
+
+  currentStock    Float             @default(0) @map("current_stock") // Stored in baseUnit
+  minimumStock    Float             @default(0) @map("minimum_stock") // Reorder threshold in baseUnit
+
+  costPerBaseUnit Float             @default(0) @map("cost_per_base_unit") // Cost per base unit
+
+  isActive        Boolean           @default(true) @map("is_active")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at")
+
+  recipeItems     RecipeItem[]
+  movements       StockMovement[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId, category, isActive])
+  @@map("raw_materials")
+}
+
+model Recipe {
+  id              Int               @id @default(autoincrement())
+  restaurantId    Int               @map("restaurant_id")
+  restaurant      Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  menuItemId      Int?              @map("menu_item_id")
+  menuItem        MenuItem?         @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  variantId       Int?              @map("variant_id")
+  variant         MenuItemVariant?  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  modifierId      Int?              @map("modifier_id")
+  modifier        MenuItemModifier? @relation(fields: [modifierId], references: [id], onDelete: Cascade)
+
+  name            String?
+  version         Int               @default(1)
+  isActive        Boolean           @default(true) @map("is_active")
+
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at")
+
+  items           RecipeItem[]
+
+  @@index([restaurantId, menuItemId, isActive])
+  @@index([restaurantId, variantId, isActive])
+  @@index([restaurantId, modifierId, isActive])
+  @@map("recipes")
+}
+
+model RecipeItem {
+  id              Int               @id @default(autoincrement())
+  recipeId        Int               @map("recipe_id")
+  recipe          Recipe            @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  rawMaterialId   Int               @map("raw_material_id")
+  rawMaterial     RawMaterial       @relation(fields: [rawMaterialId], references: [id], onDelete: Cascade)
+
+  quantity        Float
+  unit            String            // "g", "kg", "ml", "L", "pcs", etc.
+  baseQuantity    Float             @map("base_quantity") // Converted to rawMaterial.baseUnit
+
+  wastagePercent  Float             @default(0) @map("wastage_percent")
+
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at")
+
+  @@index([recipeId])
+  @@index([rawMaterialId])
+  @@map("recipe_items")
+}
+
+model StockMovement {
+  id              Int               @id @default(autoincrement())
+  restaurantId    Int               @map("restaurant_id")
+  restaurant      Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  rawMaterialId   Int               @map("raw_material_id")
+  rawMaterial     RawMaterial       @relation(fields: [rawMaterialId], references: [id], onDelete: Cascade)
+
+  movementType    String            @map("movement_type") // OPENING | PURCHASE | SALE | WASTAGE | ADJUSTMENT_IN | ADJUSTMENT_OUT | REVERSAL
+
+  quantity        Float             // Signed quantity change in baseUnit (+10000 for 10kg stock-in, -250 for 250g sale)
+  unitCost        Float             @default(0) @map("unit_cost")
+  totalCost       Float             @default(0) @map("total_cost")
+
+  balanceAfter    Float             @map("balance_after") // Stock balance in baseUnit after movement
+
+  sourceType      String            @map("source_type") // ORDER | PURCHASE | WASTAGE | ADJUSTMENT | OPENING | REVERSAL
+  sourceId        String?           @map("source_id")
+
+  orderItemId     Int?              @map("order_item_id")
+  orderItem       OrderItem?        @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  notes           String?
+  performedById   Int?              @map("performed_by_id")
+  performedByName String?           @map("performed_by_name")
+
+  idempotencyKey  String?           @unique @map("idempotency_key")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  @@index([restaurantId, rawMaterialId, createdAt])
+  @@index([restaurantId, movementType, createdAt])
+  @@index([sourceType, sourceId])
+  @@map("stock_movements")
+}
+
+///////////////////////////////////////////////////////////
+// CASHIER SHIFTS & DAY CLOSING
+///////////////////////////////////////////////////////////
+
+model CashierShift {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  userId Int  @map("user_id")
+  user   User @relation("OpenedShifts", fields: [userId], references: [id], onDelete: Cascade)
+
+  closedByUserId Int?  @map("closed_by_user_id")
+  closedByUser   User? @relation("ClosedShifts", fields: [closedByUserId], references: [id], onDelete: SetNull)
+
+  approvedByUserId Int?  @map("approved_by_user_id")
+  approvedByUser   User? @relation("ApprovedShifts", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  terminalId String @default("MAIN") @map("terminal_id")
+
+  // OPEN | CLOSING | CLOSED | CANCELLED
+  status String @default("OPEN")
+
+  businessDate DateTime @map("business_date")
+
+  openedAt DateTime  @default(now()) @map("opened_at")
+  closedAt DateTime? @map("closed_at")
+
+  openingCash Float @default(0) @map("opening_cash")
+  expectedCash Float @default(0) @map("expected_cash")
+  actualCash   Float? @map("actual_cash")
+  variance     Float?
+  varianceReason String? @map("variance_reason")
+  notes        String?
+  managerApproved Boolean @default(true) @map("manager_approved")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  cashMovements CashMovement[]
+  payments      Payment[]
+
+  @@index([restaurantId, status, createdAt])
+  @@index([restaurantId, userId, status])
+  @@index([restaurantId, businessDate])
+  @@index([restaurantId, terminalId, status])
+  @@map("cashier_shifts")
+}
+
+model CashMovement {
+  id Int @id @default(autoincrement())
+
+  shiftId Int          @map("shift_id")
+  shift   CashierShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  // OPENING_CASH | CASH_SALE | CASH_REFUND | CASH_IN | CASH_OUT | CLOSING_ADJUSTMENT
+  type String
+
+  amount Float
+  reason String?
+
+  paymentId Int?     @map("payment_id")
+  payment   Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  performedByUserId Int    @map("performed_by_user_id")
+  performedByName   String? @map("performed_by_name")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([shiftId, createdAt])
+  @@index([restaurantId, createdAt])
+  @@index([type])
+  @@map("cash_movements")
+}
+
+model DayClosing {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  businessDate DateTime @map("business_date")
+
+  // OPEN | CLOSING | CLOSED
+  status String @default("OPEN")
+
+  grossSales          Float @default(0) @map("gross_sales")
+  discountAmount      Float @default(0) @map("discount_amount")
+  taxAmount           Float @default(0) @map("tax_amount")
+  serviceChargeAmount Float @default(0) @map("service_charge_amount")
+  refundAmount        Float @default(0) @map("refund_amount")
+  netSales            Float @default(0) @map("net_sales")
+
+  cashTotal     Float @default(0) @map("cash_total")
+  upiTotal      Float @default(0) @map("upi_total")
+  cardTotal     Float @default(0) @map("card_total")
+  cashfreeTotal Float @default(0) @map("cashfree_total")
+  payLaterTotal Float @default(0) @map("pay_later_total")
+  otherTotal    Float @default(0) @map("other_total")
+
+  totalOrders     Int @default(0) @map("total_orders")
+  cancelledOrders Int @default(0) @map("cancelled_orders")
+  kotCount        Int @default(0) @map("kot_count")
+
+  totalShifts       Int   @default(0) @map("total_shifts")
+  totalCashVariance Float @default(0) @map("total_cash_variance")
+
+  notes String?
+
+  closedAt       DateTime? @map("closed_at")
+  closedByUserId Int?      @map("closed_by_user_id")
+  closedByUser   User?     @relation("ClosedDayClosings", fields: [closedByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([restaurantId, businessDate])
+  @@index([restaurantId, status])
+  @@map("day_closings")
+}
+
+// ==========================================
+// FEATURE 14: LOYALTY POINTS & REWARDS MODELS
+// ==========================================
+
+model LoyaltyAccount {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  branchId Int?    @map("branch_id")
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  customerId Int      @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  currentBalance   Int @default(0) @map("current_balance")
+  lifetimeEarned   Int @default(0) @map("lifetime_earned")
+  lifetimeRedeemed Int @default(0) @map("lifetime_redeemed")
+
+  // ACTIVE | SUSPENDED | CLOSED
+  status String @default("ACTIVE")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  transactions LoyaltyTransaction[]
+
+  @@unique([restaurantId, customerId])
+  @@index([restaurantId, customerId])
+  @@index([restaurantId, status])
+  @@map("loyalty_accounts")
+}
+
+model LoyaltyTransaction {
+  id Int @id @default(autoincrement())
+
+  loyaltyAccountId Int            @map("loyalty_account_id")
+  loyaltyAccount   LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id], onDelete: Cascade)
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  branchId Int?    @map("branch_id")
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  customerId Int      @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // EARN | REDEEM | REFUND_REVERSAL | CANCELLATION_REVERSAL | REDEMPTION_REVERSAL | EXPIRY | MANUAL_CREDIT | MANUAL_DEBIT | ADJUSTMENT
+  type String
+
+  points        Int
+  balanceBefore Int @map("balance_before")
+  balanceAfter  Int @map("balance_after")
+
+  orderId Int?   @map("order_id")
+  order   Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  referenceId String?   @map("reference_id")
+  description String?
+  expiresAt   DateTime? @map("expires_at")
+
+  createdById   Int?    @map("created_by_id")
+  createdByName String? @map("created_by_name")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([restaurantId, orderId, type])
+  @@index([restaurantId, customerId])
+  @@index([loyaltyAccountId, createdAt])
+  @@index([restaurantId, type])
+  @@index([orderId, type])
+  @@map("loyalty_transactions")
+}
+
+model LoyaltyConfig {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int        @unique @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  enabled Boolean @default(true)
+
+  // E.g., 0.1 means 0.1 points earned per ₹1 spent (10 points per ₹100)
+  pointsPerCurrency Float @default(0.1) @map("points_per_currency")
+
+  // E.g., 0.1 means 10 points = ₹1 redemption value (₹0.10 per point)
+  currencyPerPoint Float @default(0.1) @map("currency_per_point")
+
+  minOrderSubtotalForEarn Float @default(0) @map("min_order_subtotal_for_earn")
+  minPointsToRedeem       Int   @default(100) @map("min_points_to_redeem")
+
+  // E.g., Max 20% of order subtotal can be paid with loyalty points
+  maxRedeemablePercent Float @default(20) @map("max_redeemable_percent")
+
+  // Allow combining loyalty redemption with active coupon codes
+  allowCouponStacking Boolean @default(false) @map("allow_coupon_stacking")
+
+  expiryEnabled Boolean @default(false) @map("expiry_enabled")
+  expiryDays    Int     @default(365) @map("expiry_days")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("loyalty_configs")
+}
+
+
+
 
 

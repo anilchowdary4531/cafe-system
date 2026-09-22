@@ -33,3 +33,10 @@ export const clampSubunit = (subunit) => {
   return Math.trunc(v);
 };
 
+export const round2 = (value) => {
+  const v = Number(value || 0);
+  if (!Number.isFinite(v)) return 0;
+  return Math.round(v * 100) / 100;
+};
+
+

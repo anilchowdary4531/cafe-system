@@ -349,6 +349,12 @@ export const recordSessionPayment = async ({
 
     // 3. Execute Transaction
     return await prisma.$transaction(async (tx) => {
+        // Find active cashier shift for restaurant
+        const activeShift = await tx.cashierShift.findFirst({
+            where: { restaurantId: rid, status: "OPEN" },
+            orderBy: { openedAt: "desc" },
+        });
+
         // Create Payment record
         const newPayment = await tx.payment.create({
             data: {
@@ -356,6 +362,7 @@ export const recordSessionPayment = async ({
                 tableSessionId: sid,
                 orderId: session.orders?.[0]?.id || null,
                 billSplitId: splitId,
+                shiftId: activeShift ? activeShift.id : null,
                 amount: payAmount,
                 amountDue: payAmount,
                 amountReceived: rcvd,
@@ -369,6 +376,39 @@ export const recordSessionPayment = async ({
                 performedByName: actor?.userName || "Staff",
             },
         });
+
+        // If Cash payment & active shift exists, record CashMovement
+        if (paymentMode === "CASH" && activeShift) {
+            await tx.cashMovement.create({
+                data: {
+                    shiftId: activeShift.id,
+                    restaurantId: rid,
+                    type: "CASH_SALE",
+                    amount: payAmount,
+                    reason: `Cash Payment for Session #${sid}`,
+                    paymentId: newPayment.id,
+                    performedByUserId: actor?.userId || activeShift.userId,
+                    performedByName: actor?.userName || "Staff",
+                },
+            });
+
+            // Update expected cash on shift
+            const movements = await tx.cashMovement.findMany({
+                where: { shiftId: activeShift.id },
+                select: { type: true, amount: true },
+            });
+
+            let exp = 0;
+            for (const m of movements) {
+                if (["OPENING_CASH", "CASH_SALE", "CASH_IN"].includes(m.type)) exp += Number(m.amount || 0);
+                else if (["CASH_REFUND", "CASH_OUT"].includes(m.type)) exp -= Number(m.amount || 0);
+            }
+
+            await tx.cashierShift.update({
+                where: { id: activeShift.id },
+                data: { expectedCash: Math.max(0, exp) },
+            });
+        }
 
         // Update target BillSplit status if applicable
         if (targetSplit) {

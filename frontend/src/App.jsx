@@ -53,6 +53,7 @@ import OwnerDashboard from "./pages/admin/OwnerDashboard";
 import OwnerOrders from "./pages/admin/OwnerOrders";
 import MenuStudio from "./pages/admin/MenuStudio";
 import OwnerTables from "./pages/admin/OwnerTables";
+import OwnerReservations from "./pages/admin/OwnerReservations";
 import OwnerKitchenLive from "./pages/admin/OwnerKitchenLive";
 import OwnerAnalytics from "./pages/admin/OwnerAnalytics";
 import OwnerFinance from "./pages/admin/OwnerFinance";
@@ -60,6 +61,13 @@ import OwnerStaff from "./pages/admin/OwnerStaff";
 import OwnerSettings from "./pages/admin/OwnerSettings";
 import OwnerNotifications from "./pages/admin/OwnerNotifications";
 import OwnerPayLater from "./pages/admin/OwnerPayLater";
+import OwnerInventory from "./pages/admin/OwnerInventory";
+import OwnerShiftManager from "./pages/admin/OwnerShiftManager";
+import OwnerReports from "./pages/admin/OwnerReports";
+import OwnerCustomerManager from "./pages/admin/OwnerCustomerManager";
+import OwnerCustomerDetail from "./pages/admin/OwnerCustomerDetail";
+import OwnerDiscounts from "./pages/admin/OwnerDiscounts";
+import OwnerLoyalty from "./pages/admin/OwnerLoyalty";
 import RestaurantPublicMenu from "./pages/restaurant/RestaurantPublicMenu";
 import RestaurantMenu from "./pages/restaurant/RestaurantMenu";
 import SuperAdminDashboard from "./pages/super-admin/SuperAdminDashboard";
@@ -466,13 +474,21 @@ export default function App() {
                         <Route path="online-orders" element={<OwnerOrders sourceFilter="ONLINE" />} />
                         <Route path="menu" element={<MenuStudio />} />
                         <Route path="tables" element={<OwnerTables />} />
+                        <Route path="reservations" element={<OwnerReservations />} />
+                        <Route path="inventory" element={<OwnerInventory />} />
                         <Route path="kitchen" element={<OwnerKitchenLive />} />
                         <Route path="printers" element={<PrinterSettings />} />
                         <Route path="kot-history" element={<KotHistoryPage />} />
                         <Route path="analytics" element={<OwnerAnalytics />} />
+                        <Route path="reports" element={<OwnerReports />} />
                         <Route path="finance" element={<OwnerFinance />} />
+                        <Route path="shifts" element={<OwnerShiftManager />} />
                         <Route path="pay-later" element={<OwnerPayLater />} />
                         <Route path="pay-later/:accountId" element={<OwnerPayLater />} />
+                        <Route path="customers" element={<OwnerCustomerManager />} />
+                        <Route path="customers/:customerId" element={<OwnerCustomerDetail />} />
+                        <Route path="discounts" element={<OwnerDiscounts />} />
+                        <Route path="loyalty" element={<OwnerLoyalty />} />
                         <Route path="staff" element={<OwnerStaff />} />
                         <Route path="settings" element={<OwnerSettings />} />
                         <Route path="notifications" element={<OwnerNotifications />} />

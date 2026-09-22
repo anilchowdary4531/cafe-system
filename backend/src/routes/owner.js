@@ -9,6 +9,34 @@ import {
 } from "../services/staffSessionService.js";
 import { resolveMenuPricing } from "../services/menuPricingService.js";
 import { buildPayLaterController } from "../controllers/payLaterController.js";
+import {
+  searchCustomers,
+  getCustomerById,
+  createCustomer,
+  updateCustomer,
+  mergeCustomers,
+  listCustomerAddresses,
+  addCustomerAddress,
+  updateCustomerAddress,
+  deleteCustomerAddress,
+} from "../services/crmCustomerService.js";
+import {
+  validateAndCalculateDiscount,
+  listPromotions,
+  getPromotionById,
+  createPromotion,
+  updatePromotion,
+  togglePromotionStatus,
+} from "../services/promotionService.js";
+import {
+  getLoyaltyConfig,
+  updateLoyaltyConfig,
+  getLoyaltyStats,
+  listLoyaltyHistory,
+  getOrCreateLoyaltyAccount,
+  validateAndCalculateLoyaltyRedemption,
+  manualAdjustPoints,
+} from "../services/loyaltyService.js";
 import { buildSettlementController } from "../controllers/settlementController.js";
 import {
   createPrinter,
@@ -1851,4 +1879,425 @@ export default async function ownerRoutes(app, deps) {
   app.get("/owner/:restaurantId/stations", getStations);
   app.post("/owner/:restaurantId/stations", createStation);
   app.put("/owner/:restaurantId/stations/:stationId", updateStation);
+
+  // ==========================================
+  // FEATURE 12 — CUSTOMER CRM FOUNDATION ROUTES
+  // ==========================================
+  const handleGetCustomers = async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const { query, q, page, limit, status, sortBy, sortOrder } = req.query || {};
+      const result = await searchCustomers({
+        prisma,
+        restaurantId,
+        query: query || q || "",
+        page: page || 1,
+        limit: limit || 20,
+        status: status || "ACTIVE",
+        sortBy: sortBy || "createdAt",
+        sortOrder: sortOrder || "desc",
+      });
+      return reply.send(result);
+    } catch (err) {
+      console.error("[CRM Route Error] Search customers failed:", err.message);
+      return reply.code(500).send({ message: err.message || "Failed to fetch customers" });
+    }
+  };
+
+  app.get("/owner/:restaurantId/customers", handleGetCustomers);
+  app.get("/owner/:restaurantId/crm/customers", handleGetCustomers);
+
+  const handleSearchCustomersAutocomplete = async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const { q, query } = req.query || {};
+      const result = await searchCustomers({
+        prisma,
+        restaurantId,
+        query: q || query || "",
+        page: 1,
+        limit: 10,
+        status: "ACTIVE",
+      });
+      return reply.send(result.items || []);
+    } catch (err) {
+      console.error("[CRM Route Error] Autocomplete failed:", err.message);
+      return reply.code(500).send({ message: "Search failed" });
+    }
+  };
+
+  app.get("/owner/:restaurantId/customers/search", handleSearchCustomersAutocomplete);
+  app.get("/owner/:restaurantId/crm/customers/search", handleSearchCustomersAutocomplete);
+
+  const handleGetCustomerById = async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const customerId = Number(req.params.customerId);
+      const customer = await getCustomerById({ prisma, restaurantId, customerId });
+      if (!customer) return reply.code(404).send({ message: "Customer not found" });
+      return reply.send(customer);
+    } catch (err) {
+      console.error("[CRM Route Error] Get customer failed:", err.message);
+      return reply.code(500).send({ message: "Failed to fetch customer details" });
+    }
+  };
+
+  app.get("/owner/:restaurantId/customers/:customerId", handleGetCustomerById);
+  app.get("/owner/:restaurantId/crm/customers/:customerId", handleGetCustomerById);
+
+  const handleCreateCustomer = async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const res = await createCustomer({
+        prisma,
+        restaurantId,
+        input: req.body || {},
+        userId: req.user?.id,
+      });
+      if (!res.ok) {
+        return reply.code(res.status || 400).send(res);
+      }
+      return reply.code(201).send(res.customer);
+    } catch (err) {
+      console.error("[CRM Route Error] Create customer failed:", err.message);
+      return reply.code(500).send({ message: "Failed to create customer" });
+    }
+  };
+
+  app.post("/owner/:restaurantId/customers", handleCreateCustomer);
+  app.post("/owner/:restaurantId/crm/customers", handleCreateCustomer);
+
+  const handleUpdateCustomer = async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const customerId = Number(req.params.customerId);
+      const res = await updateCustomer({
+        prisma,
+        restaurantId,
+        customerId,
+        input: req.body || {},
+        userId: req.user?.id,
+      });
+      if (!res.ok) {
+        return reply.code(res.status || 400).send({ message: res.message });
+      }
+      return reply.send(res.customer);
+    } catch (err) {
+      console.error("[CRM Route Error] Update customer failed:", err.message);
+      return reply.code(500).send({ message: "Failed to update customer" });
+    }
+  };
+
+  app.put("/owner/:restaurantId/customers/:customerId", handleUpdateCustomer);
+  app.put("/owner/:restaurantId/crm/customers/:customerId", handleUpdateCustomer);
+  app.patch("/owner/:restaurantId/customers/:customerId", handleUpdateCustomer);
+  app.patch("/owner/:restaurantId/crm/customers/:customerId", handleUpdateCustomer);
+
+  const handleMergeCustomers = async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const { sourceCustomerId, targetCustomerId } = req.body || {};
+      const res = await mergeCustomers({
+        prisma,
+        restaurantId,
+        sourceCustomerId,
+        targetCustomerId,
+        userId: req.user?.id,
+        userRole: req.user?.role,
+      });
+      if (!res.ok) {
+        return reply.code(res.status || 400).send({ message: res.message });
+      }
+      return reply.send(res.result);
+    } catch (err) {
+      console.error("[CRM Route Error] Merge customers failed:", err.message);
+      return reply.code(500).send({ message: "Failed to merge customers" });
+    }
+  };
+
+  app.post("/owner/:restaurantId/customers/merge", handleMergeCustomers);
+  app.post("/owner/:restaurantId/crm/customers/merge", handleMergeCustomers);
+
+  // Address Routes
+  app.get("/owner/:restaurantId/customers/:customerId/addresses", async (req, reply) => {
+    const addresses = await listCustomerAddresses({
+      prisma,
+      restaurantId: req.params.restaurantId,
+      customerId: req.params.customerId,
+    });
+    return reply.send(addresses);
+  });
+
+  app.post("/owner/:restaurantId/customers/:customerId/addresses", async (req, reply) => {
+    const res = await addCustomerAddress({
+      prisma,
+      restaurantId: req.params.restaurantId,
+      customerId: req.params.customerId,
+      input: req.body || {},
+    });
+    if (!res.ok) return reply.code(res.status || 400).send({ message: res.message });
+    return reply.code(201).send(res.address);
+  });
+
+  app.put("/owner/:restaurantId/customers/:customerId/addresses/:addressId", async (req, reply) => {
+    const res = await updateCustomerAddress({
+      prisma,
+      restaurantId: req.params.restaurantId,
+      customerId: req.params.customerId,
+      addressId: req.params.addressId,
+      input: req.body || {},
+    });
+    if (!res.ok) return reply.code(res.status || 400).send({ message: res.message });
+    return reply.send(res.address);
+  });
+
+  app.delete("/owner/:restaurantId/customers/:customerId/addresses/:addressId", async (req, reply) => {
+    const res = await deleteCustomerAddress({
+      prisma,
+      restaurantId: req.params.restaurantId,
+      customerId: req.params.customerId,
+      addressId: req.params.addressId,
+    });
+    if (!res.ok) return reply.code(res.status || 400).send({ message: res.message });
+    return reply.send({ success: true, message: "Address deleted" });
+  });
+
+  // ==========================================
+  // FEATURE 13 — PROMOTIONS & COUPONS ROUTES
+  // ==========================================
+  app.get("/owner/:restaurantId/promotions", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const { page, limit, active, type, search } = req.query || {};
+      const result = await listPromotions({
+        prisma,
+        restaurantId,
+        page: page || 1,
+        limit: limit || 20,
+        active,
+        type,
+        search,
+      });
+      return reply.send(result);
+    } catch (err) {
+      console.error("[Promotions Route Error] List failed:", err.message);
+      return reply.code(500).send({ message: "Failed to list promotions" });
+    }
+  });
+
+  app.get("/owner/:restaurantId/promotions/:promotionId", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const promotionId = Number(req.params.promotionId);
+      const promotion = await getPromotionById({ prisma, restaurantId, promotionId });
+      if (!promotion) return reply.code(404).send({ message: "Promotion not found" });
+      return reply.send(promotion);
+    } catch (err) {
+      console.error("[Promotions Route Error] Get by ID failed:", err.message);
+      return reply.code(500).send({ message: "Failed to fetch promotion details" });
+    }
+  });
+
+  app.post("/owner/:restaurantId/promotions", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const res = await createPromotion({
+        prisma,
+        restaurantId,
+        input: req.body || {},
+        userId: req.user?.id,
+        userName: req.user?.name,
+      });
+      if (!res.ok) return reply.code(res.status || 400).send({ message: res.message });
+      return reply.code(201).send(res.promotion);
+    } catch (err) {
+      console.error("[Promotions Route Error] Create failed:", err.message);
+      return reply.code(500).send({ message: "Failed to create promotion" });
+    }
+  });
+
+  app.put("/owner/:restaurantId/promotions/:promotionId", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const promotionId = Number(req.params.promotionId);
+      const res = await updatePromotion({
+        prisma,
+        restaurantId,
+        promotionId,
+        input: req.body || {},
+      });
+      if (!res.ok) return reply.code(res.status || 400).send({ message: res.message });
+      return reply.send(res.promotion);
+    } catch (err) {
+      console.error("[Promotions Route Error] Update failed:", err.message);
+      return reply.code(500).send({ message: "Failed to update promotion" });
+    }
+  });
+
+  app.patch("/owner/:restaurantId/promotions/:promotionId/status", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const promotionId = Number(req.params.promotionId);
+      const res = await togglePromotionStatus({
+        prisma,
+        restaurantId,
+        promotionId,
+        active: req.body?.active,
+      });
+      if (!res.ok) return reply.code(res.status || 400).send({ message: res.message });
+      return reply.send(res.promotion);
+    } catch (err) {
+      console.error("[Promotions Route Error] Toggle status failed:", err.message);
+      return reply.code(500).send({ message: "Failed to update promotion status" });
+    }
+  });
+
+  app.post("/owner/:restaurantId/promotions/validate", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const { couponCode, promotionId, items, orderType, customerId, subtotal, branchId } = req.body || {};
+      const res = await validateAndCalculateDiscount({
+        prisma,
+        restaurantId,
+        branchId,
+        couponCode,
+        promotionId,
+        items: items || [],
+        orderType: orderType || "POS",
+        customerId,
+        subtotal: Number(subtotal || 0),
+      });
+      if (!res.ok) return reply.code(res.status || 400).send({ message: res.message });
+      return reply.send(res);
+    } catch (err) {
+      console.error("[Promotions Route Error] Validate failed:", err.message);
+      return reply.code(500).send({ message: "Failed to validate coupon code" });
+    }
+  });
+
+  // ==========================================
+  // LOYALTY & REWARDS ROUTES
+  // ==========================================
+
+  app.get("/owner/:restaurantId/loyalty/config", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const config = await getLoyaltyConfig({ db: prisma, restaurantId });
+      return reply.send(config);
+    } catch (err) {
+      console.error("[Loyalty Route Error] Get config failed:", err.message);
+      return reply.code(500).send({ message: "Failed to fetch loyalty config" });
+    }
+  });
+
+  app.put("/owner/:restaurantId/loyalty/config", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const updated = await updateLoyaltyConfig({
+        db: prisma,
+        restaurantId,
+        input: req.body || {},
+      });
+      return reply.send(updated);
+    } catch (err) {
+      console.error("[Loyalty Route Error] Update config failed:", err.message);
+      return reply.code(500).send({ message: err.message || "Failed to update loyalty config" });
+    }
+  });
+
+  app.get("/owner/:restaurantId/loyalty/stats", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const stats = await getLoyaltyStats({ db: prisma, restaurantId });
+      return reply.send(stats);
+    } catch (err) {
+      console.error("[Loyalty Route Error] Get stats failed:", err.message);
+      return reply.code(500).send({ message: "Failed to fetch loyalty stats" });
+    }
+  });
+
+  app.get("/owner/:restaurantId/loyalty/history", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const { customerId, page, limit, type } = req.query || {};
+      const res = await listLoyaltyHistory({
+        db: prisma,
+        restaurantId,
+        customerId: customerId ? Number(customerId) : null,
+        page: page ? Number(page) : 1,
+        limit: limit ? Number(limit) : 20,
+        type,
+      });
+      return reply.send(res);
+    } catch (err) {
+      console.error("[Loyalty Route Error] List history failed:", err.message);
+      return reply.code(500).send({ message: "Failed to fetch loyalty history" });
+    }
+  });
+
+  app.get("/owner/:restaurantId/loyalty/customer/:customerId", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const customerId = Number(req.params.customerId);
+      const account = await getOrCreateLoyaltyAccount({
+        db: prisma,
+        restaurantId,
+        customerId,
+      });
+      if (!account) return reply.code(404).send({ message: "Loyalty account not found" });
+
+      const history = await listLoyaltyHistory({
+        db: prisma,
+        restaurantId,
+        customerId,
+        page: 1,
+        limit: 30,
+      });
+
+      return reply.send({ account, history: history.items });
+    } catch (err) {
+      console.error("[Loyalty Route Error] Get customer account failed:", err.message);
+      return reply.code(500).send({ message: "Failed to fetch customer loyalty details" });
+    }
+  });
+
+  app.post("/owner/:restaurantId/loyalty/adjust", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const { customerId, points, type, reason } = req.body || {};
+      const txn = await manualAdjustPoints({
+        db: prisma,
+        restaurantId,
+        customerId: Number(customerId),
+        points: Number(points),
+        type,
+        reason,
+        createdById: req.user?.id || null,
+        createdByName: req.user?.name || null,
+      });
+      return reply.send(txn);
+    } catch (err) {
+      console.error("[Loyalty Route Error] Manual adjust failed:", err.message);
+      return reply.code(400).send({ message: err.message || "Failed to adjust loyalty points" });
+    }
+  });
+
+  app.post("/owner/:restaurantId/loyalty/validate-redemption", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const { customerId, pointsToRedeem, subtotal, hasCoupon } = req.body || {};
+      const res = await validateAndCalculateLoyaltyRedemption({
+        db: prisma,
+        restaurantId,
+        customerId: Number(customerId),
+        pointsToRedeem: Number(pointsToRedeem || 0),
+        subtotal: Number(subtotal || 0),
+        hasCoupon: Boolean(hasCoupon),
+      });
+      return reply.send(res);
+    } catch (err) {
+      console.error("[Loyalty Route Error] Validate redemption failed:", err.message);
+      return reply.code(500).send({ message: "Failed to validate loyalty points redemption" });
+    }
+  });
 }
