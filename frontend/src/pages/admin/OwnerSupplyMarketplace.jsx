@@ -245,9 +245,9 @@ export default function OwnerSupplyMarketplace() {
     };
 
     return (
-        <section className="space-y-6 theme-adaptive">
+        <section className="space-y-3 theme-adaptive">
             {/* Header */}
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b theme-border pb-5">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between pb-1">
                 <div>
                     <h2 className="text-2xl font-extrabold flex items-center gap-2 tracking-tight">
                         <Truck className="theme-accent-text" />
@@ -260,7 +260,7 @@ export default function OwnerSupplyMarketplace() {
                     <button
                         type="button"
                         onClick={() => setShowCartModal(true)}
-                        className="relative theme-button-secondary rounded-xl px-4 py-2.5 text-xs font-extrabold flex items-center gap-2 transition cursor-pointer shadow-md"
+                        className="relative theme-button-secondary rounded-xl px-4 py-2.5 text-xs font-extrabold flex items-center gap-2 transition cursor-pointer "
                     >
                         <ShoppingCart size={16} />
                         Supply Cart
@@ -277,7 +277,7 @@ export default function OwnerSupplyMarketplace() {
                     type="button"
                     onClick={() => setActiveTab("browse")}
                     className={`rounded-xl px-5 py-2.5 text-xs font-extrabold transition cursor-pointer ${
-                        activeTab === "browse" ? "theme-button shadow-md" : "theme-button-secondary"
+                        activeTab === "browse" ? "theme-button " : "theme-button-secondary"
                     }`}
                 >
                     Browse Ingredients ({products.length})
@@ -286,7 +286,7 @@ export default function OwnerSupplyMarketplace() {
                     type="button"
                     onClick={() => setActiveTab("orders")}
                     className={`rounded-xl px-5 py-2.5 text-xs font-extrabold transition cursor-pointer ${
-                        activeTab === "orders" ? "theme-button shadow-md" : "theme-button-secondary"
+                        activeTab === "orders" ? "theme-button " : "theme-button-secondary"
                     }`}
                 >
                     Track Supply Orders ({orders.length})
@@ -295,7 +295,7 @@ export default function OwnerSupplyMarketplace() {
 
             {/* Search + Categories Bar + Filter Controls */}
             {activeTab === "browse" && (
-                <div className="theme-panel rounded-3xl p-5 border shadow-sm space-y-4">
+                <div className="py-1 space-y-2.5">
                     <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
                         {/* Search Input Bar */}
                         <div className="relative flex-1">
@@ -400,7 +400,7 @@ export default function OwnerSupplyMarketplace() {
                     </div>
 
                     {/* CATEGORY SELECTOR PILLS BAR */}
-                    <div className="pt-2 border-t theme-border">
+                    <div className="pt-1">
                         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
                             <span className="text-[11px] font-extrabold theme-muted uppercase tracking-wider whitespace-nowrap mr-1 flex items-center gap-1">
                                 <SlidersHorizontal size={13} /> Select Category:
@@ -410,7 +410,7 @@ export default function OwnerSupplyMarketplace() {
                                 onClick={() => setSelectedCategory("All Categories")}
                                 className={`rounded-xl px-4 py-1.5 text-xs font-bold whitespace-nowrap transition cursor-pointer ${
                                     selectedCategory === "All Categories"
-                                        ? "theme-button shadow-md font-extrabold"
+                                        ? "theme-button  font-extrabold"
                                         : "theme-button-secondary"
                                 }`}
                             >
@@ -432,7 +432,7 @@ export default function OwnerSupplyMarketplace() {
                                         onClick={() => setSelectedCategory(cat.name)}
                                         className={`rounded-xl px-3.5 py-1.5 text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
                                             isSelected
-                                                ? "theme-button shadow-md font-extrabold"
+                                                ? "theme-button  font-extrabold"
                                                 : count > 0
                                                 ? "border theme-border theme-soft-button theme-accent-text"
                                                 : "theme-button-secondary"
@@ -498,7 +498,7 @@ export default function OwnerSupplyMarketplace() {
 
                 if (filtered.length === 0) {
                     return (
-                        <div className="theme-panel rounded-3xl border p-10 text-center space-y-4 shadow-xl my-4">
+                        <div className="py-8 text-center space-y-3 my-2">
                             <Package size={44} className="mx-auto theme-accent-text opacity-80" />
                             <div>
                                 <h3 className="text-base font-bold">No products match your filters</h3>
@@ -511,7 +511,7 @@ export default function OwnerSupplyMarketplace() {
                             <button
                                 type="button"
                                 onClick={() => { setSelectedCategory("All Categories"); setSelectedSupplier("All Suppliers"); setSearch(""); setSortBy("default"); }}
-                                className="theme-button rounded-xl px-5 py-2.5 text-xs font-extrabold transition shadow-md cursor-pointer inline-flex items-center gap-1.5"
+                                className="theme-button rounded-xl px-5 py-2.5 text-xs font-extrabold transition  cursor-pointer inline-flex items-center gap-1.5"
                             >
                                 ✨ Reset All Filters ({products.length} Products Available)
                             </button>
@@ -520,15 +520,15 @@ export default function OwnerSupplyMarketplace() {
                 }
 
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
                         {filtered.map((p) => {
                             const imgUrl = getSupplyProductImageUrl(p);
                             const displaySupplierName = p.supplierName || p.supplier?.profile?.businessName || p.supplier?.businessName || "SocialSea";
                             const displayPrice = p.prices?.[0]?.basePrice || p.basePrice || p.finalPrice || 100;
 
                             return (
-                                <div key={p.id} className="theme-panel rounded-2xl border p-4 space-y-3 shadow-md hover:border-[#f5b94e]/40 transition">
-                                    <div className="h-44 w-full rounded-xl overflow-hidden border theme-border bg-black/10 shadow-inner relative flex items-center justify-center">
+                                <div key={p.id} className="py-1 space-y-2 transition">
+                                    <div className="h-40 w-full rounded-xl overflow-hidden relative flex items-center justify-center bg-black/5">
                                         {imgUrl ? (
                                             <img
                                                 src={imgUrl}
@@ -552,7 +552,7 @@ export default function OwnerSupplyMarketplace() {
                                             <h3 className="font-bold text-base leading-snug">{p.name}</h3>
                                             <p className="text-xs mt-1.5 flex items-center gap-1.5 flex-wrap">
                                                 <span className="theme-muted font-medium">Supplier:</span>
-                                                <span className="font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20 inline-flex items-center gap-1 text-[11px]">
+                                                <span className="font-extrabold text-amber-500 inline-flex items-center gap-1 text-[11px]">
                                                     <Building2 size={12} />
                                                     {displaySupplierName}
                                                 </span>
@@ -563,7 +563,7 @@ export default function OwnerSupplyMarketplace() {
                                         </span>
                                     </div>
 
-                                    <div className="text-xs space-y-1 theme-muted border-t theme-border pt-3">
+                                    <div className="text-xs space-y-0.5 theme-muted pt-0.5">
                                         <p>Min Order Qty (MOQ): <span className="font-bold text-white">{p.moq} {p.unit}</span></p>
                                         <p>Available Stock: <span className="font-bold theme-accent-text">{p.inventory?.availableStock || p.availableStock || 250} {p.unit}</span></p>
                                     </div>
@@ -572,7 +572,7 @@ export default function OwnerSupplyMarketplace() {
                                         <button
                                             type="button"
                                             onClick={() => handleAddToCart(p, p.moq)}
-                                            className="theme-button flex-1 rounded-xl py-2.5 text-xs font-extrabold transition flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                                            className="theme-button flex-1 rounded-xl py-2.5 text-xs font-extrabold transition flex items-center justify-center gap-1.5  cursor-pointer"
                                         >
                                             <Plus size={15} />
                                             Add {p.moq} {p.unit}
@@ -598,7 +598,7 @@ export default function OwnerSupplyMarketplace() {
             {activeTab === "orders" && (
                 <div className="space-y-3">
                     {orders.map((o) => (
-                        <div key={o.id} className="theme-panel rounded-2xl border p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-md">
+                        <div key={o.id} className="theme-panel rounded-2xl border p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 ">
                             <div>
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="font-extrabold theme-accent-text">{o.orderNo}</span>
@@ -664,7 +664,7 @@ export default function OwnerSupplyMarketplace() {
 
                             <button
                                 type="submit"
-                                className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 text-black py-3 text-xs font-extrabold transition cursor-pointer shadow-md mt-2"
+                                className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 text-black py-3 text-xs font-extrabold transition cursor-pointer  mt-2"
                             >
                                 Send Bargain Offer to Supplier
                             </button>
@@ -738,7 +738,7 @@ export default function OwnerSupplyMarketplace() {
                                 <button
                                     type="button"
                                     onClick={handleCheckoutOrder}
-                                    className="theme-button w-full rounded-xl py-3 font-extrabold transition shadow-md cursor-pointer mt-2"
+                                    className="theme-button w-full rounded-xl py-3 font-extrabold transition  cursor-pointer mt-2"
                                 >
                                     Place Supply Order (Pay on Delivery)
                                 </button>
