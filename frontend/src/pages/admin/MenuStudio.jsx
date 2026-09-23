@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import axios from "axios";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, Search, Trash2 } from "lucide-react";
 import { API } from "../../config";
 import { uploadToS3Presigned } from "../../utils/s3Upload";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
