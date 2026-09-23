@@ -7,7 +7,7 @@ import { dispatchKotPrint, reprintKot, updateKotStatus, updateKotItemStatus, upd
 export const getKots = async (req, res) => {
   try {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
-    if (!restaurantId) return res.status(400).json({ message: "Restaurant ID required" });
+    if (!restaurantId) return res.status(400).send({ message: "Restaurant ID required" });
 
     const { status, stationId, priority, source, tableNo, tableSessionId, q, limit = 100 } = req.query;
 
@@ -55,10 +55,10 @@ export const getKots = async (req, res) => {
       },
     });
 
-    return res.json({ ok: true, kots });
+    return res.send({ ok: true, kots });
   } catch (err) {
     console.error("getKots error:", err);
-    return res.status(500).json({ message: err?.message || "Failed to fetch KOTs" });
+    return res.status(500).send({ message: err?.message || "Failed to fetch KOTs" });
   }
 };
 
@@ -71,7 +71,7 @@ export const updateStatus = async (req, res) => {
     const kotId = Number(req.params.kotId || 0);
     const { status } = req.body;
 
-    if (!restaurantId || !kotId) return res.status(400).json({ message: "Missing required IDs" });
+    if (!restaurantId || !kotId) return res.status(400).send({ message: "Missing required IDs" });
 
     const actor = req.user ? { userId: req.user.id, userName: req.user.name || req.user.email } : null;
 
@@ -90,10 +90,10 @@ export const updateStatus = async (req, res) => {
       io.to(`restaurant:${restaurantId}`).emit("kot:status_updated", updatedKot);
     }
 
-    return res.json({ ok: true, kot: updatedKot });
+    return res.send({ ok: true, kot: updatedKot });
   } catch (err) {
     console.error("updateKotStatus error:", err);
-    return res.status(500).json({ message: err?.message || "Failed to update KOT status" });
+    return res.status(500).send({ message: err?.message || "Failed to update KOT status" });
   }
 };
 
@@ -108,7 +108,7 @@ export const updateItemStatus = async (req, res) => {
     const { status } = req.body;
 
     if (!restaurantId || !kotId || !itemId) {
-      return res.status(400).json({ message: "Missing required parameters" });
+      return res.status(400).send({ message: "Missing required parameters" });
     }
 
     const actor = req.user ? { userId: req.user.id, userName: req.user.name || req.user.email } : null;
@@ -134,10 +134,10 @@ export const updateItemStatus = async (req, res) => {
       }
     }
 
-    return res.json({ ok: true, kot, order });
+    return res.send({ ok: true, kot, order });
   } catch (err) {
     console.error("updateItemStatus error:", err);
-    return res.status(500).json({ message: err?.message || "Failed to update item status" });
+    return res.status(500).send({ message: err?.message || "Failed to update item status" });
   }
 };
 
@@ -151,7 +151,7 @@ export const updatePriority = async (req, res) => {
     const { priority } = req.body;
 
     if (!restaurantId || !kotId || !priority) {
-      return res.status(400).json({ message: "Missing required parameters" });
+      return res.status(400).send({ message: "Missing required parameters" });
     }
 
     const updated = await updateKotPriority({
@@ -168,10 +168,10 @@ export const updatePriority = async (req, res) => {
       io.to(`restaurant_${restaurantId}`).emit("kot:status_updated", updated);
     }
 
-    return res.json({ ok: true, kot: updated });
+    return res.send({ ok: true, kot: updated });
   } catch (err) {
     console.error("updatePriority error:", err);
-    return res.status(500).json({ message: err?.message || "Failed to update priority" });
+    return res.status(500).send({ message: err?.message || "Failed to update priority" });
   }
 };
 
@@ -181,7 +181,7 @@ export const updatePriority = async (req, res) => {
 export const getWorkloadMetrics = async (req, res) => {
   try {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
-    if (!restaurantId) return res.status(400).json({ message: "Restaurant ID required" });
+    if (!restaurantId) return res.status(400).send({ message: "Restaurant ID required" });
 
     const kots = await req.prisma.kitchenOrderTicket.findMany({
       where: {
@@ -231,7 +231,7 @@ export const getWorkloadMetrics = async (req, res) => {
 
     const averagePrepMinutes = completedCount > 0 ? Math.round(totalPrepMinutes / completedCount) : 0;
 
-    return res.json({
+    return res.send({
       ok: true,
       metrics: {
         newCount,
@@ -245,7 +245,7 @@ export const getWorkloadMetrics = async (req, res) => {
     });
   } catch (err) {
     console.error("getWorkloadMetrics error:", err);
-    return res.status(500).json({ message: err?.message || "Failed to fetch kitchen workload metrics" });
+    return res.status(500).send({ message: err?.message || "Failed to fetch kitchen workload metrics" });
   }
 };
 
@@ -257,7 +257,7 @@ export const triggerReprint = async (req, res) => {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
     const kotId = Number(req.params.kotId || 0);
 
-    if (!restaurantId || !kotId) return res.status(400).json({ message: "Missing required IDs" });
+    if (!restaurantId || !kotId) return res.status(400).send({ message: "Missing required IDs" });
 
     const result = await reprintKot({
       prisma: req.prisma,
@@ -265,10 +265,10 @@ export const triggerReprint = async (req, res) => {
       restaurantId,
     });
 
-    return res.json({ ok: true, result });
+    return res.send({ ok: true, result });
   } catch (err) {
     console.error("triggerReprint error:", err);
-    return res.status(500).json({ message: err?.message || "Failed to reprint KOT" });
+    return res.status(500).send({ message: err?.message || "Failed to reprint KOT" });
   }
 };
 
@@ -278,7 +278,7 @@ export const triggerReprint = async (req, res) => {
 export const getPrinters = async (req, res) => {
   try {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
-    if (!restaurantId) return res.status(400).json({ message: "Restaurant ID required" });
+    if (!restaurantId) return res.status(400).send({ message: "Restaurant ID required" });
 
     const printers = await req.prisma.printer.findMany({
       where: { restaurantId },
@@ -286,20 +286,20 @@ export const getPrinters = async (req, res) => {
       orderBy: { createdAt: "asc" },
     });
 
-    return res.json({ ok: true, printers });
+    return res.send({ ok: true, printers });
   } catch (err) {
-    return res.status(500).json({ message: err?.message || "Failed to fetch printers" });
+    return res.status(500).send({ message: err?.message || "Failed to fetch printers" });
   }
 };
 
 export const createPrinter = async (req, res) => {
   try {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
-    if (!restaurantId) return res.status(400).json({ message: "Restaurant ID required" });
+    if (!restaurantId) return res.status(400).send({ message: "Restaurant ID required" });
 
     const { name, connectionType, ipAddress, port, paperWidth, isBillingPrinter } = req.body;
     if (!name || !String(name).trim()) {
-      return res.status(400).json({ message: "Printer name is required" });
+      return res.status(400).send({ message: "Printer name is required" });
     }
 
     const printer = await req.prisma.printer.create({
@@ -315,9 +315,9 @@ export const createPrinter = async (req, res) => {
       },
     });
 
-    return res.json({ ok: true, printer });
+    return res.send({ ok: true, printer });
   } catch (err) {
-    return res.status(500).json({ message: err?.message || "Failed to create printer" });
+    return res.status(500).send({ message: err?.message || "Failed to create printer" });
   }
 };
 
@@ -339,9 +339,9 @@ export const updatePrinter = async (req, res) => {
       },
     });
 
-    return res.json({ ok: true, printer });
+    return res.send({ ok: true, printer });
   } catch (err) {
-    return res.status(500).json({ message: err?.message || "Failed to update printer" });
+    return res.status(500).send({ message: err?.message || "Failed to update printer" });
   }
 };
 
@@ -354,9 +354,9 @@ export const deletePrinter = async (req, res) => {
       where: { id: printerId, restaurantId },
     });
 
-    return res.json({ ok: true, message: "Printer deleted" });
+    return res.send({ ok: true, message: "Printer deleted" });
   } catch (err) {
-    return res.status(500).json({ message: err?.message || "Failed to delete printer" });
+    return res.status(500).send({ message: err?.message || "Failed to delete printer" });
   }
 };
 
@@ -369,7 +369,7 @@ export const testPrinter = async (req, res) => {
       where: { id: printerId, restaurantId },
     });
 
-    if (!printer) return res.status(404).json({ message: "Printer not found" });
+    if (!printer) return res.status(404).send({ message: "Printer not found" });
 
     const result = await testPrinterConnection({
       ipAddress: printer.ipAddress,
@@ -377,9 +377,9 @@ export const testPrinter = async (req, res) => {
       timeoutMs: 3000,
     });
 
-    return res.json({ ok: true, printer, result });
+    return res.send({ ok: true, printer, result });
   } catch (err) {
-    return res.status(500).json({ message: err?.message || "Printer test failed" });
+    return res.status(500).send({ message: err?.message || "Printer test failed" });
   }
 };
 
@@ -389,7 +389,7 @@ export const testPrinter = async (req, res) => {
 export const getStations = async (req, res) => {
   try {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
-    if (!restaurantId) return res.status(400).json({ message: "Restaurant ID required" });
+    if (!restaurantId) return res.status(400).send({ message: "Restaurant ID required" });
 
     let stations = await req.prisma.kitchenStation.findMany({
       where: { restaurantId },
@@ -413,20 +413,20 @@ export const getStations = async (req, res) => {
       stations = [defaultStation];
     }
 
-    return res.json({ ok: true, stations });
+    return res.send({ ok: true, stations });
   } catch (err) {
-    return res.status(500).json({ message: err?.message || "Failed to fetch stations" });
+    return res.status(500).send({ message: err?.message || "Failed to fetch stations" });
   }
 };
 
 export const createStation = async (req, res) => {
   try {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
-    if (!restaurantId) return res.status(400).json({ message: "Restaurant ID required" });
+    if (!restaurantId) return res.status(400).send({ message: "Restaurant ID required" });
 
     const { name, code, description, printerId, isDefault } = req.body;
     if (!name || !String(name).trim()) {
-      return res.status(400).json({ message: "Station name is required" });
+      return res.status(400).send({ message: "Station name is required" });
     }
 
     const station = await req.prisma.kitchenStation.create({
@@ -442,9 +442,9 @@ export const createStation = async (req, res) => {
       include: { printer: true },
     });
 
-    return res.json({ ok: true, station });
+    return res.send({ ok: true, station });
   } catch (err) {
-    return res.status(500).json({ message: err?.message || "Failed to create station" });
+    return res.status(500).send({ message: err?.message || "Failed to create station" });
   }
 };
 
@@ -466,8 +466,8 @@ export const updateStation = async (req, res) => {
       include: { printer: true },
     });
 
-    return res.json({ ok: true, station });
+    return res.send({ ok: true, station });
   } catch (err) {
-    return res.status(500).json({ message: err?.message || "Failed to update station" });
+    return res.status(500).send({ message: err?.message || "Failed to update station" });
   }
 };

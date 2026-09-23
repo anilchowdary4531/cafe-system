@@ -1531,6 +1531,7 @@ export default function OwnerTables() {
                                         const isBilling = sessionStatus === "BILLING";
                                         const isPaid = sessionStatus === "PAID";
                                         const isAvailable = !session;
+                                        const resForTable = reservations.find((r) => Number(r.tableId) === Number(table.id));
 
                                         return (
                                             <article

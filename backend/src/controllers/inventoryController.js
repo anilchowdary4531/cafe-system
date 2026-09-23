@@ -23,10 +23,10 @@ export async function getMaterials(req, res) {
             lowStockOnly: lowStockOnly === "true",
         });
 
-        res.json({ materials });
+        res.send({ materials });
     } catch (err) {
         console.error("Error fetching raw materials:", err);
-        res.status(500).json({ message: err.message || "Failed to fetch raw materials" });
+        res.status(500).send({ message: err.message || "Failed to fetch raw materials" });
     }
 }
 
@@ -43,11 +43,11 @@ export async function createMaterial(req, res) {
         });
 
         emitInventoryUpdated(req.io, restaurantId, { type: "MATERIAL_CREATED", materialId: material.id });
-        res.status(201).json({ message: "Raw material created successfully", material });
+        res.status(201).send({ message: "Raw material created successfully", material });
     } catch (err) {
         console.error("Error creating raw material:", err);
         const status = err.code === "duplicate_material" || err.code === "invalid_input" ? 400 : 500;
-        res.status(status).json({ message: err.message || "Failed to create raw material" });
+        res.status(status).send({ message: err.message || "Failed to create raw material" });
     }
 }
 
@@ -64,11 +64,11 @@ export async function updateMaterial(req, res) {
         });
 
         emitInventoryUpdated(req.io, restaurantId, { type: "MATERIAL_UPDATED", materialId: id });
-        res.json({ message: "Raw material updated successfully", material });
+        res.send({ message: "Raw material updated successfully", material });
     } catch (err) {
         console.error("Error updating raw material:", err);
         const status = err.code === "not_found" ? 404 : 500;
-        res.status(status).json({ message: err.message || "Failed to update raw material" });
+        res.status(status).send({ message: err.message || "Failed to update raw material" });
     }
 }
 
@@ -84,10 +84,10 @@ export async function deleteMaterial(req, res) {
         });
 
         emitInventoryUpdated(req.io, restaurantId, { type: "MATERIAL_DELETED", materialId: id });
-        res.json({ message: "Raw material deleted successfully" });
+        res.send({ message: "Raw material deleted successfully" });
     } catch (err) {
         console.error("Error deleting raw material:", err);
-        res.status(500).json({ message: err.message || "Failed to delete raw material" });
+        res.status(500).send({ message: err.message || "Failed to delete raw material" });
     }
 }
 
@@ -107,11 +107,11 @@ export async function upsertRecipe(req, res) {
         });
 
         emitInventoryUpdated(req.io, restaurantId, { type: "RECIPE_SAVED", recipeId: recipe.id });
-        res.json({ message: "Recipe saved successfully", recipe });
+        res.send({ message: "Recipe saved successfully", recipe });
     } catch (err) {
         console.error("Error saving recipe:", err);
         const status = err.code === "invalid_input" || err.code === "incompatible_unit" ? 400 : 500;
-        res.status(status).json({ message: err.message || "Failed to save recipe" });
+        res.status(status).send({ message: err.message || "Failed to save recipe" });
     }
 }
 
@@ -127,10 +127,10 @@ export async function getRecipeCost(req, res) {
             variantId: variantId ? Number(variantId) : null,
         });
 
-        res.json(costData);
+        res.send(costData);
     } catch (err) {
         console.error("Error calculating recipe cost:", err);
-        res.status(500).json({ message: err.message || "Failed to calculate recipe cost" });
+        res.status(500).send({ message: err.message || "Failed to calculate recipe cost" });
     }
 }
 
@@ -147,10 +147,10 @@ export async function recordStockIn(req, res) {
         });
 
         emitInventoryUpdated(req.io, restaurantId, { type: "STOCK_IN", materialId: req.body.rawMaterialId });
-        res.status(201).json({ message: "Stock-in recorded successfully", ...result });
+        res.status(201).send({ message: "Stock-in recorded successfully", ...result });
     } catch (err) {
         console.error("Error recording stock-in:", err);
-        res.status(500).json({ message: err.message || "Failed to record stock-in" });
+        res.status(500).send({ message: err.message || "Failed to record stock-in" });
     }
 }
 
@@ -167,10 +167,10 @@ export async function recordAdjustment(req, res) {
         });
 
         emitInventoryUpdated(req.io, restaurantId, { type: "STOCK_ADJUSTMENT", materialId: req.body.rawMaterialId });
-        res.status(201).json({ message: "Stock adjustment recorded successfully", ...result });
+        res.status(201).send({ message: "Stock adjustment recorded successfully", ...result });
     } catch (err) {
         console.error("Error recording stock adjustment:", err);
-        res.status(500).json({ message: err.message || "Failed to record stock adjustment" });
+        res.status(500).send({ message: err.message || "Failed to record stock adjustment" });
     }
 }
 
@@ -187,10 +187,10 @@ export async function recordWastage(req, res) {
         });
 
         emitInventoryUpdated(req.io, restaurantId, { type: "WASTAGE", materialId: req.body.rawMaterialId });
-        res.status(201).json({ message: "Wastage recorded successfully", ...result });
+        res.status(201).send({ message: "Wastage recorded successfully", ...result });
     } catch (err) {
         console.error("Error recording wastage:", err);
-        res.status(500).json({ message: err.message || "Failed to record wastage" });
+        res.status(500).send({ message: err.message || "Failed to record wastage" });
     }
 }
 
@@ -210,10 +210,10 @@ export async function getLedger(req, res) {
             offset,
         });
 
-        res.json(data);
+        res.send(data);
     } catch (err) {
         console.error("Error fetching stock ledger:", err);
-        res.status(500).json({ message: err.message || "Failed to fetch stock ledger" });
+        res.status(500).send({ message: err.message || "Failed to fetch stock ledger" });
     }
 }
 
@@ -226,10 +226,10 @@ export async function getReport(req, res) {
             restaurantId,
         });
 
-        res.json({ report });
+        res.send({ report });
     } catch (err) {
         console.error("Error generating inventory report:", err);
-        res.status(500).json({ message: err.message || "Failed to generate inventory report" });
+        res.status(500).send({ message: err.message || "Failed to generate inventory report" });
     }
 }
 
@@ -246,9 +246,9 @@ export async function updateSettings(req, res) {
             select: { id: true, allowNegativeStock: true },
         });
 
-        res.json({ message: "Inventory settings updated successfully", restaurant });
+        res.send({ message: "Inventory settings updated successfully", restaurant });
     } catch (err) {
         console.error("Error updating inventory settings:", err);
-        res.status(500).json({ message: err.message || "Failed to update inventory settings" });
+        res.status(500).send({ message: err.message || "Failed to update inventory settings" });
     }
 }

@@ -24,7 +24,7 @@ export const approveCancellation = async (req, res) => {
         const { orderId, kotItemId, reason } = req.body;
 
         verifyManagerAuth(req.user);
-        if (!restaurantId) return res.status(400).json({ message: "Restaurant ID required" });
+        if (!restaurantId) return res.status(400).send({ message: "Restaurant ID required" });
 
         const actor = {
             userId: req.user.id,
@@ -48,7 +48,7 @@ export const approveCancellation = async (req, res) => {
                 details: { reason: reason || "Manager approved order cancellation" },
             });
 
-            return res.json({ ok: true, message: "Order cancellation approved", order });
+            return res.send({ ok: true, message: "Order cancellation approved", order });
         }
 
         if (kotItemId) {
@@ -67,12 +67,12 @@ export const approveCancellation = async (req, res) => {
                 details: { reason: reason || "Manager approved item cancellation" },
             });
 
-            return res.json({ ok: true, message: "Item cancellation approved", item });
+            return res.send({ ok: true, message: "Item cancellation approved", item });
         }
 
-        return res.status(400).json({ message: "orderId or kotItemId is required" });
+        return res.status(400).send({ message: "orderId or kotItemId is required" });
     } catch (err) {
-        return res.status(err?.statusCode || 500).json({ message: err?.message || "Failed to approve cancellation" });
+        return res.status(err?.statusCode || 500).send({ message: err?.message || "Failed to approve cancellation" });
     }
 };
 
@@ -86,7 +86,7 @@ export const approveDiscount = async (req, res) => {
 
         verifyManagerAuth(req.user);
         if (!restaurantId || (!orderId && !tableSessionId)) {
-            return res.status(400).json({ message: "Missing required parameters" });
+            return res.status(400).send({ message: "Missing required parameters" });
         }
 
         const disc = Math.max(0, Number(discountAmount || 0));
@@ -100,7 +100,7 @@ export const approveDiscount = async (req, res) => {
             const existingOrder = await req.prisma.order.findFirst({
                 where: { id: Number(orderId), restaurantId },
             });
-            if (!existingOrder) return res.status(404).json({ message: "Order not found" });
+            if (!existingOrder) return res.status(404).send({ message: "Order not found" });
 
             const newTotal = Math.max(0, existingOrder.subtotal + existingOrder.taxAmount - disc);
             const updatedOrder = await req.prisma.order.update({
@@ -122,14 +122,14 @@ export const approveDiscount = async (req, res) => {
                 details: { discountAmount: disc, discountReason },
             });
 
-            return res.json({ ok: true, message: "Order discount approved", order: updatedOrder });
+            return res.send({ ok: true, message: "Order discount approved", order: updatedOrder });
         }
 
         if (tableSessionId) {
             const session = await req.prisma.tableSession.findFirst({
                 where: { id: Number(tableSessionId), restaurantId },
             });
-            if (!session) return res.status(404).json({ message: "Table session not found" });
+            if (!session) return res.status(404).send({ message: "Table session not found" });
 
             const newTotal = Math.max(0, session.subtotal + session.taxAmount - disc);
             const updatedSession = await req.prisma.tableSession.update({
@@ -150,10 +150,10 @@ export const approveDiscount = async (req, res) => {
                 details: { discountAmount: disc, discountReason },
             });
 
-            return res.json({ ok: true, message: "Table session discount approved", session: updatedSession });
+            return res.send({ ok: true, message: "Table session discount approved", session: updatedSession });
         }
     } catch (err) {
-        return res.status(err?.statusCode || 500).json({ message: err?.message || "Failed to approve discount" });
+        return res.status(err?.statusCode || 500).send({ message: err?.message || "Failed to approve discount" });
     }
 };
 
@@ -166,7 +166,7 @@ export const approveReprint = async (req, res) => {
         const { kotId } = req.body;
 
         verifyManagerAuth(req.user);
-        if (!restaurantId || !kotId) return res.status(400).json({ message: "kotId is required" });
+        if (!restaurantId || !kotId) return res.status(400).send({ message: "kotId is required" });
 
         const actor = {
             userId: req.user.id,
@@ -190,8 +190,8 @@ export const approveReprint = async (req, res) => {
             details: { printResult: result?.ok ? "SUCCESS" : result?.message },
         });
 
-        return res.json({ ok: true, message: "KOT reprint approved", result });
+        return res.send({ ok: true, message: "KOT reprint approved", result });
     } catch (err) {
-        return res.status(err?.statusCode || 500).json({ message: err?.message || "Failed to approve reprint" });
+        return res.status(err?.statusCode || 500).send({ message: err?.message || "Failed to approve reprint" });
     }
 };

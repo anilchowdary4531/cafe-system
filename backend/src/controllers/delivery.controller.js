@@ -7,7 +7,7 @@ export const createDeliveryPartner = async (req, res) => {
     const { branchId, userId, name, phone, email, vehicleType, vehicleNumber } = req.body;
 
     if (!restaurantId) {
-      return res.status(400).json({ success: false, message: "Restaurant ID is required." });
+      return res.status(400).send({ success: false, message: "Restaurant ID is required." });
     }
 
     const partner = await deliveryService.createDeliveryPartner({
@@ -22,10 +22,10 @@ export const createDeliveryPartner = async (req, res) => {
       vehicleNumber,
     });
 
-    return res.status(201).json({ success: true, partner });
+    return res.status(201).send({ success: true, partner });
   } catch (error) {
     console.error("Create Delivery Partner Error:", error);
-    return res.status(400).json({ success: false, message: error.message || "Failed to create partner." });
+    return res.status(400).send({ success: false, message: error.message || "Failed to create partner." });
   }
 };
 
@@ -36,7 +36,7 @@ export const getDeliveryPartners = async (req, res) => {
     const { branchId, status, isActive, search } = req.query;
 
     if (!restaurantId) {
-      return res.status(400).json({ success: false, message: "Restaurant ID is required." });
+      return res.status(400).send({ success: false, message: "Restaurant ID is required." });
     }
 
     const partners = await deliveryService.getDeliveryPartners({
@@ -48,10 +48,10 @@ export const getDeliveryPartners = async (req, res) => {
       search,
     });
 
-    return res.json({ success: true, partners });
+    return res.send({ success: true, partners });
   } catch (error) {
     console.error("Get Delivery Partners Error:", error);
-    return res.status(500).json({ success: false, message: error.message || "Failed to fetch partners." });
+    return res.status(500).send({ success: false, message: error.message || "Failed to fetch partners." });
   }
 };
 
@@ -62,7 +62,7 @@ export const updateDeliveryPartner = async (req, res) => {
     const partnerId = req.params.id || req.body.partnerId;
 
     if (!restaurantId || !partnerId) {
-      return res.status(400).json({ success: false, message: "Restaurant ID and Partner ID are required." });
+      return res.status(400).send({ success: false, message: "Restaurant ID and Partner ID are required." });
     }
 
     const partner = await deliveryService.updateDeliveryPartner({
@@ -73,10 +73,10 @@ export const updateDeliveryPartner = async (req, res) => {
       actor: req.user ? { userId: req.user.id, role: req.user.role } : null,
     });
 
-    return res.json({ success: true, partner });
+    return res.send({ success: true, partner });
   } catch (error) {
     console.error("Update Delivery Partner Error:", error);
-    return res.status(400).json({ success: false, message: error.message || "Failed to update partner." });
+    return res.status(400).send({ success: false, message: error.message || "Failed to update partner." });
   }
 };
 
@@ -87,7 +87,7 @@ export const deleteDeliveryPartner = async (req, res) => {
     const partnerId = req.params.id;
 
     if (!restaurantId || !partnerId) {
-      return res.status(400).json({ success: false, message: "Restaurant ID and Partner ID are required." });
+      return res.status(400).send({ success: false, message: "Restaurant ID and Partner ID are required." });
     }
 
     const partner = await deliveryService.deleteDeliveryPartner({
@@ -97,10 +97,10 @@ export const deleteDeliveryPartner = async (req, res) => {
       actor: req.user ? { userId: req.user.id, role: req.user.role } : null,
     });
 
-    return res.json({ success: true, message: "Delivery partner deactivated.", partner });
+    return res.send({ success: true, message: "Delivery partner deactivated.", partner });
   } catch (error) {
     console.error("Delete Delivery Partner Error:", error);
-    return res.status(400).json({ success: false, message: error.message || "Failed to deactivate partner." });
+    return res.status(400).send({ success: false, message: error.message || "Failed to deactivate partner." });
   }
 };
 
@@ -112,7 +112,7 @@ export const assignDeliveryPartner = async (req, res) => {
     const { orderId, partnerId } = req.body;
 
     if (!restaurantId || !orderId || !partnerId) {
-      return res.status(400).json({ success: false, message: "restaurantId, orderId, and partnerId are required." });
+      return res.status(400).send({ success: false, message: "restaurantId, orderId, and partnerId are required." });
     }
 
     const delivery = await deliveryService.assignDeliveryPartner({
@@ -124,7 +124,7 @@ export const assignDeliveryPartner = async (req, res) => {
       actor: req.user ? { userId: req.user.id, role: req.user.role } : null,
     });
 
-    return res.json({
+    return res.send({
       success: true,
       message: `Delivery assigned to ${delivery.deliveryPartner?.name || "driver"}.`,
       delivery,
@@ -132,7 +132,7 @@ export const assignDeliveryPartner = async (req, res) => {
     });
   } catch (error) {
     console.error("Assign Delivery Partner Error:", error);
-    return res.status(400).json({ success: false, message: error.message || "Failed to assign partner." });
+    return res.status(400).send({ success: false, message: error.message || "Failed to assign partner." });
   }
 };
 
@@ -144,7 +144,7 @@ export const reassignDeliveryPartner = async (req, res) => {
     const { deliveryId, newPartnerId, reason } = req.body;
 
     if (!restaurantId || !deliveryId || !newPartnerId) {
-      return res.status(400).json({ success: false, message: "restaurantId, deliveryId, and newPartnerId are required." });
+      return res.status(400).send({ success: false, message: "restaurantId, deliveryId, and newPartnerId are required." });
     }
 
     const delivery = await deliveryService.reassignDeliveryPartner({
@@ -157,14 +157,14 @@ export const reassignDeliveryPartner = async (req, res) => {
       actor: req.user ? { userId: req.user.id, role: req.user.role } : null,
     });
 
-    return res.json({
+    return res.send({
       success: true,
       message: `Delivery reassigned to ${delivery.deliveryPartner?.name || "driver"}.`,
       delivery,
     });
   } catch (error) {
     console.error("Reassign Delivery Partner Error:", error);
-    return res.status(400).json({ success: false, message: error.message || "Failed to reassign partner." });
+    return res.status(400).send({ success: false, message: error.message || "Failed to reassign partner." });
   }
 };
 
@@ -176,11 +176,11 @@ export const updateDeliveryStatus = async (req, res) => {
     const { deliveryId, orderId, status, lat, lng, failureReason, driverNotes } = req.body;
 
     if (!deliveryId && !orderId) {
-      return res.status(400).json({ success: false, message: "deliveryId or orderId is required." });
+      return res.status(400).send({ success: false, message: "deliveryId or orderId is required." });
     }
 
     if (!status) {
-      return res.status(400).json({ success: false, message: "status is required." });
+      return res.status(400).send({ success: false, message: "status is required." });
     }
 
     const delivery = await deliveryService.updateDeliveryStatus({
@@ -197,7 +197,7 @@ export const updateDeliveryStatus = async (req, res) => {
       driverNotes,
     });
 
-    return res.json({
+    return res.send({
       success: true,
       message: `Delivery status updated to ${delivery.status}.`,
       delivery,
@@ -205,7 +205,7 @@ export const updateDeliveryStatus = async (req, res) => {
     });
   } catch (error) {
     console.error("Update Delivery Status Error:", error);
-    return res.status(400).json({ success: false, message: error.message || "Failed to update delivery status." });
+    return res.status(400).send({ success: false, message: error.message || "Failed to update delivery status." });
   }
 };
 
@@ -216,7 +216,7 @@ export const updateDriverLocation = async (req, res) => {
     const { deliveryId, lat, lng } = req.body;
 
     if (!deliveryId || lat === undefined || lng === undefined) {
-      return res.status(400).json({ success: false, message: "deliveryId, lat, and lng are required." });
+      return res.status(400).send({ success: false, message: "deliveryId, lat, and lng are required." });
     }
 
     const result = await deliveryService.updateDriverLocation({
@@ -228,10 +228,10 @@ export const updateDriverLocation = async (req, res) => {
       lng,
     });
 
-    return res.json({ success: true, ...result });
+    return res.send({ success: true, ...result });
   } catch (error) {
     console.error("Update Driver Location Error:", error);
-    return res.status(400).json({ success: false, message: error.message || "Failed to update location." });
+    return res.status(400).send({ success: false, message: error.message || "Failed to update location." });
   }
 };
 
@@ -242,7 +242,7 @@ export const getRestaurantDeliveries = async (req, res) => {
     const { branchId, status, search } = req.query;
 
     if (!restaurantId) {
-      return res.status(400).json({ success: false, message: "Restaurant ID is required." });
+      return res.status(400).send({ success: false, message: "Restaurant ID is required." });
     }
 
     const deliveries = await deliveryService.getRestaurantDeliveries({
@@ -253,10 +253,10 @@ export const getRestaurantDeliveries = async (req, res) => {
       search,
     });
 
-    return res.json({ success: true, deliveries });
+    return res.send({ success: true, deliveries });
   } catch (error) {
     console.error("Get Restaurant Deliveries Error:", error);
-    return res.status(500).json({ success: false, message: error.message || "Failed to fetch deliveries." });
+    return res.status(500).send({ success: false, message: error.message || "Failed to fetch deliveries." });
   }
 };
 
@@ -273,10 +273,10 @@ export const getDriverDeliveries = async (req, res) => {
       status,
     });
 
-    return res.json({ success: true, deliveries });
+    return res.send({ success: true, deliveries });
   } catch (error) {
     console.error("Get Driver Deliveries Error:", error);
-    return res.status(500).json({ success: false, message: error.message || "Failed to fetch driver deliveries." });
+    return res.status(500).send({ success: false, message: error.message || "Failed to fetch driver deliveries." });
   }
 };
 
@@ -293,10 +293,10 @@ export const getDeliveryTrackingForCustomer = async (req, res) => {
       customerId,
     });
 
-    return res.json({ success: true, tracking });
+    return res.send({ success: true, tracking });
   } catch (error) {
     console.error("Customer Tracking Error:", error);
-    return res.status(404).json({ success: false, message: error.message || "Order tracking not found." });
+    return res.status(404).send({ success: false, message: error.message || "Order tracking not found." });
   }
 };
 
@@ -307,7 +307,7 @@ export const getDeliveryMetricsReport = async (req, res) => {
     const { startDate, endDate, partnerId } = req.query;
 
     if (!restaurantId) {
-      return res.status(400).json({ success: false, message: "Restaurant ID is required." });
+      return res.status(400).send({ success: false, message: "Restaurant ID is required." });
     }
 
     const report = await deliveryService.getDeliveryMetricsReport({
@@ -318,9 +318,9 @@ export const getDeliveryMetricsReport = async (req, res) => {
       partnerId,
     });
 
-    return res.json({ success: true, report });
+    return res.send({ success: true, report });
   } catch (error) {
     console.error("Delivery Metrics Error:", error);
-    return res.status(500).json({ success: false, message: error.message || "Failed to generate delivery report." });
+    return res.status(500).send({ success: false, message: error.message || "Failed to generate delivery report." });
   }
 };
