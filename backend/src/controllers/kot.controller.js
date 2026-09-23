@@ -1,5 +1,6 @@
 import { testPrinterConnection } from "../services/escposService.js";
 import { dispatchKotPrint, reprintKot, updateKotStatus, updateKotItemStatus, updateKotPriority } from "../services/kotService.js";
+import prisma from "../prisma.js";
 
 /**
  * Fetch KOTs for a restaurant with status, station, priority, source, table & search query filters
@@ -31,7 +32,8 @@ export const getKots = async (req, res) => {
       }
     }
 
-    const kots = await req.prisma.kitchenOrderTicket.findMany({
+    const db = req.prisma || prisma;
+    const kots = await db.kitchenOrderTicket.findMany({
       where,
       take: Math.min(200, Math.max(1, Number(limit))),
       orderBy: [
@@ -183,7 +185,8 @@ export const getWorkloadMetrics = async (req, res) => {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
     if (!restaurantId) return res.status(400).send({ message: "Restaurant ID required" });
 
-    const kots = await req.prisma.kitchenOrderTicket.findMany({
+    const db = req.prisma || prisma;
+    const kots = await db.kitchenOrderTicket.findMany({
       where: {
         restaurantId,
         status: { in: ["PENDING", "ACCEPTED", "PRINTED", "PREPARING", "READY"] },
@@ -280,7 +283,8 @@ export const getPrinters = async (req, res) => {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
     if (!restaurantId) return res.status(400).send({ message: "Restaurant ID required" });
 
-    const printers = await req.prisma.printer.findMany({
+    const db = req.prisma || prisma;
+    const printers = await db.printer.findMany({
       where: { restaurantId },
       include: { stations: true },
       orderBy: { createdAt: "asc" },
@@ -302,7 +306,8 @@ export const createPrinter = async (req, res) => {
       return res.status(400).send({ message: "Printer name is required" });
     }
 
-    const printer = await req.prisma.printer.create({
+    const db = req.prisma || prisma;
+    const printer = await db.printer.create({
       data: {
         restaurantId,
         name: String(name).trim(),
@@ -326,7 +331,8 @@ export const updatePrinter = async (req, res) => {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
     const printerId = Number(req.params.printerId || 0);
 
-    const printer = await req.prisma.printer.update({
+    const db = req.prisma || prisma;
+    const printer = await db.printer.update({
       where: { id: printerId, restaurantId },
       data: {
         ...(req.body.name ? { name: String(req.body.name).trim() } : {}),
@@ -350,7 +356,8 @@ export const deletePrinter = async (req, res) => {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
     const printerId = Number(req.params.printerId || 0);
 
-    await req.prisma.printer.delete({
+    const db = req.prisma || prisma;
+    await db.printer.delete({
       where: { id: printerId, restaurantId },
     });
 
@@ -365,7 +372,8 @@ export const testPrinter = async (req, res) => {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
     const printerId = Number(req.params.printerId || 0);
 
-    const printer = await req.prisma.printer.findFirst({
+    const db = req.prisma || prisma;
+    const printer = await db.printer.findFirst({
       where: { id: printerId, restaurantId },
     });
 
@@ -391,7 +399,8 @@ export const getStations = async (req, res) => {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
     if (!restaurantId) return res.status(400).send({ message: "Restaurant ID required" });
 
-    let stations = await req.prisma.kitchenStation.findMany({
+    const db = req.prisma || prisma;
+    let stations = await db.kitchenStation.findMany({
       where: { restaurantId },
       include: { printer: true, _count: { select: { menuItems: true } } },
       orderBy: { createdAt: "asc" },
@@ -399,7 +408,7 @@ export const getStations = async (req, res) => {
 
     // Auto-create default HOT KITCHEN station if restaurant has no stations yet
     if (stations.length === 0) {
-      const defaultStation = await req.prisma.kitchenStation.create({
+      const defaultStation = await db.kitchenStation.create({
         data: {
           restaurantId,
           name: "HOT KITCHEN",
@@ -429,7 +438,8 @@ export const createStation = async (req, res) => {
       return res.status(400).send({ message: "Station name is required" });
     }
 
-    const station = await req.prisma.kitchenStation.create({
+    const db = req.prisma || prisma;
+    const station = await db.kitchenStation.create({
       data: {
         restaurantId,
         name: String(name).trim().toUpperCase(),
@@ -453,7 +463,8 @@ export const updateStation = async (req, res) => {
     const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
     const stationId = Number(req.params.stationId || 0);
 
-    const station = await req.prisma.kitchenStation.update({
+    const db = req.prisma || prisma;
+    const station = await db.kitchenStation.update({
       where: { id: stationId, restaurantId },
       data: {
         ...(req.body.name ? { name: String(req.body.name).trim().toUpperCase() } : {}),

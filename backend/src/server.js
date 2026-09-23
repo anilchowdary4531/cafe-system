@@ -297,6 +297,10 @@ const requireOwnerRouteAuth = async (req, reply) => {
   return null;
 };
 
+app.addHook("onRequest", async (req) => {
+  req.prisma = prisma;
+});
+
 app.addHook("onRoute", (routeOptions) => {
   const url = String(routeOptions?.url || "");
   if (!url.startsWith("/owner/")) return;
