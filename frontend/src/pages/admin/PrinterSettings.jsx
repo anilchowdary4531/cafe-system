@@ -51,20 +51,20 @@ export default function PrinterSettings() {
     const [submittingStation, setSubmittingStation] = useState(false);
 
     const loadData = async () => {
-        if (!restaurantId) return;
+        if (!restaurantId || isNaN(Number(restaurantId))) return;
         setLoading(true);
         try {
             const [printersRes, stationsRes] = await Promise.all([
                 api.get(`/owner/${restaurantId}/printers`),
                 api.get(`/owner/${restaurantId}/kitchen-stations`),
             ]);
-            setPrinters(printersRes?.data?.printers || []);
-            setStations(stationsRes?.data?.stations || []);
+            setPrinters(printersRes?.data?.printers || printersRes?.data || []);
+            setStations(stationsRes?.data?.stations || stationsRes?.data || []);
         } catch (err) {
             console.error("Failed to load printer settings", err);
             showToast({
                 title: "Error",
-                message: "Failed to load thermal printer configuration.",
+                message: err?.response?.data?.message || "Failed to load thermal printer configuration.",
                 variant: "error",
             });
         } finally {

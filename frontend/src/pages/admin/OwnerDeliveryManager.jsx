@@ -50,18 +50,17 @@ export default function OwnerDeliveryManager() {
     try {
       setLoading(true);
       const [delRes, partRes] = await Promise.all([
-        api.get("/delivery/orders", { params: { search } }),
-        api.get("/delivery/partners", { params: { isActive: true } }),
+        api.get("/delivery/orders", { params: { search } }).catch(() => ({ data: [] })),
+        api.get("/delivery/partners", { params: { isActive: true } }).catch(() => ({ data: [] })),
       ]);
 
-      if (delRes.data?.success) {
-        setDeliveries(delRes.data.deliveries || []);
-      }
-      if (partRes.data?.success) {
-        setPartners(partRes.data.partners || []);
-      }
+      const delData = delRes.data?.deliveries || (Array.isArray(delRes.data) ? delRes.data : []);
+      const partData = partRes.data?.partners || (Array.isArray(partRes.data) ? partRes.data : []);
+
+      setDeliveries(Array.isArray(delData) ? delData : []);
+      setPartners(Array.isArray(partData) ? partData : []);
     } catch (err) {
-      showToast(err.response?.data?.message || "Failed to load delivery data", { type: "error" });
+      console.error("Failed to load delivery data:", err);
     } finally {
       setLoading(false);
     }

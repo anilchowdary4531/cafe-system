@@ -32,10 +32,10 @@ export default function OwnerDeliveryPartners() {
     try {
       setLoading(true);
       const res = await api.get("/delivery/partners", { params: { search } });
-      if (res.data?.success) {
-        setPartners(res.data.partners || []);
-      }
+      const partData = res.data?.partners || res.data?.data || (Array.isArray(res.data) ? res.data : []);
+      setPartners(Array.isArray(partData) ? partData : []);
     } catch (err) {
+      console.error("Failed to fetch delivery partners:", err);
       showToast(err.response?.data?.message || "Failed to load delivery partners", { type: "error" });
     } finally {
       setLoading(false);

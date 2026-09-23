@@ -49,22 +49,27 @@ export default function KotHistoryPage() {
     const [cancellingId, setCancellingId] = useState(null);
 
     const loadData = async ({ silent = false } = {}) => {
-        if (!restaurantId) return;
+        if (!restaurantId || isNaN(Number(restaurantId))) return;
         if (silent) setRefreshing(true);
         else setLoading(true);
 
         try {
             const [kotsRes, stationsRes] = await Promise.all([
-                api.get(`/owner/${restaurantId}/kots`).catch(() => api.get(`/owner/${restaurantId}/kot`)),
-                api.get(`/owner/${restaurantId}/stations`).catch(() => api.get(`/owner/${restaurantId}/kitchen-stations`)),
+                api.get(`/owner/${restaurantId}/kots`),
+                api.get(`/owner/${restaurantId}/stations`),
             ]);
             const kotsData = kotsRes?.data?.kots || kotsRes?.data?.data || (Array.isArray(kotsRes?.data) ? kotsRes.data : []);
             const stationsData = stationsRes?.data?.stations || stationsRes?.data?.data || (Array.isArray(stationsRes?.data) ? stationsRes.data : []);
-            setKots(kotsData);
-            setStations(stationsData);
+            setKots(Array.isArray(kotsData) ? kotsData : []);
+            setStations(Array.isArray(stationsData) ? stationsData : []);
         } catch (err) {
             console.error("Failed to fetch KOT history", err);
-            showToast({ title: "Error", message: "Failed to load Kitchen Order Tickets.", variant: "error" });
+            // Only fire error toast if there's an actual HTTP 4xx/5xx error or network failure
+            showToast({
+                title: "Error",
+                message: err?.response?.data?.message || "Failed to load Kitchen Order Tickets.",
+                variant: "error",
+            });
         } finally {
             setLoading(false);
             setRefreshing(false);

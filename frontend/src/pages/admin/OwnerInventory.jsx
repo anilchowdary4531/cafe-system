@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
-import { API } from "../../config";
+import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import { useStaffSocket } from "../../context/StaffSocketContext";
 import { Package, AlertTriangle, Plus, Search, Layers, RefreshCw, FileSpreadsheet, ArrowUpRight, ArrowDownRight, DollarSign, History, Settings2, Trash2, Edit3, CheckCircle } from "lucide-react";
@@ -92,23 +91,26 @@ export default function OwnerInventory() {
 
     // API Loaders
     const loadMaterials = async () => {
-        if (!restaurantId) return;
+        if (!restaurantId || isNaN(Number(restaurantId))) return;
         try {
             setLoading(true);
-            const res = await axios.get(`${API}/owner/${restaurantId}/inventory/materials?search=${encodeURIComponent(search)}&category=${encodeURIComponent(categoryFilter)}`);
-            setMaterials(res.data?.materials || []);
+            const res = await api.get(`/owner/${restaurantId}/inventory/materials`, {
+                params: { search, category: categoryFilter },
+            });
+            const mats = res.data?.materials || res.data?.data || (Array.isArray(res.data) ? res.data : []);
+            setMaterials(Array.isArray(mats) ? mats : []);
         } catch (err) {
             console.error("Error loading raw materials:", err);
-            showToast({ title: "Error", message: "Failed to load raw materials", variant: "error" });
+            showToast({ title: "Error", message: err?.response?.data?.message || "Failed to load raw materials", variant: "error" });
         } finally {
             setLoading(false);
         }
     };
 
     const loadMenuItems = async () => {
-        if (!restaurantId) return;
+        if (!restaurantId || isNaN(Number(restaurantId))) return;
         try {
-            const res = await axios.get(`${API}/owner/${restaurantId}/menu`);
+            const res = await api.get(`/owner/${restaurantId}/menu`);
             setMenuItems(res.data || []);
         } catch (err) {
             console.error("Error loading menu items:", err);
@@ -116,20 +118,20 @@ export default function OwnerInventory() {
     };
 
     const loadLedger = async () => {
-        if (!restaurantId) return;
+        if (!restaurantId || isNaN(Number(restaurantId))) return;
         try {
-            const res = await axios.get(`${API}/owner/${restaurantId}/inventory/ledger?limit=50`);
-            setLedger(res.data?.movements || []);
+            const res = await api.get(`/owner/${restaurantId}/inventory/ledger`, { params: { limit: 50 } });
+            setLedger(res.data?.movements || res.data || []);
         } catch (err) {
             console.error("Error loading ledger:", err);
         }
     };
 
     const loadReport = async () => {
-        if (!restaurantId) return;
+        if (!restaurantId || isNaN(Number(restaurantId))) return;
         try {
-            const res = await axios.get(`${API}/owner/${restaurantId}/inventory/reports`);
-            setReport(res.data?.report || null);
+            const res = await api.get(`/owner/${restaurantId}/inventory/reports`);
+            setReport(res.data?.report || res.data || null);
         } catch (err) {
             console.error("Error loading report:", err);
         }
@@ -164,10 +166,10 @@ export default function OwnerInventory() {
 
         try {
             if (editingMaterial) {
-                await axios.put(`${API}/owner/${restaurantId}/inventory/materials/${editingMaterial.id}`, materialForm);
+                await api.put(`/owner/${restaurantId}/inventory/materials/${editingMaterial.id}`, materialForm);
                 showToast({ title: "Updated", message: "Material updated successfully", variant: "success" });
             } else {
-                await axios.post(`${API}/owner/${restaurantId}/inventory/materials`, materialForm);
+                await api.post(`/owner/${restaurantId}/inventory/materials`, materialForm);
                 showToast({ title: "Created", message: "Raw material added successfully", variant: "success" });
             }
             setShowMaterialModal(false);
@@ -192,12 +194,12 @@ export default function OwnerInventory() {
     const handleDeleteMaterial = async (id) => {
         if (!window.confirm("Archive this raw material? Historical stock movements will be preserved.")) return;
         try {
-            await axios.delete(`${API}/owner/${restaurantId}/inventory/materials/${id}`);
+            await api.delete(`/owner/${restaurantId}/inventory/materials/${id}`);
             showToast({ title: "Archived", message: "Raw material archived", variant: "success" });
             await loadMaterials();
         } catch (err) {
             console.error("Error archiving material:", err);
-            showToast({ title: "Error", message: "Failed to archive raw material", variant: "error" });
+            showToast({ title: "Error", message: err?.response?.data?.message || "Failed to archive raw material", variant: "error" });
         }
     };
 
@@ -243,7 +245,7 @@ export default function OwnerInventory() {
 
         try {
             setSavingRecipe(true);
-            await axios.post(`${API}/owner/${restaurantId}/inventory/recipes`, {
+            await api.post(`/owner/${restaurantId}/inventory/recipes`, {
                 menuItemId: Number(selectedMenuItemId),
                 variantId: selectedVariantId ? Number(selectedVariantId) : null,
                 items: recipeItems,
@@ -268,7 +270,7 @@ export default function OwnerInventory() {
 
         try {
             setSubmittingPurchase(true);
-            await axios.post(`${API}/owner/${restaurantId}/inventory/stock-in`, purchaseForm);
+            await api.post(`/owner/${restaurantId}/inventory/stock-in`, purchaseForm);
             showToast({ title: "Stock Received", message: "Stock-in logged successfully", variant: "success" });
             setPurchaseForm({ rawMaterialId: "", quantity: "", unit: "kg", totalCost: "", supplierName: "", notes: "" });
             await loadMaterials();
@@ -287,7 +289,7 @@ export default function OwnerInventory() {
         if (!adjForm.rawMaterialId || !adjForm.quantity) return;
 
         try {
-            await axios.post(`${API}/owner/${restaurantId}/inventory/adjustments`, adjForm);
+            await api.post(`/owner/${restaurantId}/inventory/adjustments`, adjForm);
             showToast({ title: "Stock Adjusted", message: "Stock correction saved", variant: "success" });
             setAdjForm({ rawMaterialId: "", quantity: "", unit: "kg", direction: "IN", reason: "Physical count correction" });
             await loadMaterials();
@@ -303,7 +305,7 @@ export default function OwnerInventory() {
         if (!wastageForm.rawMaterialId || !wastageForm.quantity) return;
 
         try {
-            await axios.post(`${API}/owner/${restaurantId}/inventory/wastage`, wastageForm);
+            await api.post(`/owner/${restaurantId}/inventory/wastage`, wastageForm);
             showToast({ title: "Wastage Logged", message: "Kitchen waste recorded", variant: "success" });
             setWastageForm({ rawMaterialId: "", quantity: "", unit: "kg", reason: "Spoilage / Preparation Waste" });
             await loadMaterials();
