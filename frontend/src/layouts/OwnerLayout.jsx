@@ -579,6 +579,18 @@ export default function OwnerLayout() {
             accessKey: "supply",
         },
         {
+            label: "Delivery Studio",
+            path: "/owner/delivery",
+            icon: <Truck size={18} />,
+            accessKey: "orders",
+        },
+        {
+            label: "Delivery Partners",
+            path: "/owner/delivery-partners",
+            icon: <Users size={18} />,
+            accessKey: "orders",
+        },
+        {
             label: "Customers",
             path: "/owner/customers",
             icon: <Users size={18} />,

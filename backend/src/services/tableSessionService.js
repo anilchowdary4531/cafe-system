@@ -30,7 +30,7 @@ export const getOrCreateActiveSession = async ({
   return prisma.$transaction(async (tx) => {
     const table = await tx.diningTable.findUnique({
       where: { id: tid },
-      select: { id: true, tableNo: true, restaurantId: true, seats: true },
+      select: { id: true, tableNo: true, restaurantId: true, seats: true, assignedWaiterId: true, assignedWaiterName: true },
     });
 
     if (!table || Number(table.restaurantId) !== rid) {
@@ -57,13 +57,16 @@ export const getOrCreateActiveSession = async ({
     });
 
     if (!session) {
+      const finalWaiterId = waiterId ? Number(waiterId) : table.assignedWaiterId || null;
+      const finalWaiterName = waiterName ? String(waiterName).trim() : table.assignedWaiterName || null;
+
       session = await tx.tableSession.create({
         data: {
           restaurantId: rid,
           tableId: tid,
           tableNo: table.tableNo,
-          waiterId: waiterId ? Number(waiterId) : null,
-          waiterName: waiterName ? String(waiterName).trim() : null,
+          waiterId: finalWaiterId,
+          waiterName: finalWaiterName,
           guestCount: Math.max(1, Number(guestCount || 1)),
           status: "OPEN",
           openedAt: new Date(),

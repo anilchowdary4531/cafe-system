@@ -4,9 +4,8 @@ import {
 } from "../controllers/offlineSyncController.js";
 
 export default async function offlineSyncRoutes(fastify) {
-    // Health probe
-    fastify.get("/health", getHealthController);
-    fastify.get("/api/health", getHealthController);
+    // Offline Health probe
+    fastify.get("/api/offline/health", getHealthController);
 
     // Batch sync
     fastify.post("/sync/batch", processSyncBatchController);

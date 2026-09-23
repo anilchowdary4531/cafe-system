@@ -65,10 +65,15 @@ model Restaurant {
   nextInvoiceNumber Int     @default(1001) @map("next_invoice_number")
   nextKotNumber     Int     @default(101)  @map("next_kot_number")
 
-  // STATUS
+  // STATUS & PUBLIC DIGITAL MENU CONFIGURATION
   isActive Boolean @default(true) @map("is_active")
   tobaccoApproved Boolean @default(false) @map("tobacco_approved")
   allowNegativeStock Boolean @default(true) @map("allow_negative_stock")
+  publicMenuToken String? @unique @map("public_menu_token")
+  isPublicMenuEnabled Boolean @default(true) @map("is_public_menu_enabled")
+  isPublicOrderingEnabled Boolean @default(true) @map("is_public_ordering_enabled")
+  showPricesOnPublicMenu Boolean @default(true) @map("show_prices_on_public_menu")
+  showUnavailableItemsOnPublicMenu Boolean @default(true) @map("show_unavailable_items_on_public_menu")
 
   // TIMESTAMPS
   createdAt DateTime @default(now()) @map("created_at")
@@ -107,6 +112,9 @@ model Restaurant {
   loyaltyAccounts      LoyaltyAccount[]
   loyaltyTransactions  LoyaltyTransaction[]
   loyaltyConfig        LoyaltyConfig?
+  deliveryPartners     DeliveryPartner[]
+  deliveries           Delivery[]
+  coupons              Coupon[]
 
   @@map("restaurants")
 }
@@ -141,6 +149,7 @@ model User {
   closedShifts       CashierShift[] @relation("ClosedShifts")
   approvedShifts     CashierShift[] @relation("ApprovedShifts")
   closedDayClosings  DayClosing[]   @relation("ClosedDayClosings")
+  deliveryPartners   DeliveryPartner[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -189,6 +198,7 @@ model MenuItem {
 
   // ITEM LEVEL TAX OVERRIDE (optional)
   taxPercent  Float?  @map("tax_percent")
+  prepTimeMinutes Int @default(15) @map("prep_time_minutes")
   isAvailable Boolean @default(true) @map("is_available")
   isFeatured  Boolean @default(false) @map("is_featured")
 
@@ -348,6 +358,7 @@ model Order {
 
   // STATUS
   status String @default("PLACED")
+  priority String @default("NORMAL") @map("priority")
   // PLACED / ACCEPTED / PREPARING / READY / DELIVERED / CANCELLED
 
   clientOperationId String? @unique @map("client_operation_id")
@@ -362,6 +373,7 @@ model Order {
   kots         KitchenOrderTicket[]
   billSplits   BillSplit[]
   loyaltyTransactions LoyaltyTransaction[]
+  delivery     Delivery?
 
   @@unique([restaurantId, orderNo])
   @@index([restaurantId, customerId, createdAt])
@@ -587,6 +599,12 @@ model DiningTable {
   rotation  Int?    @default(0) // 0 | 90 | 180 | 270
 
   qrCodeUrl String? @map("qr_code_url")
+  qrToken   String? @unique @map("qr_token")
+
+  // ASSIGNED DEFAULT WAITER
+  assignedWaiterId   Int?    @map("assigned_waiter_id")
+  assignedWaiterName String? @map("assigned_waiter_name")
+
   isActive  Boolean @default(true) @map("is_active")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -728,6 +746,9 @@ model Branch {
   promotions          Promotion[]
   loyaltyAccounts     LoyaltyAccount[]
   loyaltyTransactions LoyaltyTransaction[]
+  deliveryPartners    DeliveryPartner[]
+  deliveries          Delivery[]
+  coupons             Coupon[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId, isActive])
@@ -1694,6 +1715,10 @@ model KitchenOrderTicket {
   // STATUS: PENDING / PRINTED / PRINT_FAILED / PREPARING / READY / SERVED / CANCELLED
   status String @default("PENDING")
 
+  // PRIORITY: NORMAL / HIGH / URGENT
+  priority String @default("NORMAL") @map("priority")
+  estimatedPrepTimeMinutes Int @default(15) @map("estimated_prep_time_minutes")
+
   printed      Boolean   @default(false)
   printedAt    DateTime? @map("printed_at")
   printError   String?   @map("print_error")
@@ -1734,6 +1759,9 @@ model KitchenOrderTicketItem {
 
   qty    Int    @map("quantity")
   status String @default("PENDING")
+
+  preparedByUserId Int?    @map("prepared_by_user_id")
+  preparedByName   String? @map("prepared_by_name")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -2002,6 +2030,129 @@ model CashMovement {
   @@map("cash_movements")
 }
 
+model Coupon {
+  id              Int               @id @default(autoincrement())
+  restaurantId    Int               @map("restaurant_id")
+  restaurant      Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  branchId        Int?              @map("branch_id")
+  branch          Branch?           @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  code            String
+  description     String?
+  discountType    String            @map("discount_type") // PERCENTAGE | FIXED
+  discountValue   Float             @map("discount_value")
+  minOrderAmount  Float             @default(0) @map("min_order_amount")
+  maxDiscount     Float?            @map("max_discount")
+
+  usageLimit      Int?              @map("usage_limit")
+  usageCount      Int               @default(0) @map("usage_count")
+  perUserLimit    Int?              @map("per_user_limit")
+
+  startDate       DateTime?         @map("start_date")
+  endDate         DateTime?         @map("end_date")
+
+  isActive        Boolean           @default(true) @map("is_active")
+
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([restaurantId, code])
+  @@index([restaurantId, isActive])
+  @@index([code])
+  @@map("coupons")
+}
+
+///////////////////////////////////////////////////////////
+// DELIVERY MANAGEMENT & LIVE TRACKING
+///////////////////////////////////////////////////////////
+
+model DeliveryPartner {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  branchId Int?    @map("branch_id")
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  userId Int?  @map("user_id")
+  user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  name          String
+  phone         String
+  email         String?
+  vehicleType   String  @default("BIKE") @map("vehicle_type")
+  vehicleNumber String  @map("vehicle_number")
+
+  status   String  @default("AVAILABLE")
+  isActive Boolean @default(true) @map("is_active")
+
+  currentLatitude    Float?    @map("current_latitude")
+  currentLongitude   Float?    @map("current_longitude")
+  lastLocationUpdate DateTime? @map("last_location_update")
+
+  deliveries Delivery[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([restaurantId, status, isActive])
+  @@index([restaurantId, phone])
+  @@map("delivery_partners")
+}
+
+model Delivery {
+  id Int @id @default(autoincrement())
+
+  orderId Int   @unique @map("order_id")
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  branchId Int?    @map("branch_id")
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  deliveryPartnerId Int?             @map("delivery_partner_id")
+  deliveryPartner   DeliveryPartner? @relation(fields: [deliveryPartnerId], references: [id], onDelete: SetNull)
+
+  status String @default("UNASSIGNED")
+
+  assignedAt          DateTime? @map("assigned_at")
+  acceptedAt          DateTime? @map("accepted_at")
+  reachedRestaurantAt DateTime? @map("reached_restaurant_at")
+  pickedUpAt          DateTime? @map("picked_up_at")
+  outForDeliveryAt    DateTime? @map("out_for_delivery_at")
+  deliveredAt         DateTime? @map("delivered_at")
+  cancelledAt         DateTime? @map("cancelled_at")
+  failedAt            DateTime? @map("failed_at")
+
+  failureReason String? @map("failure_reason")
+
+  deliveryAddressSnapshot String  @map("delivery_address_snapshot")
+  deliveryLatitude        Float?  @map("delivery_latitude")
+  deliveryLongitude       Float?  @map("delivery_longitude")
+  customerNotes           String? @map("customer_notes")
+  driverNotes             String? @map("driver_notes")
+
+  currentDriverLatitude  Float?    @map("current_driver_latitude")
+  currentDriverLongitude Float?    @map("current_driver_longitude")
+  lastLocationUpdate     DateTime? @map("last_location_update")
+
+  codAmount      Float?    @default(0) @map("cod_amount")
+  codCollected   Boolean   @default(false) @map("cod_collected")
+  codCollectedAt DateTime? @map("cod_collected_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([restaurantId, status, createdAt])
+  @@index([deliveryPartnerId, status])
+  @@index([restaurantId, branchId, createdAt])
+  @@map("deliveries")
+}
+
 model DayClosing {
   id Int @id @default(autoincrement())
 
@@ -2154,6 +2305,54 @@ model LoyaltyConfig {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("loyalty_configs")
+}
+
+model TableWaiterAssignment {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int  @map("restaurant_id")
+  tableId      Int  @map("table_id")
+  tableSessionId Int? @map("table_session_id")
+
+  waiterId   Int    @map("waiter_id")
+  waiterName String @map("waiter_name")
+
+  assignedByUserId Int?    @map("assigned_by_user_id")
+  assignedByName   String? @map("assigned_by_name")
+
+  action String @default("ASSIGNED") // ASSIGNED | REASSIGNED | UNASSIGNED
+  reason String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([restaurantId, tableId])
+  @@index([restaurantId, waiterId])
+  @@index([restaurantId, tableSessionId])
+  @@map("table_waiter_assignments")
+}
+
+model AuditLog {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int? @map("restaurant_id")
+  branchId     Int? @map("branch_id")
+
+  actorUserId Int?    @map("actor_user_id")
+  actorName   String? @map("actor_name")
+  actorRole   String? @map("actor_role")
+
+  action   String // ORDER_CREATED, ORDER_CANCELLED, DISCOUNT_APPROVED, REPRINT_APPROVED, KOT_STATUS_CHANGED, PAYMENT_PROCESSED, TABLE_REOPENED, WAITER_ASSIGNED, etc.
+  entity   String // Order, KitchenOrderTicket, TableSession, Payment, DiningTable, User
+  entityId String @map("entity_id")
+
+  details Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([restaurantId, createdAt])
+  @@index([restaurantId, entity, entityId])
+  @@index([restaurantId, actorUserId])
+  @@map("audit_logs")
 }
 
 

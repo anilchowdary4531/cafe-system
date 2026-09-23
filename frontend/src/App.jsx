@@ -92,6 +92,12 @@ import Server from "./pages/Server.jsx";
 import PrinterSettings from "./pages/admin/PrinterSettings.jsx";
 import KotHistoryPage from "./pages/admin/KotHistoryPage.jsx";
 import OwnerLayout from "./layouts/OwnerLayout.jsx";
+import OwnerDeliveryPartners from "./pages/admin/OwnerDeliveryPartners.jsx";
+import OwnerDeliveryManager from "./pages/admin/OwnerDeliveryManager.jsx";
+import DriverDeliveryStudio from "./pages/driver/DriverDeliveryStudio.jsx";
+import TrackOrderPage from "./pages/customer/TrackOrderPage.jsx";
+import CustomerQrLandingPage from "./pages/customer/CustomerQrLandingPage.jsx";
+import CustomerDigitalMenuPage from "./pages/customer/CustomerDigitalMenuPage.jsx";
 
 export default function App() {
     const location = useLocation();
@@ -256,6 +262,36 @@ export default function App() {
                         }
                     />
                     <Route
+                        path="/profile/loyalty"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="loyalty" />
+                                <Footer />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/profile/offers"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="offers" />
+                                <Footer />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/profile/reservations"
+                        element={
+                            <>
+                                <Navbar />
+                                <Profile section="reservations" />
+                                <Footer />
+                            </>
+                        }
+                    />
+                    <Route
                         path="/profile/settings"
                         element={
                             <>
@@ -265,6 +301,7 @@ export default function App() {
                             </>
                         }
                     />
+
 
                     {/* Backward compatible alias */}
                     <Route path="/orders/history" element={<Navigate to="/profile/order-history" replace />} />
@@ -277,6 +314,26 @@ export default function App() {
                                 <ThankYou />
                                 <Footer />
                             </>
+                        }
+                    />
+
+                    <Route
+                        path="/orders/:orderId/track"
+                        element={
+                            <>
+                                <Navbar />
+                                <TrackOrderPage />
+                                <Footer />
+                            </>
+                        }
+                    />
+
+                    <Route
+                        path="/driver/deliveries"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CASHIER", "STAFF", "DRIVER"]}>
+                                <DriverDeliveryStudio />
+                            </ProtectedRoute>
                         }
                     />
 
@@ -363,6 +420,8 @@ export default function App() {
                     <Route path="/r/:slug/menu" element={<RestaurantPublicMenu key={`${location.pathname}${location.search}`} />} />
                     <Route path="/m/:slug/:table?" element={<RestaurantMenu key={`${location.pathname}${location.search}`} />} />
                     <Route path="/debug/menu/:slug/:table?" element={<RestaurantMenu key={`${location.pathname}${location.search}`} />} />
+                    <Route path="/order/table/:token" element={<CustomerQrLandingPage />} />
+                    <Route path="/menu/:token" element={<CustomerDigitalMenuPage />} />
 
                     {/* ================================= */}
                     {/* SUPER ADMIN PANEL */}
@@ -493,6 +552,9 @@ export default function App() {
                         <Route path="settings" element={<OwnerSettings />} />
                         <Route path="notifications" element={<OwnerNotifications />} />
                         <Route path="supply" element={<OwnerSupplyMarketplace />} />
+                        <Route path="delivery" element={<OwnerDeliveryManager />} />
+                        <Route path="delivery-partners" element={<OwnerDeliveryPartners />} />
+                        <Route path="driver-portal" element={<DriverDeliveryStudio />} />
                     </Route>
 
                     {/* ================================= */}

@@ -6,6 +6,8 @@ import { API } from "../../config";
 import { uploadToS3Presigned } from "../../utils/s3Upload";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { api, invalidateGetCache } from "../../utils/apiClient";
+import { useAuth } from "../../context/AuthContext";
+import DigitalMenuQrModal from "../../components/DigitalMenuQrModal";
 
 const emptyForm = {
     name: "",
@@ -40,6 +42,7 @@ export default function MenuStudio() {
 
     const [items, setItems] = useState([]);
     const [restaurantInfo, setRestaurantInfo] = useState(null);
+    const [showDigitalMenuModal, setShowDigitalMenuModal] = useState(false);
     const [search, setSearch] = useState("");
     const [form, setForm] = useState(emptyForm);
     const [formOpen, setFormOpen] = useState(false);
@@ -460,6 +463,13 @@ export default function MenuStudio() {
                         <span>🚬</span> + Add Tobacco Product
                     </button>
                 )}
+                <button
+                    type="button"
+                    onClick={() => setShowDigitalMenuModal(true)}
+                    className="flex items-center space-x-2 px-4 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-gray-950 font-extrabold text-xs rounded-xl shadow-lg transition"
+                >
+                    <span>Digital Menu QR</span>
+                </button>
                 <button
                     type="button"
                     onClick={() => {
@@ -906,6 +916,14 @@ export default function MenuStudio() {
                         : "No items match your search."}
                 </div>
             )}
+
+            <DigitalMenuQrModal
+                isOpen={showDigitalMenuModal}
+                onClose={() => setShowDigitalMenuModal(false)}
+                restaurantId={user?.restaurantId}
+                restaurantName={user?.restaurant?.name || "Tiffzy Restaurant"}
+                restaurantSlug={user?.restaurant?.slug || "tiffzy"}
+            />
         </div>
     );
 }

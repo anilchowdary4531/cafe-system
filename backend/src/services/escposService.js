@@ -50,6 +50,12 @@ export const generateKotEscposBuffer = ({ kot, paperWidth = "80mm" } = {}) => {
     buffers.push(CMD_TEXT_NORMAL);
     buffers.push(CMD_TEXT_BOLD_OFF);
 
+    if (kot.priority && kot.priority !== "NORMAL") {
+        buffers.push(CMD_TEXT_BOLD_ON);
+        buffers.push(Buffer.from(`*** PRIORITY: ${String(kot.priority).toUpperCase()} ***\n`));
+        buffers.push(CMD_TEXT_BOLD_OFF);
+    }
+
     if (kot.type && kot.type !== "NEW") {
         buffers.push(CMD_TEXT_BOLD_ON);
         buffers.push(Buffer.from(`*** ${kot.type} ***\n`));
@@ -57,7 +63,7 @@ export const generateKotEscposBuffer = ({ kot, paperWidth = "80mm" } = {}) => {
     }
 
     if (kot.reprintCount > 0) {
-        buffers.push(Buffer.from(`*** REPRINT (${kot.reprintCount}) ***\n`));
+        buffers.push(Buffer.from(`*** REPRINT #${kot.reprintCount} ***\n`));
     }
 
     buffers.push(CMD_ALIGN_LEFT);

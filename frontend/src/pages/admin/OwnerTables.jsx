@@ -5,6 +5,7 @@ import { API } from "../../config";
 import { useStaffSocket } from "../../context/StaffSocketContext";
 import { showToast } from "../../utils/toast";
 import SplitBillingModal from "../../components/SplitBillingModal";
+import TableQrCodeModal from "../../components/TableQrCodeModal";
 import OfflineStatusBar from "../../components/OfflineStatusBar";
 import OfflineConflictModal from "../../components/OfflineConflictModal";
 import { cacheTablesOffline, getOfflineTables } from "../../utils/offline/offlineDb";
@@ -112,6 +113,10 @@ export default function OwnerTables() {
     // Reservation State
     const [reservations, setReservations] = useState([]);
     const [seatingReservationId, setSeatingReservationId] = useState(null);
+
+    // QR Studio State
+    const [showQrStudioModal, setShowQrStudioModal] = useState(false);
+    const [qrStudioTable, setQrStudioTable] = useState(null);
 
     // Floor Plan Layout State
     const [viewMode, setViewMode] = useState("FLOOR_PLAN"); // "FLOOR_PLAN" | "GRID"
@@ -987,6 +992,16 @@ export default function OwnerTables() {
                         Manage live table sessions, running KOT totals, guest counts, and share QR ordering links.
                     </p>
                 </div>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setQrStudioTable(tables[0] || null);
+                        setShowQrStudioModal(true);
+                    }}
+                    className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs rounded-xl shadow-lg transition"
+                >
+                    <span>QR Code Studio</span>
+                </button>
             </div>
 
             {error && (
@@ -1625,6 +1640,17 @@ export default function OwnerTables() {
                                                                     </button>
                                                                     <button
                                                                         type="button"
+                                                                        onClick={() => {
+                                                                            setQrStudioTable(table);
+                                                                            setShowQrStudioModal(true);
+                                                                            setOpenMenuId(null);
+                                                                        }}
+                                                                        className={actionMenuItemClass}
+                                                                    >
+                                                                        QR Code Studio Card
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
                                                                         onClick={() => { printQr(table); setOpenMenuId(null); }}
                                                                         className={actionMenuItemClass}
                                                                     >
@@ -2045,6 +2071,22 @@ export default function OwnerTables() {
                     }}
                 />
             )}
+
+            {/* QR CODE STUDIO MODAL */}
+            <TableQrCodeModal
+                isOpen={showQrStudioModal}
+                onClose={() => setShowQrStudioModal(false)}
+                table={qrStudioTable}
+                tables={tables}
+                restaurantName={user?.restaurant?.name || "Tiffzy Restaurant"}
+                restaurantSlug={user?.restaurant?.slug || "tiffzy"}
+                restaurantId={restaurantId}
+                onQrRegenerated={(updatedTable) => {
+                    setTables((prev) =>
+                        prev.map((t) => (t.id === updatedTable.id ? { ...t, ...updatedTable } : t))
+                    );
+                }}
+            />
         </section>
     );
 }

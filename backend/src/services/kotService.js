@@ -34,7 +34,7 @@ export const createKotsForOrder = async ({ prisma, tx = prisma, order, actor, id
         }
     }
 
-    // 2. Fetch Order Items with Menu Item Station Mappings
+    // 2. Fetch Order Items with Menu Item Station & Prep Time Mappings
     const orderItems = await tx.orderItem.findMany({
         where: { orderId: order.id },
     });
@@ -44,10 +44,11 @@ export const createKotsForOrder = async ({ prisma, tx = prisma, order, actor, id
     const menuItems = menuItemIds.length > 0
         ? await tx.menuItem.findMany({
               where: { id: { in: menuItemIds } },
-              select: { id: true, kitchenStationId: true },
+              select: { id: true, kitchenStationId: true, prepTimeMinutes: true },
           })
         : [];
     const stationMap = new Map(menuItems.map((m) => [m.id, m.kitchenStationId]));
+    const prepTimeMap = new Map(menuItems.map((m) => [m.id, m.prepTimeMinutes || 15]));
 
     // 3. Fetch Restaurant Kitchen Stations
     const stations = await tx.kitchenStation.findMany({
@@ -73,11 +74,21 @@ export const createKotsForOrder = async ({ prisma, tx = prisma, order, actor, id
     }
 
     const createdKots = [];
+    const priority = order.priority ? String(order.priority).toUpperCase() : "NORMAL";
 
     // 4. Create separate KOT for each station group inside transaction
     for (const [stKey, items] of itemsByStation.entries()) {
         const stationObj = typeof stKey === "number" ? stations.find((s) => s.id === stKey) : null;
         const stationName = stationObj?.name || (defaultStation ? defaultStation.name : "MAIN KITCHEN");
+
+        // Calculate max estimated prep time for items in this station ticket
+        let maxPrepTime = 0;
+        for (const item of items) {
+            if (item.menuItemId && prepTimeMap.has(item.menuItemId)) {
+                maxPrepTime = Math.max(maxPrepTime, prepTimeMap.get(item.menuItemId) || 15);
+            }
+        }
+        if (maxPrepTime <= 0) maxPrepTime = 15;
 
         const { seq, kotNo } = await getNextKotNumber(tx, restaurantId);
 
@@ -95,6 +106,8 @@ export const createKotsForOrder = async ({ prisma, tx = prisma, order, actor, id
                 waiterName: actor?.userName || order.customerName || "Staff",
                 type: "NEW",
                 status: "PENDING",
+                priority: ["NORMAL", "HIGH", "URGENT"].includes(priority) ? priority : "NORMAL",
+                estimatedPrepTimeMinutes: maxPrepTime,
                 printed: false,
                 notes: order.notes || null,
                 idempotencyKey: idempotencyKey ? `${idempotencyKey}_st_${stKey}` : null,
@@ -188,11 +201,61 @@ export const dispatchKotPrint = async ({ prisma, kotId } = {}) => {
 };
 
 /**
- * Mark KOT status transition (PENDING -> PREPARING -> READY -> SERVED / CANCELLED)
+ * Helper to evaluate and sync parent Order status when all KOTs reach READY or DELIVERED
  */
-export const updateKotStatus = async ({ prisma, kotId, restaurantId, nextStatus } = {}) => {
+export const syncParentOrderStatusFromKots = async ({ prisma, orderId }) => {
+    if (!orderId) return null;
+
+    const allKots = await prisma.kitchenOrderTicket.findMany({
+        where: { orderId: Number(orderId) },
+        select: { status: true },
+    });
+
+    if (!allKots.length) return null;
+
+    const activeKots = allKots.filter((k) => k.status !== "CANCELLED");
+    if (!activeKots.length) {
+        const updatedOrder = await prisma.order.update({
+            where: { id: Number(orderId) },
+            data: { status: "CANCELLED" },
+            include: { items: true },
+        });
+        return updatedOrder;
+    }
+
+    const allReadyOrServed = activeKots.every((k) => k.status === "READY" || k.status === "SERVED");
+    const anyPreparing = activeKots.some((k) => k.status === "PREPARING" || k.status === "READY");
+
+    let nextOrderStatus = null;
+    if (allReadyOrServed) {
+        nextOrderStatus = "READY";
+    } else if (anyPreparing) {
+        nextOrderStatus = "PREPARING";
+    }
+
+    if (nextOrderStatus) {
+        const currentOrder = await prisma.order.findUnique({
+            where: { id: Number(orderId) },
+            select: { status: true },
+        });
+        if (currentOrder && currentOrder.status !== nextOrderStatus && currentOrder.status !== "DELIVERED") {
+            const updatedOrder = await prisma.order.update({
+                where: { id: Number(orderId) },
+                data: { status: nextOrderStatus },
+                include: { items: true },
+            });
+            return updatedOrder;
+        }
+    }
+    return null;
+};
+
+/**
+ * Mark KOT status transition (PENDING -> ACCEPTED -> PREPARING -> READY -> SERVED / CANCELLED)
+ */
+export const updateKotStatus = async ({ prisma, kotId, restaurantId, nextStatus, actor = null } = {}) => {
     const id = Number(kotId);
-    const validStatuses = ["PENDING", "PRINTED", "PRINT_FAILED", "PREPARING", "READY", "SERVED", "CANCELLED"];
+    const validStatuses = ["PENDING", "ACCEPTED", "PRINTED", "PRINT_FAILED", "PREPARING", "READY", "SERVED", "CANCELLED"];
     const status = String(nextStatus || "").trim().toUpperCase();
 
     if (!validStatuses.includes(status)) {
@@ -212,15 +275,129 @@ export const updateKotStatus = async ({ prisma, kotId, restaurantId, nextStatus 
             status,
             items: {
                 updateMany: {
-                    where: { kotId: id },
-                    data: { status },
+                    where: { kotId: id, status: { not: "CANCELLED" } },
+                    data: {
+                        status,
+                        ...(status === "READY" && actor ? { preparedByUserId: actor.userId || null, preparedByName: actor.userName || null } : {}),
+                    },
                 },
             },
         },
         include: { items: true, station: { include: { printer: true } } },
     });
 
+    // Automatically check parent order status
+    await syncParentOrderStatusFromKots({ prisma, orderId: existing.orderId });
+
     return updated;
+};
+
+/**
+ * Update Item-Level KDS Status
+ */
+export const updateKotItemStatus = async ({ prisma, kotId, itemId, restaurantId, nextStatus, actor = null } = {}) => {
+    const kId = Number(kotId);
+    const iId = Number(itemId);
+    const validStatuses = ["PENDING", "ACCEPTED", "PREPARING", "READY", "CANCELLED"];
+    const status = String(nextStatus || "").trim().toUpperCase();
+
+    if (!validStatuses.includes(status)) {
+        throw new Error(`Invalid item status '${nextStatus}'`);
+    }
+
+    const kot = await prisma.kitchenOrderTicket.findFirst({
+        where: { id: kId, restaurantId: Number(restaurantId) },
+        include: { items: true },
+    });
+    if (!kot) throw new Error("kot_not_found");
+
+    const itemExists = kot.items.find((it) => it.id === iId);
+    if (!itemExists) throw new Error("kot_item_not_found");
+
+    await prisma.kitchenOrderTicketItem.update({
+        where: { id: iId },
+        data: {
+            status,
+            ...(status === "READY" && actor ? { preparedByUserId: actor.userId || null, preparedByName: actor.userName || null } : {}),
+        },
+    });
+
+    const reloadedKot = await prisma.kitchenOrderTicket.findUnique({
+        where: { id: kId },
+        include: { items: true, station: { include: { printer: true } } },
+    });
+
+    // Check if all non-cancelled items in KOT are now READY
+    const activeItems = reloadedKot.items.filter((it) => it.status !== "CANCELLED");
+    let autoKotStatus = reloadedKot.status;
+
+    if (activeItems.length > 0 && activeItems.every((it) => it.status === "READY")) {
+        autoKotStatus = "READY";
+    } else if (activeItems.some((it) => it.status === "PREPARING" || it.status === "READY")) {
+        if (reloadedKot.status === "PENDING" || reloadedKot.status === "ACCEPTED" || reloadedKot.status === "PRINTED") {
+            autoKotStatus = "PREPARING";
+        }
+    }
+
+    let finalKot = reloadedKot;
+    if (autoKotStatus !== reloadedKot.status) {
+        finalKot = await prisma.kitchenOrderTicket.update({
+            where: { id: kId },
+            data: { status: autoKotStatus },
+            include: { items: true, station: { include: { printer: true } } },
+        });
+    }
+
+    const updatedOrder = await syncParentOrderStatusFromKots({ prisma, orderId: kot.orderId });
+
+    return { kot: finalKot, order: updatedOrder };
+};
+
+/**
+ * Update KOT & Order Priority (NORMAL, HIGH, URGENT)
+ */
+export const updateKotPriority = async ({ prisma, kotId, restaurantId, priority } = {}) => {
+    const kId = Number(kotId);
+    const validPriorities = ["NORMAL", "HIGH", "URGENT"];
+    const prio = String(priority || "").trim().toUpperCase();
+
+    if (!validPriorities.includes(prio)) {
+        throw new Error(`Invalid priority '${priority}'`);
+    }
+
+    const kot = await prisma.kitchenOrderTicket.findFirst({
+        where: { id: kId, restaurantId: Number(restaurantId) },
+    });
+    if (!kot) throw new Error("kot_not_found");
+
+    const updatedKot = await prisma.kitchenOrderTicket.update({
+        where: { id: kId },
+        data: { priority: prio },
+        include: { items: true, station: { include: { printer: true } } },
+    });
+
+    // Sync priority on order as well
+    if (kot.orderId) {
+        await prisma.order.update({
+            where: { id: kot.orderId },
+            data: { priority: prio },
+        });
+    }
+
+    return updatedKot;
+};
+
+/**
+ * Cancel an Item in KOT
+ */
+export const cancelKotItem = async ({ prisma, kotId, itemId, restaurantId, reason = null } = {}) => {
+    return updateKotItemStatus({
+        prisma,
+        kotId,
+        itemId,
+        restaurantId,
+        nextStatus: "CANCELLED",
+    });
 };
 
 /**
@@ -234,12 +411,11 @@ export const reprintKot = async ({ prisma, kotId, restaurantId } = {}) => {
     });
     if (!kot) throw new Error("kot_not_found");
 
-    const updatedKot = await prisma.kitchenOrderTicket.update({
+    await prisma.kitchenOrderTicket.update({
         where: { id },
         data: {
             reprintCount: { increment: 1 },
         },
-        include: { items: true, station: { include: { printer: true } } },
     });
 
     return dispatchKotPrint({ prisma, kotId: id });

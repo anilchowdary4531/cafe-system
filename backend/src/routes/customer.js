@@ -8,6 +8,16 @@ import { buildCustomerAuthController } from "../controllers/customerAuthControll
 import { buildPayLaterController } from "../controllers/payLaterController.js";
 import { createAndDispatchNotification } from "../services/notificationService.js";
 import { RECIPIENT_TYPES, NOTIFICATION_TYPES } from "../constants/notificationTypes.js";
+import { validateAndCalculateDiscount } from "../services/promotionService.js";
+import {
+  getOrCreateLoyaltyAccount,
+  getLoyaltyConfig,
+  validateAndCalculateLoyaltyRedemption,
+  redeemPointsForOrder,
+  listLoyaltyHistory,
+} from "../services/loyaltyService.js";
+import { computeBill } from "../services/billingService.js";
+import { toSubunit, fromSubunit } from "../services/moneyService.js";
 
 const normalizeDeliveryAddress = (value) => {
   if (!value) return "";
@@ -328,20 +338,7 @@ export default async function customerRoutes(app, deps) {
       }
 
       const subtotal = normalizedItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
-      const taxAmount = 0;
-      const serviceChargeAmount = 0;
-      const total = subtotal;
-
-      const invoiceSequence = Number(restaurant.nextInvoiceNumber || 1001);
-      const orderNo = buildReadableOrderNo({
-        restaurantName: restaurant.name,
-        restaurantSlug: restaurant.slug,
-        restaurantCode: restaurant.invoicePrefix,
-        tableNo: normalizedTableNo,
-        date: new Date(),
-        sequence: invoiceSequence,
-      });
-      const invoiceNo = `${String(restaurant.invoicePrefix || "INV").toUpperCase()}-${invoiceSequence}`;
+      const subtotalSubunit = toSubunit(subtotal);
 
       let customerRecord = null;
       if (normalizedPhone) {
@@ -378,6 +375,69 @@ export default async function customerRoutes(app, deps) {
         });
       }
 
+      // Coupon discount calculation
+      let promoSubunit = 0;
+      let couponCodeApplied = null;
+      if (body.couponCode) {
+        const promoRes = await validateAndCalculateDiscount({
+          prisma,
+          restaurantId: restaurant.id,
+          couponCode: body.couponCode,
+          items: normalizedItems,
+          orderType: normalizedOrderSource,
+          customerId: customerRecord?.id,
+          subtotal,
+        });
+        if (promoRes.ok) {
+          promoSubunit = promoRes.discountSubunit;
+          couponCodeApplied = promoRes.promotion?.code || String(body.couponCode).toUpperCase();
+        }
+      }
+
+      // Loyalty points redemption calculation
+      let loyaltySubunit = 0;
+      let redeemedPoints = 0;
+      const requestedPoints = Math.max(0, Math.floor(Number(body.pointsToRedeem || 0)));
+
+      if (requestedPoints > 0 && customerRecord?.id) {
+        const loyaltyRes = await validateAndCalculateLoyaltyRedemption({
+          db: prisma,
+          restaurantId: restaurant.id,
+          customerId: customerRecord.id,
+          pointsToRedeem: requestedPoints,
+          subtotal,
+          hasCoupon: Boolean(promoSubunit > 0),
+        });
+
+        if (loyaltyRes.valid) {
+          loyaltySubunit = loyaltyRes.discountSubunit;
+          redeemedPoints = loyaltyRes.pointsToRedeem;
+        }
+      }
+
+      // Authoritative Bill Calculation via billingService
+      const bill = computeBill({
+        items: normalizedItems.map((i) => ({ priceSubunit: toSubunit(i.price), qty: i.qty })),
+        taxEnabled: Boolean(restaurant.taxEnabled || restaurant.defaultTaxPercent > 0),
+        taxPercent: Number(restaurant.defaultTaxPercent || restaurant.taxPercent || 0),
+        serviceChargeEnabled: Boolean(restaurant.serviceChargeEnabled),
+        serviceChargePercent: Number(restaurant.serviceChargePercent || 0),
+        discountSubunit: promoSubunit,
+        loyaltyDiscountSubunit: loyaltySubunit,
+      });
+
+
+      const invoiceSequence = Number(restaurant.nextInvoiceNumber || 1001);
+      const orderNo = buildReadableOrderNo({
+        restaurantName: restaurant.name,
+        restaurantSlug: restaurant.slug,
+        restaurantCode: restaurant.invoicePrefix,
+        tableNo: normalizedTableNo,
+        date: new Date(),
+        sequence: invoiceSequence,
+      });
+      const invoiceNo = `${String(restaurant.invoicePrefix || "INV").toUpperCase()}-${invoiceSequence}`;
+
       const order = await prisma.order.create({
         data: {
           restaurantId: restaurant.id,
@@ -392,10 +452,12 @@ export default async function customerRoutes(app, deps) {
           deliveryAddress: isPickupOrder ? null : normalizedDeliveryAddress || null,
           deliveryLatitude: isPickupOrder ? null : normalizedDeliveryLocation.latitude,
           deliveryLongitude: isPickupOrder ? null : normalizedDeliveryLocation.longitude,
-          subtotal,
-          taxAmount,
-          serviceChargeAmount,
-          total,
+          subtotal: bill.subtotal,
+          taxAmount: bill.tax,
+          serviceChargeAmount: bill.serviceCharge,
+          total: bill.total,
+          loyaltyPointsRedeemed: redeemedPoints,
+          loyaltyDiscountAmount: bill.loyaltyDiscount,
           status: "PLACED",
           customerId: customerRecord?.id || null,
           items: {
@@ -425,6 +487,17 @@ export default async function customerRoutes(app, deps) {
           },
         },
       });
+
+      if (redeemedPoints > 0 && customerRecord?.id) {
+        await redeemPointsForOrder({
+          db: prisma,
+          restaurantId: restaurant.id,
+          customerId: customerRecord.id,
+          orderId: order.id,
+          pointsToRedeem: redeemedPoints,
+        }).catch((e) => console.log("Loyalty redemption error:", e?.message));
+      }
+
 
       await prisma.restaurant.update({
         where: { id: restaurant.id },
@@ -564,4 +637,538 @@ export default async function customerRoutes(app, deps) {
       return reply.code(500).send({ message: "Failed to delete notification" });
     }
   });
+
+  // ==========================================
+  // FEATURE 15: CUSTOMER CHECKOUT PREVIEW (AUTHORITATIVE)
+  // ==========================================
+  app.post("/customer/checkout/preview", async (req, reply) => {
+    try {
+      const body = req.body || {};
+      const { slug, items = [], couponCode, pointsToRedeem, restaurantId: rawRestId } = body;
+
+      let restaurant = null;
+      if (rawRestId) {
+        restaurant = await prisma.restaurant.findUnique({ where: { id: Number(rawRestId) } });
+      } else if (slug) {
+        restaurant = await prisma.restaurant.findUnique({ where: { slug } });
+      }
+
+      if (!restaurant) {
+        return reply.code(404).send({ message: "Restaurant not found" });
+      }
+
+      let phone = "";
+      try {
+        phone = await requireCustomerPhoneFromJwt(req, prisma);
+      } catch {
+        phone = "";
+      }
+      if (!phone && body.phone) {
+        phone = normalizePhone(body.phone);
+      }
+
+      let customerRecord = null;
+      if (phone) {
+        customerRecord = await prisma.customer.findUnique({
+          where: {
+            restaurantId_phone: {
+              restaurantId: restaurant.id,
+              phone,
+            },
+          },
+        });
+      }
+
+      // Re-verify items against DB active menu items
+      const requestedIds = items
+        .map((item) => Number(item.id || item.menuItemId))
+        .filter((id) => Number.isInteger(id) && id > 0);
+
+      let normalizedItems = [];
+      if (requestedIds.length > 0) {
+        const dbMenuItems = await prisma.menuItem.findMany({
+          where: {
+            restaurantId: restaurant.id,
+            id: { in: requestedIds },
+            isAvailable: true,
+          },
+          select: { id: true, name: true, price: true },
+        });
+
+        const dbItemMap = new Map(dbMenuItems.map((item) => [item.id, item]));
+
+        for (const rawItem of items) {
+          const itemId = Number(rawItem.id || rawItem.menuItemId);
+          const dbItem = dbItemMap.get(itemId);
+          if (!dbItem) continue;
+
+          const qty = Math.max(1, Number(rawItem.qty || rawItem.quantity || 1));
+          const price = Number(dbItem.price);
+          normalizedItems.push({
+            menuItemId: dbItem.id,
+            itemName: dbItem.name,
+            qty,
+            price,
+            total: price * qty,
+          });
+        }
+      } else {
+        normalizedItems = items.map((rawItem) => {
+          const qty = Math.max(1, Number(rawItem.qty || rawItem.quantity || 1));
+          const price = Number(rawItem.price || 0);
+          return {
+            menuItemId: null,
+            itemName: String(rawItem.name || "Item").trim(),
+            qty,
+            price,
+            total: price * qty,
+          };
+        });
+      }
+
+      const subtotal = normalizedItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
+      const subtotalSubunit = toSubunit(subtotal);
+
+      // Coupon Validation
+      let promoSubunit = 0;
+      let couponInfo = null;
+      let couponError = null;
+
+      if (couponCode) {
+        const promoRes = await validateAndCalculateDiscount({
+          prisma,
+          restaurantId: restaurant.id,
+          couponCode,
+          items: normalizedItems,
+          orderType: body.orderSource || "DELIVERY",
+          customerId: customerRecord?.id,
+          subtotal,
+        });
+
+        if (promoRes.ok) {
+          promoSubunit = promoRes.discountSubunit;
+          couponInfo = {
+            code: promoRes.promotion?.code || String(couponCode).toUpperCase(),
+            title: promoRes.promotion?.title || "",
+            discountAmount: promoRes.discountAmount,
+          };
+        } else {
+          couponError = promoRes.message || "Invalid coupon code";
+        }
+      }
+
+      // Loyalty Points Validation
+      let loyaltySubunit = 0;
+      let loyaltyInfo = null;
+      let loyaltyError = null;
+      const requestedPoints = Math.max(0, Math.floor(Number(pointsToRedeem || 0)));
+
+      if (requestedPoints > 0) {
+        if (!customerRecord) {
+          loyaltyError = "Customer authentication required to redeem loyalty points.";
+        } else {
+          const loyaltyRes = await validateAndCalculateLoyaltyRedemption({
+            db: prisma,
+            restaurantId: restaurant.id,
+            customerId: customerRecord.id,
+            pointsToRedeem: requestedPoints,
+            subtotal,
+            hasCoupon: Boolean(promoSubunit > 0),
+          });
+
+          if (loyaltyRes.valid) {
+            loyaltySubunit = loyaltyRes.discountSubunit;
+            loyaltyInfo = {
+              pointsRedeemed: loyaltyRes.pointsToRedeem,
+              discountAmount: loyaltyRes.discountAmount,
+              currentBalance: loyaltyRes.currentBalance,
+            };
+          } else {
+            loyaltyError = loyaltyRes.message;
+          }
+        }
+      }
+
+      // Compute Authoritative Bill
+      const bill = computeBill({
+        items: normalizedItems.map((i) => ({ priceSubunit: toSubunit(i.price), qty: i.qty })),
+        taxEnabled: Boolean(restaurant.taxEnabled || restaurant.defaultTaxPercent > 0),
+        taxPercent: Number(restaurant.defaultTaxPercent || restaurant.taxPercent || 0),
+        serviceChargeEnabled: Boolean(restaurant.serviceChargeEnabled),
+        serviceChargePercent: Number(restaurant.serviceChargePercent || 0),
+        discountSubunit: promoSubunit,
+        loyaltyDiscountSubunit: loyaltySubunit,
+      });
+
+
+      return {
+        ok: true,
+        restaurant: { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
+        billing: {
+          subtotal: bill.subtotal,
+          couponDiscount: bill.couponDiscount,
+          loyaltyDiscount: bill.loyaltyDiscount,
+          totalDiscount: bill.totalDiscount,
+          netSubtotal: bill.netSubtotal,
+          tax: bill.tax,
+          serviceCharge: bill.serviceCharge,
+          deliveryFee: bill.deliveryFee,
+          total: bill.total,
+        },
+        coupon: couponInfo,
+        couponError,
+        loyalty: loyaltyInfo,
+        loyaltyError,
+        items: normalizedItems,
+      };
+    } catch (err) {
+      console.log("Checkout preview error:", err);
+      return reply.code(500).send({ message: "Failed to calculate order preview" });
+    }
+  });
+
+  // ==========================================
+  // FEATURE 15: PROMOTION VALIDATION FOR CUSTOMER
+  // ==========================================
+  app.post("/customer/promotions/validate", async (req, reply) => {
+    try {
+      const { restaurantId, couponCode, subtotal = 0 } = req.body || {};
+      const rId = Number(restaurantId);
+      if (!rId || !couponCode) {
+        return reply.code(400).send({ ok: false, message: "Restaurant ID and coupon code are required" });
+      }
+
+      let phone = "";
+      try {
+        phone = await requireCustomerPhoneFromJwt(req, prisma);
+      } catch {
+        phone = "";
+      }
+
+      let customerRecord = null;
+      if (phone) {
+        customerRecord = await prisma.customer.findUnique({
+          where: { restaurantId_phone: { restaurantId: rId, phone } },
+        });
+      }
+
+      const res = await validateAndCalculateDiscount({
+        prisma,
+        restaurantId: rId,
+        couponCode,
+        customerId: customerRecord?.id,
+        subtotal: Number(subtotal),
+      });
+
+      if (!res.ok) {
+        return reply.code(400).send({ ok: false, message: res.message });
+      }
+
+      return {
+        ok: true,
+        code: res.promotion.code,
+        title: res.promotion.title,
+        discountAmount: res.discountAmount,
+        discountSubunit: res.discountSubunit,
+        discountType: res.promotion.discountType,
+        discountValue: res.promotion.discountValue,
+      };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ ok: false, message: "Failed to validate coupon" });
+    }
+  });
+
+  // ==========================================
+  // FEATURE 15: CUSTOMER LOYALTY & REWARDS
+  // ==========================================
+  app.get("/customer/loyalty", async (req, reply) => {
+    try {
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
+      if (!phone) return reply.code(401).send({ message: "Authentication required" });
+
+      const restaurantId = Number(req.query?.restaurantId || 0);
+      let customerRecord = null;
+
+      if (restaurantId) {
+        customerRecord = await prisma.customer.findUnique({
+          where: { restaurantId_phone: { restaurantId, phone } },
+        });
+      } else {
+        customerRecord = await prisma.customer.findFirst({
+          where: { phone },
+          orderBy: { updatedAt: "desc" },
+        });
+      }
+
+      if (!customerRecord) {
+        return {
+          currentBalance: 0,
+          lifetimeEarned: 0,
+          lifetimeRedeemed: 0,
+          config: null,
+        };
+      }
+
+      const account = await getOrCreateLoyaltyAccount({
+        db: prisma,
+        restaurantId: customerRecord.restaurantId,
+        customerId: customerRecord.id,
+      });
+
+      const config = await getLoyaltyConfig({
+        db: prisma,
+        restaurantId: customerRecord.restaurantId,
+      });
+
+      const currencyPerPoint = Number(config?.currencyPerPoint || 0.1);
+      const equivalentValue = account ? (account.currentBalance * currencyPerPoint).toFixed(2) : "0.00";
+
+      return {
+        restaurantId: customerRecord.restaurantId,
+        currentBalance: account?.currentBalance || 0,
+        lifetimeEarned: account?.lifetimeEarned || 0,
+        lifetimeRedeemed: account?.lifetimeRedeemed || 0,
+        equivalentValue: Number(equivalentValue),
+        config: config
+          ? {
+              enabled: config.enabled,
+              pointsPerCurrency: config.pointsPerCurrency,
+              currencyPerPoint: config.currencyPerPoint,
+              minPointsToRedeem: config.minPointsToRedeem,
+              maxRedeemablePercent: config.maxRedeemablePercent,
+              allowCouponStacking: config.allowCouponStacking,
+            }
+          : null,
+      };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to fetch customer loyalty details" });
+    }
+  });
+
+  app.get("/customer/loyalty/history", async (req, reply) => {
+    try {
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
+      if (!phone) return reply.code(401).send({ message: "Authentication required" });
+
+      const restaurantId = Number(req.query?.restaurantId || 0);
+      let customerRecord = null;
+
+      if (restaurantId) {
+        customerRecord = await prisma.customer.findUnique({
+          where: { restaurantId_phone: { restaurantId, phone } },
+        });
+      } else {
+        customerRecord = await prisma.customer.findFirst({
+          where: { phone },
+          orderBy: { updatedAt: "desc" },
+        });
+      }
+
+      if (!customerRecord) return { transactions: [] };
+
+      const account = await getOrCreateLoyaltyAccount({
+        db: prisma,
+        restaurantId: customerRecord.restaurantId,
+        customerId: customerRecord.id,
+      });
+
+      if (!account) return { transactions: [] };
+
+      const history = await listLoyaltyHistory({
+        db: prisma,
+        loyaltyAccountId: account.id,
+        limit: 50,
+      });
+
+      return { transactions: history };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to fetch loyalty history" });
+    }
+  });
+
+  // ==========================================
+  // FEATURE 15: CUSTOMER AVAILABLE PROMOTIONS
+  // ==========================================
+  app.get("/customer/promotions", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.query?.restaurantId || 0);
+      const slug = req.query?.slug;
+
+      let rId = restaurantId;
+      if (!rId && slug) {
+        const rest = await prisma.restaurant.findUnique({ where: { slug }, select: { id: true } });
+        if (rest) rId = rest.id;
+      }
+
+      const now = new Date();
+      const promotions = await prisma.promotion.findMany({
+        where: {
+          ...(rId ? { restaurantId: rId } : {}),
+          active: true,
+          OR: [{ startDate: null }, { startDate: { lte: now } }],
+          AND: [{ OR: [{ endDate: null }, { endDate: { gte: now } }] }],
+        },
+        select: {
+          id: true,
+          code: true,
+          title: true,
+          description: true,
+          discountType: true,
+          discountValue: true,
+          minSubtotalSubunit: true,
+          maxDiscountSubunit: true,
+          endDate: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const formatted = promotions.map((p) => ({
+        id: p.id,
+        code: p.code,
+        title: p.title,
+        description: p.description,
+        discountType: p.discountType,
+        discountValue: p.discountValue,
+        minOrderAmount: fromSubunit(p.minSubtotalSubunit || 0),
+        maxDiscountAmount: p.maxDiscountSubunit ? fromSubunit(p.maxDiscountSubunit) : null,
+        expiresAt: p.endDate,
+      }));
+
+      return { promotions: formatted };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to fetch promotions" });
+    }
+  });
+
+  // ==========================================
+  // FEATURE 15: CUSTOMER RESERVATIONS
+  // ==========================================
+  app.get("/customer/reservations", async (req, reply) => {
+    try {
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
+      if (!phone) return reply.code(401).send({ message: "Authentication required" });
+
+      const reservations = await prisma.reservation.findMany({
+        where: { phone },
+        include: {
+          restaurant: { select: { id: true, name: true, slug: true } },
+          table: { select: { id: true, tableNo: true } },
+        },
+        orderBy: { reservationTime: "desc" },
+      });
+
+      return { reservations };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to fetch customer reservations" });
+    }
+  });
+
+  // ==========================================
+  // FEATURE 15: SINGLE ORDER DETAILS WITH OWNERSHIP CHECK
+  // ==========================================
+  app.get("/customer/orders/:orderId", async (req, reply) => {
+    try {
+      const orderId = Number(req.params.orderId);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
+      if (!phone) return reply.code(401).send({ message: "Authentication required" });
+
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          restaurant: { select: { id: true, name: true, slug: true, logoUrl: true, address: true, city: true, phone: true } },
+          items: { include: { menuItem: { select: { id: true, name: true, imageUrl: true } } } },
+          statusEvents: { orderBy: { createdAt: "asc" } },
+        },
+      });
+
+      if (!order) return reply.code(404).send({ message: "Order not found" });
+
+      if (normalizePhone(order.phone) !== normalizePhone(phone)) {
+        return reply.code(403).send({ message: "Access denied. Order belongs to another customer." });
+      }
+
+      return { order };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to fetch order details" });
+    }
+  });
+
+  // ==========================================
+  // FEATURE 15: REORDER API
+  // ==========================================
+  app.post("/customer/orders/:orderId/reorder", async (req, reply) => {
+    try {
+      const orderId = Number(req.params.orderId);
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
+      if (!phone) return reply.code(401).send({ message: "Authentication required" });
+
+      const pastOrder = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: true,
+          restaurant: { select: { id: true, slug: true, name: true } },
+        },
+      });
+
+      if (!pastOrder) return reply.code(404).send({ message: "Order not found" });
+
+      if (normalizePhone(pastOrder.phone) !== normalizePhone(phone)) {
+        return reply.code(403).send({ message: "Access denied" });
+      }
+
+      const itemIds = pastOrder.items.map((i) => i.menuItemId).filter(Boolean);
+      const currentMenuItems = await prisma.menuItem.findMany({
+        where: {
+          restaurantId: pastOrder.restaurantId,
+          id: { in: itemIds },
+          isAvailable: true,
+        },
+      });
+
+      const currentItemMap = new Map(currentMenuItems.map((item) => [item.id, item]));
+
+      const cartItems = [];
+      const warnings = [];
+
+      for (const oldItem of pastOrder.items) {
+        const currentItem = oldItem.menuItemId ? currentItemMap.get(oldItem.menuItemId) : null;
+        if (!currentItem) {
+          warnings.push(`"${oldItem.itemName}" is no longer available.`);
+          continue;
+        }
+
+        const currentPrice = Number(currentItem.price);
+        const oldPrice = Number(oldItem.price);
+        if (currentPrice !== oldPrice) {
+          warnings.push(`Price for "${currentItem.name}" updated from ₹${oldPrice} to ₹${currentPrice}.`);
+        }
+
+        cartItems.push({
+          id: currentItem.id,
+          menuItemId: currentItem.id,
+          name: currentItem.name,
+          price: currentPrice,
+          quantity: Math.max(1, oldItem.qty || 1),
+          image: currentItem.imageUrl,
+        });
+      }
+
+      return {
+        ok: true,
+        restaurant: pastOrder.restaurant,
+        items: cartItems,
+        warnings,
+      };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to process reorder" });
+    }
+  });
 }
+

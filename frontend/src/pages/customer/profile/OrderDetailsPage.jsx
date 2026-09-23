@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ClipboardList } from "lucide-react";
+import { ArrowLeft, ClipboardList, Navigation } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import { useRestaurantContext } from "../../../context/RestaurantContext";
 import useCachedGet from "../../../hooks/useCachedGet";
@@ -125,8 +125,35 @@ export default function OrderDetailsPage() {
                 : "Dine-in order";
     const trackingSteps = isPickupOrder ? PICKUP_TRACKING_STEPS : isDeliveryOrder ? DELIVERY_TRACKING_STEPS : undefined;
 
-    const handleReorder = () => {
-        if (!order || !restaurantSlug) return;
+    const handleReorder = async () => {
+        if (!order || !orderId) return;
+        try {
+            const res = await api.post(`/customer/orders/${orderId}/reorder`, {}, getCustomerAuthConfig());
+            if (res.data?.ok && Array.isArray(res.data.items)) {
+                if (res.data.warnings?.length) {
+                    showToast({
+                        title: "Reorder Notice",
+                        message: res.data.warnings.join("\n"),
+                        variant: "warning",
+                    });
+                }
+                const slugToUse = res.data.restaurant?.slug || restaurantSlug;
+                setRestaurantContext({ slug: slugToUse });
+                for (const item of res.data.items) {
+                    addToCart(item, slugToUse);
+                }
+                showToast({
+                    title: "Cart Updated",
+                    message: `Added ${res.data.items.length} items to your cart.`,
+                    variant: "success",
+                });
+                navigate("/cart");
+                return;
+            }
+        } catch (err) {
+            // Fallback to client-side reorder helper
+        }
+
         const addedCount = reorderOrderToCart({
             restaurantSlug,
             order,
@@ -143,6 +170,7 @@ export default function OrderDetailsPage() {
             });
         }
     };
+
 
     return (
         <div className="space-y-6">
@@ -168,6 +196,15 @@ export default function OrderDetailsPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                        {isDeliveryOrder && orderId && (
+                            <Link
+                                to={`/orders/${orderId}/track${phone ? `?phone=${encodeURIComponent(phone)}` : ""}`}
+                                className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black px-4 py-3 text-sm font-extrabold shadow-md transition"
+                            >
+                                <Navigation size={16} />
+                                Track Delivery Live 📍
+                            </Link>
+                        )}
                         <Link
                             to={buildProfilePath("/profile/order-history")}
                             className="theme-soft-button inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold"
@@ -248,10 +285,17 @@ export default function OrderDetailsPage() {
 
                         <div className="mt-6 space-y-2 rounded-3xl border border-white/10 bg-black/10 p-5 text-sm">
                             <Row label="Subtotal" value={formatMoney(order?.subtotal)} />
+                            {Number(order?.discountAmount || 0) > 0 && (
+                                <Row label="Coupon Discount" value={`-${formatMoney(order.discountAmount)}`} textClass="text-emerald-400 font-semibold" />
+                            )}
+                            {Number(order?.loyaltyDiscountAmount || 0) > 0 && (
+                                <Row label={`Loyalty Discount (${order.loyaltyPointsRedeemed || 0} pts)`} value={`-${formatMoney(order.loyaltyDiscountAmount)}`} textClass="text-amber-400 font-semibold" />
+                            )}
                             <Row label="Tax" value={formatMoney(order?.taxAmount)} />
                             <Row label="Service charge" value={formatMoney(order?.serviceChargeAmount)} />
                             <div className="my-2 h-px bg-white/10" />
                             <Row label="Total" value={formatMoney(order?.total)} strong />
+
                         </div>
 
                         {isDeliveryOrder && order?.deliveryAddress ? (
@@ -274,11 +318,12 @@ export default function OrderDetailsPage() {
     );
 }
 
-function Row({ label, value, strong }) {
+function Row({ label, value, strong, textClass }) {
     return (
-        <div className="flex items-center justify-between gap-3">
+        <div className={`flex items-center justify-between gap-3 ${textClass || ""}`}>
             <span className="theme-muted">{label}</span>
             <span className={strong ? "font-semibold" : ""}>{value}</span>
         </div>
     );
 }
+

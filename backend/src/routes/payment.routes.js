@@ -47,9 +47,4 @@ export default async function paymentRoutes(app, deps = {}) {
   app.post("/api/coupons/create", createCoupon);
   app.get("/api/coupons", getCoupons);
 
-  // Delivery Partner Endpoints: POST /api/delivery/assign, POST /api/delivery/status, GET /api/delivery/partners
-  const { assignDeliveryPartner, updateDeliveryStatus, getDeliveryPartners } = await import("../controllers/delivery.controller.js");
-  app.post("/api/delivery/assign", assignDeliveryPartner);
-  app.post("/api/delivery/status", updateDeliveryStatus);
-  app.get("/api/delivery/partners", getDeliveryPartners);
 }

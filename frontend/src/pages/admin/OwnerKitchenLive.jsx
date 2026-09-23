@@ -287,11 +287,11 @@ export default function OwnerKitchenLive() {
                                                     <p className="text-sm font-semibold">
                                                         {order.orderNo || `Order #${order.id}`}
                                                     </p>
-                                                    {Array.isArray(order.kots) && order.kots.length > 0 && (
-                                                        <span className="rounded-md bg-orange-500/20 text-orange-300 px-1.5 py-0.5 text-[10px] font-bold font-mono">
-                                                            {order.kots.map(k => k.kotNumber).join(", ")}
-                                                        </span>
-                                                    )}
+                                                     {Array.isArray(order.kots) && order.kots.length > 0 && (
+                                                         <span className="rounded-md bg-orange-500/20 text-orange-300 px-1.5 py-0.5 text-[10px] font-bold font-mono">
+                                                             {order.kots.map(k => k.kotNo || k.kotNumber).join(", ")}
+                                                         </span>
+                                                     )}
                                                 </div>
                                                 <p className="theme-muted text-xs">
                                                     Table {order.tableNo || "-"}

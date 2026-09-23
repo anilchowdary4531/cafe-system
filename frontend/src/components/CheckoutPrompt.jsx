@@ -282,6 +282,19 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
     const onCloseRef = useRef(onClose);
     const clearCartRef = useRef(clearCart);
 
+    const [couponInput, setCouponInput] = useState("");
+    const [appliedCouponCode, setAppliedCouponCode] = useState("");
+    const [couponError, setCouponError] = useState("");
+    const [couponSuccess, setCouponSuccess] = useState("");
+
+    const [pointsToRedeemInput, setPointsToRedeemInput] = useState("");
+    const [redeemedLoyaltyPoints, setRedeemedLoyaltyPoints] = useState(0);
+    const [loyaltyError, setLoyaltyError] = useState("");
+    const [loyaltySuccess, setLoyaltySuccess] = useState("");
+
+    const [previewBilling, setPreviewBilling] = useState(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
+
     const slug = String(restaurantContext?.slug || "").trim();
     const restaurantName = String(restaurantContext?.name || "CafeKing").trim() || "CafeKing";
 
@@ -292,10 +305,53 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         scope: customer?.phone ? `customer:${customer.phone}` : "customer:session",
     });
 
+    const { data: loyaltyData } = useCachedGet(slug ? `/customer/loyalty` : null, {
+        enabled: open && Boolean(customerToken),
+        ttlMs: 10_000,
+    });
+
     const savedAddresses = useMemo(
         () => (Array.isArray(addressData?.addresses) ? addressData.addresses : []),
         [addressData]
     );
+
+    // Re-calculate Authoritative Bill Preview from Backend
+    useEffect(() => {
+        if (!open || !slug || !cart || cart.length === 0) {
+            setPreviewBilling(null);
+            return;
+        }
+
+        let isCancelled = false;
+        const fetchPreview = async () => {
+            setPreviewLoading(true);
+            try {
+                const res = await api.post("/customer/checkout/preview", {
+                    slug,
+                    items: cart.map((i) => ({ id: i.id, quantity: i.quantity || 1 })),
+                    couponCode: appliedCouponCode || undefined,
+                    pointsToRedeem: redeemedLoyaltyPoints || undefined,
+                }, getCustomerAuthConfig());
+
+                if (!isCancelled && res.data?.billing) {
+                    setPreviewBilling(res.data.billing);
+                    if (res.data?.couponError) setCouponError(res.data.couponError);
+                    if (res.data?.loyaltyError) setLoyaltyError(res.data.loyaltyError);
+                }
+            } catch (err) {
+                // Ignore preview error fallback
+            } finally {
+                if (!isCancelled) setPreviewLoading(false);
+            }
+        };
+
+        fetchPreview();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [open, slug, cart, appliedCouponCode, redeemedLoyaltyPoints, customerToken]);
+
 
     useEffect(() => {
         onCloseRef.current = onClose;
@@ -368,7 +424,64 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         const list = Array.isArray(cart) ? cart : [];
         return list.reduce((sum, it) => sum + Number(it.price || 0) * Math.max(1, Number(it.quantity || 1)), 0);
     }, [cart]);
-    const payableAmount = Number(placedOrder?.total || cartSubtotal || 0);
+    const payableAmount = Number(placedOrder?.total || previewBilling?.total || cartSubtotal || 0);
+
+    const handleApplyCoupon = async () => {
+        if (!couponInput.trim()) return;
+        setCouponError("");
+        setCouponSuccess("");
+        try {
+            const res = await api.post("/customer/promotions/validate", {
+                restaurantId: previewBilling?.restaurantId || undefined,
+                slug,
+                couponCode: couponInput.trim(),
+                subtotal: cartSubtotal,
+            }, getCustomerAuthConfig());
+
+            if (res.data?.ok) {
+                setAppliedCouponCode(res.data.code);
+                setCouponSuccess(`Coupon "${res.data.code}" applied! Save ₹${res.data.discountAmount}`);
+                setCouponInput("");
+            } else {
+                setCouponError(res.data?.message || "Invalid coupon code");
+            }
+        } catch (err) {
+            setCouponError(err.response?.data?.message || "Failed to validate coupon");
+        }
+    };
+
+    const handleRemoveCoupon = () => {
+        setAppliedCouponCode("");
+        setCouponSuccess("");
+        setCouponError("");
+    };
+
+    const handleApplyLoyaltyPoints = () => {
+        const pts = Math.max(0, Math.floor(Number(pointsToRedeemInput || 0)));
+        setLoyaltyError("");
+        setLoyaltySuccess("");
+        if (pts <= 0) {
+            setRedeemedLoyaltyPoints(0);
+            return;
+        }
+
+        const available = Number(loyaltyData?.currentBalance || 0);
+        if (pts > available) {
+            setLoyaltyError(`Insufficient points. You have ${available} points.`);
+            return;
+        }
+
+        setRedeemedLoyaltyPoints(pts);
+        setLoyaltySuccess(`Applied ${pts} loyalty points.`);
+    };
+
+    const handleRemoveLoyaltyPoints = () => {
+        setRedeemedLoyaltyPoints(0);
+        setPointsToRedeemInput("");
+        setLoyaltySuccess("");
+        setLoyaltyError("");
+    };
+
     const isTableOrder = Boolean(String(tableChoice || restaurantContext?.tableNo || "").trim());
     const isOnlineOrder = !isTableOrder;
     const selectedFulfillment = isOnlineOrder ? normalizeFulfillment(fulfillment) : "dinein";
@@ -528,6 +641,8 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                 deliveryLatitude: selectedDeliveryCoordinates.latitude,
                 deliveryLongitude: selectedDeliveryCoordinates.longitude,
                 notes: String(notes || "").trim(),
+                couponCode: appliedCouponCode || undefined,
+                pointsToRedeem: redeemedLoyaltyPoints || undefined,
                 items: cart.map((item) => ({
                     id: item.id,
                     name: item.name,
@@ -535,6 +650,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                     qty: item.quantity || 1,
                 })),
             };
+
 
             const res = await api.post(`/r/${slug}/order`, payload);
 
@@ -846,9 +962,133 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                     <p className="shrink-0 text-sm font-semibold tabular-nums sm:text-[15px]">₹{toInr(price * qty)}</p>
                                                 </div>
                                             );
-                                        })}
+                                         })}
                                     </div>
                                 )}
+                            </div>
+
+                            {/* Feature 15: Coupons & Promotions Section */}
+                            <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">Offers & Coupons</p>
+                                {appliedCouponCode ? (
+                                    <div className="mt-2.5 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs">
+                                        <div>
+                                            <p className="font-bold text-emerald-400">Coupon "{appliedCouponCode}" Applied</p>
+                                            <p className="theme-muted text-[11px]">Saving ₹{toInr(previewBilling?.couponDiscount || 0)}</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleRemoveCoupon}
+                                            className="font-bold text-red-400 underline decoration-dotted hover:opacity-80"
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="mt-2.5 flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={couponInput}
+                                            onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                                            placeholder="Enter Coupon Code (e.g. WELCOME100)"
+                                            className="theme-input flex-1 rounded-xl px-3 py-2 text-xs font-bold outline-none uppercase"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleApplyCoupon}
+                                            className="theme-button rounded-xl px-4 py-2 text-xs font-bold shrink-0"
+                                        >
+                                            Apply
+                                        </button>
+                                    </div>
+                                )}
+                                {couponError && <p className="mt-1.5 text-xs text-red-400">{couponError}</p>}
+                                {couponSuccess && <p className="mt-1.5 text-xs text-emerald-400">{couponSuccess}</p>}
+                            </div>
+
+                            {/* Feature 15: Loyalty & Rewards Redemption Section */}
+                            <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-400">Loyalty Rewards</p>
+                                    {customerToken && (
+                                        <span className="text-xs font-semibold theme-muted">
+                                            Balance: <strong className="text-amber-300">{loyaltyData?.currentBalance || 0} pts</strong> (₹{toInr(loyaltyData?.equivalentValue || 0)})
+                                        </span>
+                                    )}
+                                </div>
+
+                                {!customerToken ? (
+                                    <p className="theme-muted mt-2 text-xs">Log in with phone / OTP to redeem your accumulated loyalty points.</p>
+                                ) : (
+                                    <>
+                                        {redeemedLoyaltyPoints > 0 ? (
+                                            <div className="mt-2.5 flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs">
+                                                <div>
+                                                    <p className="font-bold text-amber-300">Redeeming {redeemedLoyaltyPoints} Points</p>
+                                                    <p className="theme-muted text-[11px]">Saving ₹{toInr(previewBilling?.loyaltyDiscount || 0)}</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleRemoveLoyaltyPoints}
+                                                    className="font-bold text-red-400 underline decoration-dotted hover:opacity-80"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-2.5 flex gap-2">
+                                                <input
+                                                    type="number"
+                                                    value={pointsToRedeemInput}
+                                                    onChange={(e) => setPointsToRedeemInput(e.target.value)}
+                                                    placeholder={`Max ${loyaltyData?.currentBalance || 0} points`}
+                                                    min={1}
+                                                    max={loyaltyData?.currentBalance || 0}
+                                                    className="theme-input flex-1 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleApplyLoyaltyPoints}
+                                                    className="theme-button rounded-xl px-4 py-2 text-xs font-bold shrink-0"
+                                                >
+                                                    Redeem Points
+                                                </button>
+                                            </div>
+                                        )}
+                                        {loyaltyError && <p className="mt-1.5 text-xs text-red-400">{loyaltyError}</p>}
+                                        {loyaltySuccess && <p className="mt-1.5 text-xs text-amber-400">{loyaltySuccess}</p>}
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Authoritative Server-Calculated Bill Breakdown */}
+                            <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4 space-y-2 text-xs">
+                                <div className="flex justify-between theme-muted">
+                                    <span>Subtotal</span>
+                                    <span className="tabular-nums">₹{toInr(previewBilling?.subtotal || cartSubtotal)}</span>
+                                </div>
+                                {Number(previewBilling?.couponDiscount || 0) > 0 && (
+                                    <div className="flex justify-between text-emerald-400 font-semibold">
+                                        <span>Coupon Discount ({appliedCouponCode})</span>
+                                        <span className="tabular-nums">-₹{toInr(previewBilling.couponDiscount)}</span>
+                                    </div>
+                                )}
+                                {Number(previewBilling?.loyaltyDiscount || 0) > 0 && (
+                                    <div className="flex justify-between text-amber-400 font-semibold">
+                                        <span>Loyalty Discount ({redeemedLoyaltyPoints} pts)</span>
+                                        <span className="tabular-nums">-₹{toInr(previewBilling.loyaltyDiscount)}</span>
+                                    </div>
+                                )}
+                                {Number(previewBilling?.tax || 0) > 0 && (
+                                    <div className="flex justify-between theme-muted">
+                                        <span>Taxes</span>
+                                        <span className="tabular-nums">₹{toInr(previewBilling.tax)}</span>
+                                    </div>
+                                )}
+                                <div className="border-t border-white/10 pt-2 flex justify-between text-base font-bold">
+                                    <span>Final Total</span>
+                                    <span className="theme-price tabular-nums">₹{toInr(payableAmount)}</span>
+                                </div>
                             </div>
                     </section>
                 ) : (

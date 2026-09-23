@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import { Link, NavLink, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Gift, Heart, IndianRupee, MapPin, Settings, Sparkles, Star, UserCircle2, Bell, Wallet } from "lucide-react";
+import { ArrowLeft, Gift, Heart, IndianRupee, MapPin, Settings, Sparkles, Star, UserCircle2, Bell, Wallet, Calendar } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import useCustomerProfile from "../hooks/useCustomerProfile";
 import useCachedGet from "../hooks/useCachedGet";
@@ -16,6 +16,10 @@ import PayLaterSection from "./customer/profile/PayLaterSection";
 import PayLaterDetailSection from "./customer/profile/PayLaterDetailSection";
 import CustomerNotifications from "./customer/profile/CustomerNotifications";
 import DeleteAccountSection from "./customer/profile/DeleteAccountSection";
+import CustomerLoyaltySection from "./customer/profile/CustomerLoyaltySection";
+import CustomerOffersSection from "./customer/profile/CustomerOffersSection";
+import CustomerReservationsSection from "./customer/profile/CustomerReservationsSection";
+
 
 const formatMoney = (value) => `Rs ${Math.round(Number(value || 0))}`;
 const formatStatus = (status) => {
@@ -101,7 +105,11 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
             : "Profile";
 
     const sectionNode = (() => {
+        if (activeSection === "loyalty") return <CustomerLoyaltySection />;
+        if (activeSection === "offers") return <CustomerOffersSection />;
+        if (activeSection === "reservations") return <CustomerReservationsSection />;
         if (activeSection === "delete-account") return <DeleteAccountSection />;
+
         if (activeSection === "ordersdetail") return <OrderDetailsPage />;
         if (activeSection === "orders") return <OrdersSection />;
         if (activeSection === "addresses") {

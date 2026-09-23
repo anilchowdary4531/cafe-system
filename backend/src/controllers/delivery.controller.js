@@ -1,96 +1,326 @@
-/**
- * Delivery Partner Controller
- */
+import * as deliveryService from "../services/deliveryService.js";
 
-export const assignDeliveryPartner = async (req, res) => {
+export const createDeliveryPartner = async (req, res) => {
   try {
-    const { orderId, partnerId, partnerName, partnerPhone, vehicleNo } = req.body;
+    const prisma = req.app.get("prisma");
+    const restaurantId = req.user?.restaurantId || req.body.restaurantId;
+    const { branchId, userId, name, phone, email, vehicleType, vehicleNumber } = req.body;
 
-    if (!orderId || !partnerName) {
-      return res.status(400).json({ success: false, message: 'OrderId and partnerName are required' });
+    if (!restaurantId) {
+      return res.status(400).json({ success: false, message: "Restaurant ID is required." });
     }
 
-    const assignment = {
-      orderId: parseInt(orderId),
-      partnerId: partnerId || 101,
-      partnerName: partnerName || 'Ramesh Kumar',
-      partnerPhone: partnerPhone || '+91 9876543210',
-      vehicleNo: vehicleNo || 'TS09-EZ-4589',
-      status: 'ASSIGNED',
-      assignedAt: new Date().toISOString()
-    };
-
-    // Emit Socket.IO event if io instance is present
-    if (req.app.get('io')) {
-      const io = req.app.get('io');
-      io.to(`order_${orderId}`).emit('delivery_status_update', {
-        orderId: parseInt(orderId),
-        status: 'ASSIGNED',
-        deliveryPartner: assignment
-      });
-    }
-
-    return res.json({
-      success: true,
-      message: `Delivery partner ${assignment.partnerName} assigned to Order #${orderId}`,
-      assignment
+    const partner = await deliveryService.createDeliveryPartner({
+      prisma,
+      restaurantId,
+      branchId,
+      userId,
+      name,
+      phone,
+      email,
+      vehicleType,
+      vehicleNumber,
     });
+
+    return res.status(201).json({ success: true, partner });
   } catch (error) {
-    console.error('Assign Delivery Error:', error);
-    return res.status(500).json({ success: false, message: 'Server error assigning delivery partner' });
-  }
-};
-
-export const updateDeliveryStatus = async (req, res) => {
-  try {
-    const { orderId, status, lat, lng } = req.body;
-
-    if (!orderId || !status) {
-      return res.status(400).json({ success: false, message: 'OrderId and status are required' });
-    }
-
-    const validStatuses = ['ACCEPTED', 'PICKED_UP', 'ON_THE_WAY', 'DELIVERED'];
-    const cleanStatus = status.toUpperCase();
-
-    if (!validStatuses.includes(cleanStatus)) {
-      return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
-    }
-
-    const updatePayload = {
-      orderId: parseInt(orderId),
-      status: cleanStatus,
-      lat: lat || 17.3850,
-      lng: lng || 78.4867,
-      updatedAt: new Date().toISOString()
-    };
-
-    // Emit Socket.IO event to order room
-    if (req.app.get('io')) {
-      const io = req.app.get('io');
-      io.to(`order_${orderId}`).emit('delivery_status_update', updatePayload);
-    }
-
-    return res.json({
-      success: true,
-      message: `Delivery status updated to ${cleanStatus} for Order #${orderId}`,
-      update: updatePayload
-    });
-  } catch (error) {
-    console.error('Update Delivery Status Error:', error);
-    return res.status(500).json({ success: false, message: 'Server error updating delivery status' });
+    console.error("Create Delivery Partner Error:", error);
+    return res.status(400).json({ success: false, message: error.message || "Failed to create partner." });
   }
 };
 
 export const getDeliveryPartners = async (req, res) => {
   try {
-    const partners = [
-      { id: 101, name: 'Ramesh Kumar', phone: '+91 9876543210', vehicleNo: 'TS09-EZ-4589', rating: 4.9, isAvailable: true },
-      { id: 102, name: 'Suresh Reddy', phone: '+91 9876543211', vehicleNo: 'TS07-FX-1234', rating: 4.8, isAvailable: true },
-      { id: 103, name: 'Vikram Singh', phone: '+91 9876543212', vehicleNo: 'TS08-AB-9876', rating: 4.7, isAvailable: false }
-    ];
+    const prisma = req.app.get("prisma");
+    const restaurantId = req.user?.restaurantId || req.query.restaurantId;
+    const { branchId, status, isActive, search } = req.query;
 
-    return res.json({ partners });
+    if (!restaurantId) {
+      return res.status(400).json({ success: false, message: "Restaurant ID is required." });
+    }
+
+    const partners = await deliveryService.getDeliveryPartners({
+      prisma,
+      restaurantId,
+      branchId,
+      status,
+      isActive,
+      search,
+    });
+
+    return res.json({ success: true, partners });
   } catch (error) {
-    return res.status(500).json({ success: false, message: 'Server error fetching delivery partners' });
+    console.error("Get Delivery Partners Error:", error);
+    return res.status(500).json({ success: false, message: error.message || "Failed to fetch partners." });
+  }
+};
+
+export const updateDeliveryPartner = async (req, res) => {
+  try {
+    const prisma = req.app.get("prisma");
+    const restaurantId = req.user?.restaurantId || req.body.restaurantId;
+    const partnerId = req.params.id || req.body.partnerId;
+
+    if (!restaurantId || !partnerId) {
+      return res.status(400).json({ success: false, message: "Restaurant ID and Partner ID are required." });
+    }
+
+    const partner = await deliveryService.updateDeliveryPartner({
+      prisma,
+      restaurantId,
+      partnerId,
+      data: req.body,
+      actor: req.user ? { userId: req.user.id, role: req.user.role } : null,
+    });
+
+    return res.json({ success: true, partner });
+  } catch (error) {
+    console.error("Update Delivery Partner Error:", error);
+    return res.status(400).json({ success: false, message: error.message || "Failed to update partner." });
+  }
+};
+
+export const deleteDeliveryPartner = async (req, res) => {
+  try {
+    const prisma = req.app.get("prisma");
+    const restaurantId = req.user?.restaurantId || req.query.restaurantId;
+    const partnerId = req.params.id;
+
+    if (!restaurantId || !partnerId) {
+      return res.status(400).json({ success: false, message: "Restaurant ID and Partner ID are required." });
+    }
+
+    const partner = await deliveryService.deleteDeliveryPartner({
+      prisma,
+      restaurantId,
+      partnerId,
+      actor: req.user ? { userId: req.user.id, role: req.user.role } : null,
+    });
+
+    return res.json({ success: true, message: "Delivery partner deactivated.", partner });
+  } catch (error) {
+    console.error("Delete Delivery Partner Error:", error);
+    return res.status(400).json({ success: false, message: error.message || "Failed to deactivate partner." });
+  }
+};
+
+export const assignDeliveryPartner = async (req, res) => {
+  try {
+    const prisma = req.app.get("prisma");
+    const io = req.app.get("io");
+    const restaurantId = req.user?.restaurantId || req.body.restaurantId;
+    const { orderId, partnerId } = req.body;
+
+    if (!restaurantId || !orderId || !partnerId) {
+      return res.status(400).json({ success: false, message: "restaurantId, orderId, and partnerId are required." });
+    }
+
+    const delivery = await deliveryService.assignDeliveryPartner({
+      prisma,
+      io,
+      restaurantId,
+      orderId,
+      partnerId,
+      actor: req.user ? { userId: req.user.id, role: req.user.role } : null,
+    });
+
+    return res.json({
+      success: true,
+      message: `Delivery assigned to ${delivery.deliveryPartner?.name || "driver"}.`,
+      delivery,
+      assignment: delivery,
+    });
+  } catch (error) {
+    console.error("Assign Delivery Partner Error:", error);
+    return res.status(400).json({ success: false, message: error.message || "Failed to assign partner." });
+  }
+};
+
+export const reassignDeliveryPartner = async (req, res) => {
+  try {
+    const prisma = req.app.get("prisma");
+    const io = req.app.get("io");
+    const restaurantId = req.user?.restaurantId || req.body.restaurantId;
+    const { deliveryId, newPartnerId, reason } = req.body;
+
+    if (!restaurantId || !deliveryId || !newPartnerId) {
+      return res.status(400).json({ success: false, message: "restaurantId, deliveryId, and newPartnerId are required." });
+    }
+
+    const delivery = await deliveryService.reassignDeliveryPartner({
+      prisma,
+      io,
+      restaurantId,
+      deliveryId,
+      newPartnerId,
+      reason,
+      actor: req.user ? { userId: req.user.id, role: req.user.role } : null,
+    });
+
+    return res.json({
+      success: true,
+      message: `Delivery reassigned to ${delivery.deliveryPartner?.name || "driver"}.`,
+      delivery,
+    });
+  } catch (error) {
+    console.error("Reassign Delivery Partner Error:", error);
+    return res.status(400).json({ success: false, message: error.message || "Failed to reassign partner." });
+  }
+};
+
+export const updateDeliveryStatus = async (req, res) => {
+  try {
+    const prisma = req.app.get("prisma");
+    const io = req.app.get("io");
+    const restaurantId = req.user?.restaurantId || req.body.restaurantId;
+    const { deliveryId, orderId, status, lat, lng, failureReason, driverNotes } = req.body;
+
+    if (!deliveryId && !orderId) {
+      return res.status(400).json({ success: false, message: "deliveryId or orderId is required." });
+    }
+
+    if (!status) {
+      return res.status(400).json({ success: false, message: "status is required." });
+    }
+
+    const delivery = await deliveryService.updateDeliveryStatus({
+      prisma,
+      io,
+      restaurantId,
+      deliveryId,
+      orderId,
+      driverActor: req.user ? { userId: req.user.id, role: req.user.role } : null,
+      nextStatus: status,
+      lat,
+      lng,
+      failureReason,
+      driverNotes,
+    });
+
+    return res.json({
+      success: true,
+      message: `Delivery status updated to ${delivery.status}.`,
+      delivery,
+      update: delivery,
+    });
+  } catch (error) {
+    console.error("Update Delivery Status Error:", error);
+    return res.status(400).json({ success: false, message: error.message || "Failed to update delivery status." });
+  }
+};
+
+export const updateDriverLocation = async (req, res) => {
+  try {
+    const prisma = req.app.get("prisma");
+    const io = req.app.get("io");
+    const { deliveryId, lat, lng } = req.body;
+
+    if (!deliveryId || lat === undefined || lng === undefined) {
+      return res.status(400).json({ success: false, message: "deliveryId, lat, and lng are required." });
+    }
+
+    const result = await deliveryService.updateDriverLocation({
+      prisma,
+      io,
+      driverActor: req.user ? { userId: req.user.id, role: req.user.role } : null,
+      deliveryId,
+      lat,
+      lng,
+    });
+
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    console.error("Update Driver Location Error:", error);
+    return res.status(400).json({ success: false, message: error.message || "Failed to update location." });
+  }
+};
+
+export const getRestaurantDeliveries = async (req, res) => {
+  try {
+    const prisma = req.app.get("prisma");
+    const restaurantId = req.user?.restaurantId || req.query.restaurantId;
+    const { branchId, status, search } = req.query;
+
+    if (!restaurantId) {
+      return res.status(400).json({ success: false, message: "Restaurant ID is required." });
+    }
+
+    const deliveries = await deliveryService.getRestaurantDeliveries({
+      prisma,
+      restaurantId,
+      branchId,
+      status,
+      search,
+    });
+
+    return res.json({ success: true, deliveries });
+  } catch (error) {
+    console.error("Get Restaurant Deliveries Error:", error);
+    return res.status(500).json({ success: false, message: error.message || "Failed to fetch deliveries." });
+  }
+};
+
+export const getDriverDeliveries = async (req, res) => {
+  try {
+    const prisma = req.app.get("prisma");
+    const driverUserId = req.user?.id;
+    const { partnerId, status } = req.query;
+
+    const deliveries = await deliveryService.getDriverDeliveries({
+      prisma,
+      driverUserId,
+      partnerId,
+      status,
+    });
+
+    return res.json({ success: true, deliveries });
+  } catch (error) {
+    console.error("Get Driver Deliveries Error:", error);
+    return res.status(500).json({ success: false, message: error.message || "Failed to fetch driver deliveries." });
+  }
+};
+
+export const getDeliveryTrackingForCustomer = async (req, res) => {
+  try {
+    const prisma = req.app.get("prisma");
+    const { orderId } = req.params;
+    const { phone, customerId } = req.query;
+
+    const tracking = await deliveryService.getDeliveryTrackingForCustomer({
+      prisma,
+      orderId,
+      phone,
+      customerId,
+    });
+
+    return res.json({ success: true, tracking });
+  } catch (error) {
+    console.error("Customer Tracking Error:", error);
+    return res.status(404).json({ success: false, message: error.message || "Order tracking not found." });
+  }
+};
+
+export const getDeliveryMetricsReport = async (req, res) => {
+  try {
+    const prisma = req.app.get("prisma");
+    const restaurantId = req.user?.restaurantId || req.query.restaurantId;
+    const { startDate, endDate, partnerId } = req.query;
+
+    if (!restaurantId) {
+      return res.status(400).json({ success: false, message: "Restaurant ID is required." });
+    }
+
+    const report = await deliveryService.getDeliveryMetricsReport({
+      prisma,
+      restaurantId,
+      startDate,
+      endDate,
+      partnerId,
+    });
+
+    return res.json({ success: true, report });
+  } catch (error) {
+    console.error("Delivery Metrics Error:", error);
+    return res.status(500).json({ success: false, message: error.message || "Failed to generate delivery report." });
   }
 };

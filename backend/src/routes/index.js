@@ -24,10 +24,13 @@ import reservationRoutes from "./reservation.js";
 import inventoryRoutes from "./inventory.js";
 import shiftRoutes from "./shift.routes.js";
 import reportRoutes from "./report.routes.js";
+import deliveryRoutes from "./delivery.routes.js";
+import qrRoutes from "./qr.routes.js";
 
 // Single route entrypoint to keep server.js simple.
 export default async function routes(app, deps) {
   await healthRoutes(app, deps);
+  await qrRoutes(app, deps);
   await supplierAuthRoutes(app, deps);
   await supplierProfileRoutes(app, deps);
   await supplierProductRoutes(app, deps);
@@ -42,6 +45,7 @@ export default async function routes(app, deps) {
   await superAdminRoutes(app, deps);
   await kitchenRoutes(app, deps);
   await paymentRoutes(app, deps);
+  await deliveryRoutes(app, deps);
   await vendorRoutes(app, deps);
   await walletRoutes(app, deps);
   await ppiWalletRoutes(app, deps);

@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { AlertCircle, AlertTriangle, CheckCircle2, ClipboardList, Clock, HelpCircle, RefreshCw, RotateCcw, XCircle } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, ClipboardList, Clock, HelpCircle, Navigation, RefreshCw, RotateCcw, XCircle } from "lucide-react";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import OrderTrackingTimeline from "../components/OrderTrackingTimeline";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
@@ -187,6 +187,16 @@ export default function ThankYou({ orderFromStatus = null, onRefreshStatus = nul
 
                     {/* Action Buttons */}
                     <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                        {orderId && (isDeliveryOrder || isSuccess) && (
+                            <Link
+                                to={`/orders/${orderId}/track`}
+                                className="sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black px-6 py-3.5 font-extrabold text-sm shadow-lg transition"
+                            >
+                                <Navigation size={18} />
+                                Track Delivery Live 📍
+                            </Link>
+                        )}
+
                         {onRefreshStatus && (isPending || isUnknown) ? (
                             <button
                                 type="button"

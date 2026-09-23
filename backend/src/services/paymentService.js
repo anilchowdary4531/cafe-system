@@ -168,6 +168,61 @@ export const createPayment = async ({ prisma, actor, input } = {}) => {
   return { payment, provider: payment.provider };
 };
 
+export const associatePaymentWithActiveShift = async (
+  prisma,
+  restaurantId,
+  paymentId,
+  paymentMethod,
+  amount,
+  actor
+) => {
+  if (!restaurantId || !paymentId) return;
+  try {
+    const activeShift = await prisma.cashierShift.findFirst({
+      where: { restaurantId: Number(restaurantId), status: "OPEN" },
+      orderBy: { openedAt: "desc" },
+    });
+    if (!activeShift) return;
+
+    await prisma.payment.update({
+      where: { id: Number(paymentId) },
+      data: { shiftId: activeShift.id },
+    });
+
+    const method = String(paymentMethod || "").toUpperCase();
+    if (method.includes("CASH")) {
+      await prisma.cashMovement.create({
+        data: {
+          shiftId: activeShift.id,
+          restaurantId: Number(restaurantId),
+          type: "CASH_SALE",
+          amount: Number(amount || 0),
+          reason: `Cash Payment #${paymentId}`,
+          paymentId: Number(paymentId),
+          performedByUserId: actor?.userId || activeShift.userId,
+          performedByName: actor?.userName || "Staff",
+        },
+      });
+
+      const movements = await prisma.cashMovement.findMany({
+        where: { shiftId: activeShift.id },
+        select: { type: true, amount: true },
+      });
+      let exp = 0;
+      for (const m of movements) {
+        if (["OPENING_CASH", "CASH_SALE", "CASH_IN"].includes(m.type)) exp += Number(m.amount || 0);
+        else if (["CASH_REFUND", "CASH_OUT"].includes(m.type)) exp -= Number(m.amount || 0);
+      }
+      await prisma.cashierShift.update({
+        where: { id: activeShift.id },
+        data: { expectedCash: Math.max(0, exp) },
+      });
+    }
+  } catch (err) {
+    console.error("[PaymentService] Error associating payment with active shift:", err);
+  }
+};
+
 export const verifyPayment = async ({ prisma, actor, input } = {}) => {
   const body = input || {};
   const paymentId = Number(body.paymentId || 0);
@@ -395,54 +450,6 @@ export const verifyPayment = async ({ prisma, actor, input } = {}) => {
 
       return updatedPayment;
     });
-
-export const associatePaymentWithActiveShift = async (prisma, restaurantId, paymentId, paymentMethod, amount, actor) => {
-  if (!restaurantId || !paymentId) return;
-  try {
-    const activeShift = await prisma.cashierShift.findFirst({
-      where: { restaurantId: Number(restaurantId), status: "OPEN" },
-      orderBy: { openedAt: "desc" },
-    });
-    if (!activeShift) return;
-
-    await prisma.payment.update({
-      where: { id: Number(paymentId) },
-      data: { shiftId: activeShift.id },
-    });
-
-    const method = String(paymentMethod || "").toUpperCase();
-    if (method.includes("CASH")) {
-      await prisma.cashMovement.create({
-        data: {
-          shiftId: activeShift.id,
-          restaurantId: Number(restaurantId),
-          type: "CASH_SALE",
-          amount: Number(amount || 0),
-          reason: `Cash Payment #${paymentId}`,
-          paymentId: Number(paymentId),
-          performedByUserId: actor?.userId || activeShift.userId,
-          performedByName: actor?.userName || "Staff",
-        },
-      });
-
-      const movements = await prisma.cashMovement.findMany({
-        where: { shiftId: activeShift.id },
-        select: { type: true, amount: true },
-      });
-      let exp = 0;
-      for (const m of movements) {
-        if (["OPENING_CASH", "CASH_SALE", "CASH_IN"].includes(m.type)) exp += Number(m.amount || 0);
-        else if (["CASH_REFUND", "CASH_OUT"].includes(m.type)) exp -= Number(m.amount || 0);
-      }
-      await prisma.cashierShift.update({
-        where: { id: activeShift.id },
-        data: { expectedCash: Math.max(0, exp) },
-      });
-    }
-  } catch (err) {
-    console.error("[PaymentService] Error associating payment with active shift:", err);
-  }
-};
 
     await associatePaymentWithActiveShift(
       prisma,

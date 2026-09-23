@@ -34,14 +34,9 @@ export default async function tableSessionRoutes(fastify) {
 
   // Table Operations: Move, Merge, Split, Item Transfer
   fastify.post("/tables/:tableId/move", moveTable);
-  fastify.post("/owner/:restaurantId/tables/:tableId/move", moveTable);
-
   fastify.post("/tables/:tableId/merge", mergeTables);
-  fastify.post("/owner/:restaurantId/tables/:tableId/merge", mergeTables);
-
   fastify.post("/tables/:tableId/split", splitTableOrTransferItems);
   fastify.post("/tables/:tableId/transfer-items", splitTableOrTransferItems);
-  fastify.post("/owner/:restaurantId/tables/:tableId/transfer-items", splitTableOrTransferItems);
 
   // Split Billing & Multi-Payment Endpoints
   fastify.post("/tables/sessions/:sessionId/split-bill", createBillSplitsController);

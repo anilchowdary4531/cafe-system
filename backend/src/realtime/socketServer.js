@@ -93,6 +93,31 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     });
   });
 
+  // Handle root socket connections for delivery rooms and tracking
+  io.on("connection", (socket) => {
+    socket.on("join_delivery_room", (payload) => {
+      const did = payload?.deliveryId || payload?.id;
+      const oid = payload?.orderId;
+      if (did) socket.join(`delivery:${did}`);
+      if (oid) socket.join(`order_${oid}`);
+    });
+
+    socket.on("leave_delivery_room", (payload) => {
+      const did = payload?.deliveryId || payload?.id;
+      const oid = payload?.orderId;
+      if (did) socket.leave(`delivery:${did}`);
+      if (oid) socket.leave(`order_${oid}`);
+    });
+
+    socket.on("join_restaurant_room", (payload) => {
+      const rid = payload?.restaurantId;
+      if (rid) {
+        socket.join(`restaurant_${rid}`);
+        socket.join(`restaurant:${rid}`);
+      }
+    });
+  });
+
   const emitOrderCreated = async (order) => {
     const rid = Number(order?.restaurantId || 0);
     const bid = Number(order?.branchId || 0);

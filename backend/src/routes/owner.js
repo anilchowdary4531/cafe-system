@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { buildReadableOrderNo, updateOrderStatus } from "../services/orderService.js";
 import { buildUploadController } from "../controllers/uploadController.js";
 import { deleteAssetByKey, uploadRestaurantAsset } from "../services/storageService.js";
@@ -45,9 +46,12 @@ import {
   getKots,
   getPrinters,
   getStations,
+  getWorkloadMetrics,
   testPrinter,
   triggerReprint,
+  updateItemStatus as updateKotItemStatusController,
   updatePrinter,
+  updatePriority as updateKotPriorityController,
   updateStation,
   updateStatus as updateKotStatusController,
 } from "../controllers/kot.controller.js";
@@ -56,6 +60,9 @@ import {
   mergeTables,
   splitTableOrTransferItems,
 } from "../controllers/tableOperationController.js";
+import { assignWaiterToTable, getWaiterAssignmentHistory, getWaiterWorkspaceData, getStaffPerformanceMetrics } from "../services/staffManagementService.js";
+import { getAuditLogs } from "../services/auditLogService.js";
+import { approveCancellation, approveDiscount, approveReprint } from "../controllers/managerApprovalController.js";
 
 export default async function ownerRoutes(app, deps) {
   const { prisma, buildQrTargetUrl, FRONTEND_URL, STAFF_ACCESS_MODULES, STAFF_ALLOWED_ROLES, normalizeAccess, normalizeDbPermissions, serializeAccess, realtime } = deps;
@@ -650,10 +657,18 @@ export default async function ownerRoutes(app, deps) {
         return acc;
       }, {});
 
-      return tables.map((table) => ({
-        ...table,
-        qrCodeUrl: buildQrTargetUrl(restaurant.slug, table.tableNo),
-        ...(function buildTableState() {
+      return tables.map((table) => {
+        let token = table.qrToken;
+        if (!token) {
+          token = crypto.randomBytes(16).toString("hex");
+          prisma.diningTable.update({ where: { id: table.id }, data: { qrToken: token } }).catch(() => {});
+        }
+        return {
+          ...table,
+          qrToken: token,
+          qrCodeUrl: buildQrTargetUrl(restaurant.slug, table.tableNo),
+          qrTargetUrl: `/order/table/${token}`,
+          ...(function buildTableState() {
           const tableKey = String(table.tableNo || "").trim().toLowerCase();
           const tableActiveOrders = activeOrdersByTable[tableKey] || [];
           const latestOrder = latestOrderByTable[tableKey] || null;
@@ -691,7 +706,8 @@ export default async function ownerRoutes(app, deps) {
             lastOrderAt: latestOrder?.updatedAt || latestOrder?.createdAt || null,
           };
         })(),
-      }));
+      };
+      });
     } catch (err) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to fetch tables" });
@@ -801,6 +817,7 @@ export default async function ownerRoutes(app, deps) {
           rotation: rotation ? Number(rotation) : 0,
           isActive: isActive ?? true,
           qrCodeUrl: targetUrl,
+          qrToken: crypto.randomBytes(16).toString("hex"),
         },
       });
     } catch (err) {
@@ -1594,7 +1611,10 @@ export default async function ownerRoutes(app, deps) {
 
       const updated = await prisma.user.update({
         where: { id: staffId },
-        data: { isActive },
+        data: {
+          isActive,
+          sessionVersion: { increment: 1 },
+        },
         include: { staffAccess: { select: { permissions: true } } },
       });
 
@@ -1867,7 +1887,10 @@ export default async function ownerRoutes(app, deps) {
 
   // KOT & THERMAL PRINTER ROUTES
   app.get("/owner/:restaurantId/kots", getKots);
+  app.get("/owner/:restaurantId/kots/workload", getWorkloadMetrics);
   app.put("/owner/:restaurantId/kots/:kotId/status", updateKotStatusController);
+  app.put("/owner/:restaurantId/kots/:kotId/items/:itemId/status", updateKotItemStatusController);
+  app.put("/owner/:restaurantId/kots/:kotId/priority", updateKotPriorityController);
   app.post("/owner/:restaurantId/kots/:kotId/reprint", triggerReprint);
 
   app.get("/owner/:restaurantId/printers", getPrinters);
@@ -1879,6 +1902,106 @@ export default async function ownerRoutes(app, deps) {
   app.get("/owner/:restaurantId/stations", getStations);
   app.post("/owner/:restaurantId/stations", createStation);
   app.put("/owner/:restaurantId/stations/:stationId", updateStation);
+
+  // ==========================================
+  // FEATURE 20 — STAFF MANAGEMENT, WAITER WORKSPACE, RBAC & MANAGER APPROVALS
+  // ==========================================
+  app.post("/owner/:restaurantId/tables/:tableId/assign-waiter", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const tableId = Number(req.params.tableId);
+      const { waiterId, tableSessionId, reason } = req.body || {};
+      const result = await assignWaiterToTable({
+        prisma,
+        restaurantId,
+        tableId,
+        tableSessionId,
+        waiterId,
+        actor: req.user ? { userId: req.user.id, userName: req.user.name || req.user.email, role: req.user.role } : null,
+        reason,
+      });
+      return { ok: true, message: "Waiter assigned", ...result };
+    } catch (err) {
+      return reply.code(400).send({ message: err?.message || "Failed to assign waiter" });
+    }
+  });
+
+  app.post("/owner/:restaurantId/tables/:tableId/reassign-waiter", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const tableId = Number(req.params.tableId);
+      const { waiterId, tableSessionId, reason } = req.body || {};
+      const result = await assignWaiterToTable({
+        prisma,
+        restaurantId,
+        tableId,
+        tableSessionId,
+        waiterId,
+        actor: req.user ? { userId: req.user.id, userName: req.user.name || req.user.email, role: req.user.role } : null,
+        reason: reason || "Reassigned to new waiter",
+      });
+      return { ok: true, message: "Waiter reassigned", ...result };
+    } catch (err) {
+      return reply.code(400).send({ message: err?.message || "Failed to reassign waiter" });
+    }
+  });
+
+  app.get("/owner/:restaurantId/tables/:tableId/assignments", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const tableId = Number(req.params.tableId);
+      const history = await getWaiterAssignmentHistory({ prisma, restaurantId, tableId });
+      return { ok: true, history };
+    } catch (err) {
+      return reply.code(400).send({ message: err?.message || "Failed to fetch assignment history" });
+    }
+  });
+
+  app.get("/owner/:restaurantId/waiter/:waiterId/workspace", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const waiterId = Number(req.params.waiterId);
+      const data = await getWaiterWorkspaceData({ prisma, restaurantId, waiterId });
+      return { ok: true, ...data };
+    } catch (err) {
+      return reply.code(400).send({ message: err?.message || "Failed to fetch waiter workspace data" });
+    }
+  });
+
+  app.get("/owner/:restaurantId/staff/:staffUserId/performance", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const staffUserId = Number(req.params.staffUserId);
+      const data = await getStaffPerformanceMetrics({ prisma, restaurantId, staffUserId });
+      return { ok: true, ...data };
+    } catch (err) {
+      return reply.code(400).send({ message: err?.message || "Failed to fetch staff performance metrics" });
+    }
+  });
+
+  app.post("/owner/:restaurantId/approvals/cancellation", approveCancellation);
+  app.post("/owner/:restaurantId/approvals/discount", approveDiscount);
+  app.post("/owner/:restaurantId/approvals/reprint", approveReprint);
+
+  app.get("/owner/:restaurantId/audit-logs", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const { branchId, action, entity, actorUserId, limit, page } = req.query || {};
+      const result = await getAuditLogs({
+        prisma,
+        restaurantId,
+        branchId,
+        action,
+        entity,
+        actorUserId,
+        limit,
+        page,
+      });
+      return { ok: true, ...result };
+    } catch (err) {
+      return reply.code(400).send({ message: err?.message || "Failed to fetch audit logs" });
+    }
+  });
 
   // ==========================================
   // FEATURE 12 — CUSTOMER CRM FOUNDATION ROUTES
