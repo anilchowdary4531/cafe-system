@@ -15,11 +15,14 @@ export const maskSecret = (secret) => {
  * Environment: TEST (SANDBOX) or PRODUCTION
  */
 export const initCashfree = () => {
-  const env = String(process.env.CASHFREE_ENV || "TEST").trim().toUpperCase();
+  const envVar = String(process.env.CASHFREE_ENV || process.env.CASHFREE_ENVIRONMENT || "").trim().toUpperCase();
   const clientId = String(process.env.CASHFREE_CLIENT_ID || "").trim();
   const clientSecret = String(process.env.CASHFREE_CLIENT_SECRET || "").trim();
 
-  const isProduction = env === "PRODUCTION" || env === "PROD" || env === "LIVE";
+  let isProduction = envVar === "PRODUCTION" || envVar === "PROD" || envVar === "LIVE";
+  if (!envVar && clientId && !clientId.toUpperCase().includes("TEST") && !clientId.toUpperCase().includes("SANDBOX")) {
+    isProduction = true;
+  }
 
   Cashfree.XClientId = clientId;
   Cashfree.XClientSecret = clientSecret;
@@ -27,12 +30,8 @@ export const initCashfree = () => {
 
   const isConfigured = Boolean(clientId && clientSecret);
 
-  if (isProduction && (!clientId || !clientSecret)) {
-    console.error("[CashfreeConfig] CRITICAL WARNING: CASHFREE_ENV is PRODUCTION but API credentials are missing!");
-  }
-
   return {
-    env,
+    env: isProduction ? "PRODUCTION" : "SANDBOX",
     isProduction,
     clientId,
     clientSecret,
@@ -48,4 +47,3 @@ export const getCashfreeInstance = () => {
   initCashfree();
   return new Cashfree();
 };
-

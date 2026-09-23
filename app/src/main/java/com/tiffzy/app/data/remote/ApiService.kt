@@ -5,6 +5,31 @@ import okhttp3.MultipartBody
 import retrofit2.http.*
 
 interface ApiService {
+
+    // WALLET ENDPOINTS
+    @GET("api/wallet/summary")
+    suspend fun getWalletSummary(): WalletSummaryResponse
+
+    @GET("api/wallet/transactions")
+    suspend fun getWalletTransactions(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20,
+        @Query("type") type: String? = null,
+        @Query("direction") direction: String? = null
+    ): WalletTransactionsResponse
+
+    @POST("api/wallet/topup/create")
+    suspend fun createTopupSession(@Body request: TopupSessionRequest): TopupSessionResponse
+
+    @POST("api/wallet/topup/verify")
+    suspend fun verifyTopup(@Body request: VerifyTopupRequest): VerifyTopupResponse
+
+    @POST("api/wallet/pay-order")
+    suspend fun payOrderWithWallet(@Body request: PayOrderWalletRequest): PayOrderWalletResponse
+
+    @GET("api/v1/wallet/ppi/status")
+    suspend fun getPpiStatus(): PpiStatusResponse
+
     @GET("healthz")
     suspend fun checkHealth(): HealthResponse
 

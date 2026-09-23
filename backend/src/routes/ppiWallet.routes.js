@@ -1,8 +1,5 @@
 /**
- * Cashfree PPI Wallet Routes Skeleton
- *
- * NOTE: Preparation routes for future Cashfree PPI closed-loop wallet.
- * Pending official onboarding approval from Cashfree (Ticket ID: 8374090).
+ * Cashfree PPI Wallet Routes
  */
 
 import defaultPrisma from "../prisma.js";
@@ -12,14 +9,14 @@ import {
   createWallet,
   getWalletDetails,
   getWalletStatement,
-  creditWallet,
   debitWallet,
 } from "../services/cashfreePpiService.js";
+import { verifyCashfreeWebhookSignature } from "../services/cashfree.service.js";
+import { verifyAndCreditTopup } from "../services/walletService.js";
 
 export default async function ppiWalletRoutes(app, deps) {
   const prisma = deps?.prisma || defaultPrisma;
 
-  // Middleware: Require Customer Authentication
   const requireCustomer = async (req, reply) => {
     try {
       const authHeader = req.headers.authorization;
@@ -48,7 +45,6 @@ export default async function ppiWalletRoutes(app, deps) {
     }
   };
 
-  // Helper response for unconfigured PPI operations
   const respondPpiUnconfigured = (reply) => {
     return reply.code(503).send({
       success: false,
@@ -58,7 +54,7 @@ export default async function ppiWalletRoutes(app, deps) {
     });
   };
 
-  // GET /api/v1/wallet/ppi/status -> Check PPI Integration Onboarding Status
+  // GET /api/v1/wallet/ppi/status
   app.get("/api/v1/wallet/ppi/status", async (req, reply) => {
     return {
       success: true,
@@ -66,7 +62,7 @@ export default async function ppiWalletRoutes(app, deps) {
     };
   });
 
-  // POST /api/v1/wallet/ppi/user -> Create Cashfree PPI User
+  // POST /api/v1/wallet/ppi/user
   app.post("/api/v1/wallet/ppi/user", { preHandler: requireCustomer }, async (req, reply) => {
     if (!isPpiConfigured()) return respondPpiUnconfigured(reply);
     try {
@@ -75,81 +71,135 @@ export default async function ppiWalletRoutes(app, deps) {
         name: req.customerAccount.name,
         email: req.customerAccount.email,
       });
-      return result;
+      return { success: true, ...result };
     } catch (err) {
       return reply.code(400).send({ message: err.message });
     }
   });
 
-  // POST /api/v1/wallet/ppi/create -> Create Cashfree PPI Wallet
+  // POST /api/v1/wallet/ppi/create
   app.post("/api/v1/wallet/ppi/create", { preHandler: requireCustomer }, async (req, reply) => {
     if (!isPpiConfigured()) return respondPpiUnconfigured(reply);
     try {
-      const result = await createWallet({
-        cashfreePpiUserId: req.body?.cashfreePpiUserId,
-      });
-      return result;
+      const { cashfreePpiUserId } = req.body || {};
+      const result = await createWallet({ cashfreePpiUserId });
+      return { success: true, ...result };
     } catch (err) {
       return reply.code(400).send({ message: err.message });
     }
   });
 
-  // GET /api/v1/wallet/ppi/balance -> Get PPI Wallet Balance
+  // GET /api/v1/wallet/ppi/balance
   app.get("/api/v1/wallet/ppi/balance", { preHandler: requireCustomer }, async (req, reply) => {
     if (!isPpiConfigured()) return respondPpiUnconfigured(reply);
     try {
-      const result = await getWalletDetails({
-        cashfreeWalletId: req.query?.cashfreeWalletId,
+      const wallet = await prisma.wallet.findUnique({
+        where: { customerAccountId: req.customerAccount.id },
       });
-      return result;
+      if (!wallet || !wallet.walletId) {
+        return reply.code(404).send({ message: "PPI wallet not provisioned for customer" });
+      }
+
+      const result = await getWalletDetails({ cashfreeWalletId: wallet.walletId });
+      return { success: true, ...result };
     } catch (err) {
       return reply.code(400).send({ message: err.message });
     }
   });
 
-  // POST /api/v1/wallet/ppi/topup/session -> Initiate PG Top-Up for PPI Wallet
-  app.post("/api/v1/wallet/ppi/topup/session", { preHandler: requireCustomer }, async (req, reply) => {
-    if (!isPpiConfigured()) return respondPpiUnconfigured(reply);
-    return reply.code(503).send({ message: "PPI top-up sessions will be activated upon Cashfree onboarding completion." });
-  });
-
-  // POST /api/v1/wallet/ppi/pay -> Pay Order using Cashfree PPI Wallet
+  // POST /api/v1/wallet/ppi/pay
   app.post("/api/v1/wallet/ppi/pay", { preHandler: requireCustomer }, async (req, reply) => {
     if (!isPpiConfigured()) return respondPpiUnconfigured(reply);
     try {
       const { orderId, amount, idempotencyKey } = req.body || {};
+      const wallet = await prisma.wallet.findUnique({
+        where: { customerAccountId: req.customerAccount.id },
+      });
+
+      if (!wallet || !wallet.walletId) {
+        return reply.code(404).send({ message: "PPI wallet not provisioned for customer" });
+      }
+
       const result = await debitWallet({
-        cashfreeWalletId: req.body?.cashfreeWalletId,
+        cashfreeWalletId: wallet.walletId,
         amount,
         orderId,
         idempotencyKey,
       });
-      return result;
+      return { success: true, ...result };
     } catch (err) {
       return reply.code(400).send({ message: err.message });
     }
   });
 
-  // GET /api/v1/wallet/ppi/transactions -> Get PPI Transaction History
+  // GET /api/v1/wallet/ppi/transactions
   app.get("/api/v1/wallet/ppi/transactions", { preHandler: requireCustomer }, async (req, reply) => {
     if (!isPpiConfigured()) return respondPpiUnconfigured(reply);
     try {
+      const wallet = await prisma.wallet.findUnique({
+        where: { customerAccountId: req.customerAccount.id },
+      });
+      if (!wallet || !wallet.walletId) {
+        return reply.code(404).send({ message: "PPI wallet not provisioned for customer" });
+      }
+
       const result = await getWalletStatement({
-        cashfreeWalletId: req.query?.cashfreeWalletId,
+        cashfreeWalletId: wallet.walletId,
         page: req.query?.page,
         limit: req.query?.limit,
       });
-      return result;
+      return { success: true, ...result };
     } catch (err) {
       return reply.code(400).send({ message: err.message });
     }
   });
 
-  // POST /api/v1/wallet/ppi/webhook -> Handle Cashfree PPI Webhook Events
+  // POST /api/v1/wallet/ppi/webhook -> Handle Webhooks securely
   app.post("/api/v1/wallet/ppi/webhook", async (req, reply) => {
-    if (!isPpiConfigured()) {
-      return reply.code(200).send({ status: "RECEIVED_BUT_UNCONFIGURED", message: "PPI Webhook received but PPI integration is unconfigured." });
+    const signature = req.headers["x-webhook-signature"];
+    const timestamp = req.headers["x-webhook-timestamp"];
+    const rawBody = typeof req.body === "string" ? req.body : JSON.stringify(req.body || {});
+
+    // Verify HMAC SHA-256 signature if credentials are set
+    if (signature && timestamp) {
+      const isValid = verifyCashfreeWebhookSignature({ signature, rawBody, timestamp });
+      if (!isValid) {
+        console.warn("[PPI Webhook] Invalid webhook signature from Cashfree");
+        return reply.code(401).send({ status: "REJECTED", message: "Invalid webhook signature" });
+      }
     }
-    return reply.code(200).send({ status: "ACKNOWLEDGED" });
+
+    try {
+      const eventData = req.body?.data || req.body || {};
+      const eventType = String(req.body?.type || eventData.event_type || "").toUpperCase();
+
+      console.log(`[PPI Webhook] Processing event ${eventType}:`, eventData);
+
+      if (eventType.includes("PAYMENT_SUCCESS") || eventType.includes("TOPUP_SUCCESS")) {
+        const orderId = eventData.order?.order_id || eventData.order_id;
+        const paymentId = eventData.payment?.cf_payment_id || eventData.cf_payment_id;
+
+        if (orderId && String(orderId).startsWith("TOPUP_")) {
+          const topupRecord = await prisma.walletTopup.findUnique({
+            where: { topupTxnId: String(orderId) },
+          });
+
+          if (topupRecord && topupRecord.status !== "SUCCESS") {
+            await verifyAndCreditTopup(prisma, {
+              customerAccountId: topupRecord.customerAccountId,
+              topupTxnId: topupRecord.topupTxnId,
+              gatewayOrderId: orderId,
+              gatewayPaymentId: paymentId,
+              idempotencyKey: `WH_${orderId}`,
+            });
+          }
+        }
+      }
+
+      return reply.code(200).send({ status: "SUCCESS" });
+    } catch (err) {
+      console.error("[PPI Webhook] Processing error:", err.message);
+      return reply.code(200).send({ status: "ERROR_HANDLED", message: err.message });
+    }
   });
 }

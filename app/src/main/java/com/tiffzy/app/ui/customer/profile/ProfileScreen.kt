@@ -41,6 +41,7 @@ fun ProfileScreen(
     onEditProfile: () -> Unit,
     onOrdersClick: () -> Unit,
     onFavoritesClick: () -> Unit = {},
+    onWalletClick: () -> Unit = {},
     onPayLaterClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
@@ -108,6 +109,7 @@ fun ProfileScreen(
                     onEditProfile = onEditProfile,
                     onOrdersClick = onOrdersClick,
                     onFavoritesClick = onFavoritesClick,
+                onWalletClick = onWalletClick,
                     onPayLaterClick = onPayLaterClick,
                     onNotificationsClick = onNotificationsClick,
                     onSettingsClick = onSettingsClick,
@@ -138,6 +140,7 @@ fun ProfileContent(
     onEditProfile: () -> Unit,
     onOrdersClick: () -> Unit,
     onFavoritesClick: () -> Unit,
+    onWalletClick: () -> Unit = {},
     onPayLaterClick: () -> Unit,
     onNotificationsClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -273,7 +276,7 @@ fun ProfileContent(
             horizontalArrangement = Arrangement.spacedBy(Dimens.SpacingSmall)
         ) {
             ModernRewardCard(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).clickable { onWalletClick() },
                 icon = Icons.Default.AccountBalanceWallet,
                 label = "Wallet",
                 value = "₹0",

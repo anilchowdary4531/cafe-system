@@ -27,7 +27,7 @@ const fallbackRestaurants = [
 ];
 
 const seededPasswords = {
-  cafeKingOwner: "ioVa3hRmNqQvTF",
+  cafeKingOwner: "serv",
   cafeKingManager: "dbVvrdeL6YZ9K5",
   cafeKingChef: "PACrQ1F6T1jnQ6",
   cafeKingChefR14: "fdfzCC8x8lTV7Q",
@@ -630,8 +630,8 @@ app.post("/login", async (req, reply) => {
     }
 
     const valid =
-        user.password === password ||
-        bcrypt.compareSync(password, user.password);
+      user.password === password ||
+      bcrypt.compareSync(password, user.password);
 
     if (!valid) {
       return reply.code(401).send({
@@ -680,9 +680,9 @@ app.post("/login", async (req, reply) => {
     console.log(err);
     return reply.code(500).send({
       message:
-          process.env.NODE_ENV === "development"
-              ? `Login failed: ${err?.message || "Unknown error"}`
-              : "Login failed",
+        process.env.NODE_ENV === "development"
+          ? `Login failed: ${err?.message || "Unknown error"}`
+          : "Login failed",
     });
   }
 });
@@ -806,8 +806,8 @@ app.get("/owner/dashboard/:restaurantId", async (req, reply) => {
     }
 
     const revenue = restaurant.orders.reduce(
-        (sum, order) => sum + Number(order.total || 0),
-        0
+      (sum, order) => sum + Number(order.total || 0),
+      0
     );
 
     return {
@@ -1407,26 +1407,26 @@ app.post("/r/:slug/order", async (req, reply) => {
 
     // Tax
     const taxAmount = restaurant.taxEnabled
-        ? (subtotal * restaurant.defaultTaxPercent) / 100
-        : 0;
+      ? (subtotal * restaurant.defaultTaxPercent) / 100
+      : 0;
 
     // Service Charge
     const serviceChargeAmount =
-        restaurant.serviceChargeEnabled
-            ? (subtotal *
-                restaurant.serviceChargePercent) /
-            100
-            : 0;
+      restaurant.serviceChargeEnabled
+        ? (subtotal *
+          restaurant.serviceChargePercent) /
+        100
+        : 0;
 
     const total =
-        subtotal + taxAmount + serviceChargeAmount;
+      subtotal + taxAmount + serviceChargeAmount;
 
     // Order Number
     const orderNo =
-        "ORD-" + Date.now();
+      "ORD-" + Date.now();
 
     const invoiceNo =
-        `${restaurant.invoicePrefix}-${restaurant.nextInvoiceNumber}`;
+      `${restaurant.invoicePrefix}-${restaurant.nextInvoiceNumber}`;
 
     let customerRecord = null;
     if (normalizedPhone) {
@@ -1551,9 +1551,9 @@ app.get("/r/:slug/orders", async (req, reply) => {
     const phone = String(req.query?.phone || "").trim();
 
     const restaurant =
-        await prisma.restaurant.findUnique({
-          where: { slug },
-        });
+      await prisma.restaurant.findUnique({
+        where: { slug },
+      });
 
     if (!restaurant) {
       return reply.code(404).send({
@@ -1562,18 +1562,18 @@ app.get("/r/:slug/orders", async (req, reply) => {
     }
 
     const orders =
-        await prisma.order.findMany({
-          where: {
-            restaurantId: restaurant.id,
-            ...(phone ? { phone } : {}),
-          },
-          include: {
-            items: true,
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        });
+      await prisma.order.findMany({
+        where: {
+          restaurantId: restaurant.id,
+          ...(phone ? { phone } : {}),
+        },
+        include: {
+          items: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
 
     return orders;
   } catch (err) {
@@ -1682,11 +1682,11 @@ app.get("/owner/:restaurantId/analytics", async (req, reply) => {
     const timeseries = Array.from({ length: bucketCount }, (_, index) => {
       const start = new Date(seriesStart.getTime() + index * bucketMs);
       const label =
-          range === "24h"
-              ? `${String(start.getHours()).padStart(2, "0")}:00`
-              : `${String(start.getDate()).padStart(2, "0")}/${String(
-                  start.getMonth() + 1
-              ).padStart(2, "0")}`;
+        range === "24h"
+          ? `${String(start.getHours()).padStart(2, "0")}:00`
+          : `${String(start.getDate()).padStart(2, "0")}/${String(
+            start.getMonth() + 1
+          ).padStart(2, "0")}`;
       return {
         idx: index,
         ts: start.toISOString(),
@@ -1749,8 +1749,8 @@ app.get("/owner/:restaurantId/analytics", async (req, reply) => {
         itemMap.set(itemName, itemAgg);
 
         const categoryFromMenu = item.menuItemId
-            ? menuById.get(item.menuItemId)?.category
-            : null;
+          ? menuById.get(item.menuItemId)?.category
+          : null;
         const categoryName = categoryFromMenu || "Uncategorized";
         const categoryAgg = categoryMap.get(categoryName) || {
           name: categoryName,
@@ -1764,8 +1764,8 @@ app.get("/owner/:restaurantId/analytics", async (req, reply) => {
     }
 
     const totalActiveOrders = activeStatuses.reduce(
-        (sum, key) => sum + Number(statusCounts[key] || 0),
-        0
+      (sum, key) => sum + Number(statusCounts[key] || 0),
+      0
     );
     const deliveredOrders = Number(statusCounts.DELIVERED || 0);
     const cancelledOrders = Number(statusCounts.CANCELLED || 0);
@@ -1781,8 +1781,8 @@ app.get("/owner/:restaurantId/analytics", async (req, reply) => {
     const todayOrders = orders.filter((o) => new Date(o.createdAt) >= todayStart);
     const todayRevenue = todayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
     const elapsedHoursToday = Math.max(
-        1,
-        (now.getTime() - todayStart.getTime()) / (60 * 60 * 1000)
+      1,
+      (now.getTime() - todayStart.getTime()) / (60 * 60 * 1000)
     );
     const runRatePerHour = todayRevenue / elapsedHoursToday;
     const projectedEodRevenue = runRatePerHour * 24;
@@ -1796,7 +1796,7 @@ app.get("/owner/:restaurantId/analytics", async (req, reply) => {
       .slice(0, 8);
 
     const categories = Array.from(categoryMap.values()).sort(
-        (a, b) => b.revenue - a.revenue
+      (a, b) => b.revenue - a.revenue
     );
 
     const tableHeatmap = Array.from(tableMap.values())
@@ -1982,7 +1982,7 @@ app.get("/owner/:restaurantId/finance", async (req, reply) => {
 
     const now = new Date();
     const fromDate = new Date(
-        now.getTime() - (range === "24h" ? 1 : range === "7d" ? 7 : 30) * 24 * 60 * 60 * 1000
+      now.getTime() - (range === "24h" ? 1 : range === "7d" ? 7 : 30) * 24 * 60 * 60 * 1000
     );
 
     const [restaurant, orders, tables, menuItems] = await Promise.all([
@@ -2013,7 +2013,7 @@ app.get("/owner/:restaurantId/finance", async (req, reply) => {
     }
 
     const expenses = [...(fallbackExpenseStore[restaurantId] || [])].filter(
-        (expense) => new Date(expense.spentAt || expense.createdAt) >= fromDate
+      (expense) => new Date(expense.spentAt || expense.createdAt) >= fromDate
     );
 
     let grossSales = 0;
@@ -2108,7 +2108,7 @@ app.get("/owner/:restaurantId/finance", async (req, reply) => {
         .map(([status, count]) => ({ status, count }))
         .sort((a, b) => b.count - a.count),
       expenses: expenses.sort(
-          (a, b) => new Date(b.spentAt || b.createdAt) - new Date(a.spentAt || a.createdAt)
+        (a, b) => new Date(b.spentAt || b.createdAt) - new Date(a.spentAt || a.createdAt)
       ),
       invoices,
       aiSignals: [
@@ -2126,9 +2126,9 @@ app.get("/owner/:restaurantId/finance", async (req, reply) => {
           type: unpaidAmount > grossSales * 0.25 ? "WARNING" : "INFO",
           title: "Outstanding Risk",
           message:
-              unpaidAmount > 0
-                  ? `${unpaidAmount.toFixed(2)} remains unpaid.`
-                  : "All invoices fully collected.",
+            unpaidAmount > 0
+              ? `${unpaidAmount.toFixed(2)} remains unpaid.`
+              : "All invoices fully collected.",
         },
       ],
     };
@@ -2293,7 +2293,7 @@ app.put("/owner/:restaurantId/settings", async (req, reply) => {
     };
 
     const filteredData = Object.fromEntries(
-        Object.entries(updates).filter(([, value]) => value !== undefined)
+      Object.entries(updates).filter(([, value]) => value !== undefined)
     );
 
     if (filteredData.defaultTaxPercent !== undefined) {
@@ -2444,10 +2444,10 @@ app.get("/owner/:restaurantId/staff", async (req, reply) => {
         .filter((user) => {
           if (!q) return true;
           return (
-              String(user.name || "").toLowerCase().includes(q) ||
-              String(user.email || "").toLowerCase().includes(q) ||
-              String(user.phone || "").toLowerCase().includes(q) ||
-              String(user.role || "").toLowerCase().includes(q)
+            String(user.name || "").toLowerCase().includes(q) ||
+            String(user.email || "").toLowerCase().includes(q) ||
+            String(user.phone || "").toLowerCase().includes(q) ||
+            String(user.role || "").toLowerCase().includes(q)
           );
         });
 
@@ -2483,10 +2483,10 @@ app.get("/owner/:restaurantId/staff", async (req, reply) => {
       .filter((user) => {
         if (!q) return true;
         return (
-            String(user.name || "").toLowerCase().includes(q) ||
-            String(user.email || "").toLowerCase().includes(q) ||
-            String(user.phone || "").toLowerCase().includes(q) ||
-            String(user.role || "").toLowerCase().includes(q)
+          String(user.name || "").toLowerCase().includes(q) ||
+          String(user.email || "").toLowerCase().includes(q) ||
+          String(user.phone || "").toLowerCase().includes(q) ||
+          String(user.role || "").toLowerCase().includes(q)
         );
       });
 
@@ -2513,10 +2513,10 @@ app.get("/owner/:restaurantId/staff", async (req, reply) => {
         .filter((user) => {
           if (!q) return true;
           return (
-              String(user.name || "").toLowerCase().includes(q) ||
-              String(user.email || "").toLowerCase().includes(q) ||
-              String(user.phone || "").toLowerCase().includes(q) ||
-              String(user.role || "").toLowerCase().includes(q)
+            String(user.name || "").toLowerCase().includes(q) ||
+            String(user.email || "").toLowerCase().includes(q) ||
+            String(user.phone || "").toLowerCase().includes(q) ||
+            String(user.role || "").toLowerCase().includes(q)
           );
         });
 
@@ -2821,7 +2821,7 @@ app.put("/owner/:restaurantId/staff/:staffId", async (req, reply) => {
 
       if (email && String(email).trim().toLowerCase() !== String(existing.email).toLowerCase()) {
         const emailExists = fallbackUsers.some(
-            (user) => user.id !== staffId && String(user.email).toLowerCase() === String(email).trim().toLowerCase()
+          (user) => user.id !== staffId && String(user.email).toLowerCase() === String(email).trim().toLowerCase()
         );
         if (emailExists) {
           return reply.code(400).send({ message: "Email already exists" });
@@ -3063,7 +3063,7 @@ app.get("/owner/:restaurantId/finance/expenses", async (req, reply) => {
   }
 
   const list = [...(fallbackExpenseStore[restaurantId] || [])].sort(
-      (a, b) => new Date(b.spentAt || b.createdAt) - new Date(a.spentAt || a.createdAt)
+    (a, b) => new Date(b.spentAt || b.createdAt) - new Date(a.spentAt || a.createdAt)
   );
   return list;
 });

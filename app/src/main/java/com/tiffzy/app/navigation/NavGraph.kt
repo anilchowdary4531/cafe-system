@@ -81,6 +81,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 
 object Routes {
+    const val Wallet = "wallet"
     const val Splash = "splash"
     const val Login = "login"
     const val Register = "register"
@@ -550,6 +551,13 @@ fun NavGraph(
             )
         }
 
+        
+        composable(Routes.Wallet) {
+            com.tiffzy.app.ui.customer.wallet.WalletScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
         composable(Routes.Checkout) {
             val context = LocalContext.current
             val cartViewModel: com.tiffzy.app.ui.customer.cart.CartViewModel = viewModel()
@@ -669,6 +677,7 @@ fun NavGraph(
                 onEditProfile = { navController.navigate(Routes.EditProfile) },
                 onOrdersClick = { navController.navigate(Routes.Orders) },
                 onFavoritesClick = { navController.navigate(Routes.Favorites) },
+                onWalletClick = { navController.navigate(Routes.Wallet) },
                 onPayLaterClick = { navController.navigate(Routes.PayLater) },
                 onNotificationsClick = { navController.navigate(Routes.Notifications) },
                 onSettingsClick = { navController.navigate(Routes.Settings) },

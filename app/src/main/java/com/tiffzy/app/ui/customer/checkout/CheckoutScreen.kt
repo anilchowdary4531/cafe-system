@@ -316,6 +316,78 @@ fun AddressSelector(
 @Composable
 fun PaymentMethodSelectorCard(selectedMethod: String, onSelectMethod: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        
+        // Tiffzy Wallet (Cashfree PPI) Option
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onSelectMethod("WALLET") },
+            colors = CardDefaults.cardColors(
+                containerColor = if (selectedMethod == "WALLET") 
+                    Color(0xFF6366F1).copy(alpha = 0.05f)
+                else MaterialTheme.colorScheme.surface
+            ),
+            border = if (selectedMethod == "WALLET") 
+                BorderStroke(2.dp, Color(0xFF6366F1)) 
+            else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (selectedMethod == "WALLET") Color(0xFF6366F1).copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AccountBalanceWallet,
+                        contentDescription = null,
+                        tint = if (selectedMethod == "WALLET") Color(0xFF6366F1) else Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Tiffzy Wallet",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            color = Color(0xFF6366F1),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "Cashfree PPI",
+                                color = Color.White,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Pay instantly with co-branded PPI wallet",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                RadioButton(
+                    selected = selectedMethod == "WALLET",
+                    onClick = { onSelectMethod("WALLET") },
+                    colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF6366F1))
+                )
+            }
+        }
+
         // Cashfree Option (Pay Online)
         Card(
             modifier = Modifier

@@ -1106,9 +1106,14 @@ model Wallet {
   customerAccountId Int             @unique @map("customer_account_id")
   customerAccount   CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
 
+  cashfreeUserId    String?         @unique @map("cashfree_user_id")
+  walletId          String?         @unique @map("wallet_id")
+  cfSubWalletId     String?         @unique @map("cf_sub_wallet_id")
+  cfProgramId       String?         @map("cf_program_id")
+
   currency          String          @default("INR")
   balance           Float           @default(0)
-  status            String          @default("ACTIVE") // ACTIVE | BLOCKED | CLOSED
+  status            String          @default("ACTIVE") // ACTIVE | PENDING | BLOCKED | CLOSED | SUSPENDED | FAILED
 
   createdAt         DateTime        @default(now()) @map("created_at")
   updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at")

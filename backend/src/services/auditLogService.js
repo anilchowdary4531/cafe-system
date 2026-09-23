@@ -89,3 +89,5 @@ export const getAuditLogs = async ({
         },
     };
 };
+
+export const createAuditLog = logAuditEvent;
