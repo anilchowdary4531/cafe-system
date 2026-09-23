@@ -203,9 +203,9 @@ export default function OwnerDiscounts() {
   const totalUses = promotions.reduce((sum, p) => sum + Number(p.usageCount || 0), 0);
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 text-[color:var(--app-text)]">
+    <div className="space-y-6 text-[color:var(--app-text)]">
       {/* Header Banner */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-6 shadow-sm">
+      <div className="theme-panel flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl p-6">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-amber-500 uppercase tracking-wider">
             <Sparkles size={14} /> Promotions & Offers Engine
@@ -213,13 +213,13 @@ export default function OwnerDiscounts() {
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-3xl">
             Coupons & Discounts Studio
           </h1>
-          <p className="mt-1 text-sm text-[color:var(--app-muted)]">
+          <p className="mt-1 text-sm theme-muted">
             Create coupon codes, automatic discounts, percentage offers, and minimum order rules.
           </p>
         </div>
         <button
           onClick={openCreateModal}
-          className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-600 shadow-md shadow-amber-500/20"
+          className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-amber-600 shadow-md shadow-amber-500/20"
         >
           <Plus size={18} /> Create New Offer
         </button>
@@ -227,9 +227,9 @@ export default function OwnerDiscounts() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
+        <div className="theme-panel rounded-2xl p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-[color:var(--app-muted)]">Active Offers</span>
+            <span className="text-xs font-medium theme-muted">Active Offers</span>
             <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-500">
               <CheckCircle2 size={18} />
             </div>
@@ -237,9 +237,9 @@ export default function OwnerDiscounts() {
           <p className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">{activeCount}</p>
         </div>
 
-        <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
+        <div className="theme-panel rounded-2xl p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-[color:var(--app-muted)]">Total Coupon Uses</span>
+            <span className="text-xs font-medium theme-muted">Total Coupon Uses</span>
             <div className="rounded-xl bg-amber-500/10 p-2 text-amber-500">
               <Gift size={18} />
             </div>
@@ -247,9 +247,9 @@ export default function OwnerDiscounts() {
           <p className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">{totalUses}</p>
         </div>
 
-        <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
+        <div className="theme-panel rounded-2xl p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-[color:var(--app-muted)]">Total Offers</span>
+            <span className="text-xs font-medium theme-muted">Total Offers</span>
             <div className="rounded-xl bg-blue-500/10 p-2 text-blue-500">
               <Tag size={18} />
             </div>
@@ -257,9 +257,9 @@ export default function OwnerDiscounts() {
           <p className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">{pagination.total}</p>
         </div>
 
-        <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
+        <div className="theme-panel rounded-2xl p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-[color:var(--app-muted)]">Current Page</span>
+            <span className="text-xs font-medium theme-muted">Current Page</span>
             <div className="rounded-xl bg-purple-500/10 p-2 text-purple-500">
               <Layers size={18} />
             </div>
@@ -271,51 +271,51 @@ export default function OwnerDiscounts() {
       </div>
 
       {/* Search & Filter Toolbar */}
-      <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
+      <div className="theme-panel rounded-2xl p-4">
         <form onSubmit={handleSearchSubmit} className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--app-muted)]" size={18} />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 theme-muted" size={18} />
             <input
               type="text"
               placeholder="Search offer by name or coupon code..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] pl-10 pr-4 py-2 text-sm text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500"
+              className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] pl-10 pr-4 py-2 text-sm text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1.5 text-xs">
-              <Filter size={14} className="text-[color:var(--app-muted)]" />
+            <div className="flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-1.5 text-xs">
+              <Filter size={14} className="theme-muted" />
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
                 className="bg-transparent font-medium text-[color:var(--app-text)] outline-none cursor-pointer"
               >
-                <option value="ALL">All Types</option>
-                <option value="PERCENTAGE">Percentage %</option>
-                <option value="FIXED_AMOUNT">Fixed Amount ₹</option>
-                <option value="AUTOMATIC_OFFER">Automatic Offer</option>
-                <option value="ITEM_DISCOUNT">Item Specific</option>
-                <option value="CATEGORY_DISCOUNT">Category Specific</option>
+                <option value="ALL" className="bg-[color:var(--app-bg)]">All Types</option>
+                <option value="PERCENTAGE" className="bg-[color:var(--app-bg)]">Percentage %</option>
+                <option value="FIXED_AMOUNT" className="bg-[color:var(--app-bg)]">Fixed Amount ₹</option>
+                <option value="AUTOMATIC_OFFER" className="bg-[color:var(--app-bg)]">Automatic Offer</option>
+                <option value="ITEM_DISCOUNT" className="bg-[color:var(--app-bg)]">Item Specific</option>
+                <option value="CATEGORY_DISCOUNT" className="bg-[color:var(--app-bg)]">Category Specific</option>
               </select>
             </div>
 
-            <div className="flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1.5 text-xs">
+            <div className="flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-1.5 text-xs">
               <select
                 value={activeFilter}
                 onChange={(e) => setActiveFilter(e.target.value)}
                 className="bg-transparent font-medium text-[color:var(--app-text)] outline-none cursor-pointer"
               >
-                <option value="ALL">All Statuses</option>
-                <option value="true">Active Only</option>
-                <option value="false">Inactive Only</option>
+                <option value="ALL" className="bg-[color:var(--app-bg)]">All Statuses</option>
+                <option value="true" className="bg-[color:var(--app-bg)]">Active Only</option>
+                <option value="false" className="bg-[color:var(--app-bg)]">Inactive Only</option>
               </select>
             </div>
 
             <button
               type="submit"
-              className="rounded-xl bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-500 hover:bg-amber-500/20 transition"
+              className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-2 text-xs font-semibold text-amber-500 hover:bg-amber-500/20 transition"
             >
               Apply Filter
             </button>
@@ -324,23 +324,23 @@ export default function OwnerDiscounts() {
       </div>
 
       {/* Promotions Table */}
-      <div className="overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] shadow-sm">
+      <div className="theme-panel overflow-hidden rounded-2xl">
         {loading ? (
-          <div className="flex h-48 items-center justify-center text-sm font-medium text-[color:var(--app-muted)]">
+          <div className="flex h-48 items-center justify-center text-sm font-medium theme-muted">
             Loading promotions...
           </div>
         ) : promotions.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 text-center">
-            <Gift className="h-12 w-12 text-[color:var(--app-muted)] opacity-50" />
+            <Gift className="h-12 w-12 theme-muted opacity-50" />
             <h3 className="mt-3 text-base font-semibold text-[color:var(--app-text)]">No promotions found</h3>
-            <p className="mt-1 text-xs text-[color:var(--app-muted)]">
+            <p className="mt-1 text-xs theme-muted">
               Create your first coupon code or automatic discount offer.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] text-[color:var(--app-muted)] uppercase tracking-wider font-semibold">
+              <thead className="border-b border-[color:var(--app-border)]/60 bg-[color:var(--app-surface)]/60 theme-muted uppercase tracking-wider font-semibold">
                 <tr>
                   <th className="px-4 py-3">Offer Name</th>
                   <th className="px-4 py-3">Coupon Code</th>
@@ -353,14 +353,14 @@ export default function OwnerDiscounts() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[color:var(--app-border)]">
+              <tbody className="divide-y divide-[color:var(--app-border)]/40">
                 {promotions.map((promo) => (
-                  <tr key={promo.id} className="hover:bg-[color:var(--app-surface-2)]/50 transition">
+                  <tr key={promo.id} className="hover:bg-[color:var(--app-surface)]/50 transition">
                     <td className="px-4 py-3 font-semibold text-[color:var(--app-text)]">
                       <div>
                         <p className="font-bold text-sm">{promo.name}</p>
                         {promo.description && (
-                          <p className="text-[10px] text-[color:var(--app-muted)] line-clamp-1">{promo.description}</p>
+                          <p className="text-[10px] theme-muted line-clamp-1">{promo.description}</p>
                         )}
                       </div>
                     </td>
@@ -370,11 +370,11 @@ export default function OwnerDiscounts() {
                           {promo.code}
                         </span>
                       ) : (
-                        <span className="text-[color:var(--app-muted)] italic font-sans font-normal">Auto / No Code</span>
+                        <span className="theme-muted italic font-sans font-normal">Auto / No Code</span>
                       )}
                     </td>
                     <td className="px-4 py-3 font-semibold text-[color:var(--app-text)]">
-                      <span className="rounded-lg bg-[color:var(--app-surface-2)] px-2 py-1 text-[10px] border border-[color:var(--app-border)]">
+                      <span className="rounded-lg theme-panel px-2 py-1 text-[10px]">
                         {promo.type}
                       </span>
                     </td>
@@ -385,7 +385,7 @@ export default function OwnerDiscounts() {
                     <td className="px-4 py-3 text-[color:var(--app-text)]">
                       {promo.minimumOrderAmount ? `₹${promo.minimumOrderAmount}` : "None"}
                     </td>
-                    <td className="px-4 py-3 text-[color:var(--app-muted)]">
+                    <td className="px-4 py-3 theme-muted">
                       {promo.startAt || promo.endAt ? (
                         <span>
                           {promo.startAt ? new Date(promo.startAt).toLocaleDateString() : "Start"} -{" "}
@@ -414,7 +414,7 @@ export default function OwnerDiscounts() {
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => openEditModal(promo)}
-                        className="rounded-lg p-1.5 text-[color:var(--app-muted)] hover:bg-amber-500/10 hover:text-amber-500 transition"
+                        className="rounded-lg p-1.5 theme-muted hover:bg-amber-500/10 hover:text-amber-500 transition"
                       >
                         <Edit2 size={16} />
                       </button>
@@ -428,22 +428,22 @@ export default function OwnerDiscounts() {
 
         {/* Pagination Controls */}
         {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-4 py-3 text-xs">
-            <span className="text-[color:var(--app-muted)]">
+          <div className="flex items-center justify-between border-t border-[color:var(--app-border)]/50 bg-[color:var(--app-surface)]/40 px-4 py-3 text-xs">
+            <span className="theme-muted">
               Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
             </span>
             <div className="flex items-center gap-2">
               <button
                 disabled={pagination.page <= 1}
                 onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
-                className="flex items-center gap-1 rounded-lg border border-[color:var(--app-border)] px-3 py-1 font-medium disabled:opacity-40 hover:bg-[color:var(--app-surface-1)]"
+                className="flex items-center gap-1 rounded-lg border border-[color:var(--app-border)] px-3 py-1 font-medium disabled:opacity-40 hover:bg-[color:var(--app-surface)]/60"
               >
                 <ChevronLeft size={14} /> Prev
               </button>
               <button
                 disabled={pagination.page >= pagination.totalPages}
                 onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
-                className="flex items-center gap-1 rounded-lg border border-[color:var(--app-border)] px-3 py-1 font-medium disabled:opacity-40 hover:bg-[color:var(--app-surface-1)]"
+                className="flex items-center gap-1 rounded-lg border border-[color:var(--app-border)] px-3 py-1 font-medium disabled:opacity-40 hover:bg-[color:var(--app-surface)]/60"
               >
                 Next <ChevronRight size={14} />
               </button>
@@ -454,15 +454,15 @@ export default function OwnerDiscounts() {
 
       {/* CREATE PROMOTION MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[color:var(--app-border)] pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="theme-panel w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-[color:var(--app-border)] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/50 pb-3">
               <h2 className="text-lg font-bold text-[color:var(--app-text)] flex items-center gap-2">
                 <Plus className="text-amber-500" size={20} /> Create New Offer / Coupon
               </h2>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="rounded-lg p-1 text-[color:var(--app-muted)] hover:bg-[color:var(--app-surface-2)]"
+                className="rounded-lg p-1 theme-muted hover:text-[color:var(--app-text)]"
               >
                 <X size={18} />
               </button>
@@ -482,7 +482,7 @@ export default function OwnerDiscounts() {
                   placeholder="e.g. Welcome 10% Discount"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                  className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
                   required
                 />
               </div>
@@ -495,7 +495,7 @@ export default function OwnerDiscounts() {
                     placeholder="WELCOME100"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] font-mono font-bold uppercase outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] font-mono font-bold uppercase outline-none focus:border-amber-500"
                   />
                 </div>
                 <div>
@@ -503,13 +503,13 @@ export default function OwnerDiscounts() {
                   <select
                     value={formData.type}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500 cursor-pointer"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500 cursor-pointer"
                   >
-                    <option value="PERCENTAGE">Percentage (%)</option>
-                    <option value="FIXED_AMOUNT">Fixed Amount (₹)</option>
-                    <option value="AUTOMATIC_OFFER">Automatic Offer</option>
-                    <option value="ITEM_DISCOUNT">Item Specific Discount</option>
-                    <option value="CATEGORY_DISCOUNT">Category Specific Discount</option>
+                    <option value="PERCENTAGE" className="bg-[color:var(--app-bg)]">Percentage (%)</option>
+                    <option value="FIXED_AMOUNT" className="bg-[color:var(--app-bg)]">Fixed Amount (₹)</option>
+                    <option value="AUTOMATIC_OFFER" className="bg-[color:var(--app-bg)]">Automatic Offer</option>
+                    <option value="ITEM_DISCOUNT" className="bg-[color:var(--app-bg)]">Item Specific Discount</option>
+                    <option value="CATEGORY_DISCOUNT" className="bg-[color:var(--app-bg)]">Category Specific Discount</option>
                   </select>
                 </div>
               </div>
@@ -524,7 +524,7 @@ export default function OwnerDiscounts() {
                     step="0.01"
                     value={formData.value}
                     onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] font-bold outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] font-bold outline-none focus:border-amber-500"
                     required
                   />
                 </div>
@@ -535,7 +535,7 @@ export default function OwnerDiscounts() {
                     placeholder="Optional max limit"
                     value={formData.maximumDiscount}
                     onChange={(e) => setFormData({ ...formData, maximumDiscount: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
@@ -547,7 +547,7 @@ export default function OwnerDiscounts() {
                     type="number"
                     value={formData.minimumOrderAmount}
                     onChange={(e) => setFormData({ ...formData, minimumOrderAmount: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
                   />
                 </div>
                 <div>
@@ -556,7 +556,7 @@ export default function OwnerDiscounts() {
                     type="number"
                     value={formData.minimumQuantity}
                     onChange={(e) => setFormData({ ...formData, minimumQuantity: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
@@ -568,7 +568,7 @@ export default function OwnerDiscounts() {
                     type="date"
                     value={formData.startAt}
                     onChange={(e) => setFormData({ ...formData, startAt: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
                   />
                 </div>
                 <div>
@@ -577,7 +577,7 @@ export default function OwnerDiscounts() {
                     type="date"
                     value={formData.endAt}
                     onChange={(e) => setFormData({ ...formData, endAt: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
@@ -590,7 +590,7 @@ export default function OwnerDiscounts() {
                     placeholder="Unlimited if empty"
                     value={formData.usageLimit}
                     onChange={(e) => setFormData({ ...formData, usageLimit: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
                   />
                 </div>
                 <div>
@@ -599,7 +599,7 @@ export default function OwnerDiscounts() {
                     type="number"
                     value={formData.usageLimitPerCustomer}
                     onChange={(e) => setFormData({ ...formData, usageLimitPerCustomer: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
@@ -611,22 +611,22 @@ export default function OwnerDiscounts() {
                   placeholder="DINE_IN,TAKEAWAY,DELIVERY"
                   value={formData.eligibleOrderTypes}
                   onChange={(e) => setFormData({ ...formData, eligibleOrderTypes: e.target.value })}
-                  className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                  className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[color:var(--app-border)]">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[color:var(--app-border)]/50">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="rounded-xl border border-[color:var(--app-border)] px-4 py-2 font-semibold text-[color:var(--app-muted)] hover:bg-[color:var(--app-surface-2)]"
+                  className="rounded-xl border border-[color:var(--app-border)] px-4 py-2 font-semibold theme-muted hover:text-[color:var(--app-text)]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="rounded-xl bg-amber-500 px-5 py-2 font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+                  className="rounded-xl bg-amber-500 px-5 py-2 font-semibold text-black hover:bg-amber-600 disabled:opacity-50"
                 >
                   {submitting ? "Saving..." : "Save Offer"}
                 </button>
@@ -638,15 +638,15 @@ export default function OwnerDiscounts() {
 
       {/* EDIT PROMOTION MODAL */}
       {showEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[color:var(--app-border)] pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="theme-panel w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-[color:var(--app-border)] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/50 pb-3">
               <h2 className="text-lg font-bold text-[color:var(--app-text)] flex items-center gap-2">
                 <Edit2 className="text-amber-500" size={20} /> Edit Promotion #{selectedPromo?.id}
               </h2>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="rounded-lg p-1 text-[color:var(--app-muted)] hover:bg-[color:var(--app-surface-2)]"
+                className="rounded-lg p-1 theme-muted hover:text-[color:var(--app-text)]"
               >
                 <X size={18} />
               </button>
@@ -665,7 +665,7 @@ export default function OwnerDiscounts() {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                  className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
                   required
                 />
               </div>
@@ -677,7 +677,7 @@ export default function OwnerDiscounts() {
                     type="text"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] font-mono font-bold uppercase outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] font-mono font-bold uppercase outline-none focus:border-amber-500"
                   />
                 </div>
                 <div>
@@ -685,13 +685,13 @@ export default function OwnerDiscounts() {
                   <select
                     value={formData.type}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500 cursor-pointer"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500 cursor-pointer"
                   >
-                    <option value="PERCENTAGE">Percentage (%)</option>
-                    <option value="FIXED_AMOUNT">Fixed Amount (₹)</option>
-                    <option value="AUTOMATIC_OFFER">Automatic Offer</option>
-                    <option value="ITEM_DISCOUNT">Item Specific Discount</option>
-                    <option value="CATEGORY_DISCOUNT">Category Specific Discount</option>
+                    <option value="PERCENTAGE" className="bg-[color:var(--app-bg)]">Percentage (%)</option>
+                    <option value="FIXED_AMOUNT" className="bg-[color:var(--app-bg)]">Fixed Amount (₹)</option>
+                    <option value="AUTOMATIC_OFFER" className="bg-[color:var(--app-bg)]">Automatic Offer</option>
+                    <option value="ITEM_DISCOUNT" className="bg-[color:var(--app-bg)]">Item Specific Discount</option>
+                    <option value="CATEGORY_DISCOUNT" className="bg-[color:var(--app-bg)]">Category Specific Discount</option>
                   </select>
                 </div>
               </div>
@@ -704,7 +704,7 @@ export default function OwnerDiscounts() {
                     step="0.01"
                     value={formData.value}
                     onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] font-bold outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] font-bold outline-none focus:border-amber-500"
                     required
                   />
                 </div>
@@ -714,7 +714,7 @@ export default function OwnerDiscounts() {
                     type="number"
                     value={formData.maximumDiscount}
                     onChange={(e) => setFormData({ ...formData, maximumDiscount: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
@@ -726,7 +726,7 @@ export default function OwnerDiscounts() {
                     type="number"
                     value={formData.minimumOrderAmount}
                     onChange={(e) => setFormData({ ...formData, minimumOrderAmount: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
                   />
                 </div>
                 <div>
@@ -735,23 +735,23 @@ export default function OwnerDiscounts() {
                     type="number"
                     value={formData.usageLimit}
                     onChange={(e) => setFormData({ ...formData, usageLimit: e.target.value })}
-                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-2 text-[color:var(--app-text)] outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[color:var(--app-border)]">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[color:var(--app-border)]/50">
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="rounded-xl border border-[color:var(--app-border)] px-4 py-2 font-semibold text-[color:var(--app-muted)] hover:bg-[color:var(--app-surface-2)]"
+                  className="rounded-xl border border-[color:var(--app-border)] px-4 py-2 font-semibold theme-muted hover:text-[color:var(--app-text)]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="rounded-xl bg-amber-500 px-5 py-2 font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+                  className="rounded-xl bg-amber-500 px-5 py-2 font-semibold text-black hover:bg-amber-600 disabled:opacity-50"
                 >
                   {submitting ? "Updating..." : "Update Offer"}
                 </button>
