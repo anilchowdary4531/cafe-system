@@ -138,15 +138,15 @@ export default function OwnerReports() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans">
+    <div className="space-y-6 text-[color:var(--app-text)] font-sans">
       {/* HEADER BAR */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-slate-800 pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[color:var(--app-border)]/40">
         <div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-            <BarChart3 className="w-8 h-8 text-amber-500" />
+          <h1 className="text-2xl md:text-3xl font-bold text-[color:var(--app-text)] tracking-tight flex items-center gap-3">
+            <BarChart3 className="w-7 h-7 text-amber-500" />
             Centralized Business Reports & Analytics
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="theme-muted text-sm mt-1">
             Backend-authoritative financial, operational, sales, tax, kitchen, and inventory intelligence
           </p>
         </div>
@@ -155,28 +155,28 @@ export default function OwnerReports() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleExport("csv")}
-            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition"
+            className="flex items-center gap-1.5 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 border border-[color:var(--app-border)] text-[color:var(--app-text)] px-3.5 py-2 rounded-xl text-xs font-bold transition"
           >
-            <Download className="w-4 h-4 text-emerald-400" />
+            <Download className="w-4 h-4 text-emerald-500" />
             CSV
           </button>
           <button
             onClick={() => handleExport("excel")}
-            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition"
+            className="flex items-center gap-1.5 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 border border-[color:var(--app-border)] text-[color:var(--app-text)] px-3.5 py-2 rounded-xl text-xs font-bold transition"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
             Excel
           </button>
           <button
             onClick={() => handleExport("pdf")}
-            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition"
+            className="flex items-center gap-1.5 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 border border-[color:var(--app-border)] text-[color:var(--app-text)] px-3.5 py-2 rounded-xl text-xs font-bold transition"
           >
-            <FileText className="w-4 h-4 text-rose-400" />
+            <FileText className="w-4 h-4 text-rose-500" />
             PDF
           </button>
           <button
             onClick={handlePrint}
-            className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2 rounded-xl text-xs font-extrabold shadow-md transition"
+            className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black px-4 py-2 rounded-xl text-xs font-extrabold shadow-md transition"
           >
             <Printer className="w-4 h-4" />
             Print
@@ -184,17 +184,17 @@ export default function OwnerReports() {
         </div>
       </div>
 
-      {/* FILTER TOOLBAR */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-8 space-y-4">
+      {/* FILTER TOOLBAR (No Dividing Boxes - Words on Paper) */}
+      <div className="py-2 border-b border-[color:var(--app-border)]/40 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* PRESETS */}
-          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1 gap-1">
+          <div className="flex items-center border border-[color:var(--app-border)]/60 rounded-xl p-1 gap-1 bg-transparent">
             {DATE_PRESETS.map((p) => (
               <button
                 key={p.label}
                 onClick={() => handlePresetSelect(p)}
                 className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${
-                  datePreset === p.label ? "bg-amber-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"
+                  datePreset === p.label ? "bg-amber-500 text-black shadow" : "theme-muted hover:text-[color:var(--app-text)]"
                 }`}
               >
                 {p.label}
@@ -204,9 +204,9 @@ export default function OwnerReports() {
 
           {/* CUSTOM DATE PICKERS */}
           <div className="flex items-center gap-3 text-xs">
-            <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <span className="text-slate-500 font-medium">From:</span>
+            <div className="flex items-center gap-2 border border-[color:var(--app-border)]/60 rounded-xl px-3 py-1.5 bg-transparent">
+              <Calendar className="w-4 h-4 theme-muted" />
+              <span className="theme-muted font-medium">From:</span>
               <input
                 type="date"
                 value={startDate}
@@ -214,12 +214,12 @@ export default function OwnerReports() {
                   setStartDate(e.target.value);
                   setDatePreset("Custom");
                 }}
-                className="bg-transparent text-white outline-none font-bold"
+                className="bg-transparent text-[color:var(--app-text)] outline-none font-bold"
               />
             </div>
-            <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <span className="text-slate-500 font-medium">To:</span>
+            <div className="flex items-center gap-2 border border-[color:var(--app-border)]/60 rounded-xl px-3 py-1.5 bg-transparent">
+              <Calendar className="w-4 h-4 theme-muted" />
+              <span className="theme-muted font-medium">To:</span>
               <input
                 type="date"
                 value={endDate}
@@ -227,13 +227,13 @@ export default function OwnerReports() {
                   setEndDate(e.target.value);
                   setDatePreset("Custom");
                 }}
-                className="bg-transparent text-white outline-none font-bold"
+                className="bg-transparent text-[color:var(--app-text)] outline-none font-bold"
               />
             </div>
 
             <button
               onClick={fetchReport}
-              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold transition"
+              className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 px-3.5 py-2 rounded-xl text-xs font-bold transition"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
               Apply
@@ -243,7 +243,7 @@ export default function OwnerReports() {
       </div>
 
       {/* REPORT SUB-TABS */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-8 no-scrollbar border-b border-slate-800">
+      <div className="flex items-center gap-2 overflow-x-auto pb-3 no-scrollbar border-b border-[color:var(--app-border)]/40">
         {REPORT_TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -254,10 +254,10 @@ export default function OwnerReports() {
                 setActiveTab(tab.id);
                 setPage(1);
               }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap border ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap border ${
                 isActive
-                  ? "bg-amber-500 text-slate-950 border-amber-500 shadow-lg shadow-amber-500/20"
-                  : "bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-900"
+                  ? "bg-amber-500 text-black border-amber-500 shadow-md"
+                  : "bg-transparent border-[color:var(--app-border)]/60 theme-muted hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -269,28 +269,28 @@ export default function OwnerReports() {
 
       {/* REPORT CONTENT BODY */}
       {loading ? (
-        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-16 text-center text-slate-400">
-          <RefreshCw className="w-10 h-10 animate-spin mx-auto mb-4 text-amber-500" />
+        <div className="py-16 text-center theme-muted">
+          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-amber-500" />
           Querying backend database for {activeTab} analytics...
         </div>
       ) : !reportData ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-500">
+        <div className="py-12 text-center theme-muted font-medium">
           No report data available for selected filters.
         </div>
       ) : (
-        <div className="space-y-8">
-          {/* EXECUTIVE SUMMARY METRIC CARDS */}
+        <div className="space-y-6">
+          {/* EXECUTIVE SUMMARY METRIC CARDS (Words on Paper) */}
           {reportData.summary && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-3 border-b border-[color:var(--app-border)]/40">
               {Object.entries(reportData.summary)
                 .filter(([k, v]) => typeof v !== "object")
                 .map(([key, value]) => (
-                  <div key={key} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <div key={key} className="py-1">
+                    <p className="text-xs font-semibold theme-muted uppercase tracking-wider">
                       {key.replace(/([A-Z])/g, " $1").trim()}
                     </p>
-                    <p className="text-2xl font-extrabold text-white mt-1">
-                      {typeof value === "number" && key.toLowerCase().includes("sales") || key.toLowerCase().includes("amount") || key.toLowerCase().includes("tax") || key.toLowerCase().includes("value") || key.toLowerCase().includes("cost")
+                    <p className="text-2xl font-bold text-[color:var(--app-text)] mt-1">
+                      {typeof value === "number" && (key.toLowerCase().includes("sales") || key.toLowerCase().includes("amount") || key.toLowerCase().includes("tax") || key.toLowerCase().includes("value") || key.toLowerCase().includes("cost"))
                         ? `₹${value.toLocaleString()}`
                         : value}
                     </p>
@@ -301,24 +301,24 @@ export default function OwnerReports() {
 
           {/* VISUAL CHARTS (IF APPLICABLE) */}
           {activeTab === "sales" && reportData.salesTrend && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                <h3 className="text-base font-bold text-white mb-4">Sales Trend (Net Sales)</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-4 border-b border-[color:var(--app-border)]/40">
+              <div className="lg:col-span-2">
+                <h3 className="text-base font-bold text-[color:var(--app-text)] mb-4">Sales Trend (Net Sales)</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={reportData.salesTrend}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
-                      <YAxis stroke="#94a3b8" fontSize={11} />
-                      <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", color: "#fff" }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--app-border)" opacity={0.4} />
+                      <XAxis dataKey="date" stroke="var(--app-muted)" fontSize={11} />
+                      <YAxis stroke="var(--app-muted)" fontSize={11} />
+                      <Tooltip contentStyle={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-text)" }} />
                       <Area type="monotone" dataKey="netSales" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.2} strokeWidth={2} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                <h3 className="text-base font-bold text-white mb-4">Payment Breakdown</h3>
+              <div>
+                <h3 className="text-base font-bold text-[color:var(--app-text)] mb-4">Payment Breakdown</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -335,7 +335,7 @@ export default function OwnerReports() {
                           <Cell key={i} fill={c} />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", color: "#fff" }} />
+                      <Tooltip contentStyle={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-text)" }} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -344,11 +344,11 @@ export default function OwnerReports() {
           )}
 
           {/* MAIN DATA TABLE */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center justify-between">
+          <div className="py-2">
+            <h3 className="text-base font-bold text-[color:var(--app-text)] mb-4 flex items-center justify-between">
               <span>{REPORT_TABS.find((t) => t.id === activeTab)?.label} Data Table</span>
-              <span className="text-xs font-normal text-slate-400">
-                Total Records: {reportData.pagination?.total || reportData.orders?.length || reportData.items?.length || 0}
+              <span className="text-xs font-normal theme-muted">
+                Total Records: {reportData.pagination?.total || reportData.orders?.length || reportData.items?.length || reportData.waiters?.length || reportData.rows?.length || 0}
               </span>
             </h3>
 
@@ -357,7 +357,7 @@ export default function OwnerReports() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider">
+                    <tr className="border-b-2 border-[color:var(--app-border)] theme-muted uppercase tracking-wider font-semibold">
                       <th className="pb-3">Order #</th>
                       <th className="pb-3">Source</th>
                       <th className="pb-3">Method</th>
@@ -368,17 +368,17 @@ export default function OwnerReports() {
                       <th className="pb-3 text-right">Total</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-[color:var(--app-border)]/40">
                     {reportData.orders.map((o) => (
-                      <tr key={o.id} className="hover:bg-slate-800/30">
-                        <td className="py-3 font-bold text-amber-400">{o.orderNo}</td>
-                        <td className="py-3 text-slate-300">{o.fulfillment || o.orderSource}</td>
-                        <td className="py-3 text-slate-300">{o.paymentMode || "CASH"}</td>
-                        <td className="py-3 text-slate-400">{new Date(o.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</td>
-                        <td className="py-3 text-right text-slate-300">₹{o.subtotal?.toLocaleString()}</td>
-                        <td className="py-3 text-right text-rose-400">₹{o.discountAmount?.toLocaleString()}</td>
-                        <td className="py-3 text-right text-slate-300">₹{o.taxAmount?.toLocaleString()}</td>
-                        <td className="py-3 text-right text-white font-extrabold">₹{o.total?.toLocaleString()}</td>
+                      <tr key={o.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                        <td className="py-3 font-bold text-amber-500">{o.orderNo}</td>
+                        <td className="py-3 text-[color:var(--app-text)]">{o.fulfillment || o.orderSource}</td>
+                        <td className="py-3 text-[color:var(--app-text)]">{o.paymentMode || "CASH"}</td>
+                        <td className="py-3 theme-muted">{new Date(o.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</td>
+                        <td className="py-3 text-right text-[color:var(--app-text)]">₹{o.subtotal?.toLocaleString()}</td>
+                        <td className="py-3 text-right text-rose-500">₹{o.discountAmount?.toLocaleString()}</td>
+                        <td className="py-3 text-right text-[color:var(--app-text)]">₹{o.taxAmount?.toLocaleString()}</td>
+                        <td className="py-3 text-right text-[color:var(--app-text)] font-extrabold">₹{o.total?.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -391,7 +391,7 @@ export default function OwnerReports() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider">
+                    <tr className="border-b-2 border-[color:var(--app-border)] theme-muted uppercase tracking-wider font-semibold">
                       <th className="pb-3">Invoice #</th>
                       <th className="pb-3">Order #</th>
                       <th className="pb-3 text-right">Taxable Value</th>
@@ -401,16 +401,16 @@ export default function OwnerReports() {
                       <th className="pb-3 text-right">Total Tax</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-[color:var(--app-border)]/40">
                     {reportData.orders.map((o) => (
-                      <tr key={o.id} className="hover:bg-slate-800/30">
-                        <td className="py-3 font-bold text-slate-200">{o.invoiceNo || o.orderNo}</td>
-                        <td className="py-3 text-amber-400 font-semibold">{o.orderNo}</td>
-                        <td className="py-3 text-right text-slate-300">₹{o.taxableValue?.toLocaleString()}</td>
-                        <td className="py-3 text-right text-slate-400">₹{o.cgst?.toLocaleString()}</td>
-                        <td className="py-3 text-right text-slate-400">₹{o.sgst?.toLocaleString()}</td>
-                        <td className="py-3 text-right text-slate-400">₹{o.igst?.toLocaleString()}</td>
-                        <td className="py-3 text-right text-emerald-400 font-extrabold">₹{o.totalTax?.toLocaleString()}</td>
+                      <tr key={o.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                        <td className="py-3 font-bold text-[color:var(--app-text)]">{o.invoiceNo || o.orderNo}</td>
+                        <td className="py-3 text-amber-500 font-semibold">{o.orderNo}</td>
+                        <td className="py-3 text-right text-[color:var(--app-text)]">₹{o.taxableValue?.toLocaleString()}</td>
+                        <td className="py-3 text-right theme-muted">₹{o.cgst?.toLocaleString()}</td>
+                        <td className="py-3 text-right theme-muted">₹{o.sgst?.toLocaleString()}</td>
+                        <td className="py-3 text-right theme-muted">₹{o.igst?.toLocaleString()}</td>
+                        <td className="py-3 text-right text-emerald-500 font-extrabold">₹{o.totalTax?.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -423,7 +423,7 @@ export default function OwnerReports() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider">
+                    <tr className="border-b-2 border-[color:var(--app-border)] theme-muted uppercase tracking-wider font-semibold">
                       <th className="pb-3">Item Name</th>
                       <th className="pb-3">Variant</th>
                       <th className="pb-3 text-right">Qty Sold</th>
@@ -431,14 +431,14 @@ export default function OwnerReports() {
                       <th className="pb-3 text-right">Gross Sales</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-[color:var(--app-border)]/40">
                     {reportData.items.map((i, idx) => (
-                      <tr key={idx} className="hover:bg-slate-800/30">
-                        <td className="py-3 font-bold text-white">{i.itemName}</td>
-                        <td className="py-3 text-slate-400">{i.variantName || "-"}</td>
-                        <td className="py-3 text-right font-bold text-amber-400">{i.qty}</td>
-                        <td className="py-3 text-right text-slate-300">₹{i.unitPrice}</td>
-                        <td className="py-3 text-right text-emerald-400 font-extrabold">₹{i.grossSales?.toLocaleString()}</td>
+                      <tr key={idx} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                        <td className="py-3 font-bold text-[color:var(--app-text)]">{i.itemName}</td>
+                        <td className="py-3 theme-muted">{i.variantName || "-"}</td>
+                        <td className="py-3 text-right font-bold text-amber-500">{i.qty}</td>
+                        <td className="py-3 text-right text-[color:var(--app-text)]">₹{i.unitPrice}</td>
+                        <td className="py-3 text-right text-emerald-500 font-extrabold">₹{i.grossSales?.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -451,7 +451,7 @@ export default function OwnerReports() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider">
+                    <tr className="border-b-2 border-[color:var(--app-border)] theme-muted uppercase tracking-wider font-semibold">
                       <th className="pb-3">Server Name</th>
                       <th className="pb-3 text-right">Sessions</th>
                       <th className="pb-3 text-right">Orders</th>
@@ -461,19 +461,19 @@ export default function OwnerReports() {
                       <th className="pb-3 text-right">Net Sales</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-[color:var(--app-border)]/40">
                     {reportData.waiters.map((w, idx) => (
-                      <tr key={idx} className="hover:bg-slate-800/30">
-                        <td className="py-3 font-bold text-white flex items-center gap-2">
+                      <tr key={idx} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                        <td className="py-3 font-bold text-[color:var(--app-text)] flex items-center gap-2">
                           <Users className="w-4 h-4 text-amber-500" />
                           {w.waiterName}
                         </td>
-                        <td className="py-3 text-right text-slate-300">{w.sessionCount}</td>
-                        <td className="py-3 text-right text-slate-300">{w.orderCount}</td>
-                        <td className="py-3 text-right font-bold text-amber-400">{w.itemsServed}</td>
-                        <td className="py-3 text-right text-emerald-400">₹{w.cashCollections?.toLocaleString()}</td>
-                        <td className="py-3 text-right text-purple-400">₹{w.digitalCollections?.toLocaleString()}</td>
-                        <td className="py-3 text-right font-extrabold text-white">₹{w.netSales?.toLocaleString()}</td>
+                        <td className="py-3 text-right text-[color:var(--app-text)]">{w.sessionCount}</td>
+                        <td className="py-3 text-right text-[color:var(--app-text)]">{w.orderCount}</td>
+                        <td className="py-3 text-right font-bold text-amber-500">{w.itemsServed}</td>
+                        <td className="py-3 text-right text-emerald-500">₹{w.cashCollections?.toLocaleString()}</td>
+                        <td className="py-3 text-right text-purple-500">₹{w.digitalCollections?.toLocaleString()}</td>
+                        <td className="py-3 text-right font-extrabold text-[color:var(--app-text)]">₹{w.netSales?.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -481,24 +481,57 @@ export default function OwnerReports() {
               </div>
             )}
 
+            {/* GENERIC TAB TABLE FALLBACK (For Categories, KOTs, Payments, Discounts, Shifts, etc.) */}
+            {!["sales", "gst", "items", "waiters"].includes(activeTab) && (reportData.rows || reportData.items || reportData.orders || reportData.data) && (
+              <div className="overflow-x-auto">
+                {(() => {
+                  const rows = reportData.rows || reportData.items || reportData.orders || reportData.data || [];
+                  if (!rows.length) return <p className="py-6 text-center theme-muted">No records for {activeTab}.</p>;
+                  const keys = Object.keys(rows[0] || {}).filter((k) => typeof rows[0][k] !== "object");
+                  return (
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b-2 border-[color:var(--app-border)] theme-muted uppercase tracking-wider font-semibold">
+                          {keys.map((k) => (
+                            <th key={k} className="pb-3 px-2">{k.replace(/([A-Z])/g, " $1").trim()}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[color:var(--app-border)]/40">
+                        {rows.map((r, idx) => (
+                          <tr key={idx} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                            {keys.map((k) => (
+                              <td key={k} className="py-3 px-2 text-[color:var(--app-text)] font-medium">
+                                {typeof r[k] === "boolean" ? (r[k] ? "Yes" : "No") : String(r[k] ?? "-")}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()}
+              </div>
+            )}
+
             {/* PAGINATION CONTROLS */}
             {reportData.pagination && reportData.pagination.totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-slate-800 pt-4 mt-6">
-                <span className="text-xs text-slate-400">
+              <div className="flex items-center justify-between border-t border-[color:var(--app-border)]/40 pt-4 mt-6">
+                <span className="text-xs theme-muted">
                   Page {reportData.pagination.page} of {reportData.pagination.totalPages}
                 </span>
                 <div className="flex items-center gap-2">
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage(page - 1)}
-                    className="p-2 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 disabled:opacity-40 hover:bg-slate-800"
+                    className="p-2 bg-transparent border border-[color:var(--app-border)] rounded-lg text-[color:var(--app-text)] disabled:opacity-40 hover:bg-black/5 dark:hover:bg-white/5"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
                     disabled={page >= reportData.pagination.totalPages}
                     onClick={() => setPage(page + 1)}
-                    className="p-2 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 disabled:opacity-40 hover:bg-slate-800"
+                    className="p-2 bg-transparent border border-[color:var(--app-border)] rounded-lg text-[color:var(--app-text)] disabled:opacity-40 hover:bg-black/5 dark:hover:bg-white/5"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
