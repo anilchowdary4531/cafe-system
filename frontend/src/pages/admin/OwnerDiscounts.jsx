@@ -203,9 +203,9 @@ export default function OwnerDiscounts() {
   const totalUses = promotions.reduce((sum, p) => sum + Number(p.usageCount || 0), 0);
 
   return (
-    <div className="space-y-6 text-[color:var(--app-text)]">
+    <div className="space-y-4 text-[color:var(--app-text)]">
       {/* Header Banner */}
-      <div className="theme-panel flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-[color:var(--app-border)]/40">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-amber-500 uppercase tracking-wider">
             <Sparkles size={14} /> Promotions & Offers Engine
@@ -225,53 +225,53 @@ export default function OwnerDiscounts() {
         </button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <div className="theme-panel rounded-2xl p-4">
+      {/* KPI Stats (Words on Paper) */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 py-2 border-b border-[color:var(--app-border)]/40">
+        <div>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium theme-muted">Active Offers</span>
-            <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-500">
-              <CheckCircle2 size={18} />
+            <span className="text-xs font-semibold theme-muted">Active Offers</span>
+            <div className="text-emerald-500">
+              <CheckCircle2 size={16} />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">{activeCount}</p>
+          <p className="mt-1 text-2xl font-bold text-[color:var(--app-text)]">{activeCount}</p>
         </div>
 
-        <div className="theme-panel rounded-2xl p-4">
+        <div>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium theme-muted">Total Coupon Uses</span>
-            <div className="rounded-xl bg-amber-500/10 p-2 text-amber-500">
-              <Gift size={18} />
+            <span className="text-xs font-semibold theme-muted">Total Coupon Uses</span>
+            <div className="text-amber-500">
+              <Gift size={16} />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">{totalUses}</p>
+          <p className="mt-1 text-2xl font-bold text-[color:var(--app-text)]">{totalUses}</p>
         </div>
 
-        <div className="theme-panel rounded-2xl p-4">
+        <div>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium theme-muted">Total Offers</span>
-            <div className="rounded-xl bg-blue-500/10 p-2 text-blue-500">
-              <Tag size={18} />
+            <span className="text-xs font-semibold theme-muted">Total Offers</span>
+            <div className="text-blue-500">
+              <Tag size={16} />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">{pagination.total}</p>
+          <p className="mt-1 text-2xl font-bold text-[color:var(--app-text)]">{pagination.total}</p>
         </div>
 
-        <div className="theme-panel rounded-2xl p-4">
+        <div>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium theme-muted">Current Page</span>
-            <div className="rounded-xl bg-purple-500/10 p-2 text-purple-500">
-              <Layers size={18} />
+            <span className="text-xs font-semibold theme-muted">Current Page</span>
+            <div className="text-purple-500">
+              <Layers size={16} />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">
+          <p className="mt-1 text-2xl font-bold text-[color:var(--app-text)]">
             {pagination.page} / {pagination.totalPages}
           </p>
         </div>
       </div>
 
       {/* Search & Filter Toolbar */}
-      <div className="theme-panel rounded-2xl p-4">
+      <div className="py-2 border-b border-[color:var(--app-border)]/40">
         <form onSubmit={handleSearchSubmit} className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 theme-muted" size={18} />
@@ -280,12 +280,12 @@ export default function OwnerDiscounts() {
               placeholder="Search offer by name or coupon code..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] pl-10 pr-4 py-2 text-sm text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500"
+              className="w-full rounded-xl border border-[color:var(--app-border)] bg-transparent pl-10 pr-4 py-2 text-sm text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-1.5 text-xs">
+            <div className="flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)] bg-transparent px-3 py-1.5 text-xs">
               <Filter size={14} className="theme-muted" />
               <select
                 value={typeFilter}
@@ -301,7 +301,7 @@ export default function OwnerDiscounts() {
               </select>
             </div>
 
-            <div className="flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] px-3 py-1.5 text-xs">
+            <div className="flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)] bg-transparent px-3 py-1.5 text-xs">
               <select
                 value={activeFilter}
                 onChange={(e) => setActiveFilter(e.target.value)}
@@ -324,7 +324,7 @@ export default function OwnerDiscounts() {
       </div>
 
       {/* Promotions Table */}
-      <div className="theme-panel overflow-hidden rounded-2xl">
+      <div className="overflow-hidden">
         {loading ? (
           <div className="flex h-48 items-center justify-center text-sm font-medium theme-muted">
             Loading promotions...
@@ -340,7 +340,7 @@ export default function OwnerDiscounts() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-[color:var(--app-border)]/60 bg-[color:var(--app-surface)]/60 theme-muted uppercase tracking-wider font-semibold">
+              <thead className="border-b-2 border-[color:var(--app-border)] theme-muted uppercase tracking-wider font-semibold">
                 <tr>
                   <th className="px-4 py-3">Offer Name</th>
                   <th className="px-4 py-3">Coupon Code</th>
@@ -355,7 +355,7 @@ export default function OwnerDiscounts() {
               </thead>
               <tbody className="divide-y divide-[color:var(--app-border)]/40">
                 {promotions.map((promo) => (
-                  <tr key={promo.id} className="hover:bg-[color:var(--app-surface)]/50 transition">
+                  <tr key={promo.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
                     <td className="px-4 py-3 font-semibold text-[color:var(--app-text)]">
                       <div>
                         <p className="font-bold text-sm">{promo.name}</p>
@@ -374,7 +374,7 @@ export default function OwnerDiscounts() {
                       )}
                     </td>
                     <td className="px-4 py-3 font-semibold text-[color:var(--app-text)]">
-                      <span className="rounded-lg theme-panel px-2 py-1 text-[10px]">
+                      <span className="px-2 py-0.5 text-[10px] font-semibold opacity-85">
                         {promo.type}
                       </span>
                     </td>
@@ -428,7 +428,7 @@ export default function OwnerDiscounts() {
 
         {/* Pagination Controls */}
         {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-[color:var(--app-border)]/50 bg-[color:var(--app-surface)]/40 px-4 py-3 text-xs">
+          <div className="flex items-center justify-between border-t border-[color:var(--app-border)]/50 pt-3 text-xs">
             <span className="theme-muted">
               Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
             </span>
@@ -436,14 +436,14 @@ export default function OwnerDiscounts() {
               <button
                 disabled={pagination.page <= 1}
                 onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
-                className="flex items-center gap-1 rounded-lg border border-[color:var(--app-border)] px-3 py-1 font-medium disabled:opacity-40 hover:bg-[color:var(--app-surface)]/60"
+                className="flex items-center gap-1 rounded-lg border border-[color:var(--app-border)] px-3 py-1 font-medium disabled:opacity-40 hover:bg-black/5 dark:hover:bg-white/5"
               >
                 <ChevronLeft size={14} /> Prev
               </button>
               <button
                 disabled={pagination.page >= pagination.totalPages}
                 onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
-                className="flex items-center gap-1 rounded-lg border border-[color:var(--app-border)] px-3 py-1 font-medium disabled:opacity-40 hover:bg-[color:var(--app-surface)]/60"
+                className="flex items-center gap-1 rounded-lg border border-[color:var(--app-border)] px-3 py-1 font-medium disabled:opacity-40 hover:bg-black/5 dark:hover:bg-white/5"
               >
                 Next <ChevronRight size={14} />
               </button>
