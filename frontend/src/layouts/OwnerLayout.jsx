@@ -1442,30 +1442,30 @@ export default function OwnerLayout() {
                                         : ""
                                 }
                             >
-                                <div className="flex flex-wrap items-center justify-between gap-2.5 py-0">
-                                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-                                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 font-bold text-amber-400">
+                                <div className="flex flex-wrap items-center justify-between gap-2 py-0">
+                                    <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm font-medium">
+                                        <span className="inline-flex items-center gap-1.5 font-bold text-amber-600 dark:text-amber-400">
                                             <TableProperties size={15} />
                                             Tables: {tableOverview.total}
                                         </span>
-                                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 font-bold text-emerald-400">
+                                        <span className="inline-flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400">
                                             <span className="relative flex h-2 w-2">
                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                             </span>
                                             Occupied: {tableOverview.occupied}
                                         </span>
-                                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-500/25 bg-slate-500/10 px-3 py-1.5 font-bold text-slate-300">
+                                        <span className="inline-flex items-center gap-1.5 font-bold theme-muted">
                                             Free: {freeTables}
                                         </span>
                                     </div>
-                                    <div className="flex flex-wrap items-center justify-end gap-2 text-[10px]">
+                                    <div className="flex flex-wrap items-center justify-end gap-3 text-[11px]">
                                         {TABLE_STATE_LEGEND.map((stateKey) => {
                                             const stateClass = toTableStateClassToken(stateKey);
                                             return (
                                                 <span
                                                     key={stateKey}
-                                                    className={`theme-table-legend-item state-${stateClass} inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-semibold`}
+                                                    className={`theme-table-legend-item state-${stateClass} inline-flex items-center gap-1.5 font-semibold`}
                                                 >
                                                     <span className="theme-table-legend-dot" />
                                                     {TABLE_STATE_LABELS[stateKey]}
@@ -1488,14 +1488,14 @@ export default function OwnerLayout() {
                                         </span>
 
                                         {availableGroupNames.length > 1 && (
-                                            <div className="flex flex-wrap items-center gap-1.5">
+                                            <div className="flex flex-wrap items-center gap-1.5 text-xs">
                                                 <button
                                                     type="button"
                                                     onClick={() => setActiveGroupFilter("All")}
-                                                    className={`rounded-full px-3 py-1 text-xs font-bold transition-all ${
+                                                    className={`font-bold transition-all px-2.5 py-0.5 rounded-md ${
                                                         activeGroupFilter === "All"
-                                                            ? "bg-[color:var(--app-primary)] text-white shadow-sm"
-                                                            : "theme-soft-button"
+                                                            ? "bg-[color:var(--app-primary)] text-white shadow-xs"
+                                                            : "text-[color:var(--app-muted)] hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
                                                     }`}
                                                 >
                                                     All ({tableOverview.total})
@@ -1509,10 +1509,10 @@ export default function OwnerLayout() {
                                                             key={groupName}
                                                             type="button"
                                                             onClick={() => setActiveGroupFilter(groupName)}
-                                                            className={`rounded-full px-3 py-1 text-xs font-bold transition-all ${
+                                                            className={`font-bold transition-all px-2.5 py-0.5 rounded-md ${
                                                                 isSelected
-                                                                    ? "bg-[color:var(--app-primary)] text-white shadow-sm"
-                                                                    : "theme-soft-button"
+                                                                    ? "bg-[color:var(--app-primary)] text-white shadow-xs"
+                                                                    : "text-[color:var(--app-muted)] hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
                                                             }`}
                                                         >
                                                             {groupName} ({count})
@@ -1662,12 +1662,12 @@ export default function OwnerLayout() {
                                                                 ? ` - Managed by ${assignedStaffLabel}`
                                                                 : ""
                                                         }`}
-                                                        className={`theme-table-box relative w-full aspect-square min-h-[130px] max-w-[150px] flex flex-col justify-between rounded-2xl p-3 pb-8 text-xs transition-all duration-200 shadow-md state-${tableStateClassToken} ${
+                                                        className={`theme-table-box relative w-full aspect-square min-h-[110px] max-w-[140px] flex flex-col justify-between rounded-xl p-2.5 pb-7 text-xs transition-all duration-200 state-${tableStateClassToken} ${
                                                             table.isOccupied ? "is-occupied" : ""
                                                         } ${isDropTarget ? "is-drop-target" : ""} ${
                                                             hasAnyPopoverOpen
-                                                                ? "z-[50] shadow-2xl ring-2 ring-amber-500/50 !transform-none"
-                                                                : "hover:shadow-xl hover:-translate-y-0.5 z-1"
+                                                                ? "z-[50] shadow-xl ring-2 ring-amber-500/50 !transform-none"
+                                                                : "hover:-translate-y-0.5 z-1"
                                                         }`}
                                                     >
                                                         <div className="flex h-full flex-col justify-between">
@@ -2066,31 +2066,31 @@ export default function OwnerLayout() {
                                 </div>
                             </div>
                             {isDashboardRoute && (
-                                <aside className="theme-panel rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4 shadow-sm xl:col-span-1 xl:flex xl:h-full xl:flex-col">
-                                    <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)] pb-3">
+                                <aside className="border-l border-[color:var(--app-border)]/30 pl-4 pr-1 py-1 xl:col-span-1 xl:flex xl:h-full xl:flex-col">
+                                    <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)]/50 pb-2">
                                         <div className="flex items-center gap-2">
-                                            <Globe2 size={16} className="text-amber-400" />
-                                            <p className="text-sm font-bold uppercase tracking-[0.14em]">
+                                            <Globe2 size={16} className="text-amber-500" />
+                                            <p className="text-xs font-extrabold uppercase tracking-[0.16em]">
                                                 Online Orders
                                             </p>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={() => navigate("/owner/online-orders")}
-                                            className="theme-button rounded-xl px-2.5 py-1 text-xs font-semibold"
+                                            className="theme-button rounded-lg px-2.5 py-1 text-xs font-semibold"
                                         >
                                             View all
                                         </button>
                                     </div>
-                                    <div className="mt-3 flex items-center justify-between text-xs text-[color:var(--app-muted)] font-semibold">
+                                    <div className="mt-2.5 flex items-center justify-between text-xs text-[color:var(--app-muted)] font-semibold">
                                         <span>Active Orders</span>
-                                        <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-amber-300 text-[10px] font-bold">
+                                        <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-500 text-[10px] font-bold">
                                             {stripOnlineOrders.length} active
                                         </span>
                                     </div>
-                                    <div className="mt-3 space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1">
+                                    <div className="mt-2.5 space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1">
                                         {stripOnlineOrders.length === 0 ? (
-                                            <div className="theme-table-order-row rounded-xl px-3 py-3 text-xs theme-muted text-center">
+                                            <div className="py-4 text-xs theme-muted text-center border-b border-[color:var(--app-border)]/20">
                                                 No active online orders.
                                             </div>
                                         ) : (
@@ -2108,7 +2108,7 @@ export default function OwnerLayout() {
                                                         key={`${order.tableKey}-${order.id}`}
                                                         type="button"
                                                         onClick={() => setSelectedLiveOrder(order)}
-                                                        className="theme-table-order-row block w-full rounded-2xl border border-[color:var(--app-border)] p-3 text-left transition duration-200 hover:border-amber-500/40 hover:bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_85%,#000_15%)]"
+                                                        className="theme-table-order-row block w-full rounded-xl border border-[color:var(--app-border)]/40 p-2.5 text-left transition duration-200 hover:border-amber-500/40 hover:bg-black/5 dark:hover:bg-white/5"
                                                     >
                                                         <div className="flex items-start justify-between gap-2">
                                                             <div className="min-w-0">
@@ -2128,9 +2128,9 @@ export default function OwnerLayout() {
                                                                 {status}
                                                             </span>
                                                         </div>
-                                                        <div className="mt-2 flex items-center justify-between border-t border-[color:var(--app-border)] pt-2 text-xs">
+                                                        <div className="mt-2 flex items-center justify-between border-t border-[color:var(--app-border)]/30 pt-1.5 text-xs">
                                                             <span className="theme-muted text-[10px]">Total</span>
-                                                            <span className="font-bold text-amber-400">
+                                                            <span className="font-bold text-amber-500">
                                                                 {formatReceiptAmount(getReceiptOrderTotal(order))}
                                                             </span>
                                                         </div>
