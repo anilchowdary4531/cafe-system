@@ -638,23 +638,8 @@ export default function OwnerLayout() {
         if (!match) return true;
         return access[match.accessKey];
     })();
-    const hideTableAssignmentStripOn = [
-        "/owner/menu",
-        "/owner/notifications",
-        "/owner/orders",
-        "/owner/online-orders",
-        "/owner/staff",
-        "/owner/tables",
-        "/owner/kitchen",
-        "/owner/finance",
-        "/owner/pay-later",
-        "/owner/analytics",
-        "/owner/settings",
-        "/owner/supply",
-    ];
-    const showTableAssignmentStrip = !hideTableAssignmentStripOn.some((path) =>
-        location.pathname.startsWith(path)
-    );
+    const isDashboardRoute = location.pathname === "/owner" || location.pathname === "/owner/";
+    const showTableAssignmentStrip = isDashboardRoute;
 
     useEffect(() => {
         if (!visibleNavItems.length) return;
@@ -1110,7 +1095,6 @@ export default function OwnerLayout() {
     }, [openOrdersTableKey]);
 
     const freeTables = Math.max(0, tableOverview.total - tableOverview.occupied);
-    const isDashboardRoute = location.pathname === "/owner";
 
     useEffect(() => {
         if (!restaurantId) return;

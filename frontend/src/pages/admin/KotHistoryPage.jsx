@@ -55,11 +55,13 @@ export default function KotHistoryPage() {
 
         try {
             const [kotsRes, stationsRes] = await Promise.all([
-                api.get(`/owner/${restaurantId}/kot`),
-                api.get(`/owner/${restaurantId}/kitchen-stations`),
+                api.get(`/owner/${restaurantId}/kots`).catch(() => api.get(`/owner/${restaurantId}/kot`)),
+                api.get(`/owner/${restaurantId}/stations`).catch(() => api.get(`/owner/${restaurantId}/kitchen-stations`)),
             ]);
-            setKots(kotsRes?.data?.kots || []);
-            setStations(stationsRes?.data?.stations || []);
+            const kotsData = kotsRes?.data?.kots || kotsRes?.data?.data || (Array.isArray(kotsRes?.data) ? kotsRes.data : []);
+            const stationsData = stationsRes?.data?.stations || stationsRes?.data?.data || (Array.isArray(stationsRes?.data) ? stationsRes.data : []);
+            setKots(kotsData);
+            setStations(stationsData);
         } catch (err) {
             console.error("Failed to fetch KOT history", err);
             showToast({ title: "Error", message: "Failed to load Kitchen Order Tickets.", variant: "error" });

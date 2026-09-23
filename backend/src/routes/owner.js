@@ -1887,20 +1887,35 @@ export default async function ownerRoutes(app, deps) {
 
   // KOT & THERMAL PRINTER ROUTES
   app.get("/owner/:restaurantId/kots", getKots);
+  app.get("/owner/:restaurantId/kot", getKots);
+  app.get("/api/owner/:restaurantId/kots", getKots);
+  app.get("/api/owner/:restaurantId/kot", getKots);
   app.get("/owner/:restaurantId/kots/workload", getWorkloadMetrics);
+  app.get("/api/owner/:restaurantId/kots/workload", getWorkloadMetrics);
   app.put("/owner/:restaurantId/kots/:kotId/status", updateKotStatusController);
+  app.put("/owner/:restaurantId/kot/:kotId/status", updateKotStatusController);
   app.put("/owner/:restaurantId/kots/:kotId/items/:itemId/status", updateKotItemStatusController);
+  app.put("/owner/:restaurantId/kot/:kotId/items/:itemId/status", updateKotItemStatusController);
   app.put("/owner/:restaurantId/kots/:kotId/priority", updateKotPriorityController);
+  app.put("/owner/:restaurantId/kot/:kotId/priority", updateKotPriorityController);
   app.post("/owner/:restaurantId/kots/:kotId/reprint", triggerReprint);
+  app.post("/owner/:restaurantId/kot/:kotId/reprint", triggerReprint);
+  app.post("/owner/:restaurantId/kots/:kotId/cancel", updateKotStatusController);
+  app.post("/owner/:restaurantId/kot/:kotId/cancel", updateKotStatusController);
 
   app.get("/owner/:restaurantId/printers", getPrinters);
+  app.get("/api/owner/:restaurantId/printers", getPrinters);
   app.post("/owner/:restaurantId/printers", createPrinter);
   app.put("/owner/:restaurantId/printers/:printerId", updatePrinter);
   app.delete("/owner/:restaurantId/printers/:printerId", deletePrinter);
   app.post("/owner/:restaurantId/printers/:printerId/test", testPrinter);
 
   app.get("/owner/:restaurantId/stations", getStations);
+  app.get("/owner/:restaurantId/kitchen-stations", getStations);
+  app.get("/api/owner/:restaurantId/stations", getStations);
+  app.get("/api/owner/:restaurantId/kitchen-stations", getStations);
   app.post("/owner/:restaurantId/stations", createStation);
+  app.post("/owner/:restaurantId/kitchen-stations", createStation);
   app.put("/owner/:restaurantId/stations/:stationId", updateStation);
 
   // ==========================================
