@@ -40,10 +40,10 @@ export default function OfflineStatusBar() {
     const hasConflict = !!syncState.conflictPayload;
 
     if (!isOffline && !isSyncing && !hasConflict && pendingCount === 0) {
-        // All normal online, small subtle indicator
+        // All normal online, small subtle button-sized badge
         return (
-            <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-[11px] font-bold text-emerald-400 border border-emerald-500/20">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-2xs m-1">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                 ONLINE
             </div>
         );
