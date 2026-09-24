@@ -45,7 +45,7 @@ const sections = [
 
 export default function Pricing() {
     return (
-        <div className="min-h-screen bg-[#f7f0e3] text-[#2f2217]" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+        <div className="min-h-screen bg-white text-[#2f2217]" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
             <main className="mx-auto max-w-4xl px-6 py-10 sm:px-10 sm:py-14 lg:px-12 lg:py-16">
                 <div className="flex items-center justify-between gap-4 text-sm">
                     <Link to="/" className="text-[#8a5b2b] transition hover:text-[#5d3c1f]">

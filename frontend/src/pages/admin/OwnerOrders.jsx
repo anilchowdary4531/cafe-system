@@ -210,7 +210,7 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
             <div
                 className={`rounded-2xl p-6 ${
                     isOnlineOrders
-                        ? "border border-orange-200 bg-[#fffaf2] text-amber-900"
+                        ? "border border-orange-200 bg-white text-amber-900"
                         : "border border-white/10 bg-[#111827] text-gray-300"
                 }`}
             >
@@ -312,10 +312,10 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
                 </div>
             )}
 
-            <div className="overflow-hidden rounded-3xl border border-orange-200/70 bg-[#fffaf2] shadow-[0_12px_30px_rgba(120,53,15,0.08)]">
+            <div className="overflow-hidden rounded-3xl border border-orange-200/70 bg-white shadow-[0_12px_30px_rgba(120,53,15,0.05)]">
                 <div className="overflow-x-auto">
                     <table className="min-w-[1100px] w-full border-collapse">
-                        <thead className="bg-[#fff3e4]">
+                        <thead className="bg-slate-50">
                             <tr className="border-b border-orange-200/80 text-[11px] uppercase tracking-[0.18em] text-amber-800">
                                 <th className="px-4 py-3 text-left font-semibold">Order ID</th>
                                 <th className="px-4 py-3 text-left font-semibold">Type</th>

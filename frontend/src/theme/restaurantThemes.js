@@ -26,8 +26,8 @@ export const restaurantThemes = [
         mood: "Authentic / Warm / Traditional",
         tone: "light",
         preview: {
-            bg: "#fff4e4",
-            surface: "#fffaf2",
+            bg: "#ffffff",
+            surface: "#ffffff",
             panel: "#5a260e",
             primary: "#f97316",
             accent: "#e0a125",
@@ -35,7 +35,7 @@ export const restaurantThemes = [
             muted: "#7c5a45",
             chart: "#dc5f1e",
         },
-        swatches: ["#5a260e", "#f97316", "#e0a125", "#fff4e4"],
+        swatches: ["#5a260e", "#f97316", "#e0a125", "#ffffff"],
     },
     {
         id: "modern-fast-conversion",
@@ -80,8 +80,8 @@ export const restaurantThemes = [
         mood: "Rustic / Earthy / Desi Vibes",
         tone: "light",
         preview: {
-            bg: "#fff2df",
-            surface: "#fff8eb",
+            bg: "#ffffff",
+            surface: "#ffffff",
             panel: "#69310f",
             primary: "#c94b12",
             accent: "#b8902f",
@@ -89,7 +89,7 @@ export const restaurantThemes = [
             muted: "#76533d",
             chart: "#c94b12",
         },
-        swatches: ["#69310f", "#c94b12", "#b8902f", "#fff2df"],
+        swatches: ["#69310f", "#c94b12", "#b8902f", "#ffffff"],
     },
 ];
 
