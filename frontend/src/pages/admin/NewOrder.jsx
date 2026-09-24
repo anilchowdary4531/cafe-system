@@ -1237,7 +1237,6 @@ export default function NewOrder() {
             <OfflineConflictModal />
             <div className="lg:min-h-screen lg:flex lg:flex-col">
                 <header className="border-b border-[color:var(--app-border)]/40">
-                    <OfflineStatusBar />
                     <div className="px-4 py-2.5 space-y-2.5">
                         <div className="grid w-full grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] lg:items-center">
                             <div className="min-w-0">
@@ -1260,29 +1259,34 @@ export default function NewOrder() {
                                 </p>
                             </div>
 
-                            <div className="flex w-full items-center gap-2 rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3.5 py-2 lg:mx-0 lg:max-w-[520px]">
-                                <Search size={18} className="theme-muted" />
-                                <input
-                                    ref={searchRef}
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Search items, categories..."
-                                    className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-muted)] sm:text-base"
-                                />
-                                {search.length > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setSearch("");
-                                            searchRef.current?.focus?.();
-                                        }}
-                                        className="theme-soft-button inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-                                        aria-label="Clear search"
-                                        title="Clear search"
-                                    >
-                                        <X size={15} />
-                                    </button>
-                                )}
+                            <div className="flex w-full items-center gap-2.5 lg:mx-0 lg:max-w-[620px]">
+                                <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3.5 py-2">
+                                    <Search size={18} className="theme-muted shrink-0" />
+                                    <input
+                                        ref={searchRef}
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        placeholder="Search items, categories..."
+                                        className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-muted)] sm:text-base"
+                                    />
+                                    {search.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSearch("");
+                                                searchRef.current?.focus?.();
+                                            }}
+                                            className="theme-soft-button inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                                            aria-label="Clear search"
+                                            title="Clear search"
+                                        >
+                                            <X size={15} />
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="shrink-0 flex items-center">
+                                    <OfflineStatusBar />
+                                </div>
                             </div>
                         </div>
 
