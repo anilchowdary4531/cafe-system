@@ -352,41 +352,41 @@ export default function OwnerInventory() {
             </div>
 
             {/* Metrics Overview */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-                <div className="rounded-2xl border border-white/10 bg-[#111827] p-4">
-                    <div className="flex items-center justify-between text-gray-400">
-                        <span className="text-xs font-semibold">Total Materials</span>
-                        <Package size={16} className="text-orange-400" />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 border-b border-[color:var(--app-border)]/40 pb-4">
+                <div className="p-2">
+                    <div className="flex items-center justify-between theme-muted">
+                        <span className="text-xs font-bold">Total Materials</span>
+                        <Package size={15} className="text-orange-500" />
                     </div>
-                    <p className="mt-2 text-2xl font-black text-white">{report?.totalMaterials || materials.length}</p>
+                    <p className="mt-1 text-2xl font-black text-[color:var(--app-text)]">{report?.totalMaterials || materials.length}</p>
                 </div>
-                <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 p-4">
-                    <div className="flex items-center justify-between text-amber-400">
-                        <span className="text-xs font-semibold">Low Stock Alert</span>
-                        <AlertTriangle size={16} />
+                <div className="p-2">
+                    <div className="flex items-center justify-between text-amber-500">
+                        <span className="text-xs font-bold">Low Stock Alert</span>
+                        <AlertTriangle size={15} />
                     </div>
-                    <p className="mt-2 text-2xl font-black text-amber-300">{report?.lowStockCount || 0}</p>
+                    <p className="mt-1 text-2xl font-black text-amber-500">{report?.lowStockCount || 0}</p>
                 </div>
-                <div className="rounded-2xl border border-red-500/30 bg-red-950/20 p-4">
-                    <div className="flex items-center justify-between text-red-400">
-                        <span className="text-xs font-semibold">Out of Stock</span>
-                        <AlertTriangle size={16} />
+                <div className="p-2">
+                    <div className="flex items-center justify-between text-red-500">
+                        <span className="text-xs font-bold">Out of Stock</span>
+                        <AlertTriangle size={15} />
                     </div>
-                    <p className="mt-2 text-2xl font-black text-red-300">{report?.outOfStockCount || 0}</p>
+                    <p className="mt-1 text-2xl font-black text-red-500">{report?.outOfStockCount || 0}</p>
                 </div>
-                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-4">
-                    <div className="flex items-center justify-between text-emerald-400">
-                        <span className="text-xs font-semibold">Inventory Valuation</span>
-                        <DollarSign size={16} />
+                <div className="p-2">
+                    <div className="flex items-center justify-between text-emerald-500">
+                        <span className="text-xs font-bold">Inventory Valuation</span>
+                        <DollarSign size={15} />
                     </div>
-                    <p className="mt-2 text-2xl font-black text-emerald-300">
+                    <p className="mt-1 text-2xl font-black text-emerald-500">
                         ₹{(report?.totalValuation || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
                     </p>
                 </div>
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-white/10 bg-[#111827] p-1.5 scrollbar-none">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-[color:var(--app-border)]/40 scrollbar-none">
                 {[
                     { id: "materials", label: "📦 Raw Materials", icon: Package },
                     { id: "recipes", label: "🍕 Recipe / BOM Studio", icon: Layers },
@@ -398,10 +398,10 @@ export default function OwnerInventory() {
                         key={tab.id}
                         type="button"
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-xs font-bold transition ${
+                        className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                             activeTab === tab.id
-                                ? "bg-orange-500 text-black shadow-lg"
-                                : "text-gray-300 hover:bg-white/5 hover:text-white"
+                                ? "bg-[color:var(--app-primary)] text-white shadow-xs"
+                                : "text-[color:var(--app-muted)] hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
                         }`}
                     >
                         {tab.label}
@@ -411,22 +411,22 @@ export default function OwnerInventory() {
 
             {/* TAB 1: RAW MATERIALS MASTER */}
             {activeTab === "materials" && (
-                <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 theme-muted" size={15} />
                             <input
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder="Search raw material name, code, or category..."
-                                className="w-full rounded-xl border border-white/10 bg-[#111827] py-2.5 pl-10 pr-4 text-xs text-white outline-none transition focus:border-orange-500/50"
+                                className="w-full rounded-xl border border-[color:var(--app-border)]/40 bg-transparent py-2 pl-9 pr-3 text-xs text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-muted)]"
                             />
                         </div>
                         <div className="flex items-center gap-2">
                             <select
                                 value={categoryFilter}
                                 onChange={(e) => setCategoryFilter(e.target.value)}
-                                className="rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-xs text-white outline-none"
+                                className="rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3 py-2 text-xs text-[color:var(--app-text)] outline-none"
                             >
                                 {CATEGORIES.map((c) => (
                                     <option key={c} value={c}>Category: {c}</option>
@@ -435,21 +435,21 @@ export default function OwnerInventory() {
                         </div>
                     </div>
 
-                    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#111827] shadow-xl">
+                    <div className="overflow-x-auto border-b border-[color:var(--app-border)]/40 pb-2">
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs">
-                                <thead className="border-b border-white/10 bg-black/40 text-gray-400 uppercase tracking-wider">
+                                <thead className="border-b border-[color:var(--app-border)]/40 theme-muted font-bold uppercase tracking-wider text-[11px]">
                                     <tr>
-                                        <th className="p-3.5">Material Name</th>
-                                        <th className="p-3.5">Category</th>
-                                        <th className="p-3.5">Current Stock</th>
-                                        <th className="p-3.5">Reorder Level</th>
-                                        <th className="p-3.5">Cost / Unit</th>
-                                        <th className="p-3.5">Status</th>
-                                        <th className="p-3.5 text-right">Actions</th>
+                                        <th className="py-2 px-3">Material Name</th>
+                                        <th className="py-2 px-3">Category</th>
+                                        <th className="py-2 px-3">Current Stock</th>
+                                        <th className="py-2 px-3">Reorder Level</th>
+                                        <th className="py-2 px-3">Cost / Unit</th>
+                                        <th className="py-2 px-3">Status</th>
+                                        <th className="py-2 px-3 text-right">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-white/5 text-gray-300">
+                                <tbody className="divide-y divide-[color:var(--app-border)]/30 text-[color:var(--app-text)]">
                                     {loading ? (
                                         <tr><td colSpan="7" className="p-6 text-center text-gray-400">Loading raw materials...</td></tr>
                                     ) : materials.length === 0 ? (

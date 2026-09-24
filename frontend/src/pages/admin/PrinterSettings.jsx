@@ -282,11 +282,11 @@ export default function PrinterSettings() {
             </div>
 
             {/* Thermal Printers Section */}
-            <div className="rounded-2xl border border-white/10 bg-[#111827] p-5">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+            <div className="pb-4">
+                <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/50 pb-3">
                     <div>
-                        <h4 className="text-lg font-bold flex items-center gap-2">
-                            <Server size={20} className="text-emerald-400" />
+                        <h4 className="text-base font-bold flex items-center gap-2">
+                            <Server size={18} className="text-emerald-500" />
                             Network ESC/POS Printers ({printers.length})
                         </h4>
                         <p className="theme-muted text-xs">Direct TCP socket printing over LAN without third-party drivers.</p>
@@ -298,55 +298,55 @@ export default function PrinterSettings() {
                         <LoaderCircle size={18} className="animate-spin" /> Loading thermal printers...
                     </div>
                 ) : printers.length === 0 ? (
-                    <div className="py-12 text-center rounded-xl border border-dashed border-white/10 my-4 p-6">
-                        <Printer size={40} className="mx-auto theme-muted mb-2 opacity-50" />
+                    <div className="py-10 text-center rounded-xl border border-dashed border-[color:var(--app-border)]/40 my-3 p-5">
+                        <Printer size={36} className="mx-auto theme-muted mb-2 opacity-50" />
                         <p className="font-semibold text-sm">No thermal printers configured</p>
                         <p className="theme-muted text-xs mt-1">Add your kitchen network printer IP address (e.g. 192.168.1.100)</p>
                         <button
                             type="button"
                             onClick={openNewPrinter}
-                            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-orange-500/20 text-orange-400 px-4 py-2 text-xs font-semibold hover:bg-orange-500/30"
+                            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-orange-500/15 text-orange-500 px-3.5 py-1.5 text-xs font-bold hover:bg-orange-500/25"
                         >
                             <Plus size={14} /> Add First Printer
                         </button>
                     </div>
                 ) : (
-                    <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                         {printers.map((p) => (
                             <div
                                 key={p.id}
-                                className="rounded-xl border border-white/10 bg-[#0f172a] p-4 flex flex-col justify-between space-y-3"
+                                className="rounded-xl border border-[color:var(--app-border)]/40 p-3 flex flex-col justify-between space-y-2.5 transition hover:bg-black/5 dark:hover:bg-white/5"
                             >
                                 <div className="space-y-1">
                                     <div className="flex items-start justify-between">
-                                        <h5 className="font-bold text-base flex items-center gap-2">
+                                        <h5 className="font-bold text-sm flex items-center gap-2">
                                             {p.name}
                                             {p.isDefault && (
-                                                <span className="rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 font-semibold">
+                                                <span className="rounded-full bg-emerald-500/20 text-emerald-500 text-[10px] px-2 py-0.5 font-semibold">
                                                     Default
                                                 </span>
                                             )}
                                         </h5>
-                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${p.isActive ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"}`}>
+                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${p.isActive ? "bg-emerald-500/20 text-emerald-500" : "bg-red-500/20 text-red-500"}`}>
                                             {p.isActive ? "Active" : "Disabled"}
                                         </span>
                                     </div>
                                     <div className="theme-muted text-xs flex items-center gap-2">
-                                        <Wifi size={13} className="text-sky-400" />
+                                        <Wifi size={13} className="text-sky-500" />
                                         <code>{p.ipAddress}:{p.port || 9100}</code>
                                     </div>
                                     <div className="theme-muted text-xs flex items-center gap-2">
-                                        <FileText size={13} className="text-amber-400" />
+                                        <FileText size={13} className="text-amber-500" />
                                         <span>Paper Size: <strong>{p.paperWidth}mm</strong></span>
                                     </div>
                                 </div>
 
-                                <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
+                                <div className="pt-2 border-t border-[color:var(--app-border)]/30 flex items-center justify-between gap-2">
                                     <button
                                         type="button"
                                         onClick={() => handleTestPrinter(p.id)}
                                         disabled={testingPrinterId === p.id}
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500/20 text-sky-300 px-3 py-1.5 text-xs font-semibold hover:bg-sky-500/30 disabled:opacity-50"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500/15 text-sky-500 px-2.5 py-1 text-xs font-semibold hover:bg-sky-500/25 disabled:opacity-50"
                                     >
                                         {testingPrinterId === p.id ? (
                                             <LoaderCircle size={13} className="animate-spin" />
@@ -360,18 +360,18 @@ export default function PrinterSettings() {
                                         <button
                                             type="button"
                                             onClick={() => openEditPrinter(p)}
-                                            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300"
+                                            className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 theme-muted"
                                             title="Edit Printer"
                                         >
-                                            <Edit3 size={15} />
+                                            <Edit3 size={14} />
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => handleDeletePrinter(p.id)}
-                                            className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400"
+                                            className="p-1 rounded-md hover:bg-red-500/20 text-red-400"
                                             title="Delete Printer"
                                         >
-                                            <Trash2 size={15} />
+                                            <Trash2 size={14} />
                                         </button>
                                     </div>
                                 </div>
@@ -382,11 +382,11 @@ export default function PrinterSettings() {
             </div>
 
             {/* Kitchen Stations Section */}
-            <div className="rounded-2xl border border-white/10 bg-[#111827] p-5">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+            <div className="pt-2">
+                <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/50 pb-3">
                     <div>
-                        <h4 className="text-lg font-bold flex items-center gap-2">
-                            <Utensils size={20} className="text-orange-400" />
+                        <h4 className="text-base font-bold flex items-center gap-2">
+                            <Utensils size={18} className="text-orange-500" />
                             Kitchen Stations ({stations.length})
                         </h4>
                         <p className="theme-muted text-xs">Category & Item routing rules for distinct prep areas (e.g. Main Kitchen, Bar, Tandoor).</p>
@@ -394,29 +394,29 @@ export default function PrinterSettings() {
                     <button
                         type="button"
                         onClick={openNewStation}
-                        className="inline-flex items-center gap-2 rounded-xl bg-orange-500/20 text-orange-400 px-3.5 py-2 text-xs font-semibold hover:bg-orange-500/30"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500/15 text-orange-500 px-3 py-1.5 text-xs font-semibold hover:bg-orange-500/25"
                     >
-                        <Plus size={16} /> Add Station
+                        <Plus size={15} /> Add Station
                     </button>
                 </div>
 
                 {loading ? (
                     <div className="py-6 text-center theme-muted text-sm">Loading stations...</div>
                 ) : stations.length === 0 ? (
-                    <div className="py-8 text-center rounded-xl border border-dashed border-white/10 my-4 p-4 text-sm theme-muted">
+                    <div className="py-6 text-center rounded-xl border border-dashed border-[color:var(--app-border)]/40 my-3 p-4 text-xs theme-muted">
                         No custom kitchen stations added yet. Defaults to <strong>Main Kitchen</strong>.
                     </div>
                 ) : (
-                    <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                         {stations.map((st) => (
                             <div
                                 key={st.id}
-                                className="rounded-xl border border-white/10 bg-[#0f172a] p-4 flex flex-col justify-between space-y-3"
+                                className="rounded-xl border border-[color:var(--app-border)]/40 p-3 flex flex-col justify-between space-y-2.5 transition hover:bg-black/5 dark:hover:bg-white/5"
                             >
                                 <div>
                                     <div className="flex items-center justify-between">
-                                        <h5 className="font-bold text-base text-white">{st.name}</h5>
-                                        <span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-mono text-slate-300">
+                                        <h5 className="font-bold text-sm text-[color:var(--app-text)]">{st.name}</h5>
+                                        <span className="rounded-md bg-black/5 dark:bg-white/10 px-2 py-0.5 text-[10px] font-mono theme-muted">
                                             {st.code || "STD"}
                                         </span>
                                     </div>
@@ -430,7 +430,7 @@ export default function PrinterSettings() {
                                     </p>
                                 </div>
 
-                                <div className="pt-2 border-t border-white/10 flex items-center justify-end gap-1">
+                                <div className="pt-2 border-t border-[color:var(--app-border)]/30 flex items-center justify-end gap-1">
                                     <button
                                         type="button"
                                         onClick={() => openEditStation(st)}

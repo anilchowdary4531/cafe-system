@@ -168,8 +168,8 @@ export default function KotHistoryPage() {
             </div>
 
             {/* Filter Bar */}
-            <div className="rounded-2xl border border-white/10 bg-[#111827] p-4 space-y-3">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center justify-between">
+            <div className="pb-2 space-y-2.5 border-b border-[color:var(--app-border)]/40">
+                <div className="flex flex-col gap-2.5 md:flex-row md:items-center justify-between">
                     {/* Status Pills */}
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
                         {KOT_STATUSES.map((st) => (
@@ -177,10 +177,10 @@ export default function KotHistoryPage() {
                                 key={st}
                                 type="button"
                                 onClick={() => setSelectedStatus(st)}
-                                className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+                                className={`rounded-lg px-3 py-1 text-xs font-bold whitespace-nowrap transition-colors ${
                                     selectedStatus === st
-                                        ? "bg-orange-500 text-black"
-                                        : "bg-white/5 text-slate-300 hover:bg-white/10"
+                                        ? "bg-[color:var(--app-primary)] text-white"
+                                        : "theme-muted hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
                                 }`}
                             >
                                 {st}
@@ -189,12 +189,12 @@ export default function KotHistoryPage() {
                     </div>
 
                     {/* Station Selector */}
-                    <div className="flex items-center gap-2">
-                        <SlidersHorizontal size={15} className="theme-muted" />
+                    <div className="flex items-center gap-2 text-xs">
+                        <SlidersHorizontal size={14} className="theme-muted" />
                         <select
                             value={selectedStation}
                             onChange={(e) => setSelectedStation(e.target.value)}
-                            className="rounded-xl border border-white/10 bg-[#0f172a] px-3 py-1.5 text-xs text-slate-300 outline-none focus:border-orange-500"
+                            className="rounded-lg border border-[color:var(--app-border)]/40 bg-transparent px-2.5 py-1 text-xs text-[color:var(--app-text)] outline-none focus:border-orange-500"
                         >
                             <option value="ALL">All Stations</option>
                             <option value="UNASSIGNED">Default Main Kitchen</option>
@@ -208,14 +208,14 @@ export default function KotHistoryPage() {
                 </div>
 
                 {/* Search Field */}
-                <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0f172a] px-3.5 py-2">
+                <div className="flex items-center gap-2 rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3.5 py-1.5">
                     <Search size={16} className="theme-muted" />
                     <input
                         type="text"
                         placeholder="Search KOT number (e.g. KOT-101), Order #, Table #, or Item..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-transparent text-sm outline-none"
+                        className="w-full bg-transparent text-xs sm:text-sm text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-muted)]"
                     />
                 </div>
             </div>
@@ -226,13 +226,13 @@ export default function KotHistoryPage() {
                     <LoaderCircle size={20} className="animate-spin" /> Loading Kitchen Order Tickets...
                 </div>
             ) : filteredKots.length === 0 ? (
-                <div className="py-16 text-center rounded-2xl border border-dashed border-white/10 bg-[#111827] p-8">
-                    <Utensils size={40} className="mx-auto theme-muted mb-2 opacity-40" />
-                    <p className="font-bold text-base">No Kitchen Order Tickets found</p>
+                <div className="py-14 text-center rounded-xl border border-dashed border-[color:var(--app-border)]/40 p-6 my-2">
+                    <Utensils size={36} className="mx-auto theme-muted mb-2 opacity-40" />
+                    <p className="font-bold text-sm">No Kitchen Order Tickets found</p>
                     <p className="theme-muted text-xs mt-1">Try resetting filters or search criteria.</p>
                 </div>
             ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                     {filteredKots.map((kot) => {
                         const tableNo = kot.order?.tableNo || "-";
                         const orderNo = kot.order?.orderNo || `#${kot.orderId}`;
@@ -241,18 +241,18 @@ export default function KotHistoryPage() {
                         return (
                             <div
                                 key={kot.id}
-                                className="rounded-2xl border border-white/10 bg-[#111827] p-4 flex flex-col justify-between space-y-3"
+                                className="rounded-xl border border-[color:var(--app-border)]/40 p-3.5 flex flex-col justify-between space-y-2.5 transition hover:bg-black/5 dark:hover:bg-white/5"
                             >
                                 <div>
                                     {/* Ticket Header */}
-                                    <div className="flex items-start justify-between border-b border-white/10 pb-2.5">
+                                    <div className="flex items-start justify-between border-b border-[color:var(--app-border)]/30 pb-2">
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <h4 className="font-bold text-lg text-orange-400 font-mono">
+                                                <h4 className="font-bold text-base text-orange-500 font-mono">
                                                     {kot.kotNumber}
                                                 </h4>
                                                 {kot.reprintCount > 0 && (
-                                                    <span className="rounded-md bg-amber-500/20 text-amber-300 text-[10px] px-1.5 py-0.5 font-bold">
+                                                    <span className="rounded-md bg-amber-500/20 text-amber-500 text-[10px] px-1.5 py-0.5 font-bold">
                                                         Reprinted x{kot.reprintCount}
                                                     </span>
                                                 )}
@@ -263,7 +263,7 @@ export default function KotHistoryPage() {
                                         </div>
 
                                         <div className="text-right">
-                                            <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${statusBadgeClass(kot.status)}`}>
+                                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold border ${statusBadgeClass(kot.status)}`}>
                                                 {kot.status}
                                             </span>
                                             <p className="theme-muted text-[11px] mt-1 flex items-center justify-end gap-1">
@@ -273,17 +273,17 @@ export default function KotHistoryPage() {
                                     </div>
 
                                     {/* Station & Thermal Print Status */}
-                                    <div className="py-2 flex items-center justify-between text-xs border-b border-white/5">
+                                    <div className="py-1.5 flex items-center justify-between text-xs border-b border-[color:var(--app-border)]/20">
                                         <span className="theme-muted">
-                                            Station: <strong className="text-slate-200">{kot.station?.name || "Main Kitchen"}</strong>
+                                            Station: <strong className="text-[color:var(--app-text)]">{kot.station?.name || "Main Kitchen"}</strong>
                                         </span>
                                         <div className="flex items-center gap-1.5">
                                             {kot.printed ? (
-                                                <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                                                <span className="text-emerald-500 font-semibold flex items-center gap-1 text-[11px]">
                                                     <CheckCircle2 size={12} /> Thermal Printed
                                                 </span>
                                             ) : (
-                                                <span className="text-red-400 font-semibold flex items-center gap-1">
+                                                <span className="text-red-500 font-semibold flex items-center gap-1 text-[11px]">
                                                     <AlertTriangle size={12} /> Print Pending/Failed
                                                 </span>
                                             )}
@@ -291,30 +291,30 @@ export default function KotHistoryPage() {
                                     </div>
 
                                     {/* Ticket Items List */}
-                                    <div className="py-2.5 space-y-2">
+                                    <div className="py-2 space-y-1.5">
                                         {kot.items.map((item) => (
                                             <div key={item.id} className="text-xs space-y-0.5">
                                                 <div className="flex items-start justify-between font-medium">
-                                                    <span className="text-slate-200">
-                                                        <strong className="text-orange-400 font-bold">{item.quantity}x</strong> {item.itemName}
+                                                    <span className="text-[color:var(--app-text)]">
+                                                        <strong className="text-orange-500 font-bold">{item.quantity}x</strong> {item.itemName}
                                                     </span>
                                                 </div>
 
                                                 {/* Variant & Modifiers Details */}
                                                 {(item.variantName || (item.modifiers && item.modifiers.length > 0)) && (
-                                                    <div className="pl-4 text-[11px] text-slate-400 space-y-0.5 border-l-2 border-orange-500/30">
+                                                    <div className="pl-3.5 text-[11px] theme-muted space-y-0.5 border-l-2 border-orange-500/40">
                                                         {item.variantName && (
-                                                            <div>Option: <span className="text-slate-300 font-medium">{item.variantName}</span></div>
+                                                            <div>Option: <span className="text-[color:var(--app-text)] font-medium">{item.variantName}</span></div>
                                                         )}
                                                         {item.modifiers && item.modifiers.map((mod, idx) => (
                                                             <div key={idx}>
-                                                                + {mod.groupName ? `${mod.groupName}: ` : ""}<span className="text-slate-300">{mod.optionName}</span>
+                                                                + {mod.groupName ? `${mod.groupName}: ` : ""}<span className="text-[color:var(--app-text)]">{mod.optionName}</span>
                                                             </div>
                                                         ))}
                                                     </div>
                                                 )}
                                                 {item.notes && (
-                                                    <p className="pl-4 text-[10px] italic text-amber-300">Note: {item.notes}</p>
+                                                    <p className="pl-3.5 text-[10px] italic text-amber-500">Note: {item.notes}</p>
                                                 )}
                                             </div>
                                         ))}
@@ -322,17 +322,17 @@ export default function KotHistoryPage() {
                                 </div>
 
                                 {/* Action Buttons */}
-                                <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
+                                <div className="pt-2 border-t border-[color:var(--app-border)]/30 flex items-center justify-between gap-2">
                                     <button
                                         type="button"
                                         onClick={() => handleReprint(kot.id)}
                                         disabled={reprintingId === kot.id}
-                                        className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500/20 text-orange-300 px-3 py-1.5 text-xs font-semibold hover:bg-orange-500/30 disabled:opacity-50"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500/15 text-orange-500 px-2.5 py-1 text-xs font-semibold hover:bg-orange-500/25 disabled:opacity-50"
                                     >
                                         {reprintingId === kot.id ? (
-                                            <LoaderCircle size={14} className="animate-spin" />
+                                            <LoaderCircle size={13} className="animate-spin" />
                                         ) : (
-                                            <Printer size={14} />
+                                            <Printer size={13} />
                                         )}
                                         Thermal Reprint
                                     </button>
@@ -342,12 +342,12 @@ export default function KotHistoryPage() {
                                             type="button"
                                             onClick={() => handleCancelKot(kot.id)}
                                             disabled={cancellingId === kot.id}
-                                            className="inline-flex items-center gap-1.5 rounded-xl bg-red-500/20 text-red-300 px-3 py-1.5 text-xs font-semibold hover:bg-red-500/30 disabled:opacity-50"
+                                            className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/15 text-red-500 px-2.5 py-1 text-xs font-semibold hover:bg-red-500/25 disabled:opacity-50"
                                         >
                                             {cancellingId === kot.id ? (
-                                                <LoaderCircle size={14} className="animate-spin" />
+                                                <LoaderCircle size={13} className="animate-spin" />
                                             ) : (
-                                                <XCircle size={14} />
+                                                <XCircle size={13} />
                                             )}
                                             Cancel KOT
                                         </button>

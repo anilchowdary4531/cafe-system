@@ -756,12 +756,12 @@ export default function MenuStudio() {
             )}
 
             {!loading && groupedItems.length > 0 && (
-                <div className="mt-5 flex flex-wrap items-center gap-2">
+                <div className="mt-4 flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--app-muted)]">Categories</span>
                     {groupedItems.map(([category, categoryItems]) => (
                         <span
                             key={category}
-                            className="theme-table-time-pill rounded-full px-3 py-1 text-xs font-semibold"
+                            className="rounded-lg bg-black/5 dark:bg-white/10 px-2.5 py-0.5 text-xs font-semibold theme-muted"
                         >
                             {category} ({categoryItems.length})
                         </span>
@@ -769,20 +769,20 @@ export default function MenuStudio() {
                 </div>
             )}
 
-            <div className="mt-6 space-y-5">
+            <div className="mt-5 space-y-4">
                 {!loading &&
                     groupedItems.map(([category, categoryItems]) => (
                         <section key={category} className="p-0">
-                            <div className="flex items-center justify-between gap-3">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--app-muted-strong)]">{category}</p>
+                            <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)]/30 pb-1">
+                                <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[color:var(--app-primary)]">{category}</p>
                                 <p className="text-xs text-[color:var(--app-muted)]">{categoryItems.length} item(s)</p>
                             </div>
 
-                            <div className="mt-3 flex gap-3 overflow-x-auto pb-1 pr-1">
+                            <div className="mt-2.5 flex gap-3 overflow-x-auto pb-1 pr-1">
                                 {categoryItems.map((item) => (
                                     <article
                                         key={item.id}
-                                        className="relative w-[230px] shrink-0 overflow-visible rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface)]"
+                                        className="relative w-[220px] shrink-0 overflow-visible rounded-xl border border-[color:var(--app-border)]/30 p-1.5 transition hover:bg-black/5 dark:hover:bg-white/5"
                                     >
                                         <div className="relative">
                                             <img

@@ -653,38 +653,38 @@ export default function OwnerPayLater() {
       </header>
 
       {/* Summary Row */}
-      <section className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-3xl border border-white/10 bg-black/10 p-6 text-left">
+      <section className="grid gap-3 sm:grid-cols-2 border-b border-[color:var(--app-border)]/40 pb-4">
+        <div className="p-2 text-left">
           <p className="theme-muted text-xs font-extrabold uppercase tracking-wider">Total Outstanding Credit</p>
-          <h3 className="mt-2 text-3xl font-extrabold text-amber-200">₹{toInr(stats.totalOutstanding)}</h3>
+          <h3 className="mt-1 text-2xl font-extrabold text-amber-500">₹{toInr(stats.totalOutstanding)}</h3>
         </div>
-        <div className="rounded-3xl border border-white/10 bg-black/10 p-6 text-left">
+        <div className="p-2 text-left">
           <p className="theme-muted text-xs font-extrabold uppercase tracking-wider">Approved Customers</p>
-          <h3 className="mt-2 text-3xl font-bold">{stats.activeCount}</h3>
+          <h3 className="mt-1 text-2xl font-bold text-[color:var(--app-text)]">{stats.activeCount}</h3>
         </div>
       </section>
 
       {/* Filtering and Search Controls */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative max-w-xs w-full">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 theme-muted" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by name or phone..."
-            className="theme-input w-full rounded-2xl pl-10 pr-4 py-2.5 text-xs outline-none text-white"
+            className="w-full rounded-xl border border-[color:var(--app-border)]/40 bg-transparent pl-9 pr-3 py-2 text-xs text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-muted)]"
           />
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {["all", "pending", "paid"].map((mode) => (
             <button
               key={mode}
               onClick={() => setFilterMode(mode)}
-              className={`rounded-xl px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border transition ${
+              className={`rounded-lg px-3 py-1 text-xs font-semibold uppercase tracking-wider transition ${
                 filterMode === mode
-                  ? "bg-white/10 border-white/20 text-white"
-                  : "border-transparent text-white/60 hover:text-white"
+                  ? "bg-[color:var(--app-primary)] text-white"
+                  : "text-[color:var(--app-muted)] hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
               }`}
             >
               {mode}
@@ -694,24 +694,24 @@ export default function OwnerPayLater() {
       </div>
 
       {/* Customers List in Table format */}
-      <section className="theme-panel rounded-[32px] p-5">
+      <section className="border-b border-[color:var(--app-border)]/40 pb-4">
         {loading ? (
-          <div className="py-12 text-center theme-muted">Loading account data...</div>
+          <div className="py-10 text-center theme-muted text-xs">Loading account data...</div>
         ) : filteredCustomers.length === 0 ? (
-          <div className="py-12 text-center theme-muted">No credit accounts match the filters.</div>
+          <div className="py-10 text-center theme-muted text-xs">No credit accounts match the filters.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
+            <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-white/5 text-[11px] font-extrabold uppercase tracking-wider text-white/40">
-                  <th className="py-3 px-4">Name</th>
-                  <th className="py-3 px-4">Phone</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Pending Balance</th>
-                  <th className="py-3 px-4 text-center">Last Transaction</th>
+                <tr className="border-b border-[color:var(--app-border)]/40 text-[11px] font-extrabold uppercase tracking-wider theme-muted">
+                  <th className="py-2.5 px-3">Name</th>
+                  <th className="py-2.5 px-3">Phone</th>
+                  <th className="py-2.5 px-3">Status</th>
+                  <th className="py-2.5 px-3 text-right">Pending Balance</th>
+                  <th className="py-2.5 px-3 text-center">Last Transaction</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-[color:var(--app-border)]/30 text-[color:var(--app-text)]">
                 {filteredCustomers.map((account) => (
                   <tr
                     key={account.id}
