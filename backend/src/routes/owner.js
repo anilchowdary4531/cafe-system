@@ -2043,7 +2043,9 @@ export default async function ownerRoutes(app, deps) {
   };
 
   app.get("/owner/:restaurantId/customers", handleGetCustomers);
+  app.get("/api/owner/:restaurantId/customers", handleGetCustomers);
   app.get("/owner/:restaurantId/crm/customers", handleGetCustomers);
+  app.get("/api/owner/:restaurantId/crm/customers", handleGetCustomers);
 
   const handleSearchCustomersAutocomplete = async (req, reply) => {
     try {
@@ -2065,7 +2067,9 @@ export default async function ownerRoutes(app, deps) {
   };
 
   app.get("/owner/:restaurantId/customers/search", handleSearchCustomersAutocomplete);
+  app.get("/api/owner/:restaurantId/customers/search", handleSearchCustomersAutocomplete);
   app.get("/owner/:restaurantId/crm/customers/search", handleSearchCustomersAutocomplete);
+  app.get("/api/owner/:restaurantId/crm/customers/search", handleSearchCustomersAutocomplete);
 
   const handleGetCustomerById = async (req, reply) => {
     try {
@@ -2081,7 +2085,9 @@ export default async function ownerRoutes(app, deps) {
   };
 
   app.get("/owner/:restaurantId/customers/:customerId", handleGetCustomerById);
+  app.get("/api/owner/:restaurantId/customers/:customerId", handleGetCustomerById);
   app.get("/owner/:restaurantId/crm/customers/:customerId", handleGetCustomerById);
+  app.get("/api/owner/:restaurantId/crm/customers/:customerId", handleGetCustomerById);
 
   const handleCreateCustomer = async (req, reply) => {
     try {
@@ -2103,7 +2109,9 @@ export default async function ownerRoutes(app, deps) {
   };
 
   app.post("/owner/:restaurantId/customers", handleCreateCustomer);
+  app.post("/api/owner/:restaurantId/customers", handleCreateCustomer);
   app.post("/owner/:restaurantId/crm/customers", handleCreateCustomer);
+  app.post("/api/owner/:restaurantId/crm/customers", handleCreateCustomer);
 
   const handleUpdateCustomer = async (req, reply) => {
     try {
@@ -2127,9 +2135,13 @@ export default async function ownerRoutes(app, deps) {
   };
 
   app.put("/owner/:restaurantId/customers/:customerId", handleUpdateCustomer);
+  app.put("/api/owner/:restaurantId/customers/:customerId", handleUpdateCustomer);
   app.put("/owner/:restaurantId/crm/customers/:customerId", handleUpdateCustomer);
+  app.put("/api/owner/:restaurantId/crm/customers/:customerId", handleUpdateCustomer);
   app.patch("/owner/:restaurantId/customers/:customerId", handleUpdateCustomer);
+  app.patch("/api/owner/:restaurantId/customers/:customerId", handleUpdateCustomer);
   app.patch("/owner/:restaurantId/crm/customers/:customerId", handleUpdateCustomer);
+  app.patch("/api/owner/:restaurantId/crm/customers/:customerId", handleUpdateCustomer);
 
   const handleMergeCustomers = async (req, reply) => {
     try {
@@ -2154,7 +2166,9 @@ export default async function ownerRoutes(app, deps) {
   };
 
   app.post("/owner/:restaurantId/customers/merge", handleMergeCustomers);
+  app.post("/api/owner/:restaurantId/customers/merge", handleMergeCustomers);
   app.post("/owner/:restaurantId/crm/customers/merge", handleMergeCustomers);
+  app.post("/api/owner/:restaurantId/crm/customers/merge", handleMergeCustomers);
 
   // Address Routes
   app.get("/owner/:restaurantId/customers/:customerId/addresses", async (req, reply) => {
