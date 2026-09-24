@@ -35,7 +35,15 @@ export default async function reportRoutes(app, deps = {}) {
 
   const getTargetRestaurantId = (req) => {
     const actor = extractActor(req);
-    return req.query.restaurantId || actor.restaurantId;
+    const id = req.query?.restaurantId || req.params?.restaurantId || actor.restaurantId || req.headers["x-restaurant-id"];
+    return id ? Number(id) : null;
+  };
+
+  const registerGet = (path, handler) => {
+    app.get(path, handler);
+    if (path.startsWith("/api/")) {
+      app.get(path.replace("/api/", "/"), handler);
+    }
   };
 
   // Helper for audit logging
@@ -59,7 +67,7 @@ export default async function reportRoutes(app, deps = {}) {
   };
 
   // 1. Sales Report
-  app.get("/api/reports/sales", async (req, reply) => {
+  registerGet("/api/reports/sales", async (req, reply) => {
     try {
       const restaurantId = getTargetRestaurantId(req);
       if (!restaurantId) return reply.status(400).send({ error: "restaurantId required" });
@@ -83,7 +91,7 @@ export default async function reportRoutes(app, deps = {}) {
   });
 
   // 2. GST / Tax Report
-  app.get("/api/reports/gst", async (req, reply) => {
+  registerGet("/api/reports/gst", async (req, reply) => {
     try {
       const restaurantId = getTargetRestaurantId(req);
       if (!restaurantId) return reply.status(400).send({ error: "restaurantId required" });
@@ -105,7 +113,7 @@ export default async function reportRoutes(app, deps = {}) {
   });
 
   // 3. Item Sales Report
-  app.get("/api/reports/items", async (req, reply) => {
+  registerGet("/api/reports/items", async (req, reply) => {
     try {
       const restaurantId = getTargetRestaurantId(req);
       if (!restaurantId) return reply.status(400).send({ error: "restaurantId required" });
@@ -129,7 +137,7 @@ export default async function reportRoutes(app, deps = {}) {
   });
 
   // 4. Category Sales Report
-  app.get("/api/reports/categories", async (req, reply) => {
+  registerGet("/api/reports/categories", async (req, reply) => {
     try {
       const restaurantId = getTargetRestaurantId(req);
       if (!restaurantId) return reply.status(400).send({ error: "restaurantId required" });
@@ -149,7 +157,7 @@ export default async function reportRoutes(app, deps = {}) {
   });
 
   // 5. Waiter / Server Report
-  app.get("/api/reports/waiters", async (req, reply) => {
+  registerGet("/api/reports/waiters", async (req, reply) => {
     try {
       const restaurantId = getTargetRestaurantId(req);
       if (!restaurantId) return reply.status(400).send({ error: "restaurantId required" });
@@ -169,7 +177,7 @@ export default async function reportRoutes(app, deps = {}) {
   });
 
   // 6. KOT Report
-  app.get("/api/reports/kots", async (req, reply) => {
+  registerGet("/api/reports/kots", async (req, reply) => {
     try {
       const restaurantId = getTargetRestaurantId(req);
       if (!restaurantId) return reply.status(400).send({ error: "restaurantId required" });
@@ -193,7 +201,7 @@ export default async function reportRoutes(app, deps = {}) {
   });
 
   // 7. Cancellation Report
-  app.get("/api/reports/cancellations", async (req, reply) => {
+  registerGet("/api/reports/cancellations", async (req, reply) => {
     try {
       const restaurantId = getTargetRestaurantId(req);
       if (!restaurantId) return reply.status(400).send({ error: "restaurantId required" });
@@ -215,7 +223,7 @@ export default async function reportRoutes(app, deps = {}) {
   });
 
   // 8. Payment Report
-  app.get("/api/reports/payments", async (req, reply) => {
+  registerGet("/api/reports/payments", async (req, reply) => {
     try {
       const restaurantId = getTargetRestaurantId(req);
       if (!restaurantId) return reply.status(400).send({ error: "restaurantId required" });
@@ -237,7 +245,7 @@ export default async function reportRoutes(app, deps = {}) {
   });
 
   // 9. Discount Report
-  app.get("/api/reports/discounts", async (req, reply) => {
+  registerGet("/api/reports/discounts", async (req, reply) => {
     try {
       const restaurantId = getTargetRestaurantId(req);
       if (!restaurantId) return reply.status(400).send({ error: "restaurantId required" });
@@ -259,7 +267,7 @@ export default async function reportRoutes(app, deps = {}) {
   });
 
   // 10. Table Report
-  app.get("/api/reports/tables", async (req, reply) => {
+  registerGet("/api/reports/tables", async (req, reply) => {
     try {
       const restaurantId = getTargetRestaurantId(req);
       if (!restaurantId) return reply.status(400).send({ error: "restaurantId required" });
@@ -281,7 +289,7 @@ export default async function reportRoutes(app, deps = {}) {
   });
 
   // 11. Shift Report
-  app.get("/api/reports/shifts", async (req, reply) => {
+  registerGet("/api/reports/shifts", async (req, reply) => {
     try {
       const restaurantId = getTargetRestaurantId(req);
       if (!restaurantId) return reply.status(400).send({ error: "restaurantId required" });
@@ -303,7 +311,7 @@ export default async function reportRoutes(app, deps = {}) {
   });
 
   // 12. Inventory Consumption Report
-  app.get("/api/reports/inventory", async (req, reply) => {
+  registerGet("/api/reports/inventory", async (req, reply) => {
     try {
       const restaurantId = getTargetRestaurantId(req);
       if (!restaurantId) return reply.status(400).send({ error: "restaurantId required" });
@@ -325,7 +333,7 @@ export default async function reportRoutes(app, deps = {}) {
   });
 
   // 13. Wastage Report
-  app.get("/api/reports/wastage", async (req, reply) => {
+  registerGet("/api/reports/wastage", async (req, reply) => {
     try {
       const restaurantId = getTargetRestaurantId(req);
       if (!restaurantId) return reply.status(400).send({ error: "restaurantId required" });
@@ -347,7 +355,7 @@ export default async function reportRoutes(app, deps = {}) {
   });
 
   // Universal Report Export Endpoint: GET /api/reports/export?type=sales&format=csv|excel|pdf
-  app.get("/api/reports/export", async (req, reply) => {
+  registerGet("/api/reports/export", async (req, reply) => {
     try {
       const actor = extractActor(req);
       const restaurantId = getTargetRestaurantId(req);
