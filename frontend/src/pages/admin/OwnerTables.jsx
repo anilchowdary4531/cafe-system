@@ -982,73 +982,73 @@ export default function OwnerTables() {
     }, [tables, activeSessions, restaurantId]);
 
     return (
-        <section>
+        <section className="space-y-4">
             <OfflineConflictModal />
             <OfflineStatusBar />
-            <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
+
+            {/* Header & Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-3">
                 <div>
                     <h3 className="text-3xl font-bold">Tables & Live Sessions</h3>
-                    <p className="mt-1 text-sm text-gray-400">
+                    <p className="mt-1 text-sm theme-muted">
                         Manage live table sessions, running KOT totals, guest counts, and share QR ordering links.
                     </p>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => {
-                        setQrStudioTable(tables[0] || null);
-                        setShowQrStudioModal(true);
-                    }}
-                    className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs rounded-xl shadow-lg transition"
-                >
-                    <span>QR Code Studio</span>
-                </button>
-            </div>
-
-            {error && (
-                <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
-                    {error}
-                </div>
-            )}
-
-            <div className="mt-5 flex w-full justify-end">
-                <div className="w-full max-w-[520px]">
-                    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_140px]">
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                         <input
                             value={newGroupName}
                             onChange={(e) => setNewGroupName(e.target.value)}
-                            placeholder="Create new table group"
-                            className="w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-2.5 outline-none transition focus:border-orange-400/40 focus:ring-2 focus:ring-orange-400/20"
+                            placeholder="New table group..."
+                            className="w-36 sm:w-44 rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3 py-2 text-xs text-[color:var(--app-text)] outline-none focus:border-orange-500 placeholder:text-[color:var(--app-muted)]"
                         />
                         <button
                             type="button"
                             onClick={createGroup}
-                            className="rounded-xl bg-orange-500 px-4 py-2.5 font-semibold text-black transition hover:bg-orange-400"
+                            className="rounded-xl bg-orange-500 px-3 py-2 text-xs font-semibold text-white hover:bg-orange-600 transition"
                         >
                             Create
                         </button>
                     </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setQrStudioTable(tables[0] || null);
+                            setShowQrStudioModal(true);
+                        }}
+                        className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs rounded-xl shadow transition"
+                    >
+                        <span>QR Code Studio</span>
+                    </button>
                 </div>
             </div>
 
-            <div className="mx-auto mt-6 flex w-full max-w-6xl flex-col gap-3 xl:flex-row xl:items-start">
-                <div className="w-full shrink-0 xl:w-[300px]">
+            {error && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300">
+                    {error}
+                </div>
+            )}
+
+            {/* Inline Table Management Toolbar (No Outer Box) */}
+            <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                <div className="w-full lg:w-60 shrink-0">
                     <input
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search table number..."
-                        className="w-full rounded-2xl border border-white/10 bg-[#111827] px-4 py-3 outline-none transition focus:border-orange-400/40 focus:ring-2 focus:ring-orange-400/20"
+                        className="w-full rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3.5 py-2 text-xs text-[color:var(--app-text)] outline-none focus:border-orange-500 placeholder:text-[color:var(--app-muted)]"
                     />
                 </div>
 
                 <form
                     onSubmit={handleSubmit}
-                    className="grid w-full flex-1 gap-3 rounded-2xl border border-white/10 bg-[#111827] p-4 md:grid-cols-[minmax(0,1.6fr)_120px_minmax(0,1.2fr)_170px_auto]"
+                    className="flex flex-wrap items-center gap-2 w-full flex-1"
                 >
                     <input
                         value={form.tableNo}
                         onChange={(e) => setForm((prev) => ({ ...prev, tableNo: e.target.value }))}
-                        placeholder="Table No (e.g., T1)"
-                        className="rounded-xl border border-white/10 bg-[#0f172a] px-3 py-2 outline-none transition focus:border-orange-400/40 focus:ring-2 focus:ring-orange-400/20"
+                        placeholder="Table No (e.g. T1)"
+                        className="w-32 rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3 py-2 text-xs text-[color:var(--app-text)] outline-none focus:border-orange-500 placeholder:text-[color:var(--app-muted)]"
                     />
                     <input
                         type="number"
@@ -1056,12 +1056,12 @@ export default function OwnerTables() {
                         value={form.seats}
                         onChange={(e) => setForm((prev) => ({ ...prev, seats: e.target.value }))}
                         placeholder="Seats"
-                        className="rounded-xl border border-white/10 bg-[#0f172a] px-3 py-2 outline-none transition focus:border-orange-400/40 focus:ring-2 focus:ring-orange-400/20"
+                        className="w-20 rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3 py-2 text-xs text-[color:var(--app-text)] outline-none focus:border-orange-500 placeholder:text-[color:var(--app-muted)]"
                     />
                     <select
                         value={form.groupName}
                         onChange={(e) => setForm((prev) => ({ ...prev, groupName: e.target.value }))}
-                        className="rounded-xl border border-white/10 bg-[#0f172a] px-3 py-2 outline-none transition focus:border-orange-400/40 focus:ring-2 focus:ring-orange-400/20"
+                        className="w-36 rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3 py-2 text-xs text-[color:var(--app-text)] outline-none focus:border-orange-500"
                     >
                         <option value="">Select group</option>
                         {groupOptions.map((group) => (
@@ -1070,7 +1070,7 @@ export default function OwnerTables() {
                             </option>
                         ))}
                     </select>
-                    <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0f172a] px-3 py-2 text-sm text-gray-300">
+                    <label className="flex items-center gap-1.5 px-2 py-2 text-xs font-medium text-[color:var(--app-text)]">
                         <input
                             type="checkbox"
                             checked={form.isActive}
@@ -1078,12 +1078,12 @@ export default function OwnerTables() {
                         />
                         Active
                     </label>
-                    <div className="flex gap-2 md:justify-end">
+                    <div className="flex items-center gap-2 sm:ml-auto">
                         {editingId && (
                             <button
                                 type="button"
                                 onClick={resetForm}
-                                className="rounded-xl border border-white/20 px-4 py-2"
+                                className="rounded-xl border border-[color:var(--app-border)]/40 px-3 py-2 text-xs text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
                             >
                                 Cancel
                             </button>
@@ -1091,7 +1091,7 @@ export default function OwnerTables() {
                         <button
                             type="submit"
                             disabled={submitting}
-                            className="rounded-xl bg-orange-500 px-4 py-2 font-semibold text-black disabled:opacity-70"
+                            className="rounded-xl bg-orange-500 px-4 py-2 text-xs font-semibold text-white hover:bg-orange-600 transition disabled:opacity-70"
                         >
                             {submitting ? "Saving..." : editingId ? "Update Table" : "Add Table"}
                         </button>
@@ -1099,17 +1099,17 @@ export default function OwnerTables() {
                 </form>
             </div>
 
-            {/* VIEW MODE SWITCHER & FLOOR PLAN TOOLBAR */}
-            <div className="mx-auto mt-4 flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#0f172a] p-3 shadow-xl">
+            {/* View Switcher Bar & Status Legend (No Outer Box Card) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-3 pt-1">
                 {/* View Mode Toggle */}
-                <div className="flex items-center gap-1 rounded-xl bg-[#111827] p-1 border border-white/10">
+                <div className="flex items-center gap-1.5">
                     <button
                         type="button"
                         onClick={() => setViewMode("FLOOR_PLAN")}
-                        className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                             viewMode === "FLOOR_PLAN"
-                                ? "bg-orange-500 text-black shadow-md"
-                                : "text-gray-300 hover:text-white"
+                                ? "bg-[color:var(--app-primary)] text-white shadow-sm"
+                                : "theme-muted hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
                         }`}
                     >
                         <span>🗺️</span> Floor Plan View
@@ -1117,38 +1117,38 @@ export default function OwnerTables() {
                     <button
                         type="button"
                         onClick={() => setViewMode("GRID")}
-                        className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                             viewMode === "GRID"
-                                ? "bg-orange-500 text-black shadow-md"
-                                : "text-gray-300 hover:text-white"
+                                ? "bg-[color:var(--app-primary)] text-white shadow-sm"
+                                : "theme-muted hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
                         }`}
                     >
                         <span>📋</span> Grid List View
                     </button>
                     <Link
                         to="/admin/reservations"
-                        className="flex items-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-400 transition hover:bg-blue-500/20"
+                        className="flex items-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-500 transition hover:bg-blue-500/20"
                     >
                         <span>📅</span> Reservations
                     </Link>
                 </div>
 
                 {/* Status Legend */}
-                <div className="hidden sm:flex items-center gap-3 text-[11px] font-semibold text-gray-300">
+                <div className="hidden sm:flex items-center gap-3 text-[11px] font-semibold theme-muted">
                     <span className="flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /> Available
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Available
                     </span>
                     <span className="flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full bg-blue-400" /> Reserved
+                        <span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> Reserved
                     </span>
                     <span className="flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full bg-amber-400 animate-pulse" /> Occupied
+                        <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" /> Occupied
                     </span>
                     <span className="flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full bg-purple-400" /> Billing
+                        <span className="h-2.5 w-2.5 rounded-full bg-purple-500" /> Billing
                     </span>
                     <span className="flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full bg-cyan-400" /> Paid
+                        <span className="h-2.5 w-2.5 rounded-full bg-cyan-500" /> Paid
                     </span>
                 </div>
 
@@ -1159,7 +1159,7 @@ export default function OwnerTables() {
                             <button
                                 type="button"
                                 onClick={handleStartEditLayout}
-                                className="flex items-center gap-1.5 rounded-xl border border-orange-500/40 bg-orange-500/10 px-3.5 py-1.5 text-xs font-bold text-orange-400 hover:bg-orange-500/20"
+                                className="flex items-center gap-1.5 rounded-xl border border-orange-500/40 bg-orange-500/10 px-3.5 py-1.5 text-xs font-bold text-orange-500 hover:bg-orange-500/20"
                             >
                                 <span>✏️</span> Edit Floor Layout
                             </button>
@@ -1176,7 +1176,7 @@ export default function OwnerTables() {
                                 <button
                                     type="button"
                                     onClick={handleCancelLayout}
-                                    className="rounded-xl border border-white/20 bg-white/5 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10"
+                                    className="rounded-xl border border-[color:var(--app-border)]/40 px-3 py-1.5 text-xs theme-muted hover:bg-black/5 dark:hover:bg-white/5"
                                 >
                                     Cancel
                                 </button>
@@ -1186,14 +1186,15 @@ export default function OwnerTables() {
                 )}
             </div>
 
-            <div className="mx-auto mt-3 flex w-full max-w-5xl flex-wrap items-center gap-2">
+            {/* Section Filter Pills */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
                 <button
                     type="button"
                     onClick={() => setActiveGroupFilter(ALL_GROUPS_FILTER)}
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
                         activeGroupFilter === ALL_GROUPS_FILTER
-                            ? "border-orange-500/70 bg-orange-500 text-black"
-                            : "border-white/10 bg-[#111827] text-gray-300 hover:border-orange-400/40"
+                            ? "bg-orange-500 text-white shadow-sm"
+                            : "border border-[color:var(--app-border)]/40 theme-muted hover:bg-black/5 dark:hover:bg-white/5"
                     }`}
                 >
                     All ({tables.length})
@@ -1203,8 +1204,8 @@ export default function OwnerTables() {
                         key={group}
                         className={`inline-flex items-center overflow-hidden rounded-full border ${
                             activeGroupFilter === group
-                                ? "border-orange-500/70"
-                                : "border-white/10"
+                                ? "border-orange-500"
+                                : "border-[color:var(--app-border)]/40"
                         }`}
                     >
                         <button
@@ -1212,8 +1213,8 @@ export default function OwnerTables() {
                             onClick={() => setActiveGroupFilter(group)}
                             className={`px-3 py-1 text-xs font-semibold transition ${
                                 activeGroupFilter === group
-                                    ? "bg-orange-500 text-black"
-                                    : "bg-[#111827] text-gray-300 hover:border-orange-400/40"
+                                    ? "bg-orange-500 text-white"
+                                    : "theme-muted hover:bg-black/5 dark:hover:bg-white/5"
                             }`}
                         >
                             {group} ({groupCounts[group] || 0})
@@ -1221,7 +1222,7 @@ export default function OwnerTables() {
                         <button
                             type="button"
                             onClick={() => deleteGroup(group)}
-                            className="border-l border-white/10 bg-[#0f172a] px-2 py-1 text-xs text-red-300 transition hover:bg-red-500/20 hover:text-red-200"
+                            className="border-l border-[color:var(--app-border)]/40 px-2 py-1 text-xs text-red-500 transition hover:bg-red-500/20"
                             aria-label={`Delete group ${group}`}
                             title={`Delete group ${group}`}
                         >
@@ -1235,31 +1236,31 @@ export default function OwnerTables() {
             {viewMode === "FLOOR_PLAN" && !loading && (
                 <div className="mx-auto mt-4 flex w-full max-w-5xl flex-col gap-3">
                     {/* Zoom & Canvas Inspector Bar */}
-                    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#0f172a] px-4 py-2 text-xs">
-                        <span className="font-semibold text-gray-300">
+                    <div className="flex items-center justify-between rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3 py-1.5 text-xs">
+                        <span className="font-semibold text-[color:var(--app-text)]">
                             {isEditingLayout ? "✏️ Drag tables to position. Click table to edit shape/rotation." : "📍 Live Spatial Floor View"}
                         </span>
                         <div className="flex items-center gap-2">
-                            <span className="text-gray-400">Zoom:</span>
+                            <span className="theme-muted">Zoom:</span>
                             <button
                                 type="button"
                                 onClick={() => setZoomLevel(prev => Math.max(0.6, prev - 0.1))}
-                                className="h-7 w-7 rounded-lg border border-white/10 bg-white/5 font-bold hover:bg-white/10"
+                                className="h-6 w-6 rounded-md border border-[color:var(--app-border)]/40 bg-transparent font-bold hover:bg-black/5 dark:hover:bg-white/5"
                             >
                                 -
                             </button>
-                            <span className="w-10 text-center font-semibold text-orange-400">{Math.round(zoomLevel * 100)}%</span>
+                            <span className="w-10 text-center font-semibold text-orange-500">{Math.round(zoomLevel * 100)}%</span>
                             <button
                                 type="button"
                                 onClick={() => setZoomLevel(prev => Math.min(1.5, prev + 0.1))}
-                                className="h-7 w-7 rounded-lg border border-white/10 bg-white/5 font-bold hover:bg-white/10"
+                                className="h-6 w-6 rounded-md border border-[color:var(--app-border)]/40 bg-transparent font-bold hover:bg-black/5 dark:hover:bg-white/5"
                             >
                                 +
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setZoomLevel(1)}
-                                className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-gray-400 hover:text-white"
+                                className="rounded-md border border-[color:var(--app-border)]/40 px-2 py-0.5 text-[11px] theme-muted hover:text-[color:var(--app-text)]"
                             >
                                 Reset
                             </button>
@@ -1486,11 +1487,11 @@ export default function OwnerTables() {
             )}
 
             {loading ? (
-                <div className="mt-6 rounded-2xl border border-white/10 bg-[#111827] p-5 text-gray-300">
+                <div className="mt-4 rounded-xl border border-[color:var(--app-border)]/40 p-5 theme-muted text-sm text-center">
                     Loading live table sessions...
                 </div>
             ) : filteredTables.length === 0 ? (
-                <div className="mt-6 flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-[#111827] p-6 text-center text-gray-300">
+                <div className="mt-4 flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[color:var(--app-border)]/40 p-6 text-center theme-muted text-sm">
                     <p>
                         {tables.length === 0
                             ? "No tables yet. Add your first table above."
@@ -1500,21 +1501,21 @@ export default function OwnerTables() {
                     </p>
                 </div>
             ) : (
-                <div className="mt-4 flex flex-col gap-3">
+                <div className="mt-3 flex flex-col gap-3">
                     {groupedTableEntries.map(([groupName, groupTables]) => {
                         const activeCount = groupTables.filter((t) => t.isActive).length;
                         return (
                             <section key={groupName} className="flex flex-col gap-2 py-0.5">
-                                <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                                <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-1.5">
                                     <div className="flex items-center gap-2.5">
-                                        <span className="text-sm font-extrabold uppercase tracking-widest text-orange-400">
+                                        <span className="text-sm font-extrabold uppercase tracking-widest text-orange-500">
                                             {groupName}
                                         </span>
-                                        <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-bold text-gray-300">
+                                        <span className="rounded-full bg-black/5 dark:bg-white/10 px-2.5 py-0.5 text-xs font-bold theme-muted">
                                             {groupTables.length} table{groupTables.length === 1 ? "" : "s"}
                                         </span>
                                     </div>
-                                    <span className="text-xs font-medium text-emerald-400">
+                                    <span className="text-xs font-medium text-emerald-500">
                                         {activeCount} active
                                     </span>
                                 </div>
@@ -1536,21 +1537,21 @@ export default function OwnerTables() {
                                         return (
                                             <article
                                                 key={table.id}
-                                                className={`relative flex flex-col justify-between rounded-2xl border p-4 transition ${
+                                                className={`relative flex flex-col justify-between rounded-xl border p-3.5 transition ${
                                                     isOccupied
-                                                        ? "border-amber-500/50 bg-gradient-to-b from-amber-500/10 to-[#0f172a]"
+                                                        ? "border-amber-500/50 bg-amber-500/5"
                                                         : isBilling
-                                                        ? "border-purple-500/50 bg-gradient-to-b from-purple-500/10 to-[#0f172a]"
+                                                        ? "border-purple-500/50 bg-purple-500/5"
                                                         : isPaid
-                                                        ? "border-cyan-500/50 bg-gradient-to-b from-cyan-500/10 to-[#0f172a]"
-                                                        : "border-white/10 bg-[#0f172a] hover:border-orange-400/30"
+                                                        ? "border-cyan-500/50 bg-cyan-500/5"
+                                                        : "border-[color:var(--app-border)]/40 hover:border-orange-500/50"
                                                 }`}
                                             >
                                                 <div className="flex items-start justify-between">
                                                     <div>
                                                         <div className="flex items-center gap-2">
                                                             <p className="text-2xl font-bold">{table.tableNo}</p>
-                                                            <span className="text-xs text-gray-400">({table.seats} seats)</span>
+                                                            <span className="text-xs theme-muted">({table.seats} seats)</span>
                                                         </div>
                                                         <select
                                                             value={tableGroup}
@@ -1561,7 +1562,7 @@ export default function OwnerTables() {
                                                                     [String(table.id)]: newGrp,
                                                                 }));
                                                             }}
-                                                            className="mt-1 rounded-lg border border-white/10 bg-[#111827] px-2 py-0.5 text-[11px] text-orange-300 outline-none"
+                                                            className="mt-1 rounded-lg border border-[color:var(--app-border)]/40 bg-transparent px-2 py-0.5 text-[11px] text-orange-500 outline-none"
                                                             title="Change Table Group"
                                                         >
                                                             {groupOptions.map((g) => (
@@ -1593,12 +1594,12 @@ export default function OwnerTables() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => toggleActionsMenu(table.id)}
-                                                                className="rounded-lg border border-white/10 px-2 py-0.5 text-lg leading-none text-gray-200 hover:bg-white/10"
+                                                                className="rounded-lg border border-[color:var(--app-border)]/40 px-2 py-0.5 text-lg leading-none theme-muted hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
                                                             >
                                                                 &#8942;
                                                             </button>
                                                             {openMenuId === table.id && (
-                                                                <div className="absolute right-0 z-30 mt-2 w-48 rounded-xl border border-white/10 bg-[#0b1220] p-1.5 shadow-2xl">
+                                                                <div className="absolute right-0 z-30 mt-2 w-48 rounded-xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)] p-1.5 shadow-xl text-[color:var(--app-text)]">
                                                                     {session && (
                                                                         <>
                                                                             <button
@@ -1820,35 +1821,35 @@ export default function OwnerTables() {
 
             {/* OPEN SESSION MODAL */}
             {openSessionTable && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <form onSubmit={handleOpenSessionSubmit} className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0f172a] p-6 shadow-2xl space-y-4">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                    <form onSubmit={handleOpenSessionSubmit} className="w-full max-w-md rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)] text-[color:var(--app-text)] p-6 shadow-2xl space-y-4">
+                        <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-3">
                             <h4 className="text-xl font-bold">Open Table {openSessionTable.tableNo}</h4>
-                            <button type="button" onClick={() => setOpenSessionTable(null)} className="text-gray-400 hover:text-white">✕</button>
+                            <button type="button" onClick={() => setOpenSessionTable(null)} className="theme-muted hover:text-[color:var(--app-text)]">✕</button>
                         </div>
                         <div>
-                            <label className="block text-xs font-semibold text-gray-300 mb-1">Number of Guests</label>
+                            <label className="block text-xs font-semibold theme-muted mb-1">Number of Guests</label>
                             <input
                                 type="number"
                                 min="1"
                                 max={openSessionTable.seats || 20}
                                 value={sessionGuestCount}
                                 onChange={(e) => setSessionGuestCount(e.target.value)}
-                                className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-2.5 text-sm outline-none focus:border-orange-400"
+                                className="w-full rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-4 py-2.5 text-sm text-[color:var(--app-text)] outline-none focus:border-orange-500"
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-semibold text-gray-300 mb-1">Server / Waiter Name (Optional)</label>
+                            <label className="block text-xs font-semibold theme-muted mb-1">Server / Waiter Name (Optional)</label>
                             <input
                                 type="text"
                                 placeholder="e.g. Ramesh"
                                 value={sessionWaiterName}
                                 onChange={(e) => setSessionWaiterName(e.target.value)}
-                                className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-2.5 text-sm outline-none focus:border-orange-400"
+                                className="w-full rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-4 py-2.5 text-sm text-[color:var(--app-text)] outline-none focus:border-orange-500"
                             />
                         </div>
                         <div className="flex gap-2 justify-end pt-2">
-                            <button type="button" onClick={() => setOpenSessionTable(null)} className="rounded-xl border border-white/20 px-4 py-2.5 text-sm">
+                            <button type="button" onClick={() => setOpenSessionTable(null)} className="rounded-xl border border-[color:var(--app-border)]/40 px-4 py-2.5 text-sm theme-muted hover:bg-black/5 dark:hover:bg-white/5">
                                 Cancel
                             </button>
                             <button type="submit" className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-500">
@@ -1861,22 +1862,22 @@ export default function OwnerTables() {
 
             {/* MOVE TABLE MODAL */}
             {moveModalTable && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <form onSubmit={handleConfirmMoveTable} className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0f172a] p-6 shadow-2xl space-y-4">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                    <form onSubmit={handleConfirmMoveTable} className="w-full max-w-md rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)] text-[color:var(--app-text)] p-6 shadow-2xl space-y-4">
+                        <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-3">
                             <h4 className="text-xl font-bold">Move Table {moveModalTable.tableNo}</h4>
-                            <button type="button" onClick={() => setMoveModalTable(null)} className="text-gray-400 hover:text-white">✕</button>
+                            <button type="button" onClick={() => setMoveModalTable(null)} className="theme-muted hover:text-[color:var(--app-text)]">✕</button>
                         </div>
-                        <p className="text-xs text-gray-300">
-                            Relocate active session from Table <strong className="text-orange-400">{moveModalTable.tableNo}</strong> to an empty table.
+                        <p className="text-xs theme-muted">
+                            Relocate active session from Table <strong className="text-orange-500">{moveModalTable.tableNo}</strong> to an empty table.
                         </p>
                         <div>
-                            <label className="block text-xs font-semibold text-gray-300 mb-1">Select Target Table</label>
+                            <label className="block text-xs font-semibold theme-muted mb-1">Select Target Table</label>
                             <select
                                 value={targetMoveTableId}
                                 onChange={(e) => setTargetMoveTableId(e.target.value)}
                                 required
-                                className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-2.5 text-sm text-white outline-none focus:border-orange-400"
+                                className="w-full rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-4 py-2.5 text-sm text-[color:var(--app-text)] outline-none focus:border-orange-500"
                             >
                                 <option value="">-- Select Empty Table --</option>
                                 {tables
@@ -1889,13 +1890,13 @@ export default function OwnerTables() {
                             </select>
                         </div>
                         <div className="flex gap-2 justify-end pt-2">
-                            <button type="button" onClick={() => setMoveModalTable(null)} className="rounded-xl border border-white/20 px-4 py-2.5 text-sm">
+                            <button type="button" onClick={() => setMoveModalTable(null)} className="rounded-xl border border-[color:var(--app-border)]/40 px-4 py-2.5 text-sm theme-muted hover:bg-black/5 dark:hover:bg-white/5">
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={submittingMove || !targetMoveTableId}
-                                className="rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-bold text-black hover:bg-orange-400 disabled:opacity-50"
+                                className="rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-600 disabled:opacity-50"
                             >
                                 {submittingMove ? "Moving..." : "Confirm Move"}
                             </button>
