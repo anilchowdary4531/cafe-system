@@ -47,11 +47,11 @@ const emptyForm = {
     isActive: true,
 };
 
-const sectionClass =
-    "theme-panel overflow-hidden rounded-[28px] border border-white/10 bg-black/10 p-5 sm:p-6";
+const sectionClass = "space-y-4 pb-6 border-b border-orange-200/60";
 const fieldLabelClass =
-    "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] theme-muted";
-const inputClass = "theme-input w-full rounded-xl px-3.5 py-2.5 text-sm outline-none";
+    "mb-1 block text-[10px] font-extrabold uppercase tracking-wider text-stone-500";
+const inputClass =
+    "w-full bg-transparent border-b border-stone-300 py-1.5 text-sm font-bold text-stone-900 placeholder:text-stone-400 outline-none focus:border-stone-800 transition";
 
 const buildLogoPreviewSources = (rawLogo) => {
     const value = String(rawLogo || "").trim();
@@ -87,20 +87,20 @@ function SectionHeader({ icon, title, subtitle, logoSrc = "" }) {
 
     return (
         <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-black/15">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-100/70 text-orange-600">
                 {logoSrc ? (
                     <img
                         src={logoSrc}
                         alt="Restaurant logo"
-                        className="h-full w-full rounded-2xl object-cover"
+                        className="h-full w-full rounded-xl object-cover"
                     />
                 ) : (
-                    <Icon size={18} className="theme-accent-text" />
+                    <Icon size={18} />
                 )}
             </span>
             <div>
-                <h3 className="text-lg font-semibold leading-tight sm:text-xl">{title}</h3>
-                <p className="theme-muted mt-1 text-xs sm:text-sm">{subtitle}</p>
+                <h3 className="text-lg font-bold leading-tight text-stone-900">{title}</h3>
+                <p className="text-xs text-stone-500 mt-0.5">{subtitle}</p>
             </div>
         </div>
     );
@@ -111,7 +111,7 @@ function Field({ label, hint, className = "", children }) {
         <label className={`block ${className}`}>
             <span className={fieldLabelClass}>{label}</span>
             {children}
-            {hint ? <span className="theme-muted mt-1 block text-xs">{hint}</span> : null}
+            {hint ? <span className="mt-1 block text-[11px] text-stone-400">{hint}</span> : null}
         </label>
     );
 }
@@ -252,9 +252,9 @@ export default function OwnerSettings() {
 
     if (loading) {
         return (
-            <div className="theme-panel rounded-[28px] border border-white/10 bg-black/10 p-6">
-                <div className="inline-flex items-center gap-2 text-sm font-semibold">
-                    <LoaderCircle size={16} className="animate-spin" />
+            <div className="py-10 text-center text-sm font-semibold text-stone-500">
+                <div className="inline-flex items-center gap-2">
+                    <LoaderCircle size={16} className="animate-spin text-orange-600" />
                     Loading settings...
                 </div>
             </div>
@@ -262,54 +262,50 @@ export default function OwnerSettings() {
     }
 
     return (
-        <section className="space-y-5 pb-5">
+        <section className="space-y-6 pb-6">
             {error && (
-                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
                     {error}
                 </div>
             )}
             {success && (
-                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">
                     {success}
                 </div>
             )}
 
-            <div className="theme-panel relative overflow-hidden rounded-[30px] border border-white/10 bg-black/10 p-5 sm:p-6">
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent_52%)]" />
-                <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            {/* Header Section - Words on Paper (No Container Box) */}
+            <div className="pb-4 border-b border-orange-200/60">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                        <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">
+                        <p className="text-[11px] font-extrabold uppercase tracking-widest text-stone-500">
                             Owner Profile
                         </p>
-                        <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
+                        <h2 className="mt-1 text-3xl font-black text-stone-900 tracking-tight">
                             Restaurant Settings
                         </h2>
-                        <p className="theme-muted mt-2 max-w-2xl text-sm">
+                        <p className="mt-1 max-w-2xl text-xs text-stone-500 font-medium">
                             Keep business details, tax setup, and billing preferences up to date.
                         </p>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2 sm:justify-end">
-                        <div className="rounded-2xl border border-white/10 bg-black/15 px-2.5 py-1.5 text-xs sm:min-w-[138px] sm:max-w-[138px]">
-                            <p className="theme-muted text-[10px] uppercase tracking-[0.14em]">Profile</p>
-                            <p className="mt-1 font-semibold leading-tight">{completionPercent}% complete</p>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-black/15 px-2.5 py-1.5 text-xs sm:min-w-[138px] sm:max-w-[138px]">
-                            <p className="theme-muted text-[10px] uppercase tracking-[0.14em]">Status</p>
-                            <p className="mt-1 font-semibold leading-tight">
-                                {Boolean(form.isActive) ? "Active restaurant" : "Inactive restaurant"}
-                            </p>
-                        </div>
+                    <div className="flex items-center gap-3">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 border border-orange-200/60 px-3 py-1 text-xs font-bold text-orange-800">
+                            Profile: {completionPercent}%
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200/60 px-3 py-1 text-xs font-bold text-emerald-800">
+                            {Boolean(form.isActive) ? "Active" : "Inactive"}
+                        </span>
                     </div>
                 </div>
-                <div className="relative mt-4 h-2 overflow-hidden rounded-full bg-black/25">
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-stone-100">
                     <div
-                        className="h-full rounded-full bg-[var(--app-primary)] transition-all"
+                        className="h-full rounded-full bg-orange-500 transition-all"
                         style={{ width: `${completionPercent}%` }}
                     />
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
                 <article className={sectionClass}>
                     <SectionHeader
                         icon={Building2}
@@ -317,7 +313,7 @@ export default function OwnerSettings() {
                         subtitle="Public profile information shown on receipts and in owner tools."
                         logoSrc={logoPreviewSrc}
                     />
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="mt-3 grid gap-4 md:grid-cols-2">
                         <Field label="Restaurant Name">
                             <input
                                 className={inputClass}
@@ -361,10 +357,10 @@ export default function OwnerSettings() {
                         </Field>
                     </div>
 
-                    <div className="mt-4 rounded-2xl border border-white/10 bg-black/15 p-4">
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="mt-4 pt-4 border-t border-stone-200/60">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="h-14 w-14 overflow-hidden rounded-2xl border border-white/15 bg-black/15">
+                                <div className="h-12 w-12 overflow-hidden rounded-xl border border-stone-200 bg-stone-50 shrink-0">
                                     {logoPreviewSrc ? (
                                         <img
                                             src={logoPreviewSrc}
@@ -374,24 +370,24 @@ export default function OwnerSettings() {
                                         />
                                     ) : (
                                         <div className="flex h-full w-full items-center justify-center">
-                                            <Upload size={20} className="theme-muted" />
+                                            <Upload size={18} className="text-stone-400" />
                                         </div>
                                     )}
                                 </div>
                                 <div>
-                                    <p className="text-sm font-semibold">Restaurant Logo</p>
-                                    <p className="theme-muted text-xs">
+                                    <p className="text-xs font-bold text-stone-900">Restaurant Logo</p>
+                                    <p className="text-[11px] text-stone-500">
                                         Recommended: square PNG/JPG/WebP/SVG
                                     </p>
                                     {logoPreviewFailed ? (
-                                        <p className="mt-1 text-xs text-amber-600">
+                                        <p className="mt-0.5 text-xs text-amber-700">
                                             Logo URL is unreachable. Re-upload or use a working URL.
                                         </p>
                                     ) : null}
                                 </div>
                             </div>
 
-                            <label className="theme-soft-button inline-flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold">
+                            <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 px-3 py-1.5 text-xs font-bold text-stone-800 transition">
                                 <Upload size={14} />
                                 {logoUploading ? "Uploading..." : "Upload New Logo"}
                                 <input
@@ -415,14 +411,14 @@ export default function OwnerSettings() {
                     </div>
                 </article>
 
-                <div className="grid gap-4 xl:grid-cols-2">
-                    <article className={`${sectionClass} h-full`}>
+                <div className="grid gap-6 lg:grid-cols-2">
+                    <article className={sectionClass}>
                         <SectionHeader
                             icon={MapPin}
                             title="Address & Identity"
                             subtitle="Used for invoices, legal records, and compliance."
                         />
-                        <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <div className="mt-3 grid gap-4 md:grid-cols-2">
                             <Field label="Address Line" className="md:col-span-2">
                                 <input
                                     className={inputClass}
@@ -473,7 +469,7 @@ export default function OwnerSettings() {
                             </Field>
                         </div>
 
-                        <div className="mt-4 border-t border-white/10 pt-4">
+                        <div className="mt-4 pt-4 border-t border-stone-200/60">
                             <MapLocationPicker
                                 latitude={form.latitude}
                                 longitude={form.longitude}
@@ -486,42 +482,42 @@ export default function OwnerSettings() {
                         </div>
                     </article>
 
-                    <article className={`${sectionClass} h-full`}>
+                    <article className={sectionClass}>
                         <SectionHeader
                             icon={ReceiptText}
                             title="Tax & Billing"
                             subtitle="Control tax mode, service charge, and invoice numbering."
                         />
 
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            <label className="theme-soft-button flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3">
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                            <label className="flex cursor-pointer items-center justify-between gap-3 border-b border-stone-200/60 py-2">
                                 <div>
-                                    <p className="text-sm font-semibold">Tax Enabled</p>
-                                    <p className="theme-muted text-xs">{taxStatusText}</p>
+                                    <p className="text-xs font-bold text-stone-900">Tax Enabled</p>
+                                    <p className="text-[11px] text-stone-500">{taxStatusText}</p>
                                 </div>
                                 <input
                                     type="checkbox"
                                     checked={Boolean(form.taxEnabled)}
                                     onChange={setChecked("taxEnabled")}
-                                    className="h-4 w-4 accent-[var(--app-primary)]"
+                                    className="h-4 w-4 accent-orange-600"
                                 />
                             </label>
 
-                            <label className="theme-soft-button flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3">
+                            <label className="flex cursor-pointer items-center justify-between gap-3 border-b border-stone-200/60 py-2">
                                 <div>
-                                    <p className="text-sm font-semibold">Service Charge</p>
-                                    <p className="theme-muted text-xs">{serviceChargeText}</p>
+                                    <p className="text-xs font-bold text-stone-900">Service Charge</p>
+                                    <p className="text-[11px] text-stone-500">{serviceChargeText}</p>
                                 </div>
                                 <input
                                     type="checkbox"
                                     checked={Boolean(form.serviceChargeEnabled)}
                                     onChange={setChecked("serviceChargeEnabled")}
-                                    className="h-4 w-4 accent-[var(--app-primary)]"
+                                    className="h-4 w-4 accent-orange-600"
                                 />
                             </label>
                         </div>
 
-                        <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <div className="mt-3 grid gap-4 md:grid-cols-2">
                             <Field label="Tax Type">
                                 <select
                                     className={inputClass}
@@ -583,7 +579,7 @@ export default function OwnerSettings() {
                         title="Operations"
                         subtitle="Core running preferences for timezone, currency, and availability."
                     />
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="mt-3 grid gap-4 md:grid-cols-2">
                         <Field label="Timezone">
                             <input
                                 className={inputClass}
@@ -600,12 +596,12 @@ export default function OwnerSettings() {
                                 onChange={setField("currency")}
                             />
                         </Field>
-                        <label className="theme-soft-button flex cursor-pointer items-center justify-between rounded-2xl px-4 py-3 md:col-span-2">
+                        <label className="flex cursor-pointer items-center justify-between border-t border-stone-200/60 pt-3 md:col-span-2">
                             <div className="flex items-center gap-2">
-                                <ShieldCheck size={16} className="theme-accent-text" />
+                                <ShieldCheck size={16} className="text-orange-600" />
                                 <div>
-                                    <p className="text-sm font-semibold">Restaurant Visibility</p>
-                                    <p className="theme-muted text-xs">
+                                    <p className="text-xs font-bold text-stone-900">Restaurant Visibility</p>
+                                    <p className="text-[11px] text-stone-500">
                                         Make this restaurant available for orders
                                     </p>
                                 </div>
@@ -614,71 +610,67 @@ export default function OwnerSettings() {
                                 type="checkbox"
                                 checked={Boolean(form.isActive)}
                                 onChange={setChecked("isActive")}
-                                className="h-4 w-4 accent-[var(--app-primary)]"
+                                className="h-4 w-4 accent-orange-600"
                             />
                         </label>
                     </div>
                 </article>
 
-                <article className="theme-panel rounded-[28px] border border-white/10 bg-black/10 p-5 sm:p-6">
+                <article className={sectionClass}>
                     <SectionHeader
                         icon={Palette}
                         title="Appearance"
                         subtitle="Choose the restaurant theme shown across staff and customer screens."
                     />
-                    <div className="relative mt-4 max-w-xl overflow-visible">
-                        <p className="theme-muted mb-2 text-sm font-semibold">UI Theme</p>
+                    <div className="mt-3 max-w-xl">
+                        <p className="text-xs font-bold text-stone-700 mb-2">UI Theme</p>
                         <ThemeSelector variant="compact" />
                     </div>
                 </article>
 
-                <article className="theme-panel overflow-hidden rounded-[28px] border border-red-500/30 bg-red-500/5 p-5 sm:p-6">
+                <article className="pb-6 border-b border-rose-200/60">
                     <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
-                            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-red-500/30 bg-red-500/10 text-red-500">
-                                <Trash2 size={18} />
+                            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+                                <Trash2 size={16} />
                             </span>
                             <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-500">Danger Zone</p>
-                                <h3 className="text-lg font-semibold text-red-500 sm:text-xl">Delete Account</h3>
-                                <p className="theme-muted mt-0.5 text-xs sm:text-sm">
+                                <p className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600">Danger Zone</p>
+                                <h3 className="text-base font-bold text-rose-800">Delete Account</h3>
+                                <p className="text-xs text-stone-500">
                                     Permanently delete your account, restaurant data, and access.
                                 </p>
                             </div>
                         </div>
                     </div>
-                    <div className="mt-4 pt-2">
+                    <div className="mt-3">
                         <Link
                             to="/delete-account"
-                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-2.5 text-sm font-semibold text-red-400 transition hover:bg-red-500/25"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3.5 py-1.5 text-xs font-bold text-rose-800 transition"
                         >
-                            <Trash2 size={16} />
+                            <Trash2 size={14} />
                             Delete Account
                         </Link>
                     </div>
                 </article>
 
-                <div className="theme-panel rounded-2xl border border-white/10 bg-black/10 p-3 sm:p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-2">
-                            <UserCircle2 size={16} className="theme-accent-text" />
-                            <p className="theme-muted text-xs sm:text-sm">
-                                Review changes before saving to keep data consistent.
-                            </p>
-                        </div>
-                        <button
-                            type="submit"
-                            disabled={saving}
-                            className="theme-button inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-70"
-                        >
-                            {saving ? (
-                                <LoaderCircle size={16} className="animate-spin" />
-                            ) : (
-                                <Save size={16} />
-                            )}
-                            Save Settings
-                        </button>
+                <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center gap-2 text-xs text-stone-500">
+                        <UserCircle2 size={16} className="text-orange-600" />
+                        <span>Review changes before saving.</span>
                     </div>
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white px-5 py-2.5 text-xs sm:text-sm font-bold shadow-sm transition disabled:opacity-70"
+                    >
+                        {saving ? (
+                            <LoaderCircle size={16} className="animate-spin" />
+                        ) : (
+                            <Save size={16} />
+                        )}
+                        Save Settings
+                    </button>
                 </div>
             </form>
         </section>
