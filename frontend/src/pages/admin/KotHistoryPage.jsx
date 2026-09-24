@@ -159,7 +159,7 @@ export default function KotHistoryPage() {
                 <button
                     type="button"
                     onClick={() => loadData({ silent: true })}
-                    className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#111827] px-4 py-2.5 text-sm font-semibold hover:bg-white/5 disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50"
                     disabled={refreshing}
                 >
                     <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
