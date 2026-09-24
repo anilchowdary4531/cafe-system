@@ -371,9 +371,9 @@ const buildBillPrintMarkup = ({ restaurantName, order } = {}) => {
 
 const CategorySidebar = memo(function CategorySidebar({ categories, activeKey, onSelect }) {
     return (
-        <aside className="theme-panel self-start rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-3 lg:sticky lg:top-4">
-            <p className="theme-muted px-2 pt-2 text-xs font-extrabold uppercase tracking-[0.24em]">Categories</p>
-            <div className="mt-2 flex max-h-[calc(100vh-180px)] flex-col gap-1 overflow-auto px-1 pb-1">
+        <aside className="self-start p-1 lg:sticky lg:top-4">
+            <p className="theme-muted px-1 pt-1 text-xs font-extrabold uppercase tracking-[0.24em]">Categories</p>
+            <div className="mt-1 flex max-h-[calc(100vh-180px)] flex-col gap-1 overflow-auto px-0.5 pb-1">
                 {categories.map((cat) => {
                     const active = cat.key === activeKey;
                     const Icon = cat.Icon;
@@ -383,13 +383,13 @@ const CategorySidebar = memo(function CategorySidebar({ categories, activeKey, o
                             type="button"
                             onClick={() => onSelect(cat.key)}
                             className={[
-                                "theme-pos-choice flex items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-semibold transition",
-                                active ? "is-active" : "",
+                                "theme-pos-choice flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-left text-xs sm:text-sm font-semibold transition",
+                                active ? "is-active bg-[color:var(--app-primary)]/15 font-bold" : "hover:bg-black/5 dark:hover:bg-white/5",
                             ].join(" ")}
                             aria-current={active ? "page" : undefined}
                         >
-                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-text)_6%,transparent)]">
-                                <Icon size={16} className="theme-pos-choice-icon" />
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/5 dark:bg-white/10">
+                                <Icon size={14} className="theme-pos-choice-icon" />
                             </span>
                             <span className="min-w-0 flex-1 truncate text-[color:var(--app-text)]">{cat.label}</span>
                             {typeof cat.count === "number" && (
@@ -411,32 +411,30 @@ const ItemCard = memo(function ItemCard({ item, qty, onAdd }) {
         <button
             type="button"
             onClick={() => onAdd(item)}
-            className="group relative overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-2.5 sm:p-3 text-left transition active:scale-[0.98] hover:bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_85%,#000_15%)] hover:shadow-md"
+            className="group relative overflow-hidden rounded-xl p-1.5 sm:p-2 text-left transition active:scale-[0.98] hover:bg-black/5 dark:hover:bg-white/5"
         >
             <img
                 src={imageSrc}
                 alt={item.name}
                 loading="lazy"
-                className="mb-2 h-20 sm:h-22 w-full rounded-xl object-cover transition duration-300 group-hover:scale-[1.02]"
+                className="mb-1.5 h-20 sm:h-22 w-full rounded-lg object-cover transition duration-300 group-hover:scale-[1.02]"
                 onError={(event) => {
                     event.currentTarget.src = FALLBACK_IMAGE;
                 }}
             />
-            <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start justify-between gap-1.5 px-0.5">
                 <div className="min-w-0">
                     <p className="truncate text-xs sm:text-sm font-bold text-[color:var(--app-text)]">{item.name}</p>
-                    <p className="theme-muted mt-0.5 truncate text-[11px] font-semibold">
+                    <p className="theme-muted mt-0.5 truncate text-[11px] font-medium">
                         {item.category || "General"} - Rs {toInr(item.price)}
                     </p>
                 </div>
                 {qty > 0 && (
-                    <span className="theme-pos-qty-badge inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-xl px-1.5 text-xs font-extrabold tabular-nums">
+                    <span className="theme-pos-qty-badge inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-lg px-1 text-[11px] font-extrabold tabular-nums">
                         {qty}
                     </span>
                 )}
             </div>
-
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/20 to-transparent opacity-0 transition group-hover:opacity-100" />
         </button>
     );
 });
@@ -471,7 +469,7 @@ const CartRow = memo(function CartRow({ item, onAdd, onSub, onRemove, onSetQty, 
     const modifiersList = Array.isArray(item?.selectedModifiers) ? item.selectedModifiers : [];
 
     return (
-        <div className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] px-3.5 py-3">
+        <div className="w-full py-2.5 px-1 border-b border-[color:var(--app-border)]/30">
             <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -1238,10 +1236,10 @@ export default function NewOrder() {
         <div className="theme-page min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_430px]">
             <OfflineConflictModal />
             <div className="lg:min-h-screen lg:flex lg:flex-col">
-                <header className="theme-nav border-b border-[color:var(--app-border)]">
+                <header className="border-b border-[color:var(--app-border)]/40">
                     <OfflineStatusBar />
-                    <div className="px-4 py-3 space-y-3">
-                        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] lg:items-center">
+                    <div className="px-4 py-2.5 space-y-2.5">
+                        <div className="grid w-full grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] lg:items-center">
                             <div className="min-w-0">
                                 <button
                                     type="button"
@@ -1252,17 +1250,17 @@ export default function NewOrder() {
                                 >
                                     <ArrowLeft size={16} />
                                 </button>
-                                <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-[color:var(--app-text)]">
+                                <h1 className="mt-1 flex items-center gap-2 text-xl sm:text-2xl font-bold text-[color:var(--app-text)]">
                                     <UtensilsCrossed size={18} className="theme-accent-text" />
                                     Billing Desk
                                 </h1>
-                                <p className="theme-muted mt-1 text-xs sm:text-sm truncate">
+                                <p className="theme-muted mt-0.5 text-xs sm:text-sm truncate">
                                     {user?.restaurant?.name || "Restaurant"} - {connected ? "Live" : "Offline"}
                                     {socketError ? ` (${socketError})` : ""}
                                 </p>
                             </div>
 
-                            <div className="theme-panel flex w-full items-center gap-2 rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] px-4 py-3 lg:mx-0 lg:max-w-[520px]">
+                            <div className="flex w-full items-center gap-2 rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3.5 py-2 lg:mx-0 lg:max-w-[520px]">
                                 <Search size={18} className="theme-muted" />
                                 <input
                                     ref={searchRef}
@@ -1289,14 +1287,14 @@ export default function NewOrder() {
                         </div>
 
                         {/* Active Bills / Tabs Section */}
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 border-t border-[color:var(--app-border)]">
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 border-t border-[color:var(--app-border)]/30">
                             <button
                                 type="button"
                                 onClick={createNewBill}
-                                className="theme-button flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold shadow-md transition hover:scale-[1.02] active:scale-[0.98]"
+                                className="theme-button flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold shadow-xs transition hover:scale-[1.02] active:scale-[0.98]"
                                 title="Create a new independent bill"
                             >
-                                <Plus size={16} />
+                                <Plus size={15} />
                                 <span>New Bill</span>
                             </button>
 
@@ -1313,12 +1311,12 @@ export default function NewOrder() {
                                             key={bill.id}
                                             onClick={() => switchBill(bill.id)}
                                             className={[
-                                                "group relative flex shrink-0 cursor-pointer items-center gap-3 rounded-2xl border px-3.5 py-2 text-xs font-semibold transition select-none",
+                                                "group relative flex shrink-0 cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition select-none",
                                                 isActive
-                                                    ? "is-active border-amber-500/60 bg-amber-500/15 text-[color:var(--app-text)] shadow-lg ring-1 ring-amber-500/30 font-bold"
+                                                    ? "is-active border-amber-500/60 bg-amber-500/15 text-[color:var(--app-text)] font-bold"
                                                     : isHeld
                                                       ? "border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
-                                                      : "border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] text-[color:var(--app-text)] hover:bg-[color:color-mix(in_srgb,var(--app-text)_6%,transparent)]",
+                                                      : "border-[color:var(--app-border)]/40 text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5",
                                             ].join(" ")}
                                         >
                                             <span
@@ -1335,15 +1333,15 @@ export default function NewOrder() {
                                             </span>
 
                                             <div className="flex flex-col min-w-0">
-                                                <span className="font-bold text-sm leading-tight flex items-center gap-1.5 text-[color:var(--app-text)]">
+                                                <span className="font-bold text-xs leading-tight flex items-center gap-1.5 text-[color:var(--app-text)]">
                                                     {bill.billNumber}
                                                     {bill.customerName && (
-                                                        <span className="text-[11px] font-normal theme-muted truncate max-w-[80px]">
+                                                        <span className="text-[10px] font-normal theme-muted truncate max-w-[80px]">
                                                             ({bill.customerName})
                                                         </span>
                                                     )}
                                                 </span>
-                                                <span className="theme-muted text-[11px] tabular-nums">
+                                                <span className="theme-muted text-[10px] tabular-nums">
                                                     {bItemCount} item{bItemCount === 1 ? "" : "s"} • Rs {toInr(bTotal)}
                                                 </span>
                                             </div>
@@ -1355,10 +1353,10 @@ export default function NewOrder() {
                                                         e.stopPropagation();
                                                         toggleHoldBill(bill.id);
                                                     }}
-                                                    className="theme-soft-button inline-flex h-6 w-6 items-center justify-center rounded-full p-0 text-[color:var(--app-muted)] hover:text-[color:var(--app-text)]"
+                                                    className="theme-soft-button inline-flex h-5 w-5 items-center justify-center rounded-full p-0 text-[color:var(--app-muted)] hover:text-[color:var(--app-text)]"
                                                     title={isHeld ? "Resume bill" : "Hold bill"}
                                                 >
-                                                    {isHeld ? <Play size={11} className="fill-current" /> : <Pause size={11} />}
+                                                    {isHeld ? <Play size={10} className="fill-current" /> : <Pause size={10} />}
                                                 </button>
 
                                                 <button
@@ -1371,10 +1369,10 @@ export default function NewOrder() {
                                                             deleteBill(bill.id);
                                                         }
                                                     }}
-                                                    className="theme-soft-button inline-flex h-6 w-6 items-center justify-center rounded-full p-0 text-[color:var(--app-muted)] hover:text-red-500 hover:bg-red-500/20"
+                                                    className="theme-soft-button inline-flex h-5 w-5 items-center justify-center rounded-full p-0 text-[color:var(--app-muted)] hover:text-red-500 hover:bg-red-500/20"
                                                     title="Close / Cancel bill"
                                                 >
-                                                    <X size={12} />
+                                                    <X size={11} />
                                                 </button>
                                             </div>
                                         </div>
@@ -1385,18 +1383,18 @@ export default function NewOrder() {
                     </div>
                 </header>
 
-                <main className="grid w-full gap-4 px-4 py-3 lg:flex-1 lg:grid-cols-[220px_minmax(0,1fr)] lg:pr-4">
+                <main className="grid w-full gap-3 px-3 py-2 sm:px-4 lg:flex-1 lg:grid-cols-[200px_minmax(0,1fr)] lg:pr-4">
                     <CategorySidebar
                         categories={categories}
                         activeKey={String(activeCategory || "ALL").toUpperCase()}
                         onSelect={setActiveCategory}
                     />
 
-                    <section className="theme-panel rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4">
-                        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                    <section className="p-1">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between border-b border-[color:var(--app-border)]/40 pb-2">
                             <div>
                                 <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Items</p>
-                                <p className="mt-1 text-lg font-bold text-[color:var(--app-text)]">Tap to add</p>
+                                <p className="mt-0.5 text-base font-bold text-[color:var(--app-text)]">Tap to add</p>
                             </div>
                             <p className="theme-muted text-xs font-semibold">
                                 {filteredMenu.length} shown | {menu.length} total
@@ -1404,12 +1402,12 @@ export default function NewOrder() {
                         </div>
 
                         {menuError && (
-                            <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                            <div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-400">
                                 {menuError}
                             </div>
                         )}
 
-                        <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 sm:gap-3">
+                        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 sm:gap-2.5">
                             {menuLoading ? (
                                 <div className="theme-muted text-sm">Loading menu...</div>
                             ) : (
@@ -1427,17 +1425,17 @@ export default function NewOrder() {
                 </main>
             </div>
 
-            <div className="lg:pl-4">
-                <aside className="theme-panel self-start rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_94%,#000_6%)] p-4 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:rounded-none">
-                    <div className="flex items-end justify-between gap-2">
+            <div className="lg:pl-2">
+                <aside className="self-start border-l border-[color:var(--app-border)]/30 pl-4 pr-1 py-1 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
+                    <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)]/50 pb-2">
                         <div>
                             <div className="flex items-center gap-2">
-                                <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.24em]">Cart</p>
-                                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500">
+                                <p className="theme-muted text-xs font-extrabold uppercase tracking-[0.2em]">Cart</p>
+                                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500">
                                     {activeBill.billNumber}
                                 </span>
                             </div>
-                            <p className="mt-1 text-lg font-bold text-[color:var(--app-text)]">
+                            <p className="mt-0.5 text-base font-bold text-[color:var(--app-text)]">
                                 {totalItems} item{totalItems === 1 ? "" : "s"}
                             </p>
                         </div>
@@ -1445,7 +1443,7 @@ export default function NewOrder() {
                     </div>
 
                     {/* Optional Customer Information with Autocomplete */}
-                    <div className="relative mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div className="relative mt-2.5 grid grid-cols-2 gap-2 text-xs">
                         <input
                             type="text"
                             placeholder="Customer Name"
@@ -1466,7 +1464,7 @@ export default function NewOrder() {
                                     setShowCustomerDropdown(false);
                                 }
                             }}
-                            className="rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] px-3 py-1.5 font-semibold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500/50"
+                            className="rounded-lg border border-[color:var(--app-border)]/40 bg-transparent px-2.5 py-1.5 font-medium text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500"
                         />
                         <input
                             type="text"
@@ -1488,7 +1486,7 @@ export default function NewOrder() {
                                     setShowCustomerDropdown(false);
                                 }
                             }}
-                            className="rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_80%,transparent)] px-3 py-1.5 font-semibold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500/50"
+                            className="rounded-lg border border-[color:var(--app-border)]/40 bg-transparent px-2.5 py-1.5 font-medium text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500"
                         />
 
                         {/* Customer Autocomplete Dropdown */}
@@ -1521,11 +1519,11 @@ export default function NewOrder() {
                         )}
                     </div>
 
-                    <div className="mt-4 flex min-h-0 flex-1 flex-col gap-1.5 overflow-auto pr-1 divide-y divide-[color:var(--app-border)]">
+                    <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-auto pr-1">
                         {cartItems.length === 0 ? (
-                            <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_50%,transparent)] p-6 text-center text-[color:var(--app-text)]">
-                                <p className="text-sm font-bold text-[color:var(--app-text)]">No items yet</p>
-                                <p className="theme-muted mt-1 text-xs">Tap items to add them to the cart.</p>
+                            <div className="py-6 text-center text-[color:var(--app-text)] border-b border-[color:var(--app-border)]/20">
+                                <p className="text-xs font-bold text-[color:var(--app-text)]">No items yet</p>
+                                <p className="theme-muted mt-0.5 text-[11px]">Tap items to add them to the cart.</p>
                             </div>
                         ) : (
                             cartItems.map((it) => (
@@ -1534,9 +1532,9 @@ export default function NewOrder() {
                         )}
                     </div>
 
-                    <div className="mt-4 shrink-0 space-y-3 border-t border-[color:var(--app-border)] pt-4">
+                    <div className="mt-2.5 shrink-0 space-y-2.5 border-t border-[color:var(--app-border)]/40 pt-2.5">
                         {/* Coupon Code Input & Applied Coupon Badge */}
-                        <div className="new-order-dividerless mt-0 rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2,var(--app-bg))_60%,transparent)] p-3 text-[color:var(--app-text)] space-y-2">
+                        <div className="new-order-dividerless mt-0 text-[color:var(--app-text)] space-y-2">
                             {appliedCoupon ? (
                                 <div className="flex items-center justify-between rounded-xl bg-amber-500/10 px-3 py-1.5 border border-amber-500/20 text-xs">
                                     <div>
