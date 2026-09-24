@@ -1055,7 +1055,7 @@ export default function NewOrder() {
             return;
         }
 
-        setCashGiven(String(subtotal));
+        setCashGiven("0");
         setShowCheckoutModal(true);
     }, [cartItems.length, orderType, placing, subtotal, tableNo]);
 
@@ -1798,10 +1798,7 @@ export default function NewOrder() {
                                 <div className="flex items-center gap-6 border-b border-stone-200/70 pb-1">
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            setPaymentMethod("CASH");
-                                            if (!cashGiven) setCashGiven(String(subtotal));
-                                        }}
+                                        onClick={() => setPaymentMethod("CASH")}
                                         className={`inline-flex items-center gap-2 border-b-2 pb-2 text-sm font-bold transition ${
                                             paymentMethod === "CASH"
                                                 ? "border-orange-600 text-orange-600"
@@ -1844,7 +1841,7 @@ export default function NewOrder() {
                                             type="number"
                                             step="any"
                                             inputMode="decimal"
-                                            placeholder={toInr(subtotal)}
+                                            placeholder="0.00"
                                             value={cashGiven}
                                             onChange={(e) => setCashGiven(e.target.value)}
                                             className="w-full bg-transparent text-right text-3xl font-black text-stone-900 outline-none tabular-nums"
