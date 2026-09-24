@@ -92,6 +92,10 @@ export const createKotsForOrder = async ({ prisma, tx = prisma, order, actor, id
 
         const { seq, kotNo } = await getNextKotNumber(tx, restaurantId);
 
+        const initialStatus = ["PREPARING", "READY", "SERVED", "DELIVERED", "CANCELLED"].includes(String(order.status || "").toUpperCase())
+            ? String(order.status).toUpperCase()
+            : "PENDING";
+
         const kot = await tx.kitchenOrderTicket.create({
             data: {
                 kotNo,
@@ -105,7 +109,7 @@ export const createKotsForOrder = async ({ prisma, tx = prisma, order, actor, id
                 waiterId: actor?.userId || null,
                 waiterName: actor?.userName || order.customerName || "Staff",
                 type: "NEW",
-                status: "PENDING",
+                status: initialStatus,
                 priority: ["NORMAL", "HIGH", "URGENT"].includes(priority) ? priority : "NORMAL",
                 estimatedPrepTimeMinutes: maxPrepTime,
                 printed: false,
@@ -122,7 +126,7 @@ export const createKotsForOrder = async ({ prisma, tx = prisma, order, actor, id
                         selectedModifiers: it.selectedModifiers || null,
                         notes: it.notes || null,
                         qty: it.qty,
-                        status: "PENDING",
+                        status: initialStatus,
                     })),
                 },
             },

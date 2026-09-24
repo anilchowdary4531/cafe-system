@@ -1,5 +1,5 @@
 import { testPrinterConnection } from "../services/escposService.js";
-import { dispatchKotPrint, reprintKot, updateKotStatus, updateKotItemStatus, updateKotPriority } from "../services/kotService.js";
+import { dispatchKotPrint, reprintKot, updateKotStatus, updateKotItemStatus, updateKotPriority, createKotsForOrder } from "../services/kotService.js";
 import prisma from "../prisma.js";
 
 /**
@@ -33,6 +33,28 @@ export const getKots = async (req, res) => {
     }
 
     const db = req.prisma || prisma;
+
+    // Auto-backfill KOT records for orders missing KOT tickets so KOT Audit Log stays in sync with Kitchen Live
+    try {
+      const unlinkedOrders = await db.order.findMany({
+        where: {
+          restaurantId,
+          kitchenTickets: { none: {} },
+        },
+        include: { items: true },
+        take: 100,
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (unlinkedOrders.length > 0) {
+        for (const order of unlinkedOrders) {
+          await createKotsForOrder({ prisma: db, order }).catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.warn("[getKots] Auto backfill warning:", e?.message);
+    }
+
     const kots = await db.kitchenOrderTicket.findMany({
       where,
       take: Math.min(200, Math.max(1, Number(limit))),
