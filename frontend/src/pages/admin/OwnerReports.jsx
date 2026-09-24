@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import {
   BarChart3,
   Calendar,
@@ -40,6 +39,8 @@ import {
   YAxis,
 } from "recharts";
 import { API } from "../../config";
+import { api } from "../../utils/apiClient";
+import { useAuth } from "../../context/AuthContext";
 
 const REPORT_TABS = [
   { id: "sales", label: "Sales", icon: ShoppingBag },
@@ -66,25 +67,33 @@ const DATE_PRESETS = [
 
 const COLORS = ["#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#06b6d4"];
 
+const formatLocalDate = (date) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export default function OwnerReports() {
+  const { user } = useAuth();
+  const restaurantId = Number(user?.restaurantId || localStorage.getItem("activeRestaurantId") || 1);
+
   const [activeTab, setActiveTab] = useState("sales");
   const [datePreset, setDatePreset] = useState("Last 7 Days");
 
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 7);
-    return d.toISOString().slice(0, 10);
+    return formatLocalDate(d);
   });
 
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [endDate, setEndDate] = useState(() => formatLocalDate(new Date()));
 
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
-
-  const token = localStorage.getItem("token");
-  const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
   const handlePresetSelect = (preset) => {
     setDatePreset(preset.label);
@@ -93,7 +102,6 @@ export default function OwnerReports() {
 
     if (preset.days === 0) {
       // Today
-      start.setHours(0, 0, 0, 0);
     } else if (preset.days === 1) {
       // Yesterday
       start.setDate(start.getDate() - 1);
@@ -102,19 +110,19 @@ export default function OwnerReports() {
       start.setDate(start.getDate() - preset.days);
     }
 
-    setStartDate(start.toISOString().slice(0, 10));
-    setEndDate(end.toISOString().slice(0, 10));
+    setStartDate(formatLocalDate(start));
+    setEndDate(formatLocalDate(end));
     setPage(1);
   };
 
   const fetchReport = async () => {
     setLoading(true);
     try {
-      let url = `${API}/reports/${activeTab}?startDate=${startDate}&endDate=${endDate}&page=${page}&limit=20`;
+      let url = `/reports/${activeTab}?restaurantId=${restaurantId}&startDate=${startDate}&endDate=${endDate}&page=${page}&limit=20`;
       if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
 
-      const res = await axios.get(url, authHeaders);
-      if (res.data?.success) {
+      const res = await api.get(url);
+      if (res.data) {
         setReportData(res.data);
       }
     } catch (err) {
@@ -126,10 +134,10 @@ export default function OwnerReports() {
 
   useEffect(() => {
     fetchReport();
-  }, [activeTab, startDate, endDate, page]);
+  }, [activeTab, startDate, endDate, page, restaurantId]);
 
   const handleExport = (format) => {
-    const url = `${API}/reports/export?type=${activeTab}&format=${format}&startDate=${startDate}&endDate=${endDate}`;
+    const url = `${API}/reports/export?type=${activeTab}&format=${format}&startDate=${startDate}&endDate=${endDate}&restaurantId=${restaurantId}`;
     window.open(url, "_blank");
   };
 
