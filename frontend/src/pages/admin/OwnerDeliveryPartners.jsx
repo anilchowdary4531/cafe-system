@@ -136,26 +136,26 @@ export default function OwnerDeliveryPartners() {
       </div>
 
       {/* Search & Stats Bar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between theme-panel rounded-2xl p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-[color:var(--app-border)]/40 pb-4">
         <div className="relative flex-1 max-w-md">
-          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 theme-muted" />
           <input
             type="text"
             placeholder="Search by driver name, phone, vehicle no..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-black/10 py-2.5 pl-10 pr-4 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="w-full bg-transparent border-b border-[color:var(--app-border)] py-2 pl-10 pr-4 text-sm text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500"
           />
         </div>
 
         <div className="flex items-center gap-4 text-xs font-semibold">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-400 border border-emerald-500/30">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-400">
             Available: {partners.filter((p) => p.status === "AVAILABLE" && p.isActive).length}
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-amber-400 border border-amber-500/30">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-amber-400">
             Busy: {partners.filter((p) => p.status === "BUSY" && p.isActive).length}
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-500/15 px-3 py-1 text-gray-400 border border-gray-500/30">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-500/15 px-3 py-1 theme-muted">
             Total: {partners.length}
           </span>
         </div>
@@ -163,14 +163,14 @@ export default function OwnerDeliveryPartners() {
 
       {/* Partners Cards / Table */}
       {loading ? (
-        <div className="theme-panel rounded-3xl p-12 text-center">
+        <div className="py-12 text-center">
           <Loader2 className="animate-spin mx-auto text-amber-500" size={32} />
           <p className="theme-muted mt-3 text-sm">Loading delivery partners...</p>
         </div>
       ) : partners.length === 0 ? (
-        <div className="theme-panel rounded-3xl p-12 text-center space-y-4">
-          <Truck size={48} className="mx-auto text-gray-500 opacity-40" />
-          <h3 className="text-lg font-bold">No delivery partners found</h3>
+        <div className="py-12 text-center space-y-4">
+          <Truck size={48} className="mx-auto theme-muted opacity-40" />
+          <h3 className="text-lg font-bold text-[color:var(--app-text)]">No delivery partners found</h3>
           <p className="theme-muted text-sm max-w-md mx-auto">
             Get started by adding your restaurant's delivery drivers or riders to assign order deliveries.
           </p>
@@ -184,7 +184,7 @@ export default function OwnerDeliveryPartners() {
           </button>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {partners.map((partner) => {
             const isAvailable = partner.status === "AVAILABLE" && partner.isActive;
             const isBusy = partner.status === "BUSY" && partner.isActive;
@@ -192,16 +192,16 @@ export default function OwnerDeliveryPartners() {
             return (
               <div
                 key={partner.id}
-                className="theme-panel rounded-3xl p-5 border border-white/10 hover:border-amber-500/40 transition flex flex-col justify-between"
+                className="py-4 border-b border-[color:var(--app-border)]/40 hover:bg-[color:var(--app-surface)]/20 transition flex flex-col justify-between space-y-4"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-lg">
+                      <div className="h-10 w-10 rounded-full bg-amber-500/15 flex items-center justify-center text-amber-500 font-bold text-base">
                         {partner.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <h3 className="font-bold text-base leading-tight">{partner.name}</h3>
+                        <h3 className="font-bold text-base leading-tight text-[color:var(--app-text)]">{partner.name}</h3>
                         <p className="theme-muted text-xs flex items-center gap-1.5 mt-0.5">
                           <Phone size={12} />
                           {partner.phone}
@@ -210,12 +210,12 @@ export default function OwnerDeliveryPartners() {
                     </div>
 
                     <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border ${
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
                         isAvailable
-                          ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                          ? "bg-emerald-500/15 text-emerald-400"
                           : isBusy
-                          ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-                          : "bg-rose-500/15 text-rose-400 border-rose-500/30"
+                          ? "bg-amber-500/15 text-amber-400"
+                          : "bg-rose-500/15 text-rose-400"
                       }`}
                     >
                       <span className={`h-1.5 w-1.5 rounded-full ${isAvailable ? "bg-emerald-400 animate-pulse" : isBusy ? "bg-amber-400" : "bg-rose-400"}`} />
@@ -223,36 +223,36 @@ export default function OwnerDeliveryPartners() {
                     </span>
                   </div>
 
-                  <div className="mt-4 space-y-2 rounded-2xl border border-white/5 bg-black/10 p-3 text-xs">
+                  <div className="mt-4 space-y-2 text-xs">
                     <div className="flex justify-between items-center">
                       <span className="theme-muted">Vehicle Type</span>
-                      <span className="font-semibold">{partner.vehicleType}</span>
+                      <span className="font-semibold text-[color:var(--app-text)]">{partner.vehicleType}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="theme-muted">Vehicle No</span>
-                      <span className="font-mono font-bold text-amber-300">{partner.vehicleNumber || "N/A"}</span>
+                      <span className="font-mono font-bold text-amber-500">{partner.vehicleNumber || "N/A"}</span>
                     </div>
                     {partner.email && (
                       <div className="flex justify-between items-center">
                         <span className="theme-muted">Email</span>
-                        <span className="truncate max-w-[160px]">{partner.email}</span>
+                        <span className="truncate max-w-[160px] text-[color:var(--app-text)]">{partner.email}</span>
                       </div>
                     )}
-                    <div className="flex justify-between items-center border-t border-white/5 pt-2">
+                    <div className="flex justify-between items-center border-t border-[color:var(--app-border)]/30 pt-2">
                       <span className="theme-muted">Active Deliveries</span>
                       <span className="font-bold text-emerald-400">{partner.activeDeliveriesCount || 0}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-5 flex items-center justify-between gap-2 border-t border-white/10 pt-3">
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-[color:var(--app-border)]/30 pt-3">
                   <button
                     type="button"
                     onClick={() => handleToggleActive(partner)}
-                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border transition ${
+                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 transition ${
                       partner.isActive
-                        ? "border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
-                        : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                        ? "text-rose-400 hover:underline"
+                        : "text-emerald-400 hover:underline"
                     }`}
                   >
                     {partner.isActive ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
@@ -262,7 +262,7 @@ export default function OwnerDeliveryPartners() {
                   <button
                     type="button"
                     onClick={() => handleOpenModal(partner)}
-                    className="theme-soft-button inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-500 hover:underline"
                   >
                     <Edit3 size={14} />
                     Edit

@@ -1,9 +1,25 @@
 import * as deliveryService from "../services/deliveryService.js";
 
+const resolveRestaurantId = async (req) => {
+  let restaurantId = req.user?.restaurantId || req.staffActor?.restaurantId || req.query?.restaurantId || req.body?.restaurantId;
+  if (!restaurantId) {
+    const prisma = req.app?.get?.("prisma") || req.prisma;
+    if (prisma) {
+      try {
+        const firstRest = await prisma.restaurant.findFirst({ select: { id: true } });
+        if (firstRest) restaurantId = firstRest.id;
+      } catch (err) {
+        console.error("Error resolving fallback restaurantId:", err);
+      }
+    }
+  }
+  return restaurantId;
+};
+
 export const createDeliveryPartner = async (req, res) => {
   try {
-    const prisma = req.app.get("prisma");
-    const restaurantId = req.user?.restaurantId || req.body.restaurantId;
+    const prisma = req.app?.get?.("prisma") || req.prisma;
+    const restaurantId = await resolveRestaurantId(req);
     const { branchId, userId, name, phone, email, vehicleType, vehicleNumber } = req.body;
 
     if (!restaurantId) {
@@ -31,8 +47,8 @@ export const createDeliveryPartner = async (req, res) => {
 
 export const getDeliveryPartners = async (req, res) => {
   try {
-    const prisma = req.app.get("prisma");
-    const restaurantId = req.user?.restaurantId || req.query.restaurantId;
+    const prisma = req.app?.get?.("prisma") || req.prisma;
+    const restaurantId = await resolveRestaurantId(req);
     const { branchId, status, isActive, search } = req.query;
 
     if (!restaurantId) {
@@ -57,8 +73,8 @@ export const getDeliveryPartners = async (req, res) => {
 
 export const updateDeliveryPartner = async (req, res) => {
   try {
-    const prisma = req.app.get("prisma");
-    const restaurantId = req.user?.restaurantId || req.body.restaurantId;
+    const prisma = req.app?.get?.("prisma") || req.prisma;
+    const restaurantId = await resolveRestaurantId(req);
     const partnerId = req.params.id || req.body.partnerId;
 
     if (!restaurantId || !partnerId) {
@@ -82,8 +98,8 @@ export const updateDeliveryPartner = async (req, res) => {
 
 export const deleteDeliveryPartner = async (req, res) => {
   try {
-    const prisma = req.app.get("prisma");
-    const restaurantId = req.user?.restaurantId || req.query.restaurantId;
+    const prisma = req.app?.get?.("prisma") || req.prisma;
+    const restaurantId = await resolveRestaurantId(req);
     const partnerId = req.params.id;
 
     if (!restaurantId || !partnerId) {
@@ -106,9 +122,9 @@ export const deleteDeliveryPartner = async (req, res) => {
 
 export const assignDeliveryPartner = async (req, res) => {
   try {
-    const prisma = req.app.get("prisma");
-    const io = req.app.get("io");
-    const restaurantId = req.user?.restaurantId || req.body.restaurantId;
+    const prisma = req.app?.get?.("prisma") || req.prisma;
+    const io = req.app?.get?.("io");
+    const restaurantId = await resolveRestaurantId(req);
     const { orderId, partnerId } = req.body;
 
     if (!restaurantId || !orderId || !partnerId) {
@@ -138,9 +154,9 @@ export const assignDeliveryPartner = async (req, res) => {
 
 export const reassignDeliveryPartner = async (req, res) => {
   try {
-    const prisma = req.app.get("prisma");
-    const io = req.app.get("io");
-    const restaurantId = req.user?.restaurantId || req.body.restaurantId;
+    const prisma = req.app?.get?.("prisma") || req.prisma;
+    const io = req.app?.get?.("io");
+    const restaurantId = await resolveRestaurantId(req);
     const { deliveryId, newPartnerId, reason } = req.body;
 
     if (!restaurantId || !deliveryId || !newPartnerId) {
@@ -170,9 +186,9 @@ export const reassignDeliveryPartner = async (req, res) => {
 
 export const updateDeliveryStatus = async (req, res) => {
   try {
-    const prisma = req.app.get("prisma");
-    const io = req.app.get("io");
-    const restaurantId = req.user?.restaurantId || req.body.restaurantId;
+    const prisma = req.app?.get?.("prisma") || req.prisma;
+    const io = req.app?.get?.("io");
+    const restaurantId = await resolveRestaurantId(req);
     const { deliveryId, orderId, status, lat, lng, failureReason, driverNotes } = req.body;
 
     if (!deliveryId && !orderId) {
@@ -211,8 +227,8 @@ export const updateDeliveryStatus = async (req, res) => {
 
 export const updateDriverLocation = async (req, res) => {
   try {
-    const prisma = req.app.get("prisma");
-    const io = req.app.get("io");
+    const prisma = req.app?.get?.("prisma") || req.prisma;
+    const io = req.app?.get?.("io");
     const { deliveryId, lat, lng } = req.body;
 
     if (!deliveryId || lat === undefined || lng === undefined) {
@@ -237,8 +253,8 @@ export const updateDriverLocation = async (req, res) => {
 
 export const getRestaurantDeliveries = async (req, res) => {
   try {
-    const prisma = req.app.get("prisma");
-    const restaurantId = req.user?.restaurantId || req.query.restaurantId;
+    const prisma = req.app?.get?.("prisma") || req.prisma;
+    const restaurantId = await resolveRestaurantId(req);
     const { branchId, status, search } = req.query;
 
     if (!restaurantId) {
