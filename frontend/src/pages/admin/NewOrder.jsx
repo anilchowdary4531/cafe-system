@@ -1731,23 +1731,23 @@ export default function NewOrder() {
 
             {/* PETPOOJA STYLE PAYMENT & CUSTOMER CHANGE CALCULATOR MODAL */}
             {showCheckoutModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 overflow-y-auto">
-                    <div className="theme-panel w-full max-w-lg rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-6 text-[color:var(--app-text)] shadow-2xl space-y-5 max-h-[92vh] flex flex-col justify-between">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+                    <div className="w-full max-w-lg rounded-3xl bg-white p-6 text-stone-900 shadow-2xl space-y-5 max-h-[92vh] flex flex-col justify-between border border-stone-100">
                         {/* Modal Header */}
-                        <div className="flex items-center justify-between pb-3 border-b border-[color:var(--app-border)]">
+                        <div className="flex items-center justify-between pb-3 border-b border-stone-200/70">
                             <div>
-                                <h3 className="text-xl font-extrabold flex items-center gap-2 text-[color:var(--app-text)]">
-                                    <Receipt size={20} className="theme-accent-text" />
+                                <h3 className="text-xl font-extrabold flex items-center gap-2 text-stone-900">
+                                    <Receipt size={20} className="text-orange-600" />
                                     Checkout & Payment
                                 </h3>
-                                <p className="theme-muted text-xs mt-0.5 font-semibold">
+                                <p className="text-xs text-stone-500 mt-0.5 font-semibold">
                                     {activeBill.billNumber} • {orderType === "DINE_IN" ? `Table ${tableNo}` : "Takeaway"}
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setShowCheckoutModal(false)}
-                                className="theme-soft-button inline-flex h-8 w-8 items-center justify-center rounded-full"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition"
                                 aria-label="Close checkout modal"
                             >
                                 <X size={16} />
@@ -1756,12 +1756,12 @@ export default function NewOrder() {
 
                         <div className="space-y-4 overflow-y-auto pr-1">
                             {/* Total Bill Section - Paper Style Header (NO BOX) */}
-                            <div className="flex items-baseline justify-between pb-3 border-b border-[color:var(--app-border)]">
+                            <div className="flex items-baseline justify-between pb-3 border-b border-stone-200/70">
                                 <div>
-                                    <span className="theme-muted text-xs uppercase font-extrabold tracking-widest">Total Payable Amount</span>
-                                    <p className="theme-muted text-xs font-semibold">{totalItems} item{totalItems === 1 ? "" : "s"} in cart</p>
+                                    <span className="text-xs uppercase font-extrabold tracking-widest text-stone-500">Total Payable Amount</span>
+                                    <p className="text-xs font-semibold text-stone-400">{totalItems} item{totalItems === 1 ? "" : "s"} in cart</p>
                                 </div>
-                                <span className="text-3xl sm:text-4xl font-black text-[color:var(--app-text)] tabular-nums">
+                                <span className="text-3xl sm:text-4xl font-black text-stone-900 tabular-nums">
                                     Rs {toInr(subtotal)}
                                 </span>
                             </div>
@@ -1769,45 +1769,44 @@ export default function NewOrder() {
                             {/* Customer Details Summary - Clean Underline Fields (NO BOXES) */}
                             <div className="grid grid-cols-2 gap-4 text-xs">
                                 <div>
-                                    <label className="theme-muted block font-extrabold uppercase text-[10px] tracking-wider mb-1">Customer Name</label>
+                                    <label className="block font-extrabold uppercase text-[10px] tracking-wider text-stone-500 mb-1">Customer Name</label>
                                     <input
                                         type="text"
                                         placeholder="Walk-in Customer"
                                         value={customerName}
                                         onChange={(e) => setCustomerName(e.target.value)}
-                                        className="w-full bg-transparent border-b border-[color:var(--app-border)] py-1.5 text-sm font-bold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-[color:var(--app-text)] transition"
+                                        className="w-full bg-transparent border-b border-stone-300 py-1.5 text-sm font-bold text-stone-900 placeholder:text-stone-400 outline-none focus:border-stone-800 transition"
                                     />
                                 </div>
                                 <div>
-                                    <label className="theme-muted block font-extrabold uppercase text-[10px] tracking-wider mb-1">Phone Number</label>
+                                    <label className="block font-extrabold uppercase text-[10px] tracking-wider text-stone-500 mb-1">Phone Number</label>
                                     <input
                                         type="text"
                                         placeholder="Optional"
                                         value={phone}
                                         onChange={(e) => setPhone(e.target.value)}
-                                        className="w-full bg-transparent border-b border-[color:var(--app-border)] py-1.5 text-sm font-bold text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-[color:var(--app-text)] transition"
+                                        className="w-full bg-transparent border-b border-stone-300 py-1.5 text-sm font-bold text-stone-900 placeholder:text-stone-400 outline-none focus:border-stone-800 transition"
                                     />
                                 </div>
                             </div>
 
-                            {/* Payment Mode Selection */}
+                            {/* Payment Mode Selection - Words on Paper Tabs (NO BOX ENCLOSURE) */}
                             <div className="pt-1">
-                                <label className="theme-muted block text-xs font-extrabold uppercase tracking-wider mb-2">
+                                <label className="block text-xs font-extrabold uppercase tracking-wider text-stone-500 mb-2">
                                     Select Payment Mode
                                 </label>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="flex items-center gap-6 border-b border-stone-200/70 pb-1">
                                     <button
                                         type="button"
                                         onClick={() => {
                                             setPaymentMethod("CASH");
                                             if (!cashGiven) setCashGiven(String(subtotal));
                                         }}
-                                        className={[
-                                            "flex items-center justify-center gap-2 rounded-2xl p-3 text-sm font-bold transition border",
+                                        className={`inline-flex items-center gap-2 border-b-2 pb-2 text-sm font-bold transition ${
                                             paymentMethod === "CASH"
-                                                ? "border-amber-500/60 bg-amber-500/15 text-[color:var(--app-text)] shadow-sm ring-1 ring-amber-500/30"
-                                                : "theme-soft-button opacity-70 hover:opacity-100",
-                                        ].join(" ")}
+                                                ? "border-orange-600 text-orange-600"
+                                                : "border-transparent text-stone-400 hover:text-stone-700"
+                                        }`}
                                     >
                                         <Banknote size={18} />
                                         <span>CASH</span>
@@ -1816,12 +1815,11 @@ export default function NewOrder() {
                                     <button
                                         type="button"
                                         onClick={() => setPaymentMethod("ONLINE")}
-                                        className={[
-                                            "flex items-center justify-center gap-2 rounded-2xl p-3 text-sm font-bold transition border",
+                                        className={`inline-flex items-center gap-2 border-b-2 pb-2 text-sm font-bold transition ${
                                             paymentMethod === "ONLINE"
-                                                ? "border-amber-500/60 bg-amber-500/15 text-[color:var(--app-text)] shadow-sm ring-1 ring-amber-500/30"
-                                                : "theme-soft-button opacity-70 hover:opacity-100",
-                                        ].join(" ")}
+                                                ? "border-orange-600 text-orange-600"
+                                                : "border-transparent text-stone-400 hover:text-stone-700"
+                                        }`}
                                     >
                                         <CreditCard size={18} />
                                         <span>ONLINE / UPI</span>
@@ -1829,19 +1827,19 @@ export default function NewOrder() {
                                 </div>
                             </div>
 
-                            {/* CASH TENDER & CHANGE RETURN CALCULATOR (NO BOXES) */}
+                            {/* CASH TENDER & CHANGE RETURN CALCULATOR (WORDS ON PAPER) */}
                             {paymentMethod === "CASH" && (
                                 <div className="space-y-3 pt-1">
                                     <div className="flex items-center justify-between">
-                                        <label className="theme-muted text-xs font-extrabold uppercase tracking-wider">
+                                        <label className="text-xs font-extrabold uppercase tracking-wider text-stone-500">
                                             Cash Received from Customer
                                         </label>
-                                        <span className="theme-muted text-xs font-semibold">Tap preset or enter amount</span>
+                                        <span className="text-xs font-semibold text-stone-400">Tap preset or enter amount</span>
                                     </div>
 
                                     {/* Clean Underline Amount Input (NO BOX) */}
-                                    <div className="flex items-center justify-between border-b-2 border-[color:var(--app-border)] pb-1.5 focus-within:border-[color:var(--app-text)] transition">
-                                        <span className="text-xl font-bold theme-muted">Rs</span>
+                                    <div className="flex items-center justify-between border-b-2 border-stone-300 pb-1.5 focus-within:border-stone-900 transition">
+                                        <span className="text-xl font-bold text-stone-400">Rs</span>
                                         <input
                                             type="number"
                                             step="any"
@@ -1849,16 +1847,16 @@ export default function NewOrder() {
                                             placeholder={toInr(subtotal)}
                                             value={cashGiven}
                                             onChange={(e) => setCashGiven(e.target.value)}
-                                            className="w-full bg-transparent text-right text-3xl font-black text-[color:var(--app-text)] outline-none tabular-nums"
+                                            className="w-full bg-transparent text-right text-3xl font-black text-stone-900 outline-none tabular-nums"
                                         />
                                     </div>
 
-                                    {/* Quick Cash Presets as Theme Buttons - NO GREEN! */}
+                                    {/* Quick Cash Presets - Soft Paper Pills (NO HEAVY BOXES) */}
                                     <div className="flex flex-wrap gap-2 pt-1">
                                         <button
                                             type="button"
                                             onClick={() => setCashGiven(String(subtotal))}
-                                            className="rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 text-xs font-extrabold shadow-sm transition"
+                                            className="rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/60 px-3 py-1.5 text-xs font-extrabold transition"
                                         >
                                             Exact (Rs {toInr(subtotal)})
                                         </button>
@@ -1867,7 +1865,7 @@ export default function NewOrder() {
                                                 key={amt}
                                                 type="button"
                                                 onClick={() => setCashGiven(String(amt))}
-                                                className="rounded-xl theme-soft-button px-3 py-1.5 text-xs font-bold"
+                                                className="rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-800 px-3 py-1.5 text-xs font-bold transition"
                                             >
                                                 Rs {amt}
                                             </button>
@@ -1876,14 +1874,14 @@ export default function NewOrder() {
                                             <button
                                                 type="button"
                                                 onClick={() => setCashGiven(String(Math.ceil(subtotal / 50) * 50))}
-                                                className="rounded-xl theme-soft-button px-3 py-1.5 text-xs font-bold"
+                                                className="rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-800 px-3 py-1.5 text-xs font-bold transition"
                                             >
                                                 Rs {Math.ceil(subtotal / 50) * 50}
                                             </button>
                                         )}
                                     </div>
 
-                                    {/* LIVE RETURN CHANGE CALCULATOR - NO BOX & NO GREEN (BLACK ONLY!) */}
+                                    {/* LIVE RETURN CHANGE CALCULATOR (WORDS ON PAPER) */}
                                     {(() => {
                                         const given = parseFloat(cashGiven) || 0;
                                         const change = given - subtotal;
@@ -1892,30 +1890,30 @@ export default function NewOrder() {
                                         if (!cashGiven) return null;
 
                                         return isEnough ? (
-                                            <div className="flex items-center justify-between pt-3 border-t border-dashed border-[color:var(--app-border)]">
+                                            <div className="flex items-center justify-between pt-3 border-t border-dashed border-stone-200">
                                                 <div>
-                                                    <span className="text-xs font-extrabold uppercase tracking-widest text-black dark:text-white block">
+                                                    <span className="text-xs font-extrabold uppercase tracking-widest text-stone-900 block">
                                                         Return Change to Customer
                                                     </span>
-                                                    <span className="text-[11px] font-semibold theme-muted">
+                                                    <span className="text-[11px] font-semibold text-stone-500">
                                                         Cash tendered: Rs {toInr(given)}
                                                     </span>
                                                 </div>
-                                                <span className="text-3xl font-black text-black dark:text-white tabular-nums">
+                                                <span className="text-3xl font-black text-stone-900 tabular-nums">
                                                     Rs {toInr(change)}
                                                 </span>
                                             </div>
                                         ) : (
-                                            <div className="flex items-center justify-between pt-3 border-t border-dashed border-[color:var(--app-border)]">
+                                            <div className="flex items-center justify-between pt-3 border-t border-dashed border-stone-200">
                                                 <div>
-                                                    <span className="text-xs font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400 block">
+                                                    <span className="text-xs font-extrabold uppercase tracking-widest text-amber-700 block">
                                                         Balance Shortage
                                                     </span>
-                                                    <span className="text-[11px] font-semibold theme-muted">
+                                                    <span className="text-[11px] font-semibold text-stone-500">
                                                         Total is Rs {toInr(subtotal)}
                                                     </span>
                                                 </div>
-                                                <span className="text-xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+                                                <span className="text-xl font-bold text-amber-700 tabular-nums">
                                                     Rs {toInr(Math.abs(change))} remaining
                                                 </span>
                                             </div>
@@ -1926,12 +1924,12 @@ export default function NewOrder() {
 
                             {/* ONLINE PAYMENT DISPLAY */}
                             {paymentMethod === "ONLINE" && (
-                                <div className="py-4 text-center space-y-2 border-t border-dashed border-[color:var(--app-border)]">
-                                    <QrCode size={32} className="mx-auto theme-muted" />
-                                    <p className="text-sm font-bold text-[color:var(--app-text)]">
+                                <div className="py-4 text-center space-y-2 border-t border-dashed border-stone-200">
+                                    <QrCode size={32} className="mx-auto text-stone-400" />
+                                    <p className="text-sm font-bold text-stone-900">
                                         Accept UPI QR / Card POS Payment
                                     </p>
-                                    <p className="theme-muted text-xs">
+                                    <p className="text-xs text-stone-500">
                                         Verify payment confirmation on your UPI QR or POS machine before completing order.
                                     </p>
                                 </div>
@@ -1939,11 +1937,11 @@ export default function NewOrder() {
                         </div>
 
                         {/* Modal Actions */}
-                        <div className="pt-4 border-t border-[color:var(--app-border)] grid grid-cols-2 gap-3">
+                        <div className="pt-4 border-t border-stone-200/70 grid grid-cols-2 gap-3">
                             <button
                                 type="button"
                                 onClick={() => handleCompleteOrder({ printReceipt: false })}
-                                className="theme-soft-button rounded-2xl py-3 px-3 text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5"
+                                className="rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 py-3 px-3 text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition"
                                 disabled={placing || (paymentMethod === "CASH" && (parseFloat(cashGiven) || 0) < subtotal)}
                             >
                                 <CheckCircle2 size={16} />
@@ -1953,7 +1951,7 @@ export default function NewOrder() {
                             <button
                                 type="button"
                                 onClick={() => handleCompleteOrder({ printReceipt: true })}
-                                className="theme-button rounded-2xl py-3 px-3 text-xs sm:text-sm font-bold shadow-lg flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
+                                className="rounded-xl bg-orange-600 hover:bg-orange-500 text-white py-3 px-3 text-xs sm:text-sm font-bold shadow-sm flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
                                 disabled={placing || (paymentMethod === "CASH" && (parseFloat(cashGiven) || 0) < subtotal)}
                             >
                                 {placing ? (
