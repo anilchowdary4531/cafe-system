@@ -272,7 +272,7 @@ export default function OwnerShiftManager() {
   return (
     <div className="space-y-6 text-[color:var(--app-text)] font-sans">
       {/* HEADER BAR */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-[color:var(--app-border)]/50 pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-[color:var(--app-border)]/40 pb-5">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-3 text-[color:var(--app-text)]">
             <Wallet className="w-7 h-7 text-amber-500" />
@@ -285,8 +285,8 @@ export default function OwnerShiftManager() {
 
         <div className="flex items-center gap-3">
           {/* Terminal Selector */}
-          <div className="flex items-center theme-panel border border-[color:var(--app-border)] rounded-xl px-3 py-1.5 text-xs sm:text-sm">
-            <span className="theme-muted mr-2 text-xs uppercase tracking-wider font-semibold">Register:</span>
+          <div className="flex items-center px-3 py-1.5 text-xs sm:text-sm">
+            <span className="theme-muted mr-2 text-xs uppercase tracking-wider font-semibold">REGISTER:</span>
             <select
               value={terminalId}
               onChange={(e) => setTerminalId(e.target.value)}
@@ -309,13 +309,13 @@ export default function OwnerShiftManager() {
       </div>
 
       {/* TABS */}
-      <div className="flex border-b border-[color:var(--app-border)]/50 mb-6 gap-2">
+      <div className="flex border-b border-[color:var(--app-border)]/40 mb-6 gap-2">
         <button
           onClick={() => setActiveTab("current")}
-          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold rounded-t-xl transition border-b-2 ${
+          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition border-b-2 ${
             activeTab === "current"
-              ? "bg-[color:var(--app-surface)] text-amber-500 border-amber-500"
-              : "theme-muted border-transparent hover:text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]/50"
+              ? "text-amber-500 border-amber-500"
+              : "theme-muted border-transparent hover:text-[color:var(--app-text)]"
           }`}
         >
           <Wallet className="w-4 h-4" />
@@ -323,10 +323,10 @@ export default function OwnerShiftManager() {
         </button>
         <button
           onClick={() => setActiveTab("history")}
-          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold rounded-t-xl transition border-b-2 ${
+          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition border-b-2 ${
             activeTab === "history"
-              ? "bg-[color:var(--app-surface)] text-amber-500 border-amber-500"
-              : "theme-muted border-transparent hover:text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]/50"
+              ? "text-amber-500 border-amber-500"
+              : "theme-muted border-transparent hover:text-[color:var(--app-text)]"
           }`}
         >
           <History className="w-4 h-4" />
@@ -334,10 +334,10 @@ export default function OwnerShiftManager() {
         </button>
         <button
           onClick={() => setActiveTab("dayClose")}
-          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold rounded-t-xl transition border-b-2 ${
+          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition border-b-2 ${
             activeTab === "dayClose"
-              ? "bg-[color:var(--app-surface)] text-amber-500 border-amber-500"
-              : "theme-muted border-transparent hover:text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]/50"
+              ? "text-amber-500 border-amber-500"
+              : "theme-muted border-transparent hover:text-[color:var(--app-text)]"
           }`}
         >
           <Calendar className="w-4 h-4" />
@@ -349,23 +349,23 @@ export default function OwnerShiftManager() {
       {activeTab === "current" && (
         <div className="space-y-6">
           {loadingShift ? (
-            <div className="theme-panel rounded-2xl p-12 text-center theme-muted">
+            <div className="py-12 text-center theme-muted">
               <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-amber-500" />
               Loading current cashier shift status...
             </div>
           ) : !currentShift ? (
             /* NO SHIFT OPEN CARD */
-            <div className="theme-panel rounded-2xl p-8 md:p-12 text-center max-w-2xl mx-auto border border-[color:var(--app-border)]">
-              <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
+            <div className="py-12 text-center max-w-2xl mx-auto space-y-4">
+              <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-2">
                 <Lock className="w-8 h-8 text-amber-500" />
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold text-[color:var(--app-text)] mb-2">No Active Shift for {terminalId}</h2>
-              <p className="theme-muted text-xs sm:text-sm mb-6 max-w-md mx-auto">
+              <h2 className="text-xl sm:text-2xl font-bold text-[color:var(--app-text)]">No Active Shift for {terminalId}</h2>
+              <p className="theme-muted text-xs sm:text-sm max-w-md mx-auto">
                 Open a cashier shift to record opening float cash and begin taking payments on this register.
               </p>
               <button
                 onClick={() => setShowOpenModal(true)}
-                className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-black font-bold px-6 py-3 rounded-xl shadow-lg shadow-amber-500/20 transition transform hover:scale-[1.02]"
+                className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-black font-bold px-6 py-3 rounded-xl shadow-md transition"
               >
                 <PlusCircle className="w-5 h-5" />
                 Open Cashier Shift
@@ -377,11 +377,11 @@ export default function OwnerShiftManager() {
               {/* LEFT & MIDDLE: SHIFT OVERVIEW & CASH DRAWER CALCULATIONS */}
               <div className="lg:col-span-2 space-y-6">
                 {/* ACTIVE SHIFT SUMMARY BANNER */}
-                <div className="theme-panel rounded-2xl p-6 relative overflow-hidden">
-                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[color:var(--app-border)]/50 pb-4 mb-5">
+                <div className="py-2 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[color:var(--app-border)]/40 pb-4">
                     <div>
                       <div className="flex items-center gap-3">
-                        <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
                           Shift OPEN
                         </span>
@@ -399,21 +399,21 @@ export default function OwnerShiftManager() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setShowCashInModal(true)}
-                        className="flex items-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3.5 py-2 rounded-xl text-xs font-bold transition"
+                        className="flex items-center gap-1.5 text-emerald-400 px-3.5 py-2 rounded-xl text-xs font-bold transition hover:underline"
                       >
                         <ArrowUpRight className="w-4 h-4" />
                         Cash In
                       </button>
                       <button
                         onClick={() => setShowCashOutModal(true)}
-                        className="flex items-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3.5 py-2 rounded-xl text-xs font-bold transition"
+                        className="flex items-center gap-1.5 text-rose-400 px-3.5 py-2 rounded-xl text-xs font-bold transition hover:underline"
                       >
                         <ArrowDownRight className="w-4 h-4" />
                         Cash Out
                       </button>
                       <button
                         onClick={() => setShowCloseModal(true)}
-                        className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black px-4 py-2 rounded-xl text-xs font-extrabold shadow-md transition"
+                        className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black px-4 py-2 rounded-xl text-xs font-extrabold shadow-sm transition"
                       >
                         <Lock className="w-4 h-4" />
                         Close Shift
@@ -422,12 +422,12 @@ export default function OwnerShiftManager() {
                   </div>
 
                   {/* CASH DRAWER BREAKDOWN GRID */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div className="bg-[color:var(--app-bg)]/40 border border-[color:var(--app-border)]/60 rounded-xl p-3.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
+                    <div className="py-2">
                       <p className="theme-muted text-xs font-medium">Opening Float</p>
                       <p className="text-lg font-bold text-[color:var(--app-text)] mt-0.5">₹{currentShift.openingCash?.toLocaleString()}</p>
                     </div>
-                    <div className="bg-[color:var(--app-bg)]/40 border border-[color:var(--app-border)]/60 rounded-xl p-3.5">
+                    <div className="py-2">
                       <p className="theme-muted text-xs font-medium">Cash Sales (+)</p>
                       <p className="text-lg font-bold text-emerald-400 mt-0.5">
                         ₹{(
@@ -437,7 +437,7 @@ export default function OwnerShiftManager() {
                         ).toLocaleString()}
                       </p>
                     </div>
-                    <div className="bg-[color:var(--app-bg)]/40 border border-[color:var(--app-border)]/60 rounded-xl p-3.5">
+                    <div className="py-2">
                       <p className="theme-muted text-xs font-medium">Cash Adjustments</p>
                       <p className="text-lg font-bold text-amber-400 mt-0.5">
                         +₹{(
@@ -451,7 +451,7 @@ export default function OwnerShiftManager() {
                         )}
                       </p>
                     </div>
-                    <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl p-3.5">
+                    <div className="py-2">
                       <p className="text-amber-500 text-xs font-bold uppercase tracking-wider">Expected Cash</p>
                       <p className="text-xl font-extrabold text-amber-400 mt-0.5">₹{currentShift.expectedCash?.toLocaleString()}</p>
                     </div>
@@ -459,7 +459,7 @@ export default function OwnerShiftManager() {
                 </div>
 
                 {/* CASH MOVEMENTS LEDGER */}
-                <div className="theme-panel rounded-2xl p-6">
+                <div className="pt-4 border-t border-[color:var(--app-border)]/40">
                   <h3 className="text-base font-bold text-[color:var(--app-text)] mb-4 flex items-center justify-between">
                     <span>Shift Cash Movements Ledger</span>
                     <span className="text-xs font-normal theme-muted">{currentShift.cashMovements?.length || 0} entries</span>
@@ -471,7 +471,7 @@ export default function OwnerShiftManager() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs">
                         <thead>
-                          <tr className="border-b border-[color:var(--app-border)]/60 theme-muted uppercase tracking-wider">
+                          <tr className="border-b border-[color:var(--app-border)]/40 theme-muted uppercase tracking-wider">
                             <th className="pb-2">Time</th>
                             <th className="pb-2">Type</th>
                             <th className="pb-2">Reason / Ref</th>
@@ -479,9 +479,9 @@ export default function OwnerShiftManager() {
                             <th className="pb-2 text-right">Amount</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-[color:var(--app-border)]/40">
+                        <tbody className="divide-y divide-[color:var(--app-border)]/30">
                           {currentShift.cashMovements.map((m) => (
-                            <tr key={m.id} className="hover:bg-[color:var(--app-surface)]/50">
+                            <tr key={m.id} className="hover:bg-[color:var(--app-surface)]/30">
                               <td className="py-2.5 theme-muted">
                                 {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </td>
@@ -513,10 +513,10 @@ export default function OwnerShiftManager() {
 
               {/* RIGHT SIDE: RECONCILIATION SUMMARY (ALL PAYMENT METHODS) */}
               <div className="space-y-6">
-                <div className="theme-panel rounded-2xl p-6">
+                <div className="pt-2">
                   <h3 className="text-base font-bold text-[color:var(--app-text)] mb-4">Payment Methods Breakdown</h3>
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center bg-[color:var(--app-bg)]/40 p-3 rounded-xl border border-[color:var(--app-border)]/60">
+                    <div className="flex justify-between items-center py-2 border-b border-[color:var(--app-border)]/30">
                       <span className="text-xs theme-muted flex items-center gap-2">
                         <Banknote className="w-4 h-4 text-emerald-400" />
                         Cash Sales
@@ -530,7 +530,7 @@ export default function OwnerShiftManager() {
                       </span>
                     </div>
 
-                    <div className="flex justify-between items-center bg-[color:var(--app-bg)]/40 p-3 rounded-xl border border-[color:var(--app-border)]/60">
+                    <div className="flex justify-between items-center py-2 border-b border-[color:var(--app-border)]/30">
                       <span className="text-xs theme-muted flex items-center gap-2">
                         <Wallet className="w-4 h-4 text-purple-400" />
                         UPI / QR Sales
@@ -544,7 +544,7 @@ export default function OwnerShiftManager() {
                       </span>
                     </div>
 
-                    <div className="flex justify-between items-center bg-[color:var(--app-bg)]/40 p-3 rounded-xl border border-[color:var(--app-border)]/60">
+                    <div className="flex justify-between items-center py-2 border-b border-[color:var(--app-border)]/30">
                       <span className="text-xs theme-muted flex items-center gap-2">
                         <DollarSign className="w-4 h-4 text-blue-400" />
                         Card Sales
@@ -558,7 +558,7 @@ export default function OwnerShiftManager() {
                       </span>
                     </div>
 
-                    <div className="flex justify-between items-center bg-[color:var(--app-bg)]/40 p-3 rounded-xl border border-[color:var(--app-border)]/60">
+                    <div className="flex justify-between items-center py-2 border-b border-[color:var(--app-border)]/30">
                       <span className="text-xs theme-muted flex items-center gap-2">
                         <Info className="w-4 h-4 text-amber-400" />
                         Cashfree / Online
@@ -584,14 +584,14 @@ export default function OwnerShiftManager() {
 
       {/* TAB 2: SHIFT HISTORY */}
       {activeTab === "history" && (
-        <div className="theme-panel rounded-2xl p-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <h3 className="text-lg font-bold text-[color:var(--app-text)]">Closed Shift Logs & Reconciliation</h3>
             <div className="flex items-center gap-3">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="theme-panel border border-[color:var(--app-border)] text-[color:var(--app-text)] text-xs rounded-xl px-3 py-2 outline-none"
+                className="bg-transparent border-b border-[color:var(--app-border)] text-[color:var(--app-text)] text-xs py-1 outline-none"
               >
                 <option value="" className="bg-[color:var(--app-bg)]">All Statuses</option>
                 <option value="CLOSED" className="bg-[color:var(--app-bg)]">CLOSED</option>
@@ -608,7 +608,7 @@ export default function OwnerShiftManager() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[color:var(--app-border)]/60 theme-muted uppercase tracking-wider">
+                  <tr className="border-b border-[color:var(--app-border)]/40 theme-muted uppercase tracking-wider">
                     <th className="pb-3">Shift ID</th>
                     <th className="pb-3">Cashier</th>
                     <th className="pb-3">Opened</th>
@@ -621,9 +621,9 @@ export default function OwnerShiftManager() {
                     <th className="pb-3 text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[color:var(--app-border)]/40">
+                <tbody className="divide-y divide-[color:var(--app-border)]/30">
                   {historyItems.map((s) => (
-                    <tr key={s.id} className="hover:bg-[color:var(--app-surface)]/50">
+                    <tr key={s.id} className="hover:bg-[color:var(--app-surface)]/30">
                       <td className="py-3 font-bold text-amber-500">#{s.id}</td>
                       <td className="py-3 font-semibold text-[color:var(--app-text)]">{s.user?.name || "Cashier"}</td>
                       <td className="py-3 theme-muted">{new Date(s.openedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</td>
@@ -639,7 +639,7 @@ export default function OwnerShiftManager() {
                       </td>
                       <td className="py-3 text-center">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          s.status === "OPEN" ? "bg-emerald-500/20 text-emerald-400" : "theme-panel theme-muted"
+                          s.status === "OPEN" ? "bg-emerald-500/20 text-emerald-400" : "theme-muted"
                         }`}>
                           {s.status}
                         </span>
@@ -677,7 +677,7 @@ export default function OwnerShiftManager() {
             <div className="space-y-6">
               {/* UNRESOLVED SHIFTS WARNING */}
               {!daySummary.canCloseDay && (
-                <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex items-center gap-3 text-rose-300 text-sm">
+                <div className="border-l-4 border-rose-500 pl-4 py-2 flex items-center gap-3 text-rose-300 text-sm">
                   <ShieldAlert className="w-6 h-6 flex-shrink-0 text-rose-400" />
                   <div>
                     <strong className="block text-[color:var(--app-text)]">Unresolved Open Cashier Shifts Exist</strong>
@@ -687,20 +687,20 @@ export default function OwnerShiftManager() {
               )}
 
               {/* DAY CLOSING METRICS GRID */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="theme-panel rounded-xl p-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 border-b border-[color:var(--app-border)]/40 pb-6">
+                <div className="py-2">
                   <p className="text-xs theme-muted">Gross Sales</p>
                   <p className="text-2xl font-extrabold text-[color:var(--app-text)] mt-1">₹{daySummary.grossSales?.toLocaleString()}</p>
                 </div>
-                <div className="theme-panel rounded-xl p-4">
+                <div className="py-2">
                   <p className="text-xs theme-muted">Total Net Sales</p>
                   <p className="text-2xl font-extrabold text-emerald-400 mt-1">₹{daySummary.netSales?.toLocaleString()}</p>
                 </div>
-                <div className="theme-panel rounded-xl p-4">
+                <div className="py-2">
                   <p className="text-xs theme-muted">Closed Shifts</p>
                   <p className="text-2xl font-extrabold text-amber-500 mt-1">{daySummary.totalShifts}</p>
                 </div>
-                <div className="theme-panel rounded-xl p-4">
+                <div className="py-2">
                   <p className="text-xs theme-muted">Overall Cash Variance</p>
                   <p className={`text-2xl font-extrabold mt-1 ${
                     daySummary.totalCashVariance === 0 ? "theme-muted" :
@@ -712,39 +712,39 @@ export default function OwnerShiftManager() {
               </div>
 
               {/* PAYMENT METHODS & ACTIONS */}
-              <div className="theme-panel rounded-2xl p-6">
+              <div className="space-y-4">
                 <h3 className="text-base font-bold text-[color:var(--app-text)] mb-4">Payment Method Summary</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-[color:var(--app-bg)]/40 p-3 rounded-xl border border-[color:var(--app-border)]/60">
+                  <div className="py-2 border-b border-[color:var(--app-border)]/30">
                     <span className="text-xs theme-muted">Cash Total</span>
                     <p className="text-lg font-bold text-[color:var(--app-text)] mt-0.5">₹{daySummary.paymentBreakdown?.cash?.toLocaleString()}</p>
                   </div>
-                  <div className="bg-[color:var(--app-bg)]/40 p-3 rounded-xl border border-[color:var(--app-border)]/60">
+                  <div className="py-2 border-b border-[color:var(--app-border)]/30">
                     <span className="text-xs theme-muted">UPI Total</span>
                     <p className="text-lg font-bold text-[color:var(--app-text)] mt-0.5">₹{daySummary.paymentBreakdown?.upi?.toLocaleString()}</p>
                   </div>
-                  <div className="bg-[color:var(--app-bg)]/40 p-3 rounded-xl border border-[color:var(--app-border)]/60">
+                  <div className="py-2 border-b border-[color:var(--app-border)]/30">
                     <span className="text-xs theme-muted">Card Total</span>
                     <p className="text-lg font-bold text-[color:var(--app-text)] mt-0.5">₹{daySummary.paymentBreakdown?.card?.toLocaleString()}</p>
                   </div>
-                  <div className="bg-[color:var(--app-bg)]/40 p-3 rounded-xl border border-[color:var(--app-border)]/60">
+                  <div className="py-2 border-b border-[color:var(--app-border)]/30">
                     <span className="text-xs theme-muted">Cashfree / Online</span>
                     <p className="text-lg font-bold text-[color:var(--app-text)] mt-0.5">₹{daySummary.paymentBreakdown?.cashfree?.toLocaleString()}</p>
                   </div>
                 </div>
 
-                <div className="border-t border-[color:var(--app-border)]/50 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="border-t border-[color:var(--app-border)]/40 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <input
                     type="text"
                     placeholder="Day closing notes / remarks..."
                     value={dayClosingNotes}
                     onChange={(e) => setDayClosingNotes(e.target.value)}
-                    className="w-full sm:w-96 bg-[color:var(--app-bg)] border border-[color:var(--app-border)] rounded-xl px-4 py-2.5 text-sm text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                    className="w-full sm:w-96 bg-transparent border-b border-[color:var(--app-border)] px-2 py-2 text-sm text-[color:var(--app-text)] outline-none focus:border-amber-500"
                   />
                   <button
                     disabled={!daySummary.canCloseDay}
                     onClick={handleExecuteDayClose}
-                    className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-bold px-6 py-2.5 rounded-xl shadow-lg transition"
+                    className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-bold px-6 py-2.5 rounded-xl shadow-md transition"
                   >
                     Execute Business Day Close
                   </button>

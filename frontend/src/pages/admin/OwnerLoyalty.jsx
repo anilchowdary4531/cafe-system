@@ -192,20 +192,20 @@ export default function OwnerLoyalty() {
   return (
     <div className="p-4 max-w-7xl mx-auto space-y-3.5">
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gradient-to-r from-orange-500 via-amber-500 to-amber-600 rounded-xl p-4 text-white shadow-md">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-4">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
-            <Award className="w-6 h-6" />
-            <h1 className="text-xl font-bold tracking-tight">Loyalty Points & Rewards Studio</h1>
+            <Award className="w-6 h-6 text-orange-500" />
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--app-text)]">Loyalty Points & Rewards Studio</h1>
           </div>
-          <p className="text-orange-100 text-xs">
+          <p className="theme-muted text-xs">
             Manage customer rewards, earning ratios, redemption thresholds, and ledger transactions.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setAdjustModalOpen(true)}
-            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/30 backdrop-blur-md px-3.5 py-1.5 rounded-lg font-semibold text-xs transition-all"
+            className="flex items-center gap-2 text-orange-500 hover:underline px-3.5 py-1.5 font-semibold text-xs transition-all"
           >
             <Sparkles className="w-4 h-4" />
             Manual Points Adjustment
@@ -214,8 +214,8 @@ export default function OwnerLoyalty() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="theme-panel border border-[color:var(--app-border)]/50 p-3.5 rounded-xl shadow-xs transition-shadow">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 border-b border-[color:var(--app-border)]/40 pb-4">
+        <div className="py-2">
           <div className="flex items-center justify-between theme-muted mb-1.5">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Active Loyalty Members</span>
             <div className="p-1.5 bg-emerald-500/10 text-emerald-600 rounded-lg">
@@ -228,7 +228,7 @@ export default function OwnerLoyalty() {
           <p className="text-[11px] theme-muted mt-0.5">Total registered customers in rewards program</p>
         </div>
 
-        <div className="theme-panel border border-[color:var(--app-border)]/50 p-3.5 rounded-xl shadow-xs transition-shadow">
+        <div className="py-2">
           <div className="flex items-center justify-between theme-muted mb-1.5">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Total Points Issued</span>
             <div className="p-1.5 bg-blue-500/10 text-blue-600 rounded-lg">
@@ -241,7 +241,7 @@ export default function OwnerLoyalty() {
           <p className="text-[11px] theme-muted mt-0.5">Lifetime points granted across all orders</p>
         </div>
 
-        <div className="theme-panel border border-[color:var(--app-border)]/50 p-3.5 rounded-xl shadow-xs transition-shadow">
+        <div className="py-2">
           <div className="flex items-center justify-between theme-muted mb-1.5">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Total Points Redeemed</span>
             <div className="p-1.5 bg-purple-500/10 text-purple-600 rounded-lg">
@@ -254,7 +254,7 @@ export default function OwnerLoyalty() {
           <p className="text-[11px] theme-muted mt-0.5">Lifetime points converted into discounts</p>
         </div>
 
-        <div className="theme-panel border border-[color:var(--app-border)]/50 p-3.5 rounded-xl shadow-xs transition-shadow">
+        <div className="py-2">
           <div className="flex items-center justify-between theme-muted mb-1.5">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Outstanding Balance</span>
             <div className="p-1.5 bg-amber-500/10 text-amber-600 rounded-lg">
@@ -269,17 +269,17 @@ export default function OwnerLoyalty() {
       </div>
 
       {/* Main Content: Config & History */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
         {/* Settings Panel */}
-        <div className="lg:col-span-1 theme-panel border border-[color:var(--app-border)]/50 rounded-xl p-4 shadow-xs space-y-4">
-          <div className="flex items-center gap-2 pb-2.5 border-b border-[color:var(--app-border)]/50">
+        <div className="lg:col-span-1 space-y-4">
+          <div className="flex items-center gap-2 pb-2.5 border-b border-[color:var(--app-border)]/40">
             <Settings className="w-4 h-4 text-orange-500" />
             <h2 className="text-base font-bold text-[color:var(--app-text)]">Program Configuration</h2>
           </div>
 
           <form onSubmit={handleSaveConfig} className="space-y-3">
             {/* Enable Program Toggle */}
-            <div className="flex items-center justify-between p-2.5 bg-[color:var(--app-bg)] rounded-lg border border-[color:var(--app-border)]/40">
+            <div className="flex items-center justify-between py-2 border-b border-[color:var(--app-border)]/30">
               <div>
                 <span className="font-semibold text-xs text-[color:var(--app-text)]">Enable Loyalty Rewards</span>
                 <p className="text-[11px] theme-muted">Allow earning and redeeming points</p>
@@ -303,7 +303,7 @@ export default function OwnerLoyalty() {
                 min="0"
                 value={Math.round(config.pointsPerCurrency * 100)}
                 onChange={(e) => setConfig({ ...config, pointsPerCurrency: Number(e.target.value) / 100 })}
-                className="w-full px-3 py-1.5 border border-[color:var(--app-border)] rounded-lg bg-[color:var(--app-bg)] text-xs font-semibold text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                className="w-full px-3 py-1.5 border-b border-[color:var(--app-border)]/60 bg-transparent text-xs font-semibold text-[color:var(--app-text)] outline-none focus:border-amber-500"
               />
               <p className="text-[11px] theme-muted mt-0.5">E.g., 10 points = 10 points per ₹100 spent</p>
             </div>
@@ -319,7 +319,7 @@ export default function OwnerLoyalty() {
                 min="0"
                 value={config.currencyPerPoint * 10}
                 onChange={(e) => setConfig({ ...config, currencyPerPoint: Number(e.target.value) / 10 })}
-                className="w-full px-3 py-1.5 border border-[color:var(--app-border)] rounded-lg bg-[color:var(--app-bg)] text-xs font-semibold text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                className="w-full px-3 py-1.5 border-b border-[color:var(--app-border)]/60 bg-transparent text-xs font-semibold text-[color:var(--app-text)] outline-none focus:border-amber-500"
               />
               <p className="text-[11px] theme-muted mt-0.5">E.g., ₹1.00 = 10 points grant ₹1 discount</p>
             </div>
@@ -335,7 +335,7 @@ export default function OwnerLoyalty() {
                 min="0"
                 value={config.minPointsToRedeem}
                 onChange={(e) => setConfig({ ...config, minPointsToRedeem: Number(e.target.value) })}
-                className="w-full px-3 py-1.5 border border-[color:var(--app-border)] rounded-lg bg-[color:var(--app-bg)] text-xs font-semibold text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                className="w-full px-3 py-1.5 border-b border-[color:var(--app-border)]/60 bg-transparent text-xs font-semibold text-[color:var(--app-text)] outline-none focus:border-amber-500"
               />
             </div>
 
@@ -351,13 +351,13 @@ export default function OwnerLoyalty() {
                 max="100"
                 value={config.maxRedeemablePercent}
                 onChange={(e) => setConfig({ ...config, maxRedeemablePercent: Number(e.target.value) })}
-                className="w-full px-3 py-1.5 border border-[color:var(--app-border)] rounded-lg bg-[color:var(--app-bg)] text-xs font-semibold text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                className="w-full px-3 py-1.5 border-b border-[color:var(--app-border)]/60 bg-transparent text-xs font-semibold text-[color:var(--app-text)] outline-none focus:border-amber-500"
               />
               <p className="text-[11px] theme-muted mt-0.5">Max % of subtotal that can be paid with points</p>
             </div>
 
             {/* Stacking Rule */}
-            <div className="flex items-center justify-between p-2.5 bg-[color:var(--app-bg)] rounded-lg border border-[color:var(--app-border)]/40">
+            <div className="flex items-center justify-between py-2 border-b border-[color:var(--app-border)]/30">
               <div>
                 <span className="font-semibold text-xs text-[color:var(--app-text)]">Allow Coupon Stacking</span>
                 <p className="text-[11px] theme-muted">Combine points redemption with coupons</p>
@@ -373,7 +373,7 @@ export default function OwnerLoyalty() {
             <button
               type="submit"
               disabled={savingConfig}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2"
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2"
             >
               {savingConfig ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Save Settings"}
             </button>
@@ -381,15 +381,15 @@ export default function OwnerLoyalty() {
         </div>
 
         {/* Ledger Transactions Table */}
-        <div className="lg:col-span-2 theme-panel border border-[color:var(--app-border)]/50 rounded-xl p-4 shadow-xs space-y-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2.5 border-b border-[color:var(--app-border)]/50">
+        <div className="lg:col-span-2 space-y-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2.5 border-b border-[color:var(--app-border)]/40">
             <div>
               <h2 className="text-base font-bold text-[color:var(--app-text)]">Loyalty Ledger History</h2>
               <p className="text-xs theme-muted">Immutable audit log of all point balance changes</p>
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex items-center bg-[color:var(--app-bg)] p-0.5 rounded-lg border border-[color:var(--app-border)]/40 text-xs font-semibold">
+            <div className="flex items-center gap-2 text-xs font-semibold">
               {["ALL", "EARN", "REDEEM", "MANUAL_CREDIT", "REFUND_REVERSAL"].map((t) => (
                 <button
                   key={t}
@@ -397,10 +397,10 @@ export default function OwnerLoyalty() {
                     setHistoryType(t);
                     setPage(1);
                   }}
-                  className={`px-2.5 py-1 rounded-md transition-all ${
+                  className={`px-2 py-1 transition-all border-b-2 ${
                     historyType === t
-                      ? "theme-panel text-orange-500 font-bold shadow-xs"
-                      : "theme-muted hover:text-[color:var(--app-text)]"
+                      ? "border-orange-500 text-orange-500 font-bold"
+                      : "border-transparent theme-muted hover:text-[color:var(--app-text)]"
                   }`}
                 >
                   {t.replace(/_/g, " ")}
@@ -424,7 +424,7 @@ export default function OwnerLoyalty() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="font-bold uppercase tracking-wider theme-muted border-b border-[color:var(--app-border)]/50">
+                  <tr className="font-bold uppercase tracking-wider theme-muted border-b border-[color:var(--app-border)]/40">
                     <th className="py-2.5 px-2">Date</th>
                     <th className="py-2.5 px-2">Customer</th>
                     <th className="py-2.5 px-2">Type</th>
@@ -437,7 +437,7 @@ export default function OwnerLoyalty() {
                   {history.map((txn) => {
                     const isPositive = txn.points > 0;
                     return (
-                      <tr key={txn.id} className="hover:bg-[color:var(--app-bg)]/60 transition-colors">
+                      <tr key={txn.id} className="hover:bg-[color:var(--app-surface)]/30 transition-colors">
                         <td className="py-2.5 px-2 text-[11px] theme-muted whitespace-nowrap">
                           {new Date(txn.createdAt).toLocaleString("en-IN", {
                             month: "short",
@@ -484,20 +484,20 @@ export default function OwnerLoyalty() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-2.5 border-t border-[color:var(--app-border)]/50">
+            <div className="flex items-center justify-between pt-2.5 border-t border-[color:var(--app-border)]/40">
               <span className="text-xs theme-muted">Page {page} of {totalPages}</span>
               <div className="flex gap-2">
                 <button
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
-                  className="p-1 rounded-md border border-[color:var(--app-border)]/50 disabled:opacity-50 theme-muted hover:text-[color:var(--app-text)]"
+                  className="p-1 disabled:opacity-50 theme-muted hover:text-[color:var(--app-text)]"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <button
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => p + 1)}
-                  className="p-1 rounded-md border border-[color:var(--app-border)]/50 disabled:opacity-50 theme-muted hover:text-[color:var(--app-text)]"
+                  className="p-1 disabled:opacity-50 theme-muted hover:text-[color:var(--app-text)]"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>

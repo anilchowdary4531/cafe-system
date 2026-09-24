@@ -147,25 +147,25 @@ export default function OwnerDeliveryManager() {
 
       {/* Search & Tabs */}
       <div className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between theme-panel rounded-2xl p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-2 border-b border-[color:var(--app-border)]/40">
           <div className="relative flex-1 max-w-md">
-            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 theme-muted" />
             <input
               type="text"
               placeholder="Search order #, customer, address, driver..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/10 py-2.5 pl-10 pr-4 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              className="w-full bg-transparent border-b border-[color:var(--app-border)] py-2 pl-10 pr-4 text-sm text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500"
             />
           </div>
 
-          <div className="text-xs font-semibold text-gray-400">
-            Total Deliveries: <span className="text-white font-bold">{deliveries.length}</span>
+          <div className="text-xs font-semibold theme-muted">
+            Total Deliveries: <span className="text-[color:var(--app-text)] font-bold">{deliveries.length}</span>
           </div>
         </div>
 
         {/* Status Tabs */}
-        <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-none">
+        <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-none border-b border-[color:var(--app-border)]/40">
           {DELIVERY_STATUS_TABS.map((tab) => {
             const count = tab.key === "ALL" ? deliveries.length : deliveries.filter((d) => d.status === tab.key).length;
             const active = statusTab === tab.key;
@@ -174,14 +174,14 @@ export default function OwnerDeliveryManager() {
                 key={tab.key}
                 type="button"
                 onClick={() => setStatusTab(tab.key)}
-                className={`shrink-0 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+                className={`shrink-0 inline-flex items-center gap-2 px-4 py-2 text-xs font-bold transition border-b-2 ${
                   active
-                    ? "bg-amber-500 text-black shadow-md"
-                    : "theme-soft-button text-gray-300 hover:text-white"
+                    ? "border-amber-500 text-amber-500 font-extrabold"
+                    : "border-transparent theme-muted hover:text-[color:var(--app-text)]"
                 }`}
               >
                 <span>{tab.label}</span>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] ${active ? "bg-black/20 text-black" : "bg-white/10 text-gray-400"}`}>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] ${active ? "bg-amber-500/20 text-amber-500" : "bg-white/10 theme-muted"}`}>
                   {count}
                 </span>
               </button>
@@ -192,18 +192,18 @@ export default function OwnerDeliveryManager() {
 
       {/* Delivery Cards Grid */}
       {loading ? (
-        <div className="theme-panel rounded-3xl p-12 text-center">
+        <div className="py-12 text-center">
           <Loader2 className="animate-spin mx-auto text-amber-500" size={32} />
           <p className="theme-muted mt-3 text-sm">Loading active deliveries...</p>
         </div>
       ) : filteredDeliveries.length === 0 ? (
-        <div className="theme-panel rounded-3xl p-12 text-center space-y-3">
-          <Truck size={48} className="mx-auto text-gray-500 opacity-40" />
-          <h3 className="text-lg font-bold">No deliveries in this tab</h3>
+        <div className="py-12 text-center space-y-3">
+          <Truck size={48} className="mx-auto theme-muted opacity-40" />
+          <h3 className="text-lg font-bold text-[color:var(--app-text)]">No deliveries in this tab</h3>
           <p className="theme-muted text-sm">No delivery orders currently match the selected filter.</p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredDeliveries.map((delivery) => {
             const order = delivery.order || {};
             const partner = delivery.deliveryPartner || {};
@@ -213,14 +213,14 @@ export default function OwnerDeliveryManager() {
             return (
               <div
                 key={delivery.id}
-                className="theme-panel rounded-3xl p-5 border border-white/10 hover:border-amber-500/40 transition flex flex-col justify-between"
+                className="py-4 border-b border-[color:var(--app-border)]/40 hover:bg-[color:var(--app-surface)]/20 transition flex flex-col justify-between space-y-4"
               >
                 <div>
                   {/* Order & Status Header */}
-                  <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
+                  <div className="flex items-start justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-3">
                     <div>
                       <span className="theme-muted text-[10px] font-extrabold uppercase tracking-widest">Order ID</span>
-                      <h3 className="text-lg font-bold text-amber-400 font-mono">
+                      <h3 className="text-lg font-bold text-amber-500 font-mono">
                         #{order.orderNo || delivery.orderId}
                       </h3>
                       <span className="text-[11px] theme-muted flex items-center gap-1 mt-0.5">
@@ -231,14 +231,14 @@ export default function OwnerDeliveryManager() {
 
                     <div className="flex flex-col items-end gap-1.5">
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border ${
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
                           delivery.status === "DELIVERED"
-                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                            ? "bg-emerald-500/15 text-emerald-400"
                             : delivery.status === "OUT_FOR_DELIVERY"
-                            ? "bg-sky-500/15 text-sky-400 border-sky-500/30 animate-pulse"
+                            ? "bg-sky-500/15 text-sky-400 animate-pulse"
                             : delivery.status === "UNASSIGNED"
-                            ? "bg-rose-500/15 text-rose-400 border-rose-500/30"
-                            : "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                            ? "bg-rose-500/15 text-rose-400"
+                            : "bg-amber-500/15 text-amber-400"
                         }`}
                       >
                         {delivery.status.replace(/_/g, " ")}
@@ -246,10 +246,10 @@ export default function OwnerDeliveryManager() {
 
                       {/* Payment Badge */}
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           isPaidOnline
-                            ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
-                            : "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                            ? "bg-emerald-500/10 text-emerald-400"
+                            : "bg-amber-500/10 text-amber-400"
                         }`}
                       >
                         {isPaidOnline ? "PAID ONLINE" : `COD: ${formatMoney(order.total)}`}
@@ -260,9 +260,9 @@ export default function OwnerDeliveryManager() {
                   {/* Customer Info */}
                   <div className="mt-3 space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-gray-200">{order.customerName || "Customer"}</span>
+                      <span className="font-semibold text-[color:var(--app-text)]">{order.customerName || "Customer"}</span>
                       {order.phone && (
-                        <a href={`tel:${order.phone}`} className="text-amber-400 hover:underline flex items-center gap-1 font-mono">
+                        <a href={`tel:${order.phone}`} className="text-amber-500 hover:underline flex items-center gap-1 font-mono">
                           <Phone size={12} />
                           {order.phone}
                         </a>
@@ -276,7 +276,7 @@ export default function OwnerDeliveryManager() {
                   </div>
 
                   {/* Assigned Driver Box */}
-                  <div className="mt-4 rounded-2xl border border-white/5 bg-black/20 p-3">
+                  <div className="mt-4 pt-3 border-t border-[color:var(--app-border)]/30">
                     <div className="flex items-center justify-between">
                       <span className="theme-muted text-[10px] font-bold uppercase tracking-wider">Assigned Driver</span>
                       {partner.id ? (
@@ -293,10 +293,10 @@ export default function OwnerDeliveryManager() {
                     {partner.id ? (
                       <div className="mt-2 flex items-center justify-between text-xs">
                         <div>
-                          <p className="font-bold">{partner.name}</p>
+                          <p className="font-bold text-[color:var(--app-text)]">{partner.name}</p>
                           <p className="theme-muted text-[11px]">{partner.vehicleType} • {partner.vehicleNumber}</p>
                         </div>
-                        <a href={`tel:${partner.phone}`} className="theme-soft-button p-2 rounded-xl text-amber-400">
+                        <a href={`tel:${partner.phone}`} className="p-2 text-amber-500 hover:underline">
                           <Phone size={14} />
                         </a>
                       </div>
@@ -307,11 +307,11 @@ export default function OwnerDeliveryManager() {
                 </div>
 
                 {/* Card Actions */}
-                <div className="mt-5 flex items-center justify-between gap-2 border-t border-white/10 pt-3">
+                <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-[color:var(--app-border)]/30">
                   <button
                     type="button"
                     onClick={() => handleOpenAssignModal(delivery)}
-                    className="theme-button inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl shadow-sm"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-500 hover:underline"
                   >
                     <User size={13} />
                     {partner.id ? "Reassign" : "Assign Partner"}
@@ -320,9 +320,9 @@ export default function OwnerDeliveryManager() {
                   <button
                     type="button"
                     onClick={() => handleOpenMapModal(delivery)}
-                    className="theme-soft-button inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-400 hover:underline"
                   >
-                    <Navigation size={13} className="text-sky-400" />
+                    <Navigation size={13} />
                     Live Map
                   </button>
                 </div>

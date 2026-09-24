@@ -220,7 +220,7 @@ export default function OwnerCustomerManager() {
   return (
     <div className="space-y-6 p-4 sm:p-6 text-[color:var(--app-text)]">
       {/* Header Banner */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-6 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-[color:var(--app-border)]/40 pb-5">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-amber-500 uppercase tracking-wider">
             <Sparkles size={14} /> CRM & Customer Relations
@@ -235,7 +235,7 @@ export default function OwnerCustomerManager() {
         <div className="flex items-center gap-3">
           <button
             onClick={openCreateModal}
-            className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-600 shadow-md shadow-amber-500/20"
+            className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-600 shadow-md"
           >
             <Plus size={18} /> New Customer
           </button>
@@ -243,41 +243,41 @@ export default function OwnerCustomerManager() {
       </div>
 
       {/* KPI Stat Cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 border-b border-[color:var(--app-border)]/40 pb-5">
+        <div className="py-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-[color:var(--app-muted)]">Total Customers</span>
-            <div className="rounded-xl bg-amber-500/10 p-2 text-amber-500">
+            <div className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg">
               <Users size={18} />
             </div>
           </div>
           <p className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">{pagination.total}</p>
         </div>
 
-        <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
+        <div className="py-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-[color:var(--app-muted)]">Active Directory</span>
-            <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-500">
+            <div className="p-1.5 bg-emerald-500/10 text-emerald-500 rounded-lg">
               <UserCheck size={18} />
             </div>
           </div>
           <p className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">{activeCount}</p>
         </div>
 
-        <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
+        <div className="py-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-[color:var(--app-muted)]">With Orders</span>
-            <div className="rounded-xl bg-blue-500/10 p-2 text-blue-500">
+            <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg">
               <ShoppingBag size={18} />
             </div>
           </div>
           <p className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">{customersWithOrders}</p>
         </div>
 
-        <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
+        <div className="py-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-[color:var(--app-muted)]">Current Page</span>
-            <div className="rounded-xl bg-purple-500/10 p-2 text-purple-500">
+            <div className="p-1.5 bg-purple-500/10 text-purple-500 rounded-lg">
               <Calendar size={18} />
             </div>
           </div>
@@ -288,7 +288,7 @@ export default function OwnerCustomerManager() {
       </div>
 
       {/* Search & Filter Toolbar */}
-      <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
+      <div className="py-2 border-b border-[color:var(--app-border)]/40">
         <form onSubmit={handleSearchSubmit} className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--app-muted)]" size={18} />
@@ -297,38 +297,38 @@ export default function OwnerCustomerManager() {
               placeholder="Search customer by name, phone, email, or ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] pl-10 pr-4 py-2 text-sm text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500"
+              className="w-full bg-transparent border-b border-[color:var(--app-border)]/60 pl-10 pr-4 py-2 text-sm text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             {/* Status Filter */}
-            <div className="flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1.5 text-xs">
+            <div className="flex items-center gap-1.5 text-xs">
               <Filter size={14} className="text-[color:var(--app-muted)]" />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-transparent font-medium text-[color:var(--app-text)] outline-none cursor-pointer"
+                className="bg-transparent border-b border-[color:var(--app-border)]/60 font-medium text-[color:var(--app-text)] py-1 outline-none cursor-pointer"
               >
-                <option value="ACTIVE">Active Only</option>
-                <option value="INACTIVE">Inactive / Merged</option>
-                <option value="ALL">All Statuses</option>
+                <option value="ACTIVE" className="bg-[color:var(--app-bg)]">Active Only</option>
+                <option value="INACTIVE" className="bg-[color:var(--app-bg)]">Inactive / Merged</option>
+                <option value="ALL" className="bg-[color:var(--app-bg)]">All Statuses</option>
               </select>
             </div>
 
             {/* Sort Selector */}
-            <div className="flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-3 py-1.5 text-xs">
+            <div className="flex items-center gap-1.5 text-xs">
               <ArrowUpDown size={14} className="text-[color:var(--app-muted)]" />
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="bg-transparent font-medium text-[color:var(--app-text)] outline-none cursor-pointer"
+                className="bg-transparent border-b border-[color:var(--app-border)]/60 font-medium text-[color:var(--app-text)] py-1 outline-none cursor-pointer"
               >
-                <option value="createdAt">Sort: Created Date</option>
-                <option value="name">Sort: Name</option>
-                <option value="orderCount">Sort: Total Orders</option>
-                <option value="totalSpend">Sort: Total Spend</option>
-                <option value="lastOrderDate">Sort: Last Order</option>
+                <option value="createdAt" className="bg-[color:var(--app-bg)]">Sort: Created Date</option>
+                <option value="name" className="bg-[color:var(--app-bg)]">Sort: Name</option>
+                <option value="orderCount" className="bg-[color:var(--app-bg)]">Sort: Total Orders</option>
+                <option value="totalSpend" className="bg-[color:var(--app-bg)]">Sort: Total Spend</option>
+                <option value="lastOrderDate" className="bg-[color:var(--app-bg)]">Sort: Last Order</option>
               </select>
               <button
                 type="button"
@@ -341,7 +341,7 @@ export default function OwnerCustomerManager() {
 
             <button
               type="submit"
-              className="rounded-xl bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-500 hover:bg-amber-500/20 transition"
+              className="px-3 py-1.5 text-xs font-semibold text-amber-500 hover:underline transition"
             >
               Apply Filter
             </button>
@@ -350,7 +350,7 @@ export default function OwnerCustomerManager() {
       </div>
 
       {/* Customer List Table */}
-      <div className="overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] shadow-sm">
+      <div className="space-y-4">
         {loading ? (
           <div className="flex h-48 items-center justify-center text-sm font-medium text-[color:var(--app-muted)]">
             Loading customers...
@@ -366,7 +366,7 @@ export default function OwnerCustomerManager() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] text-[color:var(--app-muted)] uppercase tracking-wider font-semibold">
+              <thead className="border-b border-[color:var(--app-border)]/40 text-[color:var(--app-muted)] uppercase tracking-wider font-semibold">
                 <tr>
                   <th className="px-4 py-3">Customer</th>
                   <th className="px-4 py-3">Phone</th>
@@ -378,9 +378,9 @@ export default function OwnerCustomerManager() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[color:var(--app-border)]">
+              <tbody className="divide-y divide-[color:var(--app-border)]/30">
                 {customers.map((cust) => (
-                  <tr key={cust.id} className="hover:bg-[color:var(--app-surface-2)]/50 transition">
+                  <tr key={cust.id} className="hover:bg-[color:var(--app-surface)]/30 transition">
                     <td className="px-4 py-3 font-semibold text-[color:var(--app-text)]">
                       <div className="flex items-center gap-2.5">
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/10 font-bold text-amber-500">
@@ -407,8 +407,8 @@ export default function OwnerCustomerManager() {
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                           cust.status === "ACTIVE"
-                            ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                            : "bg-red-500/10 text-red-400 border border-red-500/20"
+                            ? "bg-emerald-500/10 text-emerald-500"
+                            : "bg-red-500/10 text-red-400"
                         }`}
                       >
                         {cust.status === "ACTIVE" ? <UserCheck size={10} /> : <UserX size={10} />}
@@ -420,21 +420,21 @@ export default function OwnerCustomerManager() {
                         <Link
                           to={`/owner/customers/${cust.id}`}
                           title="View Detail Profile"
-                          className="rounded-lg p-1.5 text-[color:var(--app-muted)] hover:bg-amber-500/10 hover:text-amber-500 transition"
+                          className="rounded-lg p-1.5 text-[color:var(--app-muted)] hover:text-amber-500 transition"
                         >
                           <Eye size={16} />
                         </Link>
                         <button
                           onClick={() => openEditModal(cust)}
                           title="Edit Customer"
-                          className="rounded-lg p-1.5 text-[color:var(--app-muted)] hover:bg-blue-500/10 hover:text-blue-500 transition"
+                          className="rounded-lg p-1.5 text-[color:var(--app-muted)] hover:text-blue-500 transition"
                         >
                           <Edit2 size={16} />
                         </button>
                         <button
                           onClick={() => openMergeModal(cust)}
                           title="Merge Customer"
-                          className="rounded-lg p-1.5 text-[color:var(--app-muted)] hover:bg-purple-500/10 hover:text-purple-500 transition"
+                          className="rounded-lg p-1.5 text-[color:var(--app-muted)] hover:text-purple-500 transition"
                         >
                           <GitMerge size={16} />
                         </button>
@@ -449,7 +449,7 @@ export default function OwnerCustomerManager() {
 
         {/* Pagination Controls */}
         {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-[color:var(--app-border)] bg-[color:var(--app-surface-2)] px-4 py-3 text-xs">
+          <div className="flex items-center justify-between border-t border-[color:var(--app-border)]/40 px-4 py-3 text-xs">
             <span className="text-[color:var(--app-muted)]">
               Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
             </span>
@@ -457,14 +457,14 @@ export default function OwnerCustomerManager() {
               <button
                 disabled={pagination.page <= 1}
                 onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
-                className="flex items-center gap-1 rounded-lg border border-[color:var(--app-border)] px-3 py-1 font-medium disabled:opacity-40 hover:bg-[color:var(--app-surface-1)]"
+                className="flex items-center gap-1 px-3 py-1 font-medium disabled:opacity-40 theme-muted hover:text-[color:var(--app-text)]"
               >
                 <ChevronLeft size={14} /> Prev
               </button>
               <button
                 disabled={pagination.page >= pagination.totalPages}
                 onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
-                className="flex items-center gap-1 rounded-lg border border-[color:var(--app-border)] px-3 py-1 font-medium disabled:opacity-40 hover:bg-[color:var(--app-surface-1)]"
+                className="flex items-center gap-1 px-3 py-1 font-medium disabled:opacity-40 theme-muted hover:text-[color:var(--app-text)]"
               >
                 Next <ChevronRight size={14} />
               </button>
