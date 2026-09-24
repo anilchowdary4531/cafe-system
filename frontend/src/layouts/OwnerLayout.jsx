@@ -518,12 +518,6 @@ export default function OwnerLayout() {
             icon: <Package size={18} />,
             accessKey: "inventory",
         },
-        ...(isTobaccoApproved ? [{
-            label: "Tobacco Studio",
-            path: "/owner/menu?tobacco=true",
-            icon: <span className="text-base leading-none">🚬</span>,
-            accessKey: "menu",
-        }] : []),
         {
             label: "Tables & QR",
             path: "/owner/tables",

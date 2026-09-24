@@ -440,29 +440,6 @@ export default function MenuStudio() {
                         onChange={(e) => setSearch(e.target.value)}
                     />
                 </div>
-                {restaurantInfo?.tobaccoApproved === true && (
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setEditingId(null);
-                            setForm({
-                                name: "",
-                                description: "",
-                                category: "Cigarettes",
-                                image: "",
-                                originalPrice: "",
-                                discountPercent: "",
-                                isAvailable: true,
-                                variants: [],
-                                modifierGroups: [],
-                            });
-                            setFormOpen(true);
-                        }}
-                        className="theme-soft-button shrink-0 rounded-xl px-4 py-3 text-xs font-bold border border-amber-500/30 text-amber-300 flex items-center gap-1.5"
-                    >
-                        <span>🚬</span> + Add Tobacco Product
-                    </button>
-                )}
                 <button
                     type="button"
                     onClick={() => setShowDigitalMenuModal(true)}
