@@ -17,26 +17,27 @@ import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 
-const KOT_STATUSES = ["ALL", "PENDING", "PREPARING", "READY", "DELIVERED", "CANCELLED"];
+const KOT_STATUSES = ["ALL", "PENDING", "PREPARING", "READY", "SERVED", "DELIVERED", "CANCELLED"];
 
 const statusBadgeClass = (status) => {
     switch (status) {
         case "READY":
-            return "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+            return "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/30";
         case "PREPARING":
-            return "bg-amber-500/20 text-amber-300 border-amber-500/30";
+            return "bg-amber-500/20 text-amber-600 dark:text-amber-300 border-amber-500/30";
         case "DELIVERED":
-            return "bg-sky-500/20 text-sky-300 border-sky-500/30";
+        case "SERVED":
+            return "bg-sky-500/20 text-sky-600 dark:text-sky-300 border-sky-500/30";
         case "CANCELLED":
-            return "bg-red-500/20 text-red-300 border-red-500/30";
+            return "bg-red-500/20 text-red-600 dark:text-red-300 border-red-500/30";
         default:
-            return "bg-blue-500/20 text-blue-300 border-blue-500/30";
+            return "bg-blue-500/20 text-blue-600 dark:text-blue-300 border-blue-500/30";
     }
 };
 
 export default function KotHistoryPage() {
     const { user } = useAuth();
-    const restaurantId = user?.restaurantId;
+    const restaurantId = Number(user?.restaurantId || localStorage.getItem("activeRestaurantId") || 1);
 
     const [kots, setKots] = useState([]);
     const [stations, setStations] = useState([]);
@@ -95,7 +96,7 @@ export default function KotHistoryPage() {
             const q = searchQuery.trim().toLowerCase();
             if (!q) return true;
 
-            const kotNum = String(kot.kotNumber || "").toLowerCase();
+            const kotNum = String(kot.kotNo || kot.kotNumber || "").toLowerCase();
             const orderNum = String(kot.order?.orderNo || kot.orderId || "").toLowerCase();
             const tableNum = String(kot.order?.tableNo || "").toLowerCase();
 
@@ -103,7 +104,7 @@ export default function KotHistoryPage() {
                 kotNum.includes(q) ||
                 orderNum.includes(q) ||
                 tableNum.includes(q) ||
-                kot.items.some((i) => i.itemName.toLowerCase().includes(q))
+                (Array.isArray(kot.items) && kot.items.some((i) => String(i.itemName || "").toLowerCase().includes(q)))
             );
         });
     }, [kots, selectedStatus, selectedStation, searchQuery]);
@@ -249,7 +250,7 @@ export default function KotHistoryPage() {
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <h4 className="font-bold text-base text-orange-500 font-mono">
-                                                    {kot.kotNumber}
+                                                    {kot.kotNo || kot.kotNumber || `KOT #${kot.sequenceNumber || kot.id}`}
                                                 </h4>
                                                 {kot.reprintCount > 0 && (
                                                     <span className="rounded-md bg-amber-500/20 text-amber-500 text-[10px] px-1.5 py-0.5 font-bold">
@@ -292,32 +293,40 @@ export default function KotHistoryPage() {
 
                                     {/* Ticket Items List */}
                                     <div className="py-2 space-y-1.5">
-                                        {kot.items.map((item) => (
-                                            <div key={item.id} className="text-xs space-y-0.5">
-                                                <div className="flex items-start justify-between font-medium">
-                                                    <span className="text-[color:var(--app-text)]">
-                                                        <strong className="text-orange-500 font-bold">{item.quantity}x</strong> {item.itemName}
-                                                    </span>
-                                                </div>
-
-                                                {/* Variant & Modifiers Details */}
-                                                {(item.variantName || (item.modifiers && item.modifiers.length > 0)) && (
-                                                    <div className="pl-3.5 text-[11px] theme-muted space-y-0.5 border-l-2 border-orange-500/40">
-                                                        {item.variantName && (
-                                                            <div>Option: <span className="text-[color:var(--app-text)] font-medium">{item.variantName}</span></div>
-                                                        )}
-                                                        {item.modifiers && item.modifiers.map((mod, idx) => (
-                                                            <div key={idx}>
-                                                                + {mod.groupName ? `${mod.groupName}: ` : ""}<span className="text-[color:var(--app-text)]">{mod.optionName}</span>
-                                                            </div>
-                                                        ))}
+                                        {(Array.isArray(kot.items) ? kot.items : []).map((item) => {
+                                            const qty = item.qty || item.quantity || 1;
+                                            const mods = Array.isArray(item.selectedModifiers)
+                                                ? item.selectedModifiers
+                                                : Array.isArray(item.modifiers)
+                                                ? item.modifiers
+                                                : [];
+                                            return (
+                                                <div key={item.id} className="text-xs space-y-0.5">
+                                                    <div className="flex items-start justify-between font-medium">
+                                                        <span className="text-[color:var(--app-text)]">
+                                                            <strong className="text-orange-500 font-bold">{qty}x</strong> {item.itemName}
+                                                        </span>
                                                     </div>
-                                                )}
-                                                {item.notes && (
-                                                    <p className="pl-3.5 text-[10px] italic text-amber-500">Note: {item.notes}</p>
-                                                )}
-                                            </div>
-                                        ))}
+
+                                                    {/* Variant & Modifiers Details */}
+                                                    {(item.variantName || mods.length > 0) && (
+                                                        <div className="pl-3.5 text-[11px] theme-muted space-y-0.5 border-l-2 border-orange-500/40">
+                                                            {item.variantName && (
+                                                                <div>Option: <span className="text-[color:var(--app-text)] font-medium">{item.variantName}</span></div>
+                                                            )}
+                                                            {mods.map((mod, idx) => (
+                                                                <div key={idx}>
+                                                                    + {mod.groupName ? `${mod.groupName}: ` : ""}<span className="text-[color:var(--app-text)]">{mod.optionName || mod.name || mod}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {item.notes && (
+                                                        <p className="pl-3.5 text-[10px] italic text-amber-500">Note: {item.notes}</p>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
 

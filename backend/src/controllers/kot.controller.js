@@ -38,7 +38,7 @@ export const getKots = async (req, res) => {
       take: Math.min(200, Math.max(1, Number(limit))),
       orderBy: [
         { priority: "desc" },
-        { createdAt: "asc" },
+        { createdAt: "desc" },
       ],
       include: {
         items: true,
