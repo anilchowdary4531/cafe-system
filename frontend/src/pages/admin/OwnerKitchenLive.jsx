@@ -500,28 +500,48 @@ export default function OwnerKitchenLive() {
             {/* ========================================================= */}
             {activeTab === "overview" && (
                 <div className="space-y-4">
-                    {/* Top Summary Cards */}
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                        <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] p-4 shadow-xs">
-                            <p className="text-[11px] font-bold uppercase tracking-wider theme-muted">KOTs Today</p>
-                            <p className="mt-1 text-2xl font-black text-[color:var(--app-text)]">{overviewStats.kotsToday}</p>
-                        </div>
-                        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 shadow-xs">
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-500">Preparing</p>
-                            <p className="mt-1 text-2xl font-black text-amber-500">{overviewStats.preparing}</p>
-                        </div>
-                        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 shadow-xs">
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-500">Ready</p>
-                            <p className="mt-1 text-2xl font-black text-emerald-500">{overviewStats.ready}</p>
-                        </div>
-                        <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 p-4 shadow-xs">
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-sky-500">Delivered</p>
-                            <p className="mt-1 text-2xl font-black text-sky-500">{overviewStats.delivered}</p>
-                        </div>
-                        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 shadow-xs">
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-rose-500">Cancelled</p>
-                            <p className="mt-1 text-2xl font-black text-rose-500">{overviewStats.cancelled}</p>
-                        </div>
+                    {/* Top Summary Compact Buttons */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => { setActiveTab("live"); setLiveStatusFilter("ALL"); }}
+                            className="inline-flex items-center gap-2 rounded-xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] px-3.5 py-1.5 text-xs font-bold transition hover:bg-black/5 dark:hover:bg-white/5"
+                        >
+                            <span className="theme-muted font-bold">KOTs Today</span>
+                            <span className="rounded-md bg-black/10 dark:bg-white/10 px-2 py-0.5 text-xs font-extrabold text-[color:var(--app-text)]">{overviewStats.kotsToday}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setActiveTab("live"); setLiveStatusFilter("PREPARING"); }}
+                            className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-1.5 text-xs font-bold text-amber-500 transition hover:bg-amber-500/20"
+                        >
+                            <span className="font-bold">Preparing</span>
+                            <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-xs font-extrabold">{overviewStats.preparing}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setActiveTab("live"); setLiveStatusFilter("READY"); }}
+                            className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1.5 text-xs font-bold text-emerald-500 transition hover:bg-emerald-500/20"
+                        >
+                            <span className="font-bold">Ready</span>
+                            <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-xs font-extrabold">{overviewStats.ready}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setActiveTab("live"); setLiveStatusFilter("DELIVERED"); }}
+                            className="inline-flex items-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-3.5 py-1.5 text-xs font-bold text-sky-500 transition hover:bg-sky-500/20"
+                        >
+                            <span className="font-bold">Delivered</span>
+                            <span className="rounded-md bg-sky-500/20 px-2 py-0.5 text-xs font-extrabold">{overviewStats.delivered}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setActiveTab("audit"); setAuditStatusFilter("CANCELLED"); }}
+                            className="inline-flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-1.5 text-xs font-bold text-rose-500 transition hover:bg-rose-500/20"
+                        >
+                            <span className="font-bold">Cancelled</span>
+                            <span className="rounded-md bg-rose-500/20 px-2 py-0.5 text-xs font-extrabold">{overviewStats.cancelled}</span>
+                        </button>
                     </div>
 
                     {/* Main Overview Split Grid */}
