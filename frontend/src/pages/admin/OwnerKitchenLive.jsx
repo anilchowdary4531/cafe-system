@@ -1772,23 +1772,33 @@ export default function OwnerKitchenLive() {
             {activeTab === "hardware" && (
                 <div className="space-y-5">
                     {/* Hardware Overview Top Cards */}
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-1">
-                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">Thermal Printers</p>
-                            <p className="text-2xl font-black text-emerald-400">
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 truncate">Thermal Printers</p>
+                                <p className="text-[10px] theme-muted truncate">ESC/POS Port 9100 Printers</p>
+                            </div>
+                            <span className="rounded-lg bg-emerald-500/20 px-2.5 py-1 text-xs font-black text-emerald-400 whitespace-nowrap border border-emerald-500/30">
                                 {printers.filter((p) => p.isActive !== false).length} Online / {printers.length || 1} Total
-                            </p>
-                            <p className="text-[11px] theme-muted">ESC/POS Port 9100 Network Printers</p>
+                            </span>
                         </div>
-                        <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 p-4 space-y-1">
-                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-sky-400">Kitchen Display Systems (KDS)</p>
-                            <p className="text-2xl font-black text-sky-400">1 Online / 1 Total</p>
-                            <p className="text-[11px] theme-muted">Real-time WebSocket Kitchen Screens</p>
+                        <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3.5 py-2.5 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-extrabold uppercase tracking-wider text-sky-400 truncate">Kitchen Display Systems (KDS)</p>
+                                <p className="text-[10px] theme-muted truncate">WebSocket Kitchen Screens</p>
+                            </div>
+                            <span className="rounded-lg bg-sky-500/20 px-2.5 py-1 text-xs font-black text-sky-400 whitespace-nowrap border border-sky-500/30">
+                                1 Online / 1 Total
+                            </span>
                         </div>
-                        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-1">
-                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">POS Billing Terminals</p>
-                            <p className="text-2xl font-black text-amber-400">1 Online / 1 Total</p>
-                            <p className="text-[11px] theme-muted">Active Cashier & Waiter Terminals</p>
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400 truncate">POS Billing Terminals</p>
+                                <p className="text-[10px] theme-muted truncate">Cashier & Waiter Terminals</p>
+                            </div>
+                            <span className="rounded-lg bg-amber-500/20 px-2.5 py-1 text-xs font-black text-amber-400 whitespace-nowrap border border-amber-500/30">
+                                1 Online / 1 Total
+                            </span>
                         </div>
                     </div>
 
