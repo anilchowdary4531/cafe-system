@@ -23,6 +23,10 @@ import {
     Layers,
     ArrowUpRight,
     TrendingUp,
+    History,
+    Calendar,
+    ChevronLeft,
+    ChevronRight,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/apiClient";
@@ -90,6 +94,7 @@ export default function OwnerKitchenLive() {
 
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab = searchParams.get("tab") || "overview";
+    const liveView = searchParams.get("view") || "live";
 
     const setActiveTab = (tabKey) => {
         setSearchParams({ tab: tabKey });
@@ -110,6 +115,23 @@ export default function OwnerKitchenLive() {
     const [liveQuery, setLiveQuery] = useState("");
     const [liveStatusFilter, setLiveStatusFilter] = useState("ALL");
     const [liveStationFilter, setLiveStationFilter] = useState("ALL");
+
+    // History View State
+    const historyPreset = searchParams.get("preset") || "yesterday";
+    const historySelectedDate = searchParams.get("date") || "";
+    const historyStartDate = searchParams.get("startDate") || "";
+    const historyEndDate = searchParams.get("endDate") || "";
+    const [historySearch, setHistorySearch] = useState("");
+    const [historyStatusFilter, setHistoryStatusFilter] = useState("ALL");
+    const [historyStationFilter, setHistoryStationFilter] = useState("ALL");
+    const [historyTableFilter, setHistoryTableFilter] = useState("ALL");
+    const [historySourceFilter, setHistorySourceFilter] = useState("ALL");
+    const [historyPage, setHistoryPage] = useState(1);
+    const [historyLimit, setHistoryLimit] = useState(20);
+    const [historyKots, setHistoryKots] = useState([]);
+    const [historyPagination, setHistoryPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [selectedHistoryKot, setSelectedHistoryKot] = useState(null);
 
     // Filters for KOT Audit Trail Tab
     const [auditSearch, setAuditSearch] = useState("");
@@ -153,7 +175,7 @@ export default function OwnerKitchenLive() {
         if (!restaurantId || isNaN(Number(restaurantId))) return;
         try {
             const [kotsRes, stationsRes] = await Promise.all([
-                api.get(`/owner/${restaurantId}/kots`),
+                api.get(`/owner/${restaurantId}/kots?scope=today`),
                 api.get(`/owner/${restaurantId}/stations`),
             ]);
             const kotsData = kotsRes?.data?.kots || kotsRes?.data?.data || (Array.isArray(kotsRes?.data) ? kotsRes.data : []);
@@ -165,7 +187,49 @@ export default function OwnerKitchenLive() {
         }
     };
 
-    // 3. Fetch Hardware Printers
+    // 3. Fetch Historical KOT Orders for History View
+    const loadHistoryKots = async ({ silent = false } = {}) => {
+        if (!restaurantId || isNaN(Number(restaurantId))) return;
+        try {
+            if (silent) setRefreshing(true);
+            else setHistoryLoading(true);
+
+            const params = new URLSearchParams({
+                scope: "history",
+                preset: historyPreset,
+                page: String(historyPage),
+                limit: String(historyLimit),
+            });
+
+            if (historySelectedDate) {
+                params.set("startDate", historySelectedDate);
+                params.set("endDate", historySelectedDate);
+            } else {
+                if (historyStartDate) params.set("startDate", historyStartDate);
+                if (historyEndDate) params.set("endDate", historyEndDate);
+            }
+
+            if (historyStatusFilter !== "ALL") params.set("status", historyStatusFilter);
+            if (historyStationFilter !== "ALL") params.set("stationId", historyStationFilter);
+            if (historyTableFilter !== "ALL") params.set("tableNo", historyTableFilter);
+            if (historySourceFilter !== "ALL") params.set("source", historySourceFilter);
+            if (historySearch.trim()) params.set("q", historySearch.trim());
+
+            const res = await api.get(`/owner/${restaurantId}/kots?${params.toString()}`);
+            const list = res?.data?.kots || [];
+            setHistoryKots(Array.isArray(list) ? list : []);
+            if (res?.data?.pagination) {
+                setHistoryPagination(res.data.pagination);
+            }
+        } catch (err) {
+            console.error("Failed to load historical KOTs", err);
+        } finally {
+            setHistoryLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    // 4. Fetch Hardware Printers
     const loadHardwarePrinters = async () => {
         if (!restaurantId || isNaN(Number(restaurantId))) return;
         try {
@@ -179,7 +243,11 @@ export default function OwnerKitchenLive() {
 
     const handleRefreshAll = async () => {
         setRefreshing(true);
-        await Promise.all([loadLiveOrders({ silent: true }), loadKotHistory(), loadHardwarePrinters()]);
+        if (activeTab === "live" && liveView === "history") {
+            await Promise.all([loadHistoryKots({ silent: true }), loadHardwarePrinters()]);
+        } else {
+            await Promise.all([loadLiveOrders({ silent: true }), loadKotHistory(), loadHardwarePrinters()]);
+        }
         setRefreshing(false);
         showToast({ title: "Refreshed", message: "Kitchen Operations data updated.", variant: "info" });
     };
@@ -189,6 +257,27 @@ export default function OwnerKitchenLive() {
         loadKotHistory();
         loadHardwarePrinters();
     }, [restaurantId]);
+
+    useEffect(() => {
+        if (activeTab === "live" && liveView === "history") {
+            loadHistoryKots();
+        }
+    }, [
+        activeTab,
+        liveView,
+        historyPreset,
+        historySelectedDate,
+        historyStartDate,
+        historyEndDate,
+        historyStatusFilter,
+        historyStationFilter,
+        historyTableFilter,
+        historySourceFilter,
+        historySearch,
+        historyPage,
+        historyLimit,
+        restaurantId,
+    ]);
 
     // WebSocket real-time order listener for Live KOT tab
     useEffect(() => {
@@ -411,6 +500,57 @@ export default function OwnerKitchenLive() {
         });
         return Array.from(set);
     }, [kots]);
+
+    const getFormattedDisplayDate = () => {
+        let dateStr = historySelectedDate;
+        if (!dateStr) {
+            if (historyPreset === "today") {
+                dateStr = new Date().toISOString().split("T")[0];
+            } else if (historyPreset === "yesterday") {
+                dateStr = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+            } else {
+                dateStr = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+            }
+        }
+        const [y, m, d] = dateStr.split("-");
+        if (y && m && d) {
+            const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+            return dateObj.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+        }
+        return dateStr;
+    };
+
+    const getCurrentYmd = () => {
+        if (historySelectedDate) return historySelectedDate;
+        if (historyPreset === "today") return new Date().toISOString().split("T")[0];
+        return new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    };
+
+    const handleStepDate = (dir) => {
+        const currentYmd = getCurrentYmd();
+        const [y, m, d] = currentYmd.split("-").map(Number);
+        const dateObj = new Date(y, m - 1, d);
+        if (dir === "prev") {
+            dateObj.setDate(dateObj.getDate() - 1);
+        } else if (dir === "next") {
+            dateObj.setDate(dateObj.getDate() + 1);
+        }
+        const newYmd = dateObj.toISOString().split("T")[0];
+        const todayYmd = new Date().toISOString().split("T")[0];
+        if (newYmd > todayYmd) return;
+
+        const nextPreset = newYmd === todayYmd ? "today" : newYmd === new Date(Date.now() - 86400000).toISOString().split("T")[0] ? "yesterday" : "custom";
+
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set("tab", "live");
+            next.set("view", "history");
+            next.set("preset", nextPreset);
+            next.set("date", newYmd);
+            return next;
+        });
+        setHistoryPage(1);
+    };
 
     if (effectiveRole === "CHEF") {
         return <Navigate to="/kitchen" replace />;
@@ -637,187 +777,615 @@ export default function OwnerKitchenLive() {
                 </div>
             )}
 
-            {/* ========================================================= */}
-            {/* TAB 2 — LIVE KOTS */}
-            {/* ========================================================= */}
             {activeTab === "live" && (
                 <div className="space-y-4">
-                    {/* Live KOT Filter Controls Bar */}
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-[color:var(--app-border)]/40 pb-3">
-                        {/* Status Pills */}
-                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                    {/* Secondary Navigation Bar: LIVE KOTS | HISTORY */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-3">
+                        <div className="flex items-center gap-1.5 rounded-2xl bg-black/5 dark:bg-white/5 p-1 border border-[color:var(--app-border)]/30">
                             <button
                                 type="button"
-                                onClick={() => setLiveStatusFilter("ALL")}
-                                className={`rounded-xl px-3 py-1.5 text-xs font-extrabold whitespace-nowrap transition ${
-                                    liveStatusFilter === "ALL"
-                                        ? "bg-orange-500 text-black shadow-xs"
-                                        : "theme-muted hover:bg-black/5 dark:hover:bg-white/5"
+                                onClick={() => {
+                                    setSearchParams({ tab: "live", view: "live" });
+                                }}
+                                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black transition-all ${
+                                    liveView !== "history"
+                                        ? "bg-gradient-to-r from-orange-500 to-amber-500 text-black shadow-md"
+                                        : "theme-muted hover:text-white"
                                 }`}
                             >
-                                All ({orders.length})
+                                <ChefHat size={15} />
+                                LIVE KOTS
                             </button>
-                            {STATUS_COLUMNS.map((col) => (
-                                <button
-                                    key={col}
-                                    type="button"
-                                    onClick={() => setLiveStatusFilter(col)}
-                                    className={`rounded-xl px-3 py-1.5 text-xs font-extrabold whitespace-nowrap transition ${
-                                        liveStatusFilter === col
-                                            ? "bg-orange-500 text-black shadow-xs"
-                                            : "theme-muted hover:bg-black/5 dark:hover:bg-white/5"
-                                    }`}
-                                >
-                                    {col} ({liveCounts[col] || 0})
-                                </button>
-                            ))}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearchParams({ tab: "live", view: "history", preset: "yesterday" });
+                                }}
+                                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black transition-all ${
+                                    liveView === "history"
+                                        ? "bg-gradient-to-r from-orange-500 to-amber-500 text-black shadow-md"
+                                        : "theme-muted hover:text-white"
+                                }`}
+                            >
+                                <History size={15} />
+                                HISTORY
+                            </button>
                         </div>
 
-                        {/* Search & Station Selector */}
-                        <div className="flex items-center gap-2">
-                            <div className="relative flex-1 min-w-[200px]">
-                                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 theme-muted" />
-                                <input
-                                    value={liveQuery}
-                                    onChange={(e) => setLiveQuery(e.target.value)}
-                                    placeholder="Search order #, table, customer, or KOT #..."
-                                    className="w-full rounded-xl border border-[color:var(--app-border)]/40 bg-transparent py-1.5 pl-9 pr-3 text-xs outline-none focus:border-orange-500"
-                                />
+                        {liveView !== "history" ? (
+                            <div className="flex items-center gap-2 text-xs theme-muted">
+                                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span className="font-bold text-orange-400">Today's Orders</span>
+                                <span>•</span>
+                                <span className="font-medium">
+                                    {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+                                </span>
                             </div>
-                            <select
-                                value={liveStationFilter}
-                                onChange={(e) => setLiveStationFilter(e.target.value)}
-                                className="rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3 py-1.5 text-xs outline-none focus:border-orange-500"
-                            >
-                                <option value="ALL" className="bg-zinc-900 text-white">All Stations</option>
-                                <option value="UNASSIGNED" className="bg-zinc-900 text-white">Unassigned</option>
-                                {stations.map((st) => (
-                                    <option key={st.id} value={st.id} className="bg-zinc-900 text-white">
-                                        {st.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                        ) : (
+                            <div className="flex items-center gap-2 text-xs theme-muted">
+                                <RotateCcw size={14} className="text-amber-400" />
+                                <span className="font-bold text-amber-400">Historical Order Lookup</span>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Live KOT Cards Grid */}
-                    <div className="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
-                        {STATUS_COLUMNS.map((status) => {
-                            if (liveStatusFilter !== "ALL" && liveStatusFilter !== status) return null;
+                    {/* LIVE VIEW */}
+                    {liveView !== "history" && (
+                        <>
+                            {/* Live KOT Filter Controls Bar */}
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-[color:var(--app-border)]/40 pb-3">
+                                {/* Status Pills */}
+                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setLiveStatusFilter("ALL")}
+                                        className={`rounded-xl px-3 py-1.5 text-xs font-extrabold whitespace-nowrap transition ${
+                                            liveStatusFilter === "ALL"
+                                                ? "bg-orange-500 text-black shadow-xs"
+                                                : "theme-muted hover:bg-black/5 dark:hover:bg-white/5"
+                                        }`}
+                                    >
+                                        All ({orders.length})
+                                    </button>
+                                    {STATUS_COLUMNS.map((col) => (
+                                        <button
+                                            key={col}
+                                            type="button"
+                                            onClick={() => setLiveStatusFilter(col)}
+                                            className={`rounded-xl px-3 py-1.5 text-xs font-extrabold whitespace-nowrap transition ${
+                                                liveStatusFilter === col
+                                                    ? "bg-orange-500 text-black shadow-xs"
+                                                    : "theme-muted hover:bg-black/5 dark:hover:bg-white/5"
+                                            }`}
+                                        >
+                                            {col} ({liveCounts[col] || 0})
+                                        </button>
+                                    ))}
+                                </div>
 
-                            return (
-                                <div key={status} className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] p-4 space-y-3">
-                                    <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/30 pb-2">
-                                        <h4 className="text-xs font-extrabold uppercase tracking-wider text-orange-400">{status}</h4>
-                                        <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold text-orange-300">
-                                            {liveCounts[status] || 0}
-                                        </span>
+                                {/* Search & Station Selector */}
+                                <div className="flex items-center gap-2">
+                                    <div className="relative flex-1 min-w-[200px]">
+                                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 theme-muted" />
+                                        <input
+                                            value={liveQuery}
+                                            onChange={(e) => setLiveQuery(e.target.value)}
+                                            placeholder="Search order #, table, customer, or KOT #..."
+                                            className="w-full rounded-xl border border-[color:var(--app-border)]/40 bg-transparent py-1.5 pl-9 pr-3 text-xs outline-none focus:border-orange-500"
+                                        />
                                     </div>
+                                    <select
+                                        value={liveStationFilter}
+                                        onChange={(e) => setLiveStationFilter(e.target.value)}
+                                        className="rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3 py-1.5 text-xs outline-none focus:border-orange-500"
+                                    >
+                                        <option value="ALL" className="bg-zinc-900 text-white">All Stations</option>
+                                        <option value="UNASSIGNED" className="bg-zinc-900 text-white">Unassigned</option>
+                                        {stations.map((st) => (
+                                            <option key={st.id} value={st.id} className="bg-zinc-900 text-white">
+                                                {st.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
 
-                                    <div className="space-y-3">
-                                        {liveGroupedOrders[status].map((order) => {
-                                            const prepMins = getMinutesSince(order.createdAt);
-                                            const action = nextActionByStatus(normalizeStatus(order.status));
+                            {/* Live KOT Cards Grid */}
+                            <div className="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
+                                {STATUS_COLUMNS.map((status) => {
+                                    if (liveStatusFilter !== "ALL" && liveStatusFilter !== status) return null;
 
-                                            return (
-                                                <article
-                                                    key={order.id}
-                                                    className="rounded-xl border border-[color:var(--app-border)]/40 bg-black/10 dark:bg-white/5 p-3.5 space-y-3 shadow-xs"
-                                                >
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <div>
-                                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                                <p className="text-sm font-black">
-                                                                    {order.orderNo || `Order #${order.id}`}
-                                                                </p>
-                                                                {Array.isArray(order.kots) && order.kots.length > 0 && (
-                                                                    <span className="rounded bg-orange-500/20 text-orange-400 px-1.5 py-0.5 text-[10px] font-extrabold font-mono">
-                                                                        {order.kots.map((k) => k.kotNo || k.kotNumber).join(", ")}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <p className="theme-muted text-xs mt-0.5">
-                                                                Table {order.tableNo || "-"}
-                                                                {order.customerName ? ` • ${order.customerName}` : ""}
-                                                            </p>
-                                                        </div>
-                                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${statusPillClass(normalizeStatus(order.status))}`}>
-                                                            {normalizeStatus(order.status)}
-                                                        </span>
-                                                    </div>
+                                    return (
+                                        <div key={status} className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] p-4 space-y-3">
+                                            <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/30 pb-2">
+                                                <h4 className="text-xs font-extrabold uppercase tracking-wider text-orange-400">{status}</h4>
+                                                <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold text-orange-300">
+                                                    {liveCounts[status] || 0}
+                                                </span>
+                                            </div>
 
-                                                    <div className="space-y-2 border-t border-[color:var(--app-border)]/30 pt-2">
-                                                        {(order.items || []).map((item, iIdx) => {
-                                                            const variantLabel = item.variantName || item.variant?.name || "";
-                                                            const addons = Array.isArray(item.selectedAddons)
-                                                                ? item.selectedAddons
-                                                                : (Array.isArray(item.modifiers) ? item.modifiers : []);
+                                            <div className="space-y-3">
+                                                {liveGroupedOrders[status].map((order) => {
+                                                    const prepMins = getMinutesSince(order.createdAt);
+                                                    const action = nextActionByStatus(normalizeStatus(order.status));
 
-                                                            return (
-                                                                <div key={iIdx} className="space-y-0.5 text-xs">
-                                                                    <div className="flex items-center justify-between">
-                                                                        <span className="font-semibold">
-                                                                            <strong className="text-orange-500 font-extrabold mr-1">{item.qty || item.quantity || 1}x</strong>
-                                                                            {item.itemName || item.name}
-                                                                        </span>
-                                                                        <span className="theme-muted font-mono">
-                                                                            ₹{formatCurrency(item.total || item.price * (item.qty || 1))}
-                                                                        </span>
-                                                                    </div>
-
-                                                                    {(variantLabel || (addons && addons.length > 0)) && (
-                                                                        <div className="pl-3 text-[11px] theme-muted space-y-0.5 border-l-2 border-orange-500/40">
-                                                                            {variantLabel && (
-                                                                                <div>Size: <span className="font-medium">{variantLabel}</span></div>
-                                                                            )}
-                                                                            {addons && addons.map((add, idx) => (
-                                                                                <div key={idx}>
-                                                                                    + {add.groupName ? `${add.groupName}: ` : ""}{add.name || add.optionName}
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-
-                                                    <div className="flex items-center justify-between border-t border-[color:var(--app-border)]/30 pt-2 text-xs theme-muted">
-                                                        <span>Total: ₹{formatCurrency(order.total)}</span>
-                                                        <span className="inline-flex items-center gap-1 text-[11px]">
-                                                            <Clock3 size={13} />
-                                                            {prepMins === null ? "--" : `${prepMins} mins ago`}
-                                                        </span>
-                                                    </div>
-
-                                                    {action && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => updateOrderStatus(order, action.nextStatus)}
-                                                            disabled={updatingOrderId === order.id}
-                                                            className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-3 py-2 text-xs font-black text-black shadow-md hover:from-orange-400 hover:to-amber-400 transition disabled:opacity-60"
+                                                    return (
+                                                        <article
+                                                            key={order.id}
+                                                            className="rounded-xl border border-[color:var(--app-border)]/40 bg-black/10 dark:bg-white/5 p-3.5 space-y-3 shadow-xs"
                                                         >
-                                                            {updatingOrderId === order.id ? (
-                                                                <LoaderCircle size={14} className="animate-spin" />
-                                                            ) : (
-                                                                <CheckCircle2 size={14} />
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <div>
+                                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                                        <p className="text-sm font-black">
+                                                                            {order.orderNo || `Order #${order.id}`}
+                                                                        </p>
+                                                                        {Array.isArray(order.kots) && order.kots.length > 0 && (
+                                                                            <span className="rounded bg-orange-500/20 text-orange-400 px-1.5 py-0.5 text-[10px] font-extrabold font-mono">
+                                                                                {order.kots.map((k) => k.kotNo || k.kotNumber).join(", ")}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <p className="theme-muted text-xs mt-0.5">
+                                                                        Table {order.tableNo || "-"}
+                                                                        {order.customerName ? ` • ${order.customerName}` : ""}
+                                                                    </p>
+                                                                </div>
+                                                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${statusPillClass(normalizeStatus(order.status))}`}>
+                                                                    {normalizeStatus(order.status)}
+                                                                </span>
+                                                            </div>
+
+                                                            <div className="space-y-2 border-t border-[color:var(--app-border)]/30 pt-2">
+                                                                {(order.items || []).map((item, iIdx) => {
+                                                                    const variantLabel = item.variantName || item.variant?.name || "";
+                                                                    const addons = Array.isArray(item.selectedAddons)
+                                                                        ? item.selectedAddons
+                                                                        : (Array.isArray(item.modifiers) ? item.modifiers : []);
+
+                                                                    return (
+                                                                        <div key={iIdx} className="space-y-0.5 text-xs">
+                                                                            <div className="flex items-center justify-between">
+                                                                                <span className="font-semibold">
+                                                                                    <strong className="text-orange-500 font-extrabold mr-1">{item.qty || item.quantity || 1}x</strong>
+                                                                                    {item.itemName || item.name}
+                                                                                </span>
+                                                                                <span className="theme-muted font-mono">
+                                                                                    ₹{formatCurrency(item.total || item.price * (item.qty || 1))}
+                                                                                </span>
+                                                                            </div>
+
+                                                                            {(variantLabel || (addons && addons.length > 0)) && (
+                                                                                <div className="pl-3 text-[11px] theme-muted space-y-0.5 border-l-2 border-orange-500/40">
+                                                                                    {variantLabel && (
+                                                                                        <div>Size: <span className="font-medium">{variantLabel}</span></div>
+                                                                                    )}
+                                                                                    {addons && addons.map((add, idx) => (
+                                                                                        <div key={idx}>
+                                                                                            + {add.groupName ? `${add.groupName}: ` : ""}{add.name || add.optionName}
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+
+                                                            <div className="flex items-center justify-between border-t border-[color:var(--app-border)]/30 pt-2 text-xs theme-muted">
+                                                                <span>Total: ₹{formatCurrency(order.total)}</span>
+                                                                <span className="inline-flex items-center gap-1 text-[11px]">
+                                                                    <Clock3 size={13} />
+                                                                    {prepMins === null ? "--" : `${prepMins} mins ago`}
+                                                                </span>
+                                                            </div>
+
+                                                            {action && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => updateOrderStatus(order, action.nextStatus)}
+                                                                    disabled={updatingOrderId === order.id}
+                                                                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-3 py-2 text-xs font-black text-black shadow-md hover:from-orange-400 hover:to-amber-400 transition disabled:opacity-60"
+                                                                >
+                                                                    {updatingOrderId === order.id ? (
+                                                                        <LoaderCircle size={14} className="animate-spin" />
+                                                                    ) : (
+                                                                        <CheckCircle2 size={14} />
+                                                                    )}
+                                                                    <span>{action.label}</span>
+                                                                </button>
                                                             )}
-                                                            <span>{action.label}</span>
-                                                        </button>
-                                                    )}
-                                                </article>
-                                            );
-                                        })}
+                                                        </article>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {!loading && liveGroupedOrders[status].length === 0 && (
+                                                <div className="rounded-xl border border-dashed border-[color:var(--app-border)]/40 p-4 text-center text-xs theme-muted">
+                                                    No active kitchen orders in {status.toLowerCase()} queue. New KOTs will appear automatically.
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {orders.length === 0 && !loading && (
+                                <div className="rounded-2xl border border-dashed border-[color:var(--app-border)]/50 p-8 text-center space-y-2">
+                                    <ChefHat size={36} className="mx-auto theme-muted opacity-50" />
+                                    <h4 className="font-extrabold text-sm">No kitchen orders today</h4>
+                                    <p className="theme-muted text-xs">New orders will appear here automatically.</p>
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {/* HISTORY VIEW */}
+                    {liveView === "history" && (
+                        <div className="space-y-4">
+                            {/* History Filter & Date Bar */}
+                            <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] p-4 space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    {/* Date Stepper & Preset Dropdown */}
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <div className="flex items-center rounded-xl border border-[color:var(--app-border)]/40 bg-black/10 dark:bg-white/5 p-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleStepDate("prev")}
+                                                className="rounded-lg p-1.5 theme-muted hover:text-orange-400 hover:bg-black/10 transition"
+                                                title="Previous Day"
+                                            >
+                                                <ChevronLeft size={16} />
+                                            </button>
+                                            <div className="px-3 text-xs font-bold font-mono text-orange-400">
+                                                {getFormattedDisplayDate()}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleStepDate("next")}
+                                                disabled={getCurrentYmd() >= new Date().toISOString().split("T")[0]}
+                                                className="rounded-lg p-1.5 theme-muted hover:text-orange-400 hover:bg-black/10 transition disabled:opacity-30 disabled:hover:text-inherit"
+                                                title="Next Day"
+                                            >
+                                                <ChevronRight size={16} />
+                                            </button>
+                                        </div>
+
+                                        <select
+                                            value={historyPreset}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setSearchParams((prev) => {
+                                                    const next = new URLSearchParams(prev);
+                                                    next.set("tab", "live");
+                                                    next.set("view", "history");
+                                                    next.set("preset", val);
+                                                    next.delete("date");
+                                                    return next;
+                                                });
+                                                setHistoryPage(1);
+                                            }}
+                                            className="rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3 py-1.5 text-xs font-semibold outline-none focus:border-orange-500"
+                                        >
+                                            <option value="yesterday" className="bg-zinc-900 text-white">Yesterday</option>
+                                            <option value="today" className="bg-zinc-900 text-white">Today</option>
+                                            <option value="last7days" className="bg-zinc-900 text-white">Last 7 Days</option>
+                                            <option value="last30days" className="bg-zinc-900 text-white">Last 30 Days</option>
+                                            <option value="custom" className="bg-zinc-900 text-white">Custom Range</option>
+                                        </select>
                                     </div>
 
-                                    {!loading && liveGroupedOrders[status].length === 0 && (
-                                        <div className="rounded-xl border border-dashed border-[color:var(--app-border)]/40 p-4 text-center text-xs theme-muted">
-                                            No active kitchen orders in {status.toLowerCase()} queue. New KOTs will appear automatically.
-                                        </div>
+                                    {/* Search Input */}
+                                    <div className="relative flex-1 min-w-[240px]">
+                                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 theme-muted" />
+                                        <input
+                                            value={historySearch}
+                                            onChange={(e) => {
+                                                setHistorySearch(e.target.value);
+                                                setHistoryPage(1);
+                                            }}
+                                            placeholder="Search KOT #, order #, table, customer, or item..."
+                                            className="w-full rounded-xl border border-[color:var(--app-border)]/40 bg-transparent py-1.5 pl-9 pr-3 text-xs outline-none focus:border-orange-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Filters Row */}
+                                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[color:var(--app-border)]/30 text-xs">
+                                    <span className="theme-muted font-bold flex items-center gap-1">
+                                        <Filter size={13} /> Filters:
+                                    </span>
+
+                                    {/* Status Filter */}
+                                    <select
+                                        value={historyStatusFilter}
+                                        onChange={(e) => {
+                                            setHistoryStatusFilter(e.target.value);
+                                            setHistoryPage(1);
+                                        }}
+                                        className="rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-2.5 py-1 text-xs outline-none focus:border-orange-500"
+                                    >
+                                        <option value="ALL" className="bg-zinc-900 text-white">All Statuses</option>
+                                        {KOT_STATUSES.filter((s) => s !== "ALL").map((st) => (
+                                            <option key={st} value={st} className="bg-zinc-900 text-white">{st}</option>
+                                        ))}
+                                    </select>
+
+                                    {/* Station Filter */}
+                                    <select
+                                        value={historyStationFilter}
+                                        onChange={(e) => {
+                                            setHistoryStationFilter(e.target.value);
+                                            setHistoryPage(1);
+                                        }}
+                                        className="rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-2.5 py-1 text-xs outline-none focus:border-orange-500"
+                                    >
+                                        <option value="ALL" className="bg-zinc-900 text-white">All Stations</option>
+                                        {stations.map((st) => (
+                                            <option key={st.id} value={st.id} className="bg-zinc-900 text-white">{st.name}</option>
+                                        ))}
+                                    </select>
+
+                                    {/* Source Filter */}
+                                    <select
+                                        value={historySourceFilter}
+                                        onChange={(e) => {
+                                            setHistorySourceFilter(e.target.value);
+                                            setHistoryPage(1);
+                                        }}
+                                        className="rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-2.5 py-1 text-xs outline-none focus:border-orange-500"
+                                    >
+                                        <option value="ALL" className="bg-zinc-900 text-white">All Sources</option>
+                                        <option value="QR_ORDER" className="bg-zinc-900 text-white">QR Order</option>
+                                        <option value="WAITER" className="bg-zinc-900 text-white">Waiter Order</option>
+                                        <option value="POS" className="bg-zinc-900 text-white">POS Order</option>
+                                        <option value="MANUAL" className="bg-zinc-900 text-white">Manual Order</option>
+                                    </select>
+
+                                    {(historySearch || historyStatusFilter !== "ALL" || historyStationFilter !== "ALL" || historySourceFilter !== "ALL") && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setHistorySearch("");
+                                                setHistoryStatusFilter("ALL");
+                                                setHistoryStationFilter("ALL");
+                                                setHistorySourceFilter("ALL");
+                                                setHistoryPage(1);
+                                            }}
+                                            className="text-[11px] text-orange-400 hover:underline ml-auto font-semibold"
+                                        >
+                                            Reset Filters
+                                        </button>
                                     )}
                                 </div>
-                            );
-                        })}
+                            </div>
+
+                            {/* History Table */}
+                            <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] overflow-hidden shadow-xs">
+                                {historyLoading ? (
+                                    <div className="p-12 text-center theme-muted space-y-2">
+                                        <LoaderCircle size={28} className="animate-spin mx-auto text-orange-500" />
+                                        <p className="text-xs">Loading historical kitchen records...</p>
+                                    </div>
+                                ) : historyKots.length === 0 ? (
+                                    <div className="p-12 text-center theme-muted space-y-2">
+                                        <RotateCcw size={32} className="mx-auto opacity-50 text-amber-500" />
+                                        <h4 className="font-extrabold text-sm">No historical orders found</h4>
+                                        <p className="text-xs">Try selecting another date or adjusting your filters.</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="border-b border-[color:var(--app-border)]/40 bg-black/10 dark:bg-white/5 uppercase text-[10px] tracking-wider theme-muted font-extrabold">
+                                                <tr>
+                                                    <th className="p-3">KOT / Order #</th>
+                                                    <th className="p-3">Date & Time</th>
+                                                    <th className="p-3">Table / Source</th>
+                                                    <th className="p-3">Customer</th>
+                                                    <th className="p-3">Items Summary</th>
+                                                    <th className="p-3">Total</th>
+                                                    <th className="p-3">Status</th>
+                                                    <th className="p-3 text-right">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[color:var(--app-border)]/30">
+                                                {historyKots.map((kot) => {
+                                                    const order = kot.order || {};
+                                                    const itemsPreview = Array.isArray(kot.items)
+                                                        ? kot.items.map((i) => `${i.qty || 1}x ${i.itemName || i.name}`).join(", ")
+                                                        : "-";
+
+                                                    return (
+                                                        <tr
+                                                            key={kot.id}
+                                                            onClick={() => setSelectedHistoryKot(kot)}
+                                                            className="hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition"
+                                                        >
+                                                            <td className="p-3 font-mono font-bold">
+                                                                <div className="text-orange-400 font-extrabold">{kot.kotNo}</div>
+                                                                <div className="text-[11px] theme-muted">{order.orderNo || `ORD-${order.id || kot.orderId}`}</div>
+                                                            </td>
+                                                            <td className="p-3 whitespace-nowrap">
+                                                                <div>{new Date(kot.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
+                                                                <div className="text-[11px] theme-muted font-mono">{formatTimeOnly(kot.createdAt)}</div>
+                                                            </td>
+                                                            <td className="p-3 whitespace-nowrap">
+                                                                <div className="font-semibold">Table {kot.tableNo || order.tableNo || "-"}</div>
+                                                                <div className="text-[11px] theme-muted uppercase">{order.orderSource || "QR Order"}</div>
+                                                            </td>
+                                                            <td className="p-3 whitespace-nowrap font-medium">
+                                                                {order.customerName || "Guest"}
+                                                            </td>
+                                                            <td className="p-3 max-w-[240px] truncate theme-muted" title={itemsPreview}>
+                                                                {itemsPreview}
+                                                            </td>
+                                                            <td className="p-3 whitespace-nowrap font-mono font-bold">
+                                                                ₹{formatCurrency(order.totalAmount || 0)}
+                                                            </td>
+                                                            <td className="p-3 whitespace-nowrap">
+                                                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${statusPillClass(normalizeStatus(kot.status))}`}>
+                                                                    {kot.status}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-3 text-right whitespace-nowrap">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedHistoryKot(kot);
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 rounded-lg border border-[color:var(--app-border)]/40 px-2.5 py-1 text-[11px] font-bold theme-muted hover:text-orange-400 hover:border-orange-500/40 transition"
+                                                                >
+                                                                    <Eye size={12} />
+                                                                    Details
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {/* Server-side Pagination Bar */}
+                                {historyPagination.totalPages > 1 && (
+                                    <div className="flex items-center justify-between border-t border-[color:var(--app-border)]/40 p-3 text-xs theme-muted">
+                                        <div>
+                                            Page <strong className="text-orange-400">{historyPagination.page}</strong> of <strong>{historyPagination.totalPages}</strong> ({historyPagination.total} orders)
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                                                disabled={historyPagination.page <= 1}
+                                                className="rounded-lg border border-[color:var(--app-border)]/40 px-3 py-1 font-bold disabled:opacity-30 hover:bg-black/10 transition"
+                                            >
+                                                Previous
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setHistoryPage((p) => Math.min(historyPagination.totalPages, p + 1))}
+                                                disabled={historyPagination.page >= historyPagination.totalPages}
+                                                className="rounded-lg border border-[color:var(--app-border)]/40 px-3 py-1 font-bold disabled:opacity-30 hover:bg-black/10 transition"
+                                            >
+                                                Next
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Historical Order Details Modal */}
+            {selectedHistoryKot && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+                    <div className="w-full max-w-xl rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-4">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-lg font-black text-orange-400">{selectedHistoryKot.kotNo}</h3>
+                                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${statusPillClass(normalizeStatus(selectedHistoryKot.status))}`}>
+                                        {selectedHistoryKot.status}
+                                    </span>
+                                </div>
+                                <p className="theme-muted text-xs mt-0.5">
+                                    Order #{selectedHistoryKot.order?.orderNo || selectedHistoryKot.orderId}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedHistoryKot(null)}
+                                className="rounded-xl p-2 theme-muted hover:bg-black/10 dark:hover:bg-white/10"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Order Details Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-2xl bg-black/10 dark:bg-white/5 p-3.5 text-xs">
+                            <div>
+                                <div className="theme-muted text-[10px] font-bold uppercase">Date & Time</div>
+                                <div className="font-bold">{new Date(selectedHistoryKot.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</div>
+                                <div className="theme-muted font-mono">{formatTimeOnly(selectedHistoryKot.createdAt)}</div>
+                            </div>
+                            <div>
+                                <div className="theme-muted text-[10px] font-bold uppercase">Table / Source</div>
+                                <div className="font-bold">Table {selectedHistoryKot.tableNo || selectedHistoryKot.order?.tableNo || "-"}</div>
+                                <div className="theme-muted text-[11px]">{selectedHistoryKot.order?.orderSource || "QR Order"}</div>
+                            </div>
+                            <div>
+                                <div className="theme-muted text-[10px] font-bold uppercase">Customer</div>
+                                <div className="font-bold">{selectedHistoryKot.order?.customerName || "Guest"}</div>
+                            </div>
+                            <div>
+                                <div className="theme-muted text-[10px] font-bold uppercase">Total Amount</div>
+                                <div className="font-black font-mono text-orange-400">₹{formatCurrency(selectedHistoryKot.order?.totalAmount || 0)}</div>
+                            </div>
+                        </div>
+
+                        {/* Items Table */}
+                        <div className="space-y-2">
+                            <h4 className="text-xs font-black uppercase text-orange-400">Order Items</h4>
+                            <div className="rounded-2xl border border-[color:var(--app-border)]/40 divide-y divide-[color:var(--app-border)]/30 overflow-hidden">
+                                {(selectedHistoryKot.items || []).map((item, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-3 text-xs">
+                                        <div>
+                                            <div className="font-bold">
+                                                <span className="text-orange-500 mr-1">{item.qty || 1}x</span>
+                                                {item.itemName || item.name}
+                                            </div>
+                                            {item.notes && <div className="text-[11px] theme-muted italic mt-0.5">Note: {item.notes}</div>}
+                                        </div>
+                                        <div className="font-mono font-bold">
+                                            ₹{formatCurrency(item.totalPrice || item.price * (item.qty || 1))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Event Timeline */}
+                        {Array.isArray(selectedHistoryKot.order?.statusEvents) && selectedHistoryKot.order.statusEvents.length > 0 && (
+                            <div className="space-y-2 border-t border-[color:var(--app-border)]/40 pt-4">
+                                <h4 className="text-xs font-black uppercase text-orange-400">Order Timeline</h4>
+                                <div className="space-y-2 pl-2 border-l-2 border-orange-500/30">
+                                    {selectedHistoryKot.order.statusEvents.map((ev, eIdx) => (
+                                        <div key={eIdx} className="flex items-center justify-between text-xs">
+                                            <div className="font-semibold flex items-center gap-1.5">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                                                <span>Status changed to <strong className="uppercase text-orange-400">{ev.status}</strong></span>
+                                            </div>
+                                            <span className="theme-muted font-mono text-[11px]">{formatTimeOnly(ev.createdAt)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-between border-t border-[color:var(--app-border)]/40 pt-4">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedHistoryKot(null)}
+                                className="rounded-xl border border-[color:var(--app-border)]/40 px-4 py-2 text-xs font-bold theme-muted hover:bg-black/10 transition"
+                            >
+                                Close
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleReprintKot(selectedHistoryKot.id)}
+                                disabled={reprintingKotId === selectedHistoryKot.id}
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-black hover:bg-orange-400 transition disabled:opacity-60"
+                            >
+                                <Printer size={14} />
+                                <span>Reprint KOT</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

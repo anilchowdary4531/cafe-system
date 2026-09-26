@@ -54,12 +54,27 @@ export default async function staffRoutes(app, deps) {
       if (!restaurantId) return reply.code(400).send({ message: "Restaurant required" });
 
       const status = req.query?.status ? normalizeOrderStatus(req.query.status) : "";
+
+      // Calculate start of current business day in Asia/Kolkata
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" });
+      const [year, month, day] = formatter.format(now).split("-");
+      const startOfToday = new Date(`${year}-${month}-${day}T00:00:00.000+05:30`);
+      const activeCutoff = new Date(Date.now() - 24 * 3600 * 1000);
+
       const where = {
         restaurantId,
         ...(status ? { status } : {}),
         ...(actor?.branchId && String(actor.role || "").toUpperCase() !== "OWNER" && String(actor.role || "").toUpperCase() !== "MANAGER"
           ? { branchId: actor.branchId }
           : {}),
+        OR: [
+          { createdAt: { gte: startOfToday } },
+          {
+            createdAt: { gte: activeCutoff },
+            status: { in: ["PLACED", "PREPARING", "READY", "ACCEPTED", "PENDING"] },
+          },
+        ],
       };
 
       const orders = await prisma.order.findMany({
@@ -68,6 +83,7 @@ export default async function staffRoutes(app, deps) {
           items: true,
           customer: true,
           statusEvents: { orderBy: { createdAt: "asc" } },
+          kots: { include: { items: true } },
         },
         orderBy: { createdAt: "desc" },
         take: 250,
