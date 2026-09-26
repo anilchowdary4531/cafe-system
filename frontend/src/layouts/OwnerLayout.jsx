@@ -25,6 +25,8 @@ import {
     Award,
     ZoomIn,
     ZoomOut,
+    Eye,
+    EyeOff,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
@@ -467,6 +469,25 @@ export default function OwnerLayout() {
                 localStorage.setItem("owner_table_zoom_level", String(clamped));
             } catch {}
             return clamped;
+        });
+    };
+
+    const [showOnlineOrdersPanel, setShowOnlineOrdersPanel] = useState(() => {
+        try {
+            const saved = localStorage.getItem("owner_show_online_orders_panel");
+            return saved !== null ? saved === "true" : true;
+        } catch {
+            return true;
+        }
+    });
+
+    const toggleOnlineOrdersPanel = () => {
+        setShowOnlineOrdersPanel((prev) => {
+            const next = !prev;
+            try {
+                localStorage.setItem("owner_show_online_orders_panel", String(next));
+            } catch {}
+            return next;
         });
     };
 
@@ -1459,13 +1480,19 @@ export default function OwnerLayout() {
                     >
                         <div
                             className={
-                                isDashboardRoute ? "grid min-h-[80vh] h-full gap-4 xl:grid-cols-4" : "flex flex-col gap-2.5"
+                                isDashboardRoute
+                                    ? `grid min-h-[80vh] h-full gap-4 ${
+                                          showOnlineOrdersPanel ? "xl:grid-cols-4" : "xl:grid-cols-1"
+                                      }`
+                                    : "flex flex-col gap-2.5"
                             }
                         >
                             <div
                                 className={
                                     isDashboardRoute
-                                        ? "flex min-h-0 flex-col gap-1.5 xl:col-span-3"
+                                        ? `flex min-h-0 flex-col gap-1.5 ${
+                                              showOnlineOrdersPanel ? "xl:col-span-3" : "xl:col-span-1 w-full"
+                                          }`
                                         : ""
                                 }
                             >
@@ -1586,6 +1613,23 @@ export default function OwnerLayout() {
                                                     </button>
                                                 )}
                                             </div>
+
+                                            {/* Toggle Online Orders Column Button */}
+                                            {isDashboardRoute && (
+                                                <button
+                                                    type="button"
+                                                    onClick={toggleOnlineOrdersPanel}
+                                                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border transition shadow-xs ${
+                                                        showOnlineOrdersPanel
+                                                            ? "border-[color:var(--app-border)]/40 bg-black/5 dark:bg-white/5 text-[color:var(--app-muted)] hover:text-[color:var(--app-text)]"
+                                                            : "border-amber-500/40 bg-amber-500/15 text-amber-500 hover:bg-amber-500/25"
+                                                    }`}
+                                                    title={showOnlineOrdersPanel ? "Hide Online Orders Column" : "Show Online Orders Column"}
+                                                >
+                                                    {showOnlineOrdersPanel ? <EyeOff size={13} /> : <Eye size={13} />}
+                                                    <span>{showOnlineOrdersPanel ? "Hide Panel" : "Online Orders"}</span>
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
 
@@ -2154,7 +2198,7 @@ export default function OwnerLayout() {
                                     )}
                                 </div>
                             </div>
-                            {isDashboardRoute && (
+                            {isDashboardRoute && showOnlineOrdersPanel && (
                                 <aside className="border-l border-[color:var(--app-border)]/30 pl-4 pr-1 py-1 xl:col-span-1 xl:flex xl:h-full xl:flex-col">
                                     <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)]/50 pb-2">
                                         <div className="flex items-center gap-2">
@@ -2163,13 +2207,24 @@ export default function OwnerLayout() {
                                                 Online Orders
                                             </p>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => navigate("/owner/kitchen?tab=live")}
-                                            className="theme-button rounded-lg px-2.5 py-1 text-xs font-semibold"
-                                        >
-                                            View all
-                                        </button>
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => navigate("/owner/kitchen?tab=live")}
+                                                className="theme-button rounded-lg px-2.5 py-1 text-xs font-semibold"
+                                            >
+                                                View all
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={toggleOnlineOrdersPanel}
+                                                className="p-1.5 rounded-lg text-[color:var(--app-muted)] hover:text-amber-500 hover:bg-black/10 dark:hover:bg-white/10 transition"
+                                                title="Hide Online Orders column"
+                                                aria-label="Hide Online Orders panel"
+                                            >
+                                                <EyeOff size={14} />
+                                            </button>
+                                        </div>
                                     </div>
                                     <div className="mt-2.5 flex items-center justify-between text-xs text-[color:var(--app-muted)] font-semibold">
                                         <span>Active Orders</span>
