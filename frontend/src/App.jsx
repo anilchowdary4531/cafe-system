@@ -537,7 +537,7 @@ export default function App() {
                         <Route path="inventory" element={<OwnerInventory />} />
                         <Route path="kitchen" element={<OwnerKitchenLive />} />
                         <Route path="printers" element={<PrinterSettings />} />
-                        <Route path="kot-history" element={<Navigate to="/owner/kitchen?tab=audit" replace />} />
+                        <Route path="kot-history" element={<Navigate to="/owner/kitchen?tab=live&view=history" replace />} />
                         <Route path="analytics" element={<OwnerAnalytics />} />
                         <Route path="reports" element={<OwnerReports />} />
                         <Route path="finance" element={<OwnerFinance />} />

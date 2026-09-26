@@ -51,6 +51,46 @@ const getMinutesSince = (isoDate) => {
     return Math.max(0, Math.floor((Date.now() - t) / 60000));
 };
 
+const getTodayYmd = () => {
+    const formatter = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" });
+    return formatter.format(new Date());
+};
+
+const getYesterdayYmd = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const formatter = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" });
+    return formatter.format(d);
+};
+
+const formatFullDateTime = (isoDate) => {
+    if (!isoDate) return "--";
+    const d = new Date(isoDate);
+    if (Number.isNaN(d.getTime())) return "--";
+    const datePart = d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+    const timePart = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
+    return `${datePart} · ${timePart}`;
+};
+
+const getOrderCardTimeInfo = (isoDate) => {
+    if (!isoDate) return { fullTime: "--", relative: "" };
+    const d = new Date(isoDate);
+    if (Number.isNaN(d.getTime())) return { fullTime: "--", relative: "" };
+
+    const todayYmd = getTodayYmd();
+    const orderYmd = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(d);
+    const fullTime = formatFullDateTime(isoDate);
+
+    if (orderYmd === todayYmd) {
+        const mins = Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000));
+        return { fullTime, relative: `${mins} mins ago` };
+    }
+    if (orderYmd === getYesterdayYmd()) {
+        return { fullTime, relative: "Yesterday" };
+    }
+    return { fullTime, relative: orderYmd };
+};
+
 const formatTimeOnly = (isoDate) => {
     if (!isoDate) return "--:--";
     const d = new Date(isoDate);
@@ -131,6 +171,7 @@ export default function OwnerKitchenLive() {
     const [historyKots, setHistoryKots] = useState([]);
     const [historyPagination, setHistoryPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
     const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyError, setHistoryError] = useState("");
     const [selectedHistoryKot, setSelectedHistoryKot] = useState(null);
 
     // Filters for KOT Audit Trail Tab
@@ -156,7 +197,7 @@ export default function OwnerKitchenLive() {
             if (silent) setRefreshing(true);
             else setLoading(true);
 
-            const res = await api.get("/orders/live");
+            const res = await api.get(`/orders/live?restaurantId=${restaurantId}`);
             const list = Array.isArray(res?.data?.orders) ? res.data.orders : [];
             setOrders(list);
             setError("");
@@ -191,6 +232,7 @@ export default function OwnerKitchenLive() {
     const loadHistoryKots = async ({ silent = false } = {}) => {
         if (!restaurantId || isNaN(Number(restaurantId))) return;
         try {
+            setHistoryError("");
             if (silent) setRefreshing(true);
             else setHistoryLoading(true);
 
@@ -223,6 +265,7 @@ export default function OwnerKitchenLive() {
             }
         } catch (err) {
             console.error("Failed to load historical KOTs", err);
+            setHistoryError("Unable to load order history.");
         } finally {
             setHistoryLoading(false);
             setRefreshing(false);
@@ -388,6 +431,78 @@ export default function OwnerKitchenLive() {
         }
     };
 
+    // History Date Information Helper
+    const historyDateInfo = useMemo(() => {
+        const todayYmd = getTodayYmd();
+        const yesterdayYmd = getYesterdayYmd();
+
+        let targetYmd = historySelectedDate || historyStartDate || "";
+        if (historyPreset === "yesterday" || (!targetYmd && historyPreset !== "today" && historyPreset !== "last7days" && historyPreset !== "last30days" && historyPreset !== "custom")) {
+            targetYmd = yesterdayYmd;
+        } else if (historyPreset === "today") {
+            targetYmd = todayYmd;
+        }
+
+        if (historyPreset === "last7days") {
+            return { label: "Previous 7 Days", subtext: "Past 7 Business Days", ymd: "" };
+        }
+        if (historyPreset === "last30days") {
+            return { label: "Previous 30 Days", subtext: "Past 30 Business Days", ymd: "" };
+        }
+        if (historyPreset === "custom" && historyStartDate && historyEndDate) {
+            return { label: "Custom Range", subtext: `${historyStartDate} to ${historyEndDate}`, ymd: "" };
+        }
+
+        if (targetYmd === todayYmd) {
+            const fullDate = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+            return { label: "Today", subtext: fullDate, ymd: targetYmd };
+        }
+        if (targetYmd === yesterdayYmd) {
+            const yDate = new Date(Date.now() - 86400000);
+            const fullDate = yDate.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+            return { label: "Yesterday", subtext: fullDate, ymd: targetYmd };
+        }
+
+        if (targetYmd) {
+            const [y, m, d] = targetYmd.split("-").map(Number);
+            const dt = new Date(y, m - 1, d);
+            const fullDate = dt.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+            return { label: "Previous Day", subtext: fullDate, ymd: targetYmd };
+        }
+
+        const yDate = new Date(Date.now() - 86400000);
+        const fullDate = yDate.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+        return { label: "Yesterday", subtext: fullDate, ymd: yesterdayYmd };
+    }, [historyPreset, historySelectedDate, historyStartDate, historyEndDate]);
+
+    const handleStepDate = (direction) => {
+        const todayYmd = getTodayYmd();
+        const currentYmd = historyDateInfo.ymd || historySelectedDate || (historyPreset === "today" ? todayYmd : getYesterdayYmd());
+        const [y, m, d] = currentYmd.split("-").map(Number);
+        const currentDate = new Date(y, m - 1, d);
+
+        if (direction === "prev") {
+            currentDate.setDate(currentDate.getDate() - 1);
+        } else if (direction === "next") {
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        const formatter = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" });
+        const nextYmd = formatter.format(currentDate);
+
+        if (nextYmd > todayYmd) return;
+
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set("tab", "live");
+            next.set("view", "history");
+            next.set("date", nextYmd);
+            next.delete("preset");
+            return next;
+        });
+        setHistoryPage(1);
+    };
+
     // Filtered Live Orders
     const filteredLiveOrders = useMemo(() => {
         const q = liveQuery.trim().toLowerCase();
@@ -501,56 +616,7 @@ export default function OwnerKitchenLive() {
         return Array.from(set);
     }, [kots]);
 
-    const getFormattedDisplayDate = () => {
-        let dateStr = historySelectedDate;
-        if (!dateStr) {
-            if (historyPreset === "today") {
-                dateStr = new Date().toISOString().split("T")[0];
-            } else if (historyPreset === "yesterday") {
-                dateStr = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-            } else {
-                dateStr = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-            }
-        }
-        const [y, m, d] = dateStr.split("-");
-        if (y && m && d) {
-            const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
-            return dateObj.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-        }
-        return dateStr;
-    };
 
-    const getCurrentYmd = () => {
-        if (historySelectedDate) return historySelectedDate;
-        if (historyPreset === "today") return new Date().toISOString().split("T")[0];
-        return new Date(Date.now() - 86400000).toISOString().split("T")[0];
-    };
-
-    const handleStepDate = (dir) => {
-        const currentYmd = getCurrentYmd();
-        const [y, m, d] = currentYmd.split("-").map(Number);
-        const dateObj = new Date(y, m - 1, d);
-        if (dir === "prev") {
-            dateObj.setDate(dateObj.getDate() - 1);
-        } else if (dir === "next") {
-            dateObj.setDate(dateObj.getDate() + 1);
-        }
-        const newYmd = dateObj.toISOString().split("T")[0];
-        const todayYmd = new Date().toISOString().split("T")[0];
-        if (newYmd > todayYmd) return;
-
-        const nextPreset = newYmd === todayYmd ? "today" : newYmd === new Date(Date.now() - 86400000).toISOString().split("T")[0] ? "yesterday" : "custom";
-
-        setSearchParams((prev) => {
-            const next = new URLSearchParams(prev);
-            next.set("tab", "live");
-            next.set("view", "history");
-            next.set("preset", nextPreset);
-            next.set("date", newYmd);
-            return next;
-        });
-        setHistoryPage(1);
-    };
 
     if (effectiveRole === "CHEF") {
         return <Navigate to="/kitchen" replace />;
@@ -814,17 +880,21 @@ export default function OwnerKitchenLive() {
 
                         {liveView !== "history" ? (
                             <div className="flex items-center gap-2 text-xs theme-muted">
-                                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span className="font-bold text-orange-400">Today's Orders</span>
-                                <span>•</span>
-                                <span className="font-medium">
-                                    {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
-                                </span>
+                                <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <div className="flex items-center gap-1.5 font-black">
+                                    <span className="text-emerald-400">Today's Orders</span>
+                                    <span>•</span>
+                                    <span className="text-white font-extrabold">
+                                        {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}
+                                    </span>
+                                </div>
                             </div>
                         ) : (
                             <div className="flex items-center gap-2 text-xs theme-muted">
                                 <RotateCcw size={14} className="text-amber-400" />
-                                <span className="font-bold text-amber-400">Historical Order Lookup</span>
+                                <span className="font-bold text-amber-400">History Date</span>
+                                <span>•</span>
+                                <span className="font-extrabold text-white">{historyDateInfo.label} ({historyDateInfo.subtext})</span>
                             </div>
                         )}
                     </div>
@@ -906,7 +976,7 @@ export default function OwnerKitchenLive() {
 
                                             <div className="space-y-3">
                                                 {liveGroupedOrders[status].map((order) => {
-                                                    const prepMins = getMinutesSince(order.createdAt);
+                                                    const cardTimeInfo = getOrderCardTimeInfo(order.createdAt);
                                                     const action = nextActionByStatus(normalizeStatus(order.status));
 
                                                     return (
@@ -972,12 +1042,17 @@ export default function OwnerKitchenLive() {
                                                                 })}
                                                             </div>
 
-                                                            <div className="flex items-center justify-between border-t border-[color:var(--app-border)]/30 pt-2 text-xs theme-muted">
-                                                                <span>Total: ₹{formatCurrency(order.total)}</span>
-                                                                <span className="inline-flex items-center gap-1 text-[11px]">
-                                                                    <Clock3 size={13} />
-                                                                    {prepMins === null ? "--" : `${prepMins} mins ago`}
-                                                                </span>
+                                                            <div className="flex flex-col gap-0.5 border-t border-[color:var(--app-border)]/30 pt-2 text-xs theme-muted">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="font-bold text-[color:var(--app-text)]">Total: ₹{formatCurrency(order.totalAmount || order.total)}</span>
+                                                                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-orange-400">
+                                                                        <Clock3 size={13} />
+                                                                        {cardTimeInfo.relative}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-[10px] theme-muted font-mono">
+                                                                    {cardTimeInfo.fullTime}
+                                                                </div>
                                                             </div>
 
                                                             {action && (
@@ -1012,8 +1087,11 @@ export default function OwnerKitchenLive() {
 
                             {orders.length === 0 && !loading && (
                                 <div className="rounded-2xl border border-dashed border-[color:var(--app-border)]/50 p-8 text-center space-y-2">
-                                    <ChefHat size={36} className="mx-auto theme-muted opacity-50" />
-                                    <h4 className="font-extrabold text-sm">No kitchen orders today</h4>
+                                    <ChefHat size={36} className="mx-auto text-orange-500 opacity-60" />
+                                    <h4 className="font-black text-sm text-white">No orders for today</h4>
+                                    <p className="font-extrabold text-xs text-orange-400">
+                                        {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}
+                                    </p>
                                     <p className="theme-muted text-xs">New orders will appear here automatically.</p>
                                 </div>
                             )}
@@ -1027,27 +1105,34 @@ export default function OwnerKitchenLive() {
                             <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] p-4 space-y-3">
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                     {/* Date Stepper & Preset Dropdown */}
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <div className="flex items-center rounded-xl border border-[color:var(--app-border)]/40 bg-black/10 dark:bg-white/5 p-1">
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <div className="flex items-center gap-2 rounded-2xl border border-[color:var(--app-border)]/40 bg-black/10 dark:bg-white/5 p-1.5">
                                             <button
                                                 type="button"
                                                 onClick={() => handleStepDate("prev")}
-                                                className="rounded-lg p-1.5 theme-muted hover:text-orange-400 hover:bg-black/10 transition"
+                                                className="flex items-center gap-1 rounded-xl bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-black px-3 py-1.5 text-xs font-black transition"
                                                 title="Previous Day"
                                             >
-                                                <ChevronLeft size={16} />
+                                                <ChevronLeft size={15} />
+                                                Previous Day
                                             </button>
-                                            <div className="px-3 text-xs font-bold font-mono text-orange-400">
-                                                {getFormattedDisplayDate()}
+                                            <div className="flex flex-col border-x border-[color:var(--app-border)]/30 px-3 text-center min-w-[140px]">
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">
+                                                    {historyDateInfo.label}
+                                                </span>
+                                                <span className="text-xs font-extrabold text-white">
+                                                    {historyDateInfo.subtext}
+                                                </span>
                                             </div>
                                             <button
                                                 type="button"
                                                 onClick={() => handleStepDate("next")}
-                                                disabled={getCurrentYmd() >= new Date().toISOString().split("T")[0]}
-                                                className="rounded-lg p-1.5 theme-muted hover:text-orange-400 hover:bg-black/10 transition disabled:opacity-30 disabled:hover:text-inherit"
+                                                disabled={!historyDateInfo.ymd || historyDateInfo.ymd >= getTodayYmd()}
+                                                className="flex items-center gap-1 rounded-xl bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-black px-3 py-1.5 text-xs font-black transition disabled:opacity-30 disabled:hover:bg-orange-500/10 disabled:hover:text-orange-400"
                                                 title="Next Day"
                                             >
-                                                <ChevronRight size={16} />
+                                                Next Day
+                                                <ChevronRight size={15} />
                                             </button>
                                         </div>
 
@@ -1065,12 +1150,12 @@ export default function OwnerKitchenLive() {
                                                 });
                                                 setHistoryPage(1);
                                             }}
-                                            className="rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3 py-1.5 text-xs font-semibold outline-none focus:border-orange-500"
+                                            className="rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3 py-2 text-xs font-extrabold outline-none focus:border-orange-500"
                                         >
                                             <option value="yesterday" className="bg-zinc-900 text-white">Yesterday</option>
                                             <option value="today" className="bg-zinc-900 text-white">Today</option>
-                                            <option value="last7days" className="bg-zinc-900 text-white">Last 7 Days</option>
-                                            <option value="last30days" className="bg-zinc-900 text-white">Last 30 Days</option>
+                                            <option value="last7days" className="bg-zinc-900 text-white">Previous 7 Days</option>
+                                            <option value="last30days" className="bg-zinc-900 text-white">Previous 30 Days</option>
                                             <option value="custom" className="bg-zinc-900 text-white">Custom Range</option>
                                         </select>
                                     </div>
@@ -1167,11 +1252,25 @@ export default function OwnerKitchenLive() {
                                         <LoaderCircle size={28} className="animate-spin mx-auto text-orange-500" />
                                         <p className="text-xs">Loading historical kitchen records...</p>
                                     </div>
+                                ) : historyError ? (
+                                    <div className="p-12 text-center space-y-3">
+                                        <AlertTriangle size={32} className="mx-auto text-red-500" />
+                                        <h4 className="font-black text-sm text-red-400">Unable to load order history.</h4>
+                                        <button
+                                            type="button"
+                                            onClick={() => loadHistoryKots()}
+                                            className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-xs font-black text-black hover:bg-orange-400 transition shadow-md"
+                                        >
+                                            <RefreshCw size={14} />
+                                            Retry
+                                        </button>
+                                    </div>
                                 ) : historyKots.length === 0 ? (
                                     <div className="p-12 text-center theme-muted space-y-2">
-                                        <RotateCcw size={32} className="mx-auto opacity-50 text-amber-500" />
-                                        <h4 className="font-extrabold text-sm">No historical orders found</h4>
-                                        <p className="text-xs">Try selecting another date or adjusting your filters.</p>
+                                        <RotateCcw size={32} className="mx-auto text-amber-500 opacity-60" />
+                                        <h4 className="font-black text-sm text-white">No orders found</h4>
+                                        <p className="font-bold text-xs text-amber-400">{historyDateInfo.subtext}</p>
+                                        <p className="text-xs">Try another date or date range.</p>
                                     </div>
                                 ) : (
                                     <div className="overflow-x-auto">

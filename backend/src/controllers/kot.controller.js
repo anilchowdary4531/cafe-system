@@ -136,7 +136,7 @@ export const getKots = async (req, res) => {
     // Auto-backfill KOT records for unlinked orders
     try {
       const unlinkedOrders = await db.order.findMany({
-        where: { restaurantId, kitchenTickets: { none: {} } },
+        where: { restaurantId, kots: { none: {} } },
         include: { items: true },
         take: 50,
         orderBy: { createdAt: "desc" },
@@ -171,10 +171,10 @@ export const getKots = async (req, res) => {
               tableNo: true,
               status: true,
               priority: true,
-              totalAmount: true,
+              total: true,
               subtotal: true,
-              tax: true,
-              discount: true,
+              taxAmount: true,
+              discountAmount: true,
               createdAt: true,
               items: true,
               statusEvents: { orderBy: { createdAt: "asc" } },

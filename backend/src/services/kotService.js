@@ -114,6 +114,7 @@ export const createKotsForOrder = async ({ prisma, tx = prisma, order, actor, id
                 estimatedPrepTimeMinutes: maxPrepTime,
                 printed: false,
                 notes: order.notes || null,
+                createdAt: order.createdAt || new Date(),
                 idempotencyKey: idempotencyKey ? `${idempotencyKey}_st_${stKey}` : null,
                 items: {
                     create: items.map((it) => ({

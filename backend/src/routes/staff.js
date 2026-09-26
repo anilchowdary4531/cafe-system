@@ -50,7 +50,7 @@ export default async function staffRoutes(app, deps) {
   app.get("/orders/live", { preHandler: requireStaff }, async (req, reply) => {
     try {
       const actor = req.staffActor;
-      const restaurantId = Number(actor?.restaurantId || 0);
+      const restaurantId = Number(req.query?.restaurantId || actor?.restaurantId || req.user?.restaurantId || 0);
       if (!restaurantId) return reply.code(400).send({ message: "Restaurant required" });
 
       const status = req.query?.status ? normalizeOrderStatus(req.query.status) : "";
