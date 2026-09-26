@@ -501,12 +501,6 @@ export default function OwnerLayout() {
             accessKey: "orders",
         },
         {
-            label: "Online Orders",
-            path: "/owner/online-orders",
-            icon: <Globe2 size={18} />,
-            accessKey: "orders",
-        },
-        {
             label: "Menu Studio",
             path: "/owner/menu",
             icon: <UtensilsCrossed size={18} />,
@@ -2088,7 +2082,7 @@ export default function OwnerLayout() {
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => navigate("/owner/online-orders")}
+                                            onClick={() => navigate("/owner/kitchen?tab=live")}
                                             className="theme-button rounded-lg px-2.5 py-1 text-xs font-semibold"
                                         >
                                             View all

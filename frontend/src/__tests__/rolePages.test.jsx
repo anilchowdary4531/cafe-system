@@ -221,9 +221,9 @@ describe("owner panel pages", () => {
         expect(screen.getByTestId("owner-orders")).toBeInTheDocument();
     });
 
-    it("renders the owner online orders page", () => {
+    it("redirects owner online orders route to owner kitchen", () => {
         renderAt("/owner/online-orders");
-        expect(screen.getByTestId("owner-online-orders")).toBeInTheDocument();
+        expect(screen.getByTestId("owner-kitchen")).toBeInTheDocument();
     });
 
     it("renders the menu studio page", () => {

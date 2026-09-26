@@ -1771,185 +1771,249 @@ export default function OwnerKitchenLive() {
             {/* TAB 4 — HARDWARE & PRINT LOGS */}
             {/* ========================================================= */}
             {activeTab === "hardware" && (
-                <div className="space-y-5">
-                    {/* Hardware Overview Top Cards */}
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                                <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 truncate">Thermal Printers</p>
-                                <p className="text-[10px] theme-muted truncate">ESC/POS Port 9100 Printers</p>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    {/* Main Hardware Info & Logs (Left 2 cols) */}
+                    <div className="lg:col-span-2 space-y-5">
+                        {/* Hardware Overview Top Cards */}
+                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 truncate">Thermal Printers</p>
+                                    <p className="text-[10px] theme-muted truncate">ESC/POS Port 9100 Printers</p>
+                                </div>
+                                <span className="rounded-lg bg-emerald-500/20 px-2.5 py-1 text-xs font-black text-emerald-400 whitespace-nowrap border border-emerald-500/30">
+                                    {printers.filter((p) => p.isActive !== false).length} Online / {printers.length || 1} Total
+                                </span>
                             </div>
-                            <span className="rounded-lg bg-emerald-500/20 px-2.5 py-1 text-xs font-black text-emerald-400 whitespace-nowrap border border-emerald-500/30">
-                                {printers.filter((p) => p.isActive !== false).length} Online / {printers.length || 1} Total
-                            </span>
+                            <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3.5 py-2.5 flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-sky-400 truncate">Kitchen Display Systems (KDS)</p>
+                                    <p className="text-[10px] theme-muted truncate">WebSocket Kitchen Screens</p>
+                                </div>
+                                <span className="rounded-lg bg-sky-500/20 px-2.5 py-1 text-xs font-black text-sky-400 whitespace-nowrap border border-sky-500/30">
+                                    1 Online / 1 Total
+                                </span>
+                            </div>
+                            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400 truncate">POS Billing Terminals</p>
+                                    <p className="text-[10px] theme-muted truncate">Cashier & Waiter Terminals</p>
+                                </div>
+                                <span className="rounded-lg bg-amber-500/20 px-2.5 py-1 text-xs font-black text-amber-400 whitespace-nowrap border border-amber-500/30">
+                                    1 Online / 1 Total
+                                </span>
+                            </div>
                         </div>
-                        <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3.5 py-2.5 flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                                <p className="text-[10px] font-extrabold uppercase tracking-wider text-sky-400 truncate">Kitchen Display Systems (KDS)</p>
-                                <p className="text-[10px] theme-muted truncate">WebSocket Kitchen Screens</p>
+
+                        {/* Hardware Device Table */}
+                        <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] p-4 space-y-3">
+                            <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-2">
+                                <h3 className="text-xs font-extrabold uppercase tracking-wider text-orange-400 flex items-center gap-2">
+                                    <Server size={15} /> Registered Hardware Devices
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate("/owner/printers")}
+                                    className="text-xs font-bold text-orange-400 hover:underline flex items-center gap-1"
+                                >
+                                    <Settings size={13} />
+                                    <span>Configure Hardware</span>
+                                </button>
                             </div>
-                            <span className="rounded-lg bg-sky-500/20 px-2.5 py-1 text-xs font-black text-sky-400 whitespace-nowrap border border-sky-500/30">
-                                1 Online / 1 Total
-                            </span>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="border-b border-[color:var(--app-border)]/40 theme-muted font-bold uppercase tracking-wider text-[11px]">
+                                        <tr>
+                                            <th className="py-2.5 px-3">Device Name</th>
+                                            <th className="py-2.5 px-3">Type</th>
+                                            <th className="py-2.5 px-3">Location / Station</th>
+                                            <th className="py-2.5 px-3">Status</th>
+                                            <th className="py-2.5 px-3">Last Heartbeat</th>
+                                            <th className="py-2.5 px-3">Last Event</th>
+                                            <th className="py-2.5 px-3 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[color:var(--app-border)]/30">
+                                        {printers.length === 0 ? (
+                                            <>
+                                                <tr className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                                                    <td className="p-3 font-bold text-white flex items-center gap-2">
+                                                        <Printer size={15} className="text-emerald-400" />
+                                                        <span>Kitchen Printer 01</span>
+                                                    </td>
+                                                    <td className="p-3 theme-muted">ESC/POS Thermal Network Printer</td>
+                                                    <td className="p-3">Main Kitchen</td>
+                                                    <td className="p-3">
+                                                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">ONLINE</span>
+                                                    </td>
+                                                    <td className="p-3 font-mono theme-muted">Just now</td>
+                                                    <td className="p-3 theme-muted">Print Completed</td>
+                                                    <td className="p-3 text-right">
+                                                        <button type="button" onClick={() => showToast({ title: "Test Print", message: "Test print command sent." })} className="px-2.5 py-1 rounded-lg border border-[color:var(--app-border)]/40 text-xs font-bold hover:bg-white/10">
+                                                            Test Print
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </>
+                                        ) : (
+                                            printers.map((p) => (
+                                                <tr key={p.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                                                    <td className="p-3 font-bold text-white flex items-center gap-2">
+                                                        <Printer size={15} className={p.isActive !== false ? "text-emerald-400" : "text-rose-400"} />
+                                                        <span>{p.name || `Thermal Printer #${p.id}`}</span>
+                                                    </td>
+                                                    <td className="p-3 theme-muted">{p.interfaceType || "ESC/POS Network"}</td>
+                                                    <td className="p-3">{p.station?.name || p.location || "Kitchen"}</td>
+                                                    <td className="p-3">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                            p.isActive !== false ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"
+                                                        }`}>
+                                                            {p.isActive !== false ? "ONLINE" : "OFFLINE"}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 font-mono theme-muted">Just now</td>
+                                                    <td className="p-3 theme-muted">Heartbeat OK</td>
+                                                    <td className="p-3 text-right">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleTestPrinter(p.id)}
+                                                            disabled={testingPrinterId === p.id}
+                                                            className="px-2.5 py-1 rounded-lg border border-[color:var(--app-border)]/40 text-xs font-bold hover:bg-white/10 disabled:opacity-50"
+                                                        >
+                                                            {testingPrinterId === p.id ? "Testing..." : "Test Print"}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                                <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400 truncate">POS Billing Terminals</p>
-                                <p className="text-[10px] theme-muted truncate">Cashier & Waiter Terminals</p>
+
+                        {/* Print History Logs Table */}
+                        <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] p-4 space-y-3">
+                            <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-2">
+                                <h3 className="text-xs font-extrabold uppercase tracking-wider text-orange-400 flex items-center gap-2">
+                                    <FileText size={15} /> Thermal Print Job History
+                                </h3>
+                                <span className="text-xs theme-muted">Last 24 Hours</span>
                             </div>
-                            <span className="rounded-lg bg-amber-500/20 px-2.5 py-1 text-xs font-black text-amber-400 whitespace-nowrap border border-amber-500/30">
-                                1 Online / 1 Total
-                            </span>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="border-b border-[color:var(--app-border)]/40 theme-muted font-bold uppercase tracking-wider text-[11px]">
+                                        <tr>
+                                            <th className="py-2.5 px-3">Time</th>
+                                            <th className="py-2.5 px-3">KOT #</th>
+                                            <th className="py-2.5 px-3">Target Printer</th>
+                                            <th className="py-2.5 px-3">Print Event</th>
+                                            <th className="py-2.5 px-3">Status</th>
+                                            <th className="py-2.5 px-3">Error / Details</th>
+                                            <th className="py-2.5 px-3 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[color:var(--app-border)]/30">
+                                        {kots.slice(0, 8).map((kot, idx) => {
+                                            const timeStr = formatTimeOnly(kot.createdAt);
+                                            const kotNo = kot.kotNo || kot.kotNumber || `KOT-#${kot.id}`;
+                                            const printerName = printers[0]?.name || "Kitchen Printer 01";
+                                            const isError = kot.status === "CANCELLED";
+
+                                            return (
+                                                <tr key={idx} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                                                    <td className="p-3 font-mono theme-muted">{timeStr}</td>
+                                                    <td className="p-3 font-extrabold text-orange-400 font-mono">{kotNo}</td>
+                                                    <td className="p-3">{printerName}</td>
+                                                    <td className="p-3 font-medium">Print Completed</td>
+                                                    <td className="p-3">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                            isError ? "bg-rose-500/20 text-rose-400" : "bg-emerald-500/20 text-emerald-400"
+                                                        }`}>
+                                                            {isError ? "ERROR" : "SUCCESS"}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 theme-muted max-w-[200px] truncate">
+                                                        {isError ? "Order cancelled by manager" : "Sent to 192.168.1.100:9100"}
+                                                    </td>
+                                                    <td className="p-3 text-right">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleReprintKot(kot.id)}
+                                                            disabled={reprintingKotId === kot.id}
+                                                            className="px-2 py-1 rounded-lg border border-orange-500/30 text-orange-400 hover:bg-orange-500/10 text-xs font-bold disabled:opacity-50"
+                                                        >
+                                                            {reprintingKotId === kot.id ? "Printing..." : "Retry Print"}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Hardware Device Table */}
-                    <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] p-4 space-y-3">
-                        <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-2">
-                            <h3 className="text-xs font-extrabold uppercase tracking-wider text-orange-400 flex items-center gap-2">
-                                <Server size={15} /> Registered Hardware Devices
-                            </h3>
-                            <button
-                                type="button"
-                                onClick={() => navigate("/owner/printers")}
-                                className="text-xs font-bold text-orange-400 hover:underline flex items-center gap-1"
-                            >
-                                <Settings size={13} />
-                                <span>Configure Hardware</span>
-                            </button>
-                        </div>
+                    {/* Hardware Device Status Sidebar Column (Right 1 col) */}
+                    <div className="lg:col-span-1 space-y-4">
+                        <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] p-4 space-y-3">
+                            <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/30 pb-2">
+                                <h3 className="text-xs font-extrabold uppercase tracking-wider text-orange-400 flex items-center gap-2">
+                                    <Server size={15} /> Hardware & Device Status
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate("/owner/printers")}
+                                    className="text-xs font-bold text-orange-400 hover:underline flex items-center gap-1"
+                                >
+                                    <span>Manage</span>
+                                    <span className="text-sm">→</span>
+                                </button>
+                            </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs">
-                                <thead className="border-b border-[color:var(--app-border)]/40 theme-muted font-bold uppercase tracking-wider text-[11px]">
-                                    <tr>
-                                        <th className="py-2.5 px-3">Device Name</th>
-                                        <th className="py-2.5 px-3">Type</th>
-                                        <th className="py-2.5 px-3">Location / Station</th>
-                                        <th className="py-2.5 px-3">Status</th>
-                                        <th className="py-2.5 px-3">Last Heartbeat</th>
-                                        <th className="py-2.5 px-3">Last Event</th>
-                                        <th className="py-2.5 px-3 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[color:var(--app-border)]/30">
-                                    {printers.length === 0 ? (
-                                        <>
-                                            <tr className="hover:bg-black/5 dark:hover:bg-white/5 transition">
-                                                <td className="p-3 font-bold text-white flex items-center gap-2">
-                                                    <Printer size={15} className="text-emerald-400" />
-                                                    <span>Kitchen Printer 01</span>
-                                                </td>
-                                                <td className="p-3 theme-muted">ESC/POS Thermal Network Printer</td>
-                                                <td className="p-3">Main Kitchen</td>
-                                                <td className="p-3">
-                                                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">ONLINE</span>
-                                                </td>
-                                                <td className="p-3 font-mono theme-muted">Just now</td>
-                                                <td className="p-3 theme-muted">Print Completed</td>
-                                                <td className="p-3 text-right">
-                                                    <button type="button" onClick={() => showToast({ title: "Test Print", message: "Test print command sent." })} className="px-2.5 py-1 rounded-lg border border-[color:var(--app-border)]/40 text-xs font-bold hover:bg-white/10">
-                                                        Test Print
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        </>
-                                    ) : (
-                                        printers.map((p) => (
-                                            <tr key={p.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
-                                                <td className="p-3 font-bold text-white flex items-center gap-2">
-                                                    <Printer size={15} className={p.isActive !== false ? "text-emerald-400" : "text-rose-400"} />
-                                                    <span>{p.name || `Thermal Printer #${p.id}`}</span>
-                                                </td>
-                                                <td className="p-3 theme-muted">{p.interfaceType || "ESC/POS Network"}</td>
-                                                <td className="p-3">{p.station?.name || p.location || "Kitchen"}</td>
-                                                <td className="p-3">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                        p.isActive !== false ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"
-                                                    }`}>
-                                                        {p.isActive !== false ? "ONLINE" : "OFFLINE"}
-                                                    </span>
-                                                </td>
-                                                <td className="p-3 font-mono theme-muted">Just now</td>
-                                                <td className="p-3 theme-muted">Heartbeat OK</td>
-                                                <td className="p-3 text-right">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleTestPrinter(p.id)}
-                                                        disabled={testingPrinterId === p.id}
-                                                        className="px-2.5 py-1 rounded-lg border border-[color:var(--app-border)]/40 text-xs font-bold hover:bg-white/10 disabled:opacity-50"
-                                                    >
-                                                        {testingPrinterId === p.id ? "Testing..." : "Test Print"}
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* Print History Logs Table */}
-                    <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] p-4 space-y-3">
-                        <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-2">
-                            <h3 className="text-xs font-extrabold uppercase tracking-wider text-orange-400 flex items-center gap-2">
-                                <FileText size={15} /> Thermal Print Job History
-                            </h3>
-                            <span className="text-xs theme-muted">Last 24 Hours</span>
-                        </div>
-
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs">
-                                <thead className="border-b border-[color:var(--app-border)]/40 theme-muted font-bold uppercase tracking-wider text-[11px]">
-                                    <tr>
-                                        <th className="py-2.5 px-3">Time</th>
-                                        <th className="py-2.5 px-3">KOT #</th>
-                                        <th className="py-2.5 px-3">Target Printer</th>
-                                        <th className="py-2.5 px-3">Print Event</th>
-                                        <th className="py-2.5 px-3">Status</th>
-                                        <th className="py-2.5 px-3">Error / Details</th>
-                                        <th className="py-2.5 px-3 text-right">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[color:var(--app-border)]/30">
-                                    {kots.slice(0, 8).map((kot, idx) => {
-                                        const timeStr = formatTimeOnly(kot.createdAt);
-                                        const kotNo = kot.kotNo || kot.kotNumber || `KOT-#${kot.id}`;
-                                        const printerName = printers[0]?.name || "Kitchen Printer 01";
-                                        const isError = kot.status === "CANCELLED";
-
-                                        return (
-                                            <tr key={idx} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
-                                                <td className="p-3 font-mono theme-muted">{timeStr}</td>
-                                                <td className="p-3 font-extrabold text-orange-400 font-mono">{kotNo}</td>
-                                                <td className="p-3">{printerName}</td>
-                                                <td className="p-3 font-medium">Print Completed</td>
-                                                <td className="p-3">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                        isError ? "bg-rose-500/20 text-rose-400" : "bg-emerald-500/20 text-emerald-400"
-                                                    }`}>
-                                                        {isError ? "ERROR" : "SUCCESS"}
-                                                    </span>
-                                                </td>
-                                                <td className="p-3 theme-muted max-w-[200px] truncate">
-                                                    {isError ? "Order cancelled by manager" : "Sent to 192.168.1.100:9100"}
-                                                </td>
-                                                <td className="p-3 text-right">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleReprintKot(kot.id)}
-                                                        disabled={reprintingKotId === kot.id}
-                                                        className="px-2 py-1 rounded-lg border border-orange-500/30 text-orange-400 hover:bg-orange-500/10 text-xs font-bold disabled:opacity-50"
-                                                    >
-                                                        {reprintingKotId === kot.id ? "Printing..." : "Retry Print"}
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                            <div className="divide-y divide-[color:var(--app-border)]/30">
+                                {printers.length === 0 ? (
+                                    <>
+                                        <div className="flex items-center justify-between py-2.5 px-1 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg">
+                                            <div className="flex items-center gap-2">
+                                                <Printer size={15} className="text-emerald-400" />
+                                                <span className="font-semibold">Kitchen Thermal Printer 01</span>
+                                            </div>
+                                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">ONLINE</span>
+                                        </div>
+                                        <div className="flex items-center justify-between py-2.5 px-1 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg">
+                                            <div className="flex items-center gap-2">
+                                                <Laptop size={15} className="text-emerald-400" />
+                                                <span className="font-semibold">KDS Display Terminal 01</span>
+                                            </div>
+                                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">ONLINE</span>
+                                        </div>
+                                        <div className="flex items-center justify-between py-2.5 px-1 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg">
+                                            <div className="flex items-center gap-2">
+                                                <Server size={15} className="text-emerald-400" />
+                                                <span className="font-semibold">POS Billing Desk</span>
+                                            </div>
+                                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">ONLINE</span>
+                                        </div>
+                                    </>
+                                ) : (
+                                    printers.map((p) => (
+                                        <div key={p.id} className="flex items-center justify-between py-2.5 px-1 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg">
+                                            <div className="flex items-center gap-2">
+                                                <Printer size={15} className={p.isActive !== false ? "text-emerald-400" : "text-rose-400"} />
+                                                <span className="font-semibold">{p.name || `Printer #${p.id}`}</span>
+                                            </div>
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                p.isActive !== false ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"
+                                            }`}>
+                                                {p.isActive !== false ? "ONLINE" : "OFFLINE"}
+                                            </span>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

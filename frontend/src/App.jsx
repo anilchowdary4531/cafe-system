@@ -530,7 +530,7 @@ export default function App() {
                     >
                         <Route index element={<OwnerDashboard />} />
                         <Route path="orders" element={<OwnerOrders />} />
-                        <Route path="online-orders" element={<OwnerOrders sourceFilter="ONLINE" />} />
+                        <Route path="online-orders" element={<Navigate to="/owner/kitchen?tab=live" replace />} />
                         <Route path="menu" element={<MenuStudio />} />
                         <Route path="tables" element={<OwnerTables />} />
                         <Route path="reservations" element={<OwnerReservations />} />
