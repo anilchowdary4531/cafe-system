@@ -23,6 +23,8 @@ import {
     Package,
     Tag,
     Award,
+    ZoomIn,
+    ZoomOut,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
@@ -448,6 +450,25 @@ export default function OwnerLayout() {
     const [printedTableKeys, setPrintedTableKeys] = useState(() => new Set());
     const [tableGroups, setTableGroups] = useState({});
     const [activeGroupFilter, setActiveGroupFilter] = useState("All");
+    const [tableZoom, setTableZoom] = useState(() => {
+        try {
+            const saved = localStorage.getItem("owner_table_zoom_level");
+            return saved ? Math.min(180, Math.max(70, Number(saved))) : 100;
+        } catch {
+            return 100;
+        }
+    });
+
+    const changeTableZoom = (updater) => {
+        setTableZoom((prev) => {
+            const next = typeof updater === "function" ? updater(prev) : updater;
+            const clamped = Math.min(180, Math.max(70, next));
+            try {
+                localStorage.setItem("owner_table_zoom_level", String(clamped));
+            } catch {}
+            return clamped;
+        });
+    };
 
     const { user, logout } = useAuth();
     const restaurantId = Number(user?.restaurantId || 0);
@@ -1493,40 +1514,79 @@ export default function OwnerLayout() {
                                             Tables by Group
                                         </span>
 
-                                        {availableGroupNames.length > 1 && (
-                                            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {availableGroupNames.length > 1 && (
+                                                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setActiveGroupFilter("All")}
+                                                        className={`font-bold transition-all px-2.5 py-0.5 rounded-md ${
+                                                            activeGroupFilter === "All"
+                                                                ? "bg-[color:var(--app-primary)] text-white shadow-xs"
+                                                                : "text-[color:var(--app-muted)] hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
+                                                        }`}
+                                                    >
+                                                        All ({tableOverview.total})
+                                                    </button>
+                                                    {availableGroupNames.map((groupName) => {
+                                                        const count = groupedTablesMap[groupName]?.length || 0;
+                                                        const isSelected =
+                                                            activeGroupFilter.toLowerCase() === groupName.toLowerCase();
+                                                        return (
+                                                            <button
+                                                                key={groupName}
+                                                                type="button"
+                                                                onClick={() => setActiveGroupFilter(groupName)}
+                                                                className={`font-bold transition-all px-2.5 py-0.5 rounded-md ${
+                                                                    isSelected
+                                                                        ? "bg-[color:var(--app-primary)] text-white shadow-xs"
+                                                                        : "text-[color:var(--app-muted)] hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
+                                                                }`}
+                                                            >
+                                                                {groupName} ({count})
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+
+                                            {/* Zoom Control Buttons Beside Group Filters */}
+                                            <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 rounded-lg p-0.5 border border-[color:var(--app-border)]/40 shadow-xs">
                                                 <button
                                                     type="button"
-                                                    onClick={() => setActiveGroupFilter("All")}
-                                                    className={`font-bold transition-all px-2.5 py-0.5 rounded-md ${
-                                                        activeGroupFilter === "All"
-                                                            ? "bg-[color:var(--app-primary)] text-white shadow-xs"
-                                                            : "text-[color:var(--app-muted)] hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
-                                                    }`}
+                                                    onClick={() => changeTableZoom((prev) => prev - 15)}
+                                                    disabled={tableZoom <= 70}
+                                                    className="p-1 rounded-md text-[color:var(--app-muted)] hover:text-[color:var(--app-text)] hover:bg-black/10 dark:hover:bg-white/10 transition disabled:opacity-30"
+                                                    title="Decrease table box size (Zoom Out)"
+                                                    aria-label="Zoom Out"
                                                 >
-                                                    All ({tableOverview.total})
+                                                    <ZoomOut size={14} />
                                                 </button>
-                                                {availableGroupNames.map((groupName) => {
-                                                    const count = groupedTablesMap[groupName]?.length || 0;
-                                                    const isSelected =
-                                                        activeGroupFilter.toLowerCase() === groupName.toLowerCase();
-                                                    return (
-                                                        <button
-                                                            key={groupName}
-                                                            type="button"
-                                                            onClick={() => setActiveGroupFilter(groupName)}
-                                                            className={`font-bold transition-all px-2.5 py-0.5 rounded-md ${
-                                                                isSelected
-                                                                    ? "bg-[color:var(--app-primary)] text-white shadow-xs"
-                                                                    : "text-[color:var(--app-muted)] hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
-                                                            }`}
-                                                        >
-                                                            {groupName} ({count})
-                                                        </button>
-                                                    );
-                                                })}
+                                                <span className="text-[10px] font-extrabold px-1 min-w-[34px] text-center theme-muted select-none">
+                                                    {tableZoom}%
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => changeTableZoom((prev) => prev + 15)}
+                                                    disabled={tableZoom >= 180}
+                                                    className="p-1 rounded-md text-[color:var(--app-muted)] hover:text-[color:var(--app-text)] hover:bg-black/10 dark:hover:bg-white/10 transition disabled:opacity-30"
+                                                    title="Increase table box size (Zoom In)"
+                                                    aria-label="Zoom In"
+                                                >
+                                                    <ZoomIn size={14} />
+                                                </button>
+                                                {tableZoom !== 100 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => changeTableZoom(100)}
+                                                        className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 hover:bg-orange-500 hover:text-white transition text-[color:var(--app-muted)]"
+                                                        title="Reset size to 100%"
+                                                    >
+                                                        Reset
+                                                    </button>
+                                                )}
                                             </div>
-                                        )}
+                                        </div>
                                     </div>
 
                                     {tableOverview.loading ? (
@@ -1571,8 +1631,17 @@ export default function OwnerLayout() {
                                                         <div
                                                             className={
                                                                 isDashboardRoute
-                                                                    ? "grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-3 sm:gap-4 w-full auto-rows-fr overflow-visible pt-1"
+                                                                    ? "grid gap-3 sm:gap-4 w-full auto-rows-fr overflow-visible pt-1"
                                                                     : "flex flex-wrap gap-2 pt-1"
+                                                            }
+                                                            style={
+                                                                isDashboardRoute
+                                                                    ? {
+                                                                          gridTemplateColumns: `repeat(auto-fill, minmax(${Math.round(
+                                                                              130 * (tableZoom / 100)
+                                                                          )}px, 1fr))`,
+                                                                      }
+                                                                    : undefined
                                                             }
                                                         >
                                                             {groupTables.map((table) => {
@@ -1668,13 +1737,18 @@ export default function OwnerLayout() {
                                                                 ? ` - Managed by ${assignedStaffLabel}`
                                                                 : ""
                                                         }`}
-                                                        className={`theme-table-box relative w-full aspect-square min-h-[110px] max-w-[140px] flex flex-col justify-between rounded-xl p-2.5 pb-7 text-xs transition-all duration-200 state-${tableStateClassToken} ${
+                                                        className={`theme-table-box relative w-full aspect-square flex flex-col justify-between rounded-xl p-2.5 pb-7 text-xs transition-all duration-200 state-${tableStateClassToken} ${
                                                             table.isOccupied ? "is-occupied" : ""
                                                         } ${isDropTarget ? "is-drop-target" : ""} ${
                                                             hasAnyPopoverOpen
                                                                 ? "z-[50] shadow-xl ring-2 ring-amber-500/50 !transform-none"
                                                                 : "hover:-translate-y-0.5 z-1"
                                                         }`}
+                                                        style={{
+                                                            minHeight: `${Math.round(110 * (tableZoom / 100))}px`,
+                                                            maxWidth: `${Math.round(140 * (tableZoom / 100))}px`,
+                                                            fontSize: `${Math.max(10, Math.round(12 * (tableZoom / 100)))}px`,
+                                                        }}
                                                     >
                                                         <div className="flex h-full flex-col justify-between">
                                                             <div className="flex items-start justify-between gap-2">
