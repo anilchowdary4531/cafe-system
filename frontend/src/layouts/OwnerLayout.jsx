@@ -2332,8 +2332,8 @@ export default function OwnerLayout() {
                     </div>
                 )}
 
-                {/* Non-Dashboard top-left Menu button ☰ */}
-                {!isDashboardRoute && (
+                {/* Non-Dashboard top-left Menu button ☰ (Hidden on pages like Menu Studio that render their own aligned header menu button) */}
+                {!isDashboardRoute && !location.pathname.startsWith("/owner/menu") && (
                     <div className="pt-3 px-3 sm:px-4 md:px-6 flex items-center justify-start">
                         <button
                             type="button"
@@ -2354,7 +2354,7 @@ export default function OwnerLayout() {
                             No modules are enabled for this account.
                         </div>
                     ) : canAccessCurrentRoute ? (
-                        <Outlet />
+                        <Outlet context={{ setSidebarOpen, openSidebar: () => setSidebarOpen(true) }} />
                     ) : null}
                 </main>
                 <Footer />

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useOutletContext } from "react-router-dom";
 import axios from "axios";
-import { MoreVertical, Search, Trash2 } from "lucide-react";
+import { Menu, MoreVertical, Search, Trash2 } from "lucide-react";
 import { API } from "../../config";
 import { uploadToS3Presigned } from "../../utils/s3Upload";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
@@ -63,6 +63,7 @@ const getDiscountedPrice = (originalPrice, discountPercent) => {
 
 export default function MenuStudio() {
     const [searchParams] = useSearchParams();
+    const { setSidebarOpen } = useOutletContext() || {};
     const isTobaccoParam = searchParams.get("tobacco") === "true";
 
     const [items, setItems] = useState([]);
@@ -455,7 +456,18 @@ export default function MenuStudio() {
         <div className="theme-page min-h-screen px-4 py-6 md:px-8">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[color:var(--app-heading)]">Menu Studio</h1>
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setSidebarOpen?.(true)}
+                            className="theme-icon-button theme-icon-button-primary inline-flex items-center justify-center rounded-xl p-2.5 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            aria-label="Open navigation menu"
+                            title="Open navigation menu"
+                        >
+                            <Menu size={20} />
+                        </button>
+                        <h1 className="text-2xl font-bold tracking-tight text-[color:var(--app-heading)]">Menu Studio</h1>
+                    </div>
                     <p className="mt-1 text-xs text-[color:var(--app-muted)]">
                         Create, edit, and control item availability, variants, and add-ons for your restaurant menu.
                     </p>
