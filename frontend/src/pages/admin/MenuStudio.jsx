@@ -17,7 +17,32 @@ const emptyForm = {
     originalPrice: "",
     discountPercent: "",
     isAvailable: true,
+    variants: [],
+    modifierGroups: [],
 };
+
+const emptyTobaccoForm = {
+    name: "",
+    brand: "",
+    category: "Cigarettes",
+    packSize: "10 Sticks Pack",
+    description: "Statutory Warning: Tobacco causes painful death. 18+ Only.",
+    image: "",
+    originalPrice: "",
+    discountPercent: "0",
+    isTobacco: true,
+    ageVerificationRequired: true,
+    isAvailable: true,
+};
+
+const TOBACCO_CATEGORIES = [
+    "Cigarettes",
+    "Cigars",
+    "Smokeless Tobacco",
+    "Hookah / Shisha",
+    "Vapes / E-Cigarettes",
+    "Rolling Tobacco",
+];
 
 const toMoney = (value) => {
     const number = Number(value || 0);
@@ -45,6 +70,7 @@ export default function MenuStudio() {
     const [showDigitalMenuModal, setShowDigitalMenuModal] = useState(false);
     const [search, setSearch] = useState("");
     const [form, setForm] = useState(emptyForm);
+    const [formType, setFormType] = useState("NORMAL"); // "NORMAL" | "TOBACCO"
     const [formOpen, setFormOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -125,16 +151,9 @@ export default function MenuStudio() {
 
     useEffect(() => {
         if (isTobaccoParam && restaurantInfo?.tobaccoApproved === true) {
+            setFormType("TOBACCO");
+            setForm(emptyTobaccoForm);
             setFormOpen(true);
-            setForm({
-                name: "",
-                description: "",
-                category: "Cigarettes",
-                image: "",
-                originalPrice: "",
-                discountPercent: "",
-                isAvailable: true,
-            });
         }
     }, [isTobaccoParam, restaurantInfo?.tobaccoApproved]);
 
@@ -164,8 +183,8 @@ export default function MenuStudio() {
         };
     }, [openActionMenuId]);
 
-    const resetForm = ({ close = false } = {}) => {
-        setForm(emptyForm);
+    const resetForm = ({ close = false, type = formType } = {}) => {
+        setForm(type === "TOBACCO" ? emptyTobaccoForm : emptyForm);
         setEditingId(null);
         if (close) setFormOpen(false);
     };
@@ -233,6 +252,7 @@ export default function MenuStudio() {
                 originalPrice,
                 discountPercent,
                 price,
+                isTobacco: formType === "TOBACCO",
             };
 
             if (editingId) {
@@ -253,14 +273,26 @@ export default function MenuStudio() {
         }
     };
 
+    const isTobaccoItem = (item) => {
+        if (item.isTobacco) return true;
+        if (TOBACCO_CATEGORIES.some((cat) => item.category?.toLowerCase()?.includes(cat.toLowerCase()))) return true;
+        return false;
+    };
+
     const startEdit = (item) => {
+        const isTob = isTobaccoItem(item);
+        setFormType(isTob ? "TOBACCO" : "NORMAL");
         setForm({
             name: item.name || "",
+            brand: item.brand || "",
+            category: item.category || (isTob ? "Cigarettes" : ""),
+            packSize: item.packSize || "10 Sticks Pack",
             description: item.description || "",
-            category: item.category || "",
             image: item.image || "",
             originalPrice: item.originalPrice ?? item.price ?? "",
             discountPercent: item.discountPercent ?? 0,
+            isTobacco: isTob,
+            ageVerificationRequired: item.ageVerificationRequired !== false,
             isAvailable: item.isAvailable ?? true,
             variants: Array.isArray(item.variants)
                 ? item.variants.map((v) => ({ name: v.name, price: v.price, isDefault: Boolean(v.isDefault), isActive: v.isActive !== false }))
@@ -450,16 +482,43 @@ export default function MenuStudio() {
                 <button
                     type="button"
                     onClick={() => {
-                        if (formOpen && !editingId) resetForm();
-                        else {
+                        if (formOpen && formType === "NORMAL" && !editingId) {
+                            setFormOpen(false);
+                        } else {
+                            setFormType("NORMAL");
                             setEditingId(null);
                             setForm(emptyForm);
                             setFormOpen(true);
                         }
                     }}
-                    className="theme-button rounded-xl px-4 py-3 font-semibold"
+                    className={`rounded-xl px-4 py-3 font-semibold transition ${
+                        formOpen && formType === "NORMAL"
+                            ? "bg-zinc-800 text-zinc-300 border border-zinc-700"
+                            : "theme-button"
+                    }`}
                 >
-                    {formOpen ? "Hide Form" : "Add Item"}
+                    {formOpen && formType === "NORMAL" ? "Hide Normal Form" : "+ Add Item"}
+                </button>
+                <button
+                    type="button"
+                    onClick={() => {
+                        if (formOpen && formType === "TOBACCO" && !editingId) {
+                            setFormOpen(false);
+                        } else {
+                            setFormType("TOBACCO");
+                            setEditingId(null);
+                            setForm(emptyTobaccoForm);
+                            setFormOpen(true);
+                        }
+                    }}
+                    className={`flex items-center gap-2 rounded-xl px-4 py-3 font-bold text-xs shadow-lg transition ${
+                        formOpen && formType === "TOBACCO"
+                            ? "bg-amber-950 text-amber-200 border border-amber-500/60"
+                            : "bg-gradient-to-r from-amber-600 via-orange-600 to-red-700 text-white hover:from-amber-500 hover:to-red-600 border border-amber-400/40"
+                    }`}
+                >
+                    <span className="text-base">🚬</span>
+                    <span>{formOpen && formType === "TOBACCO" ? "Hide Tobacco Form" : "+ Add Tobacco Item"}</span>
                 </button>
             </div>
 
@@ -469,11 +528,24 @@ export default function MenuStudio() {
                 </div>
             )}
 
-            {formOpen && (
+            {/* NORMAL ITEM FORM */}
+            {formOpen && formType === "NORMAL" && (
                 <form
                     onSubmit={handleSubmit}
                     className="theme-panel mt-6 grid gap-4 rounded-2xl p-5 md:grid-cols-2"
                 >
+                    <div className="md:col-span-2 flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-2">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xl">🍽️</span>
+                            <h2 className="text-sm font-bold uppercase tracking-wider text-[color:var(--app-primary)]">
+                                {editingId ? "Edit Normal Menu Item" : "Add Normal Menu Item"}
+                            </h2>
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            Food & Beverage
+                        </span>
+                    </div>
+
                     <input
                         className="theme-input rounded-xl px-3 py-2 outline-none"
                         placeholder="Item name"
@@ -482,7 +554,7 @@ export default function MenuStudio() {
                     />
                     <input
                         className="theme-input rounded-xl px-3 py-2 outline-none"
-                        placeholder="Category"
+                        placeholder="Category (e.g. Coffee, Food, Sweets)"
                         value={form.category}
                         onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
                     />
@@ -732,14 +804,207 @@ export default function MenuStudio() {
                 </form>
             )}
 
+            {/* DEDICATED TOBACCO FORM */}
+            {formOpen && formType === "TOBACCO" && (
+                <form
+                    onSubmit={handleSubmit}
+                    className="mt-6 rounded-2xl border-2 border-amber-500/50 bg-gradient-to-b from-amber-950/40 via-zinc-900/95 to-zinc-950 p-5 md:p-6 shadow-2xl grid gap-4 md:grid-cols-2 text-zinc-100"
+                >
+                    <div className="md:col-span-2 rounded-xl border border-amber-500/40 bg-amber-950/60 p-4 flex items-start gap-3 text-amber-200">
+                        <span className="text-2xl">🔞</span>
+                        <div className="space-y-1 text-xs">
+                            <p className="font-extrabold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                                <span>Statutory Tobacco Product Registry</span>
+                                <span className="text-[10px] bg-amber-500 text-black px-2 py-0.5 rounded font-black tracking-widest">
+                                    18+ MANDATORY
+                                </span>
+                            </p>
+                            <p className="text-amber-200/90 leading-relaxed">
+                                Under COPTA regulations, tobacco product sales are legally restricted to adults aged 18 and above. Ensure age verification is strictly enforced during ordering.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                            Tobacco Product / Item Name *
+                        </label>
+                        <input
+                            className="w-full rounded-xl border border-amber-500/30 bg-zinc-900/80 px-3 py-2 text-sm outline-none focus:border-amber-400 text-white placeholder-zinc-500"
+                            placeholder="e.g. Classic Milds, Marlboro Lights, Shisha Mint"
+                            value={form.name}
+                            onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                            Tobacco Category *
+                        </label>
+                        <select
+                            className="w-full rounded-xl border border-amber-500/30 bg-zinc-900/80 px-3 py-2 text-sm outline-none focus:border-amber-400 text-white"
+                            value={form.category}
+                            onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+                        >
+                            {TOBACCO_CATEGORIES.map((cat) => (
+                                <option key={cat} value={cat} className="bg-zinc-900 text-white">
+                                    {cat}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                            Brand / Manufacturer
+                        </label>
+                        <input
+                            className="w-full rounded-xl border border-amber-500/30 bg-zinc-900/80 px-3 py-2 text-sm outline-none focus:border-amber-400 text-white placeholder-zinc-500"
+                            placeholder="e.g. ITC Ltd, Philip Morris, Godfrey Phillips"
+                            value={form.brand || ""}
+                            onChange={(e) => setForm((prev) => ({ ...prev, brand: e.target.value }))}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                            Pack Size / Stick Count
+                        </label>
+                        <input
+                            className="w-full rounded-xl border border-amber-500/30 bg-zinc-900/80 px-3 py-2 text-sm outline-none focus:border-amber-400 text-white placeholder-zinc-500"
+                            placeholder="e.g. 10 Sticks Pack, 20 Sticks Pack, 50g Tub"
+                            value={form.packSize || ""}
+                            onChange={(e) => setForm((prev) => ({ ...prev, packSize: e.target.value }))}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                            Original Price / MRP (₹) *
+                        </label>
+                        <input
+                            className="w-full rounded-xl border border-amber-500/30 bg-zinc-900/80 px-3 py-2 text-sm outline-none focus:border-amber-400 text-white placeholder-zinc-500"
+                            placeholder="Price in ₹"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={form.originalPrice}
+                            onChange={(e) => setForm((prev) => ({ ...prev, originalPrice: e.target.value }))}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                            Discount %
+                        </label>
+                        <input
+                            className="w-full rounded-xl border border-amber-500/30 bg-zinc-900/80 px-3 py-2 text-sm outline-none focus:border-amber-400 text-white placeholder-zinc-500"
+                            placeholder="0"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={form.discountPercent}
+                            onChange={(e) => setForm((prev) => ({ ...prev, discountPercent: e.target.value }))}
+                        />
+                    </div>
+
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-950/30 px-4 py-2.5 md:col-span-2 flex items-center justify-between">
+                        <div>
+                            <p className="text-[10px] uppercase tracking-widest text-amber-400 font-bold">Effective Retail Selling Price</p>
+                            <p className="text-xs text-amber-200/70">Calculated after statutory discount</p>
+                        </div>
+                        <p className="text-xl font-extrabold text-amber-300">
+                            {formatMoney(getDiscountedPrice(form.originalPrice, form.discountPercent))}
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2 md:col-span-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                            Product Image (Upload or URL)
+                        </label>
+                        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                            <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                                disabled={imageUploading}
+                                onChange={(e) => uploadMenuImage(e.target.files?.[0])}
+                                className="block w-full text-sm text-zinc-300 file:mr-3 file:rounded-lg file:border-0 file:bg-amber-600 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-amber-500 disabled:opacity-70 md:w-auto"
+                            />
+                            <input
+                                className="w-full flex-1 rounded-xl border border-amber-500/30 bg-zinc-900/80 px-3 py-2 text-sm outline-none focus:border-amber-400 text-white placeholder-zinc-500"
+                                placeholder="Image URL (optional)"
+                                value={form.image}
+                                onChange={(e) => setForm((prev) => ({ ...prev, image: e.target.value }))}
+                            />
+                        </div>
+                        {imageUploading && <p className="text-xs text-amber-400">Uploading image to S3...</p>}
+                    </div>
+
+                    <div className="flex flex-col gap-1 md:col-span-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                            Statutory Health Warning & Description
+                        </label>
+                        <textarea
+                            rows={3}
+                            className="w-full rounded-xl border border-amber-500/30 bg-zinc-900/80 px-3 py-2 text-sm outline-none focus:border-amber-400 text-white placeholder-zinc-500"
+                            placeholder="Statutory warning text..."
+                            value={form.description}
+                            onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-2 md:col-span-2 bg-amber-950/40 p-3 rounded-xl border border-amber-500/30">
+                        <label className="flex items-center gap-2.5 text-xs font-bold text-amber-200 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                className="rounded text-amber-500 focus:ring-amber-400"
+                                checked={form.ageVerificationRequired !== false}
+                                onChange={(e) => setForm((prev) => ({ ...prev, ageVerificationRequired: e.target.checked }))}
+                            />
+                            <span>🔞 Flag Mandatory 18+ Age Check at POS / Waiter Terminal</span>
+                        </label>
+                        <label className="flex items-center gap-2.5 text-xs font-bold text-zinc-300 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                className="rounded text-amber-500 focus:ring-amber-400"
+                                checked={form.isAvailable}
+                                onChange={(e) => setForm((prev) => ({ ...prev, isAvailable: e.target.checked }))}
+                            />
+                            <span>Product Available in Stock & Active on Menu</span>
+                        </label>
+                    </div>
+
+                    <div className="flex gap-3 md:col-span-2 justify-end pt-2">
+                        <button
+                            type="button"
+                            onClick={() => resetForm({ close: true })}
+                            className="rounded-xl px-5 py-2.5 text-xs font-bold text-zinc-300 border border-zinc-700 hover:bg-zinc-800 transition"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            className="rounded-xl px-6 py-2.5 text-xs font-extrabold bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 text-white shadow-lg transition disabled:opacity-60"
+                        >
+                            {submitting ? "Saving Tobacco Product..." : editingId ? "Update Tobacco Product" : "Save Tobacco Product"}
+                        </button>
+                    </div>
+                </form>
+            )}
+
             {!loading && groupedItems.length > 0 && (
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--app-muted)]">Categories</span>
                     {groupedItems.map(([category, categoryItems]) => (
                         <span
                             key={category}
-                            className="rounded-lg bg-black/5 dark:bg-white/10 px-2.5 py-0.5 text-xs font-semibold theme-muted"
+                            className="rounded-lg bg-black/5 dark:bg-white/10 px-2.5 py-0.5 text-xs font-semibold theme-muted flex items-center gap-1"
                         >
+                            {TOBACCO_CATEGORIES.some((c) => category.toLowerCase().includes(c.toLowerCase())) && (
+                                <span className="text-[10px]">🚬</span>
+                            )}
                             {category} ({categoryItems.length})
                         </span>
                     ))}
@@ -751,7 +1016,12 @@ export default function MenuStudio() {
                     groupedItems.map(([category, categoryItems]) => (
                         <section key={category} className="p-0">
                             <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)]/30 pb-1">
-                                <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[color:var(--app-primary)]">{category}</p>
+                                <div className="flex items-center gap-1.5">
+                                    {TOBACCO_CATEGORIES.some((c) => category.toLowerCase().includes(c.toLowerCase())) && (
+                                        <span className="text-xs">🚬</span>
+                                    )}
+                                    <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[color:var(--app-primary)]">{category}</p>
+                                </div>
                                 <p className="text-xs text-[color:var(--app-muted)]">{categoryItems.length} item(s)</p>
                             </div>
 
@@ -762,6 +1032,12 @@ export default function MenuStudio() {
                                         className="relative w-[220px] shrink-0 overflow-visible rounded-xl border border-[color:var(--app-border)]/30 p-1.5 transition hover:bg-black/5 dark:hover:bg-white/5"
                                     >
                                         <div className="relative">
+                                            {isTobaccoItem(item) && (
+                                                <div className="absolute left-2 top-2 z-10 rounded-lg bg-amber-950/90 border border-amber-500/60 px-2 py-0.5 text-[10px] font-black text-amber-300 backdrop-blur-sm shadow flex items-center gap-1">
+                                                    <span>🔞</span>
+                                                    <span>18+ TOBACCO</span>
+                                                </div>
+                                            )}
                                             <img
                                                 src={resolveImageUrl(item.image) || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c"}
                                                 alt={item.name}
