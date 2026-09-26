@@ -310,18 +310,18 @@ export default function OwnerReports() {
           {/* EXECUTIVE SUMMARY METRIC CARDS */}
           {reportData.summary && (
             <div className="pb-4 border-b border-[color:var(--app-border)]/40">
-              <div className="text-xs font-bold uppercase tracking-wider text-[var(--app-primary)] mb-2">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--app-primary)] mb-1.5">
                 PERIOD PERFORMANCE OVERVIEW · {REPORT_TABS.find((t) => t.id === activeTab)?.label?.toUpperCase() || "REPORT"}
               </div>
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-4 py-2">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 py-1">
                 {Object.entries(reportData.summary)
                   .filter(([k, v]) => typeof v !== "object")
                   .map(([key, value]) => (
                     <div key={key} className="space-y-0.5">
-                      <div className="theme-muted text-xs font-medium uppercase tracking-wide">
+                      <div className="theme-muted text-[10px] font-bold uppercase tracking-wider">
                         {key.replace(/([A-Z])/g, " $1").trim()}
                       </div>
-                      <div className="text-2xl font-black tracking-tight text-[color:var(--app-text)]">
+                      <div className="text-base sm:text-lg font-bold tracking-tight text-[color:var(--app-text)]">
                         {typeof value === "number" &&
                         (key.toLowerCase().includes("sales") ||
                           key.toLowerCase().includes("amount") ||
