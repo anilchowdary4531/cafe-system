@@ -221,7 +221,7 @@ export default function OwnerCustomerManager() {
   const customersWithOrders = customers.filter((c) => (c.totalOrders || 0) > 0).length;
 
   return (
-    <div className="px-3 py-1 sm:px-5 sm:py-1.5 max-w-7xl mx-auto space-y-3 text-[color:var(--app-text)] font-sans">
+    <div className="px-3 py-1 sm:px-5 sm:py-1.5 w-full space-y-3 text-[color:var(--app-text)] font-sans">
       {/* Header Banner - Sleek Paper Style */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-[color:var(--app-border)]/40 pb-3 gap-2">
         <div>

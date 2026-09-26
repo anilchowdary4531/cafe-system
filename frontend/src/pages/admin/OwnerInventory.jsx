@@ -316,14 +316,14 @@ export default function OwnerInventory() {
     };
 
     return (
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
+        <div className="px-3 py-1 sm:px-5 sm:py-1.5 w-full flex flex-col gap-3.5 text-[color:var(--app-text)] font-sans">
             {/* Page Header */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-[color:var(--app-border)]/40 pb-3">
                 <div>
-                    <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight text-white sm:text-3xl">
-                        <Package className="text-orange-400" size={28} /> Raw Material Inventory & BOM
+                    <h1 className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-[color:var(--app-heading)] sm:text-2xl">
+                        <Package className="text-orange-500" size={24} /> Raw Material Inventory & BOM
                     </h1>
-                    <p className="mt-1 text-xs text-gray-400 sm:text-sm">
+                    <p className="mt-0.5 text-xs text-[color:var(--app-muted)]">
                         Manage ingredient master, recipes, stock-ins, kitchen wastage, and automatic order consumption.
                     </p>
                 </div>
@@ -344,15 +344,15 @@ export default function OwnerInventory() {
                             });
                             setShowMaterialModal(true);
                         }}
-                        className="flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-bold text-black transition hover:bg-orange-400"
+                        className="flex items-center gap-1.5 rounded-xl bg-orange-500 px-3.5 py-2 text-xs font-bold text-black transition hover:bg-orange-400"
                     >
-                        <Plus size={18} /> Add Raw Material
+                        <Plus size={16} /> Add Raw Material
                     </button>
                 </div>
             </div>
 
             {/* Metrics Overview */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 border-b border-[color:var(--app-border)]/40 pb-4">
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3 border-b border-[color:var(--app-border)]/40 pb-3">
                 <div className="p-2">
                     <div className="flex items-center justify-between theme-muted">
                         <span className="text-xs font-bold">Total Materials</span>

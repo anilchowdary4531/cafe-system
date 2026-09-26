@@ -190,7 +190,7 @@ export default function OwnerLoyalty() {
   }
 
   return (
-    <div className="p-4 max-w-7xl mx-auto space-y-3.5">
+    <div className="px-3 py-1 sm:px-5 sm:py-1.5 w-full space-y-3.5 text-[color:var(--app-text)] font-sans">
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-4">
         <div className="space-y-0.5">

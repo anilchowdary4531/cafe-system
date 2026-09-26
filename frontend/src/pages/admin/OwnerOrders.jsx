@@ -212,7 +212,7 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
     }
 
     return (
-        <div className="px-3 py-1 sm:px-5 sm:py-1.5 max-w-7xl mx-auto space-y-3 text-[color:var(--app-text)] font-sans">
+        <div className="px-3 py-1 sm:px-5 sm:py-1.5 w-full space-y-3 text-[color:var(--app-text)] font-sans">
             {/* Header Tabs (if applicable) */}
             {!isOnlineOrders && (
                 <div className="flex items-center gap-4 overflow-x-auto border-b border-[color:var(--app-border)]/40 pb-1">
