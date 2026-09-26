@@ -531,12 +531,6 @@ export default function OwnerLayout() {
             accessKey: "kitchen",
         },
         {
-            label: "KOT Logs",
-            path: "/owner/kitchen?tab=audit",
-            icon: <FileText size={18} />,
-            accessKey: "kitchen",
-        },
-        {
             label: "Printers",
             path: "/owner/printers",
             icon: <Printer size={18} />,
