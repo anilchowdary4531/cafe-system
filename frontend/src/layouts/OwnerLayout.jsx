@@ -525,14 +525,14 @@ export default function OwnerLayout() {
             accessKey: "tables",
         },
         {
-            label: "Kitchen Live",
+            label: "Kitchen Operations",
             path: "/owner/kitchen",
             icon: <ChefHat size={18} />,
             accessKey: "kitchen",
         },
         {
             label: "KOT Logs",
-            path: "/owner/kot-history",
+            path: "/owner/kitchen?tab=audit",
             icon: <FileText size={18} />,
             accessKey: "kitchen",
         },
