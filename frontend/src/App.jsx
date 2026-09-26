@@ -529,6 +529,10 @@ export default function App() {
                         }
                     >
                         <Route index element={<OwnerDashboard />} />
+                        <Route path="billing" element={<NewOrder />} />
+                        <Route path="billing-desk" element={<NewOrder />} />
+                        <Route path="new-order" element={<NewOrder />} />
+                        <Route path="pos" element={<NewOrder />} />
                         <Route path="orders" element={<OwnerOrders />} />
                         <Route path="online-orders" element={<Navigate to="/owner/kitchen?tab=live" replace />} />
                         <Route path="menu" element={<MenuStudio />} />

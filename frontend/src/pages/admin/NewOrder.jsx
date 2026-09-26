@@ -39,6 +39,7 @@ import OfflineConflictModal from "../../components/OfflineConflictModal";
 import BrandLogo from "../../components/BrandLogo";
 import { cacheMenuOffline, getOfflineMenu, queueOfflineOperation, saveOfflineOrder } from "../../utils/offline/offlineDb";
 import { connectivityService } from "../../utils/offline/connectivityService";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const toInr = (value) => {
     const n = Number(value || 0);
@@ -1251,8 +1252,8 @@ export default function NewOrder() {
                                     <BrandLogo className="theme-brand-logo h-7 w-7 object-contain" title="Tiffzy logo" />
                                     <span className="theme-brand-text text-xl font-bold tracking-tight">Tiffzy</span>
                                 </button>
-                                <h1 className="mt-1 flex items-center gap-2 text-xl sm:text-2xl font-bold text-[color:var(--app-text)]">
-                                    <UtensilsCrossed size={18} className="theme-accent-text" />
+                                <h1 className="mt-1 flex items-center gap-3 text-xl sm:text-2xl font-bold text-[color:var(--app-text)]">
+                                    <OwnerMenuButton />
                                     Billing Desk
                                 </h1>
                                 <p className="theme-muted mt-0.5 text-xs sm:text-sm truncate">

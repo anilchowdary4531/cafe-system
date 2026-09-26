@@ -532,7 +532,7 @@ export default function OwnerLayout() {
         },
         {
             label: "Billing Desk",
-            path: "/admin/new-order",
+            path: "/owner/billing",
             icon: <ClipboardPlus size={18} />,
             accessKey: "orders",
         },
@@ -1467,7 +1467,7 @@ export default function OwnerLayout() {
                                 {access.orders && (
                                     <button
                                         type="button"
-                                        onClick={() => navigate("/admin/new-order")}
+                                        onClick={() => navigate("/owner/billing")}
                                         className="theme-icon-button rounded-2xl p-2.5 sm:p-3"
                                         title="Open billing desk"
                                         aria-label="Open billing desk"
