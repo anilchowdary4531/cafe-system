@@ -1330,13 +1330,13 @@ export default function OwnerLayout() {
                 />
             )}
 
-            {/* Navigation Drawer Sidebar (Black & White Theme) */}
+            {/* Navigation Drawer Sidebar (Light Theme - White Background & Dark Text) */}
             <aside
                 aria-label="Navigation sidebar"
                 className={`
           fixed top-0 left-0 bottom-0 z-50
           w-64 sm:w-72
-          bg-zinc-950 text-white border-r border-zinc-800/80 shadow-2xl
+          bg-white text-gray-900 border-r border-gray-200 shadow-2xl
           transition-all duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
@@ -1355,13 +1355,13 @@ export default function OwnerLayout() {
                         >
                             <BrandLogo className="theme-brand-logo h-8 w-8" title="Tiffzy logo" />
                             <div>
-                                <h1 className="text-xl font-bold text-white">Tiffzy</h1>
-                                <span className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider block">OWNER PANEL</span>
+                                <h1 className="text-xl font-bold text-gray-900">Tiffzy</h1>
+                                <span className="text-gray-500 text-[10px] uppercase font-bold tracking-wider block">OWNER PANEL</span>
                             </div>
                         </button>
 
                         <button
-                            className="text-zinc-400 hover:text-white hover:bg-zinc-800/80 rounded-xl p-2 transition cursor-pointer"
+                            className="text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-xl p-2 transition cursor-pointer"
                             onClick={() => setSidebarOpen(false)}
                             aria-label="Close navigation menu"
                             title="Close navigation menu"
@@ -1386,16 +1386,16 @@ export default function OwnerLayout() {
                                     className={({ isActive }) =>
                                         `flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl transition text-sm font-medium ${
                                             isActive || isCurrentActive
-                                                ? "bg-white/10 text-white font-bold border-l-4 border-white shadow-xs"
-                                                : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100"
+                                                ? "bg-gray-100 text-gray-900 font-bold border-l-4 border-gray-900 shadow-2xs"
+                                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                                         }`
                                     }
                                 >
                                     <div className="flex items-center gap-3">
-                                        <span className={`relative ${isCurrentActive ? "text-white" : "text-zinc-400"}`}>
+                                        <span className={`relative ${isCurrentActive ? "text-gray-900" : "text-gray-500"}`}>
                                             {item.icon}
                                             {item.path === "/owner/notifications" && unreadCount > 0 && (
-                                                <span className="bg-white text-black font-extrabold absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none">
+                                                <span className="bg-gray-900 text-white font-extrabold absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none">
                                                     {unreadCount > 99 ? "99+" : unreadCount}
                                                 </span>
                                             )}
@@ -1403,7 +1403,7 @@ export default function OwnerLayout() {
                                         <span>{item.label}</span>
                                     </div>
                                     {(isCurrentActive) && (
-                                        <span className="rounded bg-white px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-black">
+                                        <span className="rounded bg-gray-900 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white">
                                             ACTIVE
                                         </span>
                                     )}
@@ -1416,7 +1416,7 @@ export default function OwnerLayout() {
                     <button
                         type="button"
                         onClick={logout}
-                        className="mt-4 flex items-center gap-3 px-4 py-2.5 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-semibold cursor-pointer"
+                        className="mt-4 flex items-center gap-3 px-4 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 text-xs font-semibold cursor-pointer"
                     >
                         <LogOut size={16} />
                         Logout
