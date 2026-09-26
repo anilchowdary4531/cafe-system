@@ -1288,10 +1288,18 @@ export default function OwnerLayout() {
                 <div className="h-full flex flex-col p-5 overflow-y-auto">
                     {/* Logo */}
                     <div className="flex items-center justify-between mb-8">
-                        <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                navigate("/owner");
+                                setSidebarOpen(false);
+                            }}
+                            className="flex items-center gap-2 text-left cursor-pointer transition-opacity hover:opacity-80 focus:outline-none"
+                            title="Go to Dashboard"
+                        >
                             <BrandLogo className="theme-brand-logo h-9 w-9" title="Tiffzy logo" />
                             <h1 className="theme-brand-text text-2xl font-bold sm:text-3xl">Tiffzy</h1>
-                        </div>
+                        </button>
 
                         <button
                             className="theme-icon-button block rounded-xl p-2"
@@ -1355,7 +1363,12 @@ export default function OwnerLayout() {
                                 <Menu size={20} />
                             </button>
 
-                            <div className="min-w-0 space-y-0.5">
+                            <button
+                                type="button"
+                                onClick={() => navigate("/owner")}
+                                className="min-w-0 space-y-0.5 text-left cursor-pointer transition-opacity hover:opacity-80 focus:outline-none"
+                                title="Go to Dashboard"
+                            >
                                 <div className="flex items-center gap-2 min-w-0">
                                     <BrandLogo className="theme-brand-logo h-6 w-6 shrink-0" title="Tiffzy logo" />
                                     <h2 className="theme-brand-text text-lg sm:text-xl font-bold truncate">
@@ -1365,7 +1378,7 @@ export default function OwnerLayout() {
                                 <p className="theme-muted-strong text-[11px] font-semibold uppercase tracking-[0.18em] sm:text-xs">
                                     Owner Panel
                                 </p>
-                            </div>
+                            </button>
                         </div>
 
                         {/* Right */}
