@@ -678,6 +678,16 @@ export default function OwnerLayout() {
     }, [location.pathname]);
 
     useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === "Escape" && sidebarOpen) {
+                setSidebarOpen(false);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [sidebarOpen]);
+
+    useEffect(() => {
         const syncUnread = () => setUnreadCount(getOwnerUnreadCount());
         syncUnread();
         const unsubscribe = subscribeOwnerNotifications(syncUnread);
@@ -1311,8 +1321,18 @@ export default function OwnerLayout() {
                 />
             )}
 
-            {/* Sidebar */}
+            {/* Backdrop overlay for navigation drawer */}
+            {sidebarOpen && (
+                <div
+                    className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs transition-opacity"
+                    onClick={() => setSidebarOpen(false)}
+                    aria-hidden="true"
+                />
+            )}
+
+            {/* Navigation Drawer Sidebar */}
             <aside
+                aria-label="Navigation sidebar"
                 className={`
           fixed top-0 left-0 bottom-0 z-50
           w-64 sm:w-72
@@ -1321,9 +1341,9 @@ export default function OwnerLayout() {
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
             >
-                <div className="h-full flex flex-col p-5 overflow-y-auto">
-                    {/* Logo */}
-                    <div className="flex items-center justify-between mb-8">
+                <div className="h-full flex flex-col p-4 overflow-y-auto">
+                    {/* Logo & Close Button */}
+                    <div className="flex items-center justify-between mb-6">
                         <button
                             type="button"
                             onClick={() => {
@@ -1333,144 +1353,167 @@ export default function OwnerLayout() {
                             className="flex items-center gap-2 text-left cursor-pointer transition-opacity hover:opacity-80 focus:outline-none"
                             title="Go to Dashboard"
                         >
-                            <BrandLogo className="theme-brand-logo h-9 w-9" title="Tiffzy logo" />
-                            <h1 className="theme-brand-text text-2xl font-bold sm:text-3xl">Tiffzy</h1>
+                            <BrandLogo className="theme-brand-logo h-8 w-8" title="Tiffzy logo" />
+                            <div>
+                                <h1 className="theme-brand-text text-xl font-bold">Tiffzy</h1>
+                                <span className="theme-muted text-[10px] uppercase font-bold tracking-wider block">OWNER PANEL</span>
+                            </div>
                         </button>
 
                         <button
                             className="theme-icon-button block rounded-xl p-2"
                             onClick={() => setSidebarOpen(false)}
+                            aria-label="Close navigation menu"
+                            title="Close navigation menu"
                         >
-                            <X size={20} />
+                            <X size={18} />
                         </button>
                     </div>
 
-                    {/* Nav */}
-                    <div className="space-y-2">
-                        {visibleNavItems.map((item) => (
-                            <NavLink
-                                key={item.path}
-                                to={item.path}
-                                end={item.path === "/owner"}
-                                className={({ isActive }) =>
-                                    `flex items-center gap-3 px-4 py-3 rounded-2xl transition ${
-                                        isActive
-                                            ? "theme-nav-item-active"
-                                            : "theme-nav-item"
-                                    }`
-                                }
-                            >
-                                <span className="relative">
-                                    {item.icon}
-                                    {item.path === "/owner/notifications" && unreadCount > 0 && (
-                                        <span className="theme-count-badge absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none">
-                                            {unreadCount > 99 ? "99+" : unreadCount}
+                    {/* Navigation Items with ACTIVE badge */}
+                    <div className="space-y-1.5 flex-1 overflow-y-auto pr-1">
+                        {visibleNavItems.map((item) => {
+                            const isCurrentActive = item.path === "/owner"
+                                ? (location.pathname === "/owner" || location.pathname === "/owner/")
+                                : location.pathname.startsWith(item.path);
+
+                            return (
+                                <NavLink
+                                    key={item.path}
+                                    to={item.path}
+                                    end={item.path === "/owner"}
+                                    onClick={() => setSidebarOpen(false)}
+                                    className={({ isActive }) =>
+                                        `flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl transition text-sm font-medium ${
+                                            isActive || isCurrentActive
+                                                ? "bg-[var(--app-primary)]/10 text-[var(--app-primary)] font-bold border-l-4 border-[var(--app-primary)]"
+                                                : "theme-nav-item hover:bg-[color:var(--app-border)]/20"
+                                        }`
+                                    }
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <span className="relative text-[var(--app-primary)]">
+                                            {item.icon}
+                                            {item.path === "/owner/notifications" && unreadCount > 0 && (
+                                                <span className="theme-count-badge absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none">
+                                                    {unreadCount > 99 ? "99+" : unreadCount}
+                                                </span>
+                                            )}
+                                        </span>
+                                        <span>{item.label}</span>
+                                    </div>
+                                    {(isCurrentActive) && (
+                                        <span className="rounded bg-[var(--app-primary)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                                            ACTIVE
                                         </span>
                                     )}
-                                </span>
-                                <span className="text-sm sm:text-base">{item.label}</span>
-                            </NavLink>
-                        ))}
+                                </NavLink>
+                            );
+                        })}
                     </div>
 
-                {/* Logout */}
-                <button
-                    type="button"
-                    onClick={logout}
-                    className="mt-auto flex items-center gap-3 px-4 py-3 rounded-2xl bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                >
-                    <LogOut size={18} />
-                    Logout
+                    {/* Logout */}
+                    <button
+                        type="button"
+                        onClick={logout}
+                        className="mt-4 flex items-center gap-3 px-4 py-2.5 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 text-xs font-semibold"
+                    >
+                        <LogOut size={16} />
+                        Logout
                     </button>
                 </div>
             </aside>
 
-            {/* Main */}
+            {/* Main Content Area */}
             <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-                {/* Header */}
-                <header className="theme-nav border-b px-3 py-3 sm:px-4 md:px-6">
-                    <div className="flex items-center justify-between gap-3">
-                        {/* Left */}
-                        <div className="flex items-start gap-3 min-w-0">
-                            <button
-                                className="theme-icon-button theme-icon-button-primary block shrink-0 rounded-xl p-2.5 shadow-lg"
-                                onClick={() => setSidebarOpen((prev) => !prev)}
-                            >
-                                <Menu size={20} />
-                            </button>
+                {/* Header - Full navbar ONLY on Dashboard page (/owner) */}
+                {isDashboardRoute && (
+                    <header className="theme-nav border-b px-3 py-3 sm:px-4 md:px-6">
+                        <div className="flex items-center justify-between gap-3">
+                            {/* Left */}
+                            <div className="flex items-start gap-3 min-w-0">
+                                <button
+                                    className="theme-icon-button theme-icon-button-primary block shrink-0 rounded-xl p-2.5 shadow-lg"
+                                    onClick={() => setSidebarOpen((prev) => !prev)}
+                                    aria-label="Open navigation menu"
+                                    title="Open navigation menu"
+                                >
+                                    <Menu size={20} />
+                                </button>
 
-                            <button
-                                type="button"
-                                onClick={() => navigate("/owner")}
-                                className="min-w-0 space-y-0.5 text-left cursor-pointer transition-opacity hover:opacity-80 focus:outline-none"
-                                title="Go to Dashboard"
-                            >
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <BrandLogo className="theme-brand-logo h-6 w-6 shrink-0" title="Tiffzy logo" />
-                                    <h2 className="theme-brand-text text-lg sm:text-xl font-bold truncate">
-                                        Tiffzy
-                                    </h2>
-                                </div>
-                                <p className="theme-muted-strong text-[11px] font-semibold uppercase tracking-[0.18em] sm:text-xs">
-                                    Owner Panel
+                                <button
+                                    type="button"
+                                    onClick={() => navigate("/owner")}
+                                    className="min-w-0 space-y-0.5 text-left cursor-pointer transition-opacity hover:opacity-80 focus:outline-none"
+                                    title="Go to Dashboard"
+                                >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <BrandLogo className="theme-brand-logo h-6 w-6 shrink-0" title="Tiffzy logo" />
+                                        <h2 className="theme-brand-text text-lg sm:text-xl font-bold truncate">
+                                            Tiffzy
+                                        </h2>
+                                    </div>
+                                    <p className="theme-muted-strong text-[11px] font-semibold uppercase tracking-[0.18em] sm:text-xs">
+                                        Owner Panel
+                                    </p>
+                                </button>
+                            </div>
+
+                            {/* Right */}
+                            <div className="flex shrink-0 items-center gap-2">
+                                <p className="theme-muted max-w-[160px] truncate text-sm font-medium sm:max-w-[220px]">
+                                    {restaurantName}
                                 </p>
-                            </button>
+                                {access.orders && (
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate("/admin/new-order")}
+                                        className="theme-icon-button rounded-2xl p-2.5 sm:p-3"
+                                        title="Open billing desk"
+                                        aria-label="Open billing desk"
+                                    >
+                                        <ClipboardPlus size={18} />
+                                    </button>
+                                )}
+                                {access.finance && (
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate("/owner/finance")}
+                                        className="theme-icon-button rounded-2xl p-2.5 sm:p-3"
+                                        title="Open finance"
+                                        aria-label="Open finance page"
+                                    >
+                                        <Wallet size={18} />
+                                    </button>
+                                )}
+                                {access.kitchen && (
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate("/owner/kitchen")}
+                                        className="theme-icon-button rounded-2xl p-2.5 sm:p-3"
+                                        title="Kitchen Operations"
+                                        aria-label="Open Kitchen Operations"
+                                    >
+                                        <ChefHat size={18} />
+                                    </button>
+                                )}
+                                {access.notifications && (
+                                    <button
+                                        onClick={() => navigate("/owner/notifications")}
+                                        className="theme-icon-button relative rounded-2xl p-2.5 sm:p-3"
+                                    >
+                                        <Bell size={18} />
+                                        {unreadCount > 0 && (
+                                            <span className="theme-count-badge absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none">
+                                                {unreadCount > 99 ? "99+" : unreadCount}
+                                            </span>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
                         </div>
-
-                        {/* Right */}
-                        <div className="flex shrink-0 items-center gap-2">
-                            <p className="theme-muted max-w-[160px] truncate text-sm font-medium sm:max-w-[220px]">
-                                {restaurantName}
-                            </p>
-                            {access.orders && (
-                                <button
-                                    type="button"
-                                    onClick={() => navigate("/admin/new-order")}
-                                    className="theme-icon-button rounded-2xl p-2.5 sm:p-3"
-                                    title="Open billing desk"
-                                    aria-label="Open billing desk"
-                                >
-                                    <ClipboardPlus size={18} />
-                                </button>
-                            )}
-                            {access.finance && (
-                                <button
-                                    type="button"
-                                    onClick={() => navigate("/owner/finance")}
-                                    className="theme-icon-button rounded-2xl p-2.5 sm:p-3"
-                                    title="Open finance"
-                                    aria-label="Open finance page"
-                                >
-                                    <Wallet size={18} />
-                                </button>
-                            )}
-                            {access.kitchen && (
-                                <button
-                                    type="button"
-                                    onClick={() => navigate("/owner/kitchen")}
-                                    className="theme-icon-button rounded-2xl p-2.5 sm:p-3"
-                                    title="Kitchen Operations"
-                                    aria-label="Open Kitchen Operations"
-                                >
-                                    <ChefHat size={18} />
-                                </button>
-                            )}
-                            {access.notifications && (
-                                <button
-                                    onClick={() => navigate("/owner/notifications")}
-                                    className="theme-icon-button relative rounded-2xl p-2.5 sm:p-3"
-                                >
-                                    <Bell size={18} />
-                                    {unreadCount > 0 && (
-                                        <span className="theme-count-badge absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none">
-                                            {unreadCount > 99 ? "99+" : unreadCount}
-                                        </span>
-                                    )}
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </header>
+                    </header>
+                )}
 
                 {showTableAssignmentStrip && (
                     <div
@@ -1624,10 +1667,10 @@ export default function OwnerLayout() {
                                                             ? "border-[color:var(--app-border)]/40 bg-black/5 dark:bg-white/5 text-[color:var(--app-muted)] hover:text-[color:var(--app-text)]"
                                                             : "border-amber-500/40 bg-amber-500/15 text-amber-500 hover:bg-amber-500/25"
                                                     }`}
-                                                    title={showOnlineOrdersPanel ? "Hide Online Orders Column" : "Show Online Orders Column"}
+                                                    title={showOnlineOrdersPanel ? "Hide Live Orders Column" : "Show Live Orders Column"}
                                                 >
                                                     {showOnlineOrdersPanel ? <EyeOff size={13} /> : <Eye size={13} />}
-                                                    <span>{showOnlineOrdersPanel ? "Hide Panel" : "Online Orders"}</span>
+                                                    <span>{showOnlineOrdersPanel ? "Hide Panel" : "Live Orders"}</span>
                                                 </button>
                                             )}
                                         </div>
@@ -2204,7 +2247,7 @@ export default function OwnerLayout() {
                                         <div className="flex items-center gap-2">
                                             <Globe2 size={16} className="text-amber-500" />
                                             <p className="text-xs font-extrabold uppercase tracking-[0.16em]">
-                                                Online Orders
+                                                Live Orders
                                             </p>
                                         </div>
                                         <div className="flex items-center gap-1.5">
@@ -2219,8 +2262,8 @@ export default function OwnerLayout() {
                                                 type="button"
                                                 onClick={toggleOnlineOrdersPanel}
                                                 className="p-1.5 rounded-lg text-[color:var(--app-muted)] hover:text-amber-500 hover:bg-black/10 dark:hover:bg-white/10 transition"
-                                                title="Hide Online Orders column"
-                                                aria-label="Hide Online Orders panel"
+                                                title="Hide Live Orders column"
+                                                aria-label="Hide Live Orders panel"
                                             >
                                                 <EyeOff size={14} />
                                             </button>
@@ -2235,7 +2278,7 @@ export default function OwnerLayout() {
                                     <div className="mt-2.5 space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1">
                                         {stripOnlineOrders.length === 0 ? (
                                             <div className="py-4 text-xs theme-muted text-center border-b border-[color:var(--app-border)]/20">
-                                                No active online orders.
+                                                No active live orders.
                                             </div>
                                         ) : (
                                             stripOnlineOrders.map((order) => {
@@ -2286,6 +2329,21 @@ export default function OwnerLayout() {
                                 </aside>
                             )}
                         </div>
+                    </div>
+                )}
+
+                {/* Non-Dashboard top-left Menu button ☰ */}
+                {!isDashboardRoute && (
+                    <div className="pt-3 px-3 sm:px-4 md:px-6 flex items-center justify-start">
+                        <button
+                            type="button"
+                            onClick={() => setSidebarOpen(true)}
+                            className="theme-icon-button theme-icon-button-primary inline-flex items-center justify-center rounded-xl p-2.5 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            aria-label="Open navigation menu"
+                            title="Open navigation menu"
+                        >
+                            <Menu size={20} />
+                        </button>
                     </div>
                 )}
 

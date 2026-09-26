@@ -36,6 +36,7 @@ import { appendOwnerNotification } from "../../utils/ownerNotifications";
 import ItemCustomizationModal from "../../components/ItemCustomizationModal";
 import OfflineStatusBar from "../../components/OfflineStatusBar";
 import OfflineConflictModal from "../../components/OfflineConflictModal";
+import BrandLogo from "../../components/BrandLogo";
 import { cacheMenuOffline, getOfflineMenu, queueOfflineOperation, saveOfflineOrder } from "../../utils/offline/offlineDb";
 import { connectivityService } from "../../utils/offline/connectivityService";
 
@@ -1243,11 +1244,12 @@ export default function NewOrder() {
                                 <button
                                     type="button"
                                     onClick={() => navigate("/owner")}
-                                    className="theme-soft-button inline-flex h-8 w-8 items-center justify-center rounded-full"
+                                    className="mb-1 inline-flex items-center gap-2 text-left cursor-pointer transition-opacity hover:opacity-80 focus:outline-none"
                                     aria-label="Go to dashboard"
                                     title="Go to dashboard"
                                 >
-                                    <ArrowLeft size={16} />
+                                    <BrandLogo className="theme-brand-logo h-7 w-7 object-contain" title="Tiffzy logo" />
+                                    <span className="theme-brand-text text-xl font-bold tracking-tight">Tiffzy</span>
                                 </button>
                                 <h1 className="mt-1 flex items-center gap-2 text-xl sm:text-2xl font-bold text-[color:var(--app-text)]">
                                     <UtensilsCrossed size={18} className="theme-accent-text" />
