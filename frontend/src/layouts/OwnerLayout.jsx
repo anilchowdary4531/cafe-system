@@ -1355,7 +1355,7 @@ export default function OwnerLayout() {
                         >
                             <BrandLogo className="theme-brand-logo h-8 w-8" title="Tiffzy logo" />
                             <div>
-                                <h1 className="text-xl font-bold text-gray-900">Tiffzy</h1>
+                                <h1 className="theme-brand-text text-xl font-bold">Tiffzy</h1>
                                 <span className="text-gray-500 text-[10px] uppercase font-bold tracking-wider block">OWNER PANEL</span>
                             </div>
                         </button>
