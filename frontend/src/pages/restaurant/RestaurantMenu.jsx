@@ -516,14 +516,19 @@ export default function RestaurantMenu() {
                         </div>
                     </div>
 
-                    <div className="min-w-0 justify-self-center text-center">
+                    <div className="min-w-0 justify-self-center text-center flex flex-col items-center">
                         <p className="hidden text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]/80 sm:block">
                             Restaurant
                         </p>
                         <p className="truncate text-base font-black tracking-tight text-[color:var(--app-accent)] sm:text-lg md:text-xl">
                             {restaurantName}
                         </p>
-                        {restaurantLocation ? (
+                        {tableNo ? (
+                            <div className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-orange-500/15 border border-orange-500/40 px-3 py-0.5 text-xs font-black text-orange-500 shadow-xs">
+                                <UtensilsCrossed size={12} className="text-orange-500" />
+                                <span>Table {tableNo}</span>
+                            </div>
+                        ) : restaurantLocation ? (
                             <p className="hidden truncate text-xs text-[color:var(--app-muted)] sm:block sm:text-sm">
                                 {restaurantLocation}
                             </p>

@@ -1,6 +1,8 @@
 import { prisma } from '../config/prisma.js';
 import { createAndDispatchNotification } from '../services/notificationService.js';
 import { RECIPIENT_TYPES, NOTIFICATION_TYPES } from '../constants/notificationTypes.js';
+import { getOrCreateActiveSession, recalculateSessionTotals } from '../services/tableSessionService.js';
+import { createKotsForOrder, dispatchKotPrint } from '../services/kotService.js';
 
 // 🔢 ORDER NUMBER
 function makeOrderNo() {
@@ -46,9 +48,14 @@ export async function placeCustomerOrder(req, reply) {
         customerName,
         phone,
         tableNumber,
+        tableNo: altTableNo,
         notes,
+        fulfillment,
         items = [],
     } = req.body || {};
+
+    const rawTableNo = tableNumber || altTableNo;
+    const cleanTableNo = rawTableNo ? String(rawTableNo).trim() : null;
 
     // 🔍 FIND RESTAURANT
     const restaurant = await prisma.restaurant.findUnique({
@@ -64,7 +71,7 @@ export async function placeCustomerOrder(req, reply) {
     }
 
     // 🔍 FETCH MENU ITEMS
-    const ids = items.map((i) => Number(i.id));
+    const ids = items.map((i) => Number(i.id || i.menuItemId)).filter(Boolean);
 
     const dbItems = await prisma.menuItem.findMany({
         where: {
@@ -78,7 +85,7 @@ export async function placeCustomerOrder(req, reply) {
 
     // 🧠 NORMALIZE ITEMS
     const normalized = items.map((raw) => {
-        const db = map.get(Number(raw.id));
+        const db = map.get(Number(raw.id || raw.menuItemId));
         const rawPrice = Number(raw.price);
         const hasValidRawPrice = raw.price !== undefined && raw.price !== null && !Number.isNaN(rawPrice) && rawPrice >= 0;
 
@@ -86,12 +93,14 @@ export async function placeCustomerOrder(req, reply) {
             throw new Error(`Invalid item ID: ${raw.id}`);
         }
 
-        const qty = Number(raw.qty || 1);
+        const qty = Number(raw.qty || raw.quantity || 1);
         const price = hasValidRawPrice ? rawPrice : Number(db.price);
 
         return {
             menuItemId: db?.id || null,
             itemName: db?.name || String(raw.name || raw.itemName || "Item").trim(),
+            variantName: raw.variantName || null,
+            selectedModifiers: raw.modifiers || null,
             qty,
             price,
             total: qty * price,
@@ -100,19 +109,48 @@ export async function placeCustomerOrder(req, reply) {
 
     // 💰 CALCULATIONS
     const subtotal = normalized.reduce((a, b) => a + b.total, 0);
-    const taxAmount = 0;
-    const serviceChargeAmount = 0;
-    const total = subtotal;
+    let taxAmount = 0;
+    if (restaurant.taxEnabled && restaurant.defaultTaxPercent) {
+        taxAmount = (subtotal * Number(restaurant.defaultTaxPercent)) / 100;
+    }
+    let serviceChargeAmount = 0;
+    if (restaurant.serviceChargeEnabled && restaurant.serviceChargePercent) {
+        serviceChargeAmount = (subtotal * Number(restaurant.serviceChargePercent)) / 100;
+    }
+    const total = subtotal + taxAmount + serviceChargeAmount;
+
+    // 🏷️ LINK TABLE & TABLE SESSION
+    let tableSessionId = null;
+    let targetTable = null;
+
+    if (cleanTableNo) {
+        targetTable = await prisma.diningTable.findFirst({
+            where: { restaurantId: restaurant.id, tableNo: cleanTableNo },
+        });
+
+        if (targetTable) {
+            const activeSession = await getOrCreateActiveSession({
+                prisma,
+                restaurantId: restaurant.id,
+                tableId: targetTable.id,
+                guestCount: 1,
+            });
+            tableSessionId = activeSession.id;
+        }
+    }
 
     // 💾 CREATE ORDER
     const order = await prisma.order.create({
         data: {
             restaurantId: restaurant.id,
             orderNo: makeOrderNo(),
-            customerName,
-            phone,
-            tableNo: tableNumber,
-            notes,
+            orderSource: cleanTableNo ? "QR" : "ONLINE",
+            fulfillment: fulfillment ? String(fulfillment).toUpperCase() : (cleanTableNo ? "DINE_IN" : "DELIVERY"),
+            customerName: customerName ? String(customerName).trim() : (cleanTableNo ? `Table ${cleanTableNo} Guest` : "Customer"),
+            phone: phone ? String(phone).trim() : null,
+            tableNo: cleanTableNo,
+            tableSessionId,
+            notes: notes ? String(notes).trim() : null,
             subtotal,
             taxAmount,
             serviceChargeAmount,
@@ -120,7 +158,21 @@ export async function placeCustomerOrder(req, reply) {
             paymentStatus: 'PENDING',
             status: 'PLACED',
             items: {
-                create: normalized,
+                create: normalized.map((item) => ({
+                    menuItemId: item.menuItemId,
+                    itemName: item.itemName,
+                    variantName: item.variantName,
+                    selectedModifiers: item.selectedModifiers,
+                    qty: item.qty,
+                    price: item.price,
+                    total: item.total,
+                })),
+            },
+            statusEvents: {
+                create: {
+                    status: 'PLACED',
+                    source: cleanTableNo ? 'QR' : 'ONLINE',
+                },
             },
         },
         include: {
@@ -128,12 +180,53 @@ export async function placeCustomerOrder(req, reply) {
         },
     });
 
+    // 🎫 CREATE KOTS FOR KITCHEN
+    try {
+        const kots = await createKotsForOrder({
+            prisma,
+            order,
+        });
+        order.kots = kots;
+    } catch (kotErr) {
+        console.warn("[placeCustomerOrder] KOT creation warning:", kotErr?.message);
+    }
+
+    // 📊 RECALCULATE TABLE SESSION TOTALS
+    let updatedSession = null;
+    if (tableSessionId) {
+        try {
+            updatedSession = await recalculateSessionTotals({ prisma, sessionId: tableSessionId });
+        } catch (sessErr) {
+            console.warn("[placeCustomerOrder] Session recalculate warning:", sessErr?.message);
+        }
+    }
+
     // 🔥 REAL-TIME SOCKET EMIT & NOTIFICATIONS
     const io = req.server.io;
 
     if (io) {
-        io.to(`restaurant_${restaurant.id}`).emit("new_order", order);
-        io.to(`restaurant:${restaurant.id}`).emit("new_order", order);
+        const restRoom1 = `restaurant_${restaurant.id}`;
+        const restRoom2 = `restaurant:${restaurant.id}`;
+
+        io.to(restRoom1).emit("new_order", order);
+        io.to(restRoom2).emit("new_order", order);
+        io.to(restRoom1).emit("order:created", order);
+        io.to(restRoom2).emit("order:created", order);
+
+        if (Array.isArray(order.kots)) {
+            for (const kot of order.kots) {
+                io.to(restRoom1).emit("kot:created", kot);
+                io.to(restRoom2).emit("kot:created", kot);
+                dispatchKotPrint({ prisma, kotId: kot.id }).catch(() => {});
+            }
+        }
+
+        if (updatedSession && targetTable) {
+            io.to(restRoom1).emit("table:session_updated", updatedSession);
+            io.to(restRoom2).emit("table:session_updated", updatedSession);
+            io.to(restRoom1).emit("table:updated", { tableId: targetTable.id, status: updatedSession.status });
+            io.to(restRoom2).emit("table:updated", { tableId: targetTable.id, status: updatedSession.status });
+        }
     }
 
     // 🔔 Create DB Notifications for Restaurant Owner & Customer
@@ -179,5 +272,6 @@ export async function placeCustomerOrder(req, reply) {
     return {
         message: 'Order placed successfully',
         order,
+        session: updatedSession,
     };
 }

@@ -548,6 +548,43 @@ export const updateOrderStatus = async ({ prisma, actor, orderId, nextStatus, no
       },
     });
 
+    // Recalculate TableSession totals & check for table release on cancellation
+    if (updated.tableSessionId) {
+      try {
+        const sessionOrders = await tx.order.findMany({
+          where: { tableSessionId: updated.tableSessionId, status: { not: "CANCELLED" } },
+          select: { id: true, subtotal: true, taxAmount: true, serviceChargeAmount: true, discountAmount: true, total: true },
+        });
+
+        const activeOrderCount = sessionOrders.length;
+        const sessionSubtotal = sessionOrders.reduce((sum, o) => sum + Number(o.subtotal || 0), 0);
+        const sessionTax = sessionOrders.reduce((sum, o) => sum + Number(o.taxAmount || 0), 0);
+        const sessionService = sessionOrders.reduce((sum, o) => sum + Number(o.serviceChargeAmount || 0), 0);
+        const sessionDiscount = sessionOrders.reduce((sum, o) => sum + Number(o.discountAmount || 0), 0);
+        const sessionTotal = sessionOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+
+        const sessionUpdateData = {
+          subtotal: sessionSubtotal,
+          taxAmount: sessionTax,
+          serviceChargeAmount: sessionService,
+          discountAmount: sessionDiscount,
+          total: sessionTotal,
+        };
+
+        if (activeOrderCount === 0 && targetStatus === "CANCELLED") {
+          sessionUpdateData.status = "CANCELLED";
+          sessionUpdateData.closedAt = new Date();
+        }
+
+        await tx.tableSession.update({
+          where: { id: updated.tableSessionId },
+          data: sessionUpdateData,
+        });
+      } catch (sessErr) {
+        console.warn("[updateOrderStatus] TableSession sync warning:", sessErr?.message);
+      }
+    }
+
     // Trigger Notification for Customer on Order Status Change
     if (updated?.customer?.id) {
       const statusTypeMap = {
