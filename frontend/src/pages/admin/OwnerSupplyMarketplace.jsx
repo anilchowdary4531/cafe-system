@@ -23,6 +23,7 @@ import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import { SUPPLY_CATEGORIES } from "../../utils/supplyCategories";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const getSupplyProductImageUrl = (item) => {
     if (!item) return "";
@@ -249,7 +250,8 @@ export default function OwnerSupplyMarketplace() {
             {/* Header */}
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between pb-1">
                 <div>
-                    <h2 className="text-2xl font-extrabold flex items-center gap-2 tracking-tight">
+                    <h2 className="text-2xl font-extrabold flex items-center gap-3 tracking-tight">
+                        <OwnerMenuButton />
                         <Truck className="theme-accent-text" />
                         Tiffzy Supply Marketplace & Price Bargaining
                     </h2>

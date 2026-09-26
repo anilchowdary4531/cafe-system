@@ -26,6 +26,7 @@ import {
 import { api } from "../../utils/apiClient";
 import { useAuth } from "../../context/AuthContext";
 import { showToast } from "../../utils/toast";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 export default function OwnerDiscounts() {
   const { restaurant } = useAuth();
@@ -210,7 +211,8 @@ export default function OwnerDiscounts() {
           <div className="flex items-center gap-2 text-xs font-semibold text-amber-500 uppercase tracking-wider">
             <Sparkles size={14} /> Promotions & Offers Engine
           </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-3xl">
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-3xl flex items-center gap-3">
+            <OwnerMenuButton />
             Coupons & Discounts Studio
           </h1>
           <p className="mt-1 text-sm theme-muted">

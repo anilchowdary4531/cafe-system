@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { Truck, Navigation, Phone, CheckCircle2, AlertTriangle, Clock, MapPin, Loader2, Play, Pause, RefreshCw, ChevronRight } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const formatMoney = (value) => `₹${Math.round(Number(value || 0))}`;
 
@@ -118,7 +119,8 @@ export default function DriverDeliveryStudio() {
       {/* Top Header */}
       <div className="flex items-center justify-between border-b border-white/10 pb-4">
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
+          <h1 className="text-xl font-bold flex items-center gap-3">
+            <OwnerMenuButton />
             <Truck className="text-amber-500" size={24} />
             Driver Delivery Portal
           </h1>

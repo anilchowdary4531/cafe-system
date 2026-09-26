@@ -23,6 +23,8 @@ import { api } from "../../utils/apiClient";
 import { useAuth } from "../../context/AuthContext";
 import { showToast } from "../../utils/toast";
 
+import OwnerMenuButton from "../../components/OwnerMenuButton";
+
 export default function OwnerCustomerManager() {
   const navigate = useNavigate();
   const { restaurant } = useAuth();
@@ -228,7 +230,8 @@ export default function OwnerCustomerManager() {
           <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-600 uppercase tracking-widest">
             <Sparkles size={12} /> CRM & Customer Relations
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl">
+          <h1 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl flex items-center gap-3">
+            <OwnerMenuButton />
             Customer Directory
           </h1>
           <p className="text-xs text-[color:var(--app-muted)]">

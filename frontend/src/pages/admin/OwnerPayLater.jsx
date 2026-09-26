@@ -19,6 +19,7 @@ import {
   Coins,
   BellRing
 } from "lucide-react";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const toInr = (val) => {
   const n = Number(val || 0);
@@ -313,7 +314,10 @@ export default function OwnerPayLater() {
           </button>
           <div>
             <p className="theme-muted text-xs font-semibold uppercase tracking-widest">Pay Later Account</p>
-            <h2 className="text-2xl font-bold tracking-tight">{accountDetails.customer.name || "Customer Ledger"}</h2>
+            <h2 className="text-2xl font-bold tracking-tight flex items-center gap-3">
+              <OwnerMenuButton />
+              {accountDetails.customer.name || "Customer Ledger"}
+            </h2>
           </div>
         </header>
 
@@ -641,7 +645,10 @@ export default function OwnerPayLater() {
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="theme-muted text-xs font-semibold uppercase tracking-widest">Finance Management</p>
-          <h2 className="text-3xl font-extrabold tracking-tight">Pay Later / Khata</h2>
+          <h2 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
+            <OwnerMenuButton />
+            Pay Later / Khata
+          </h2>
         </div>
         <button
           onClick={() => setShowAddModal(true)}

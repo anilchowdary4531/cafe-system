@@ -19,6 +19,7 @@ import {
 import { api } from "../../utils/apiClient";
 import { useAuth } from "../../context/AuthContext";
 import { showToast } from "../../utils/toast";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 export default function OwnerLoyalty() {
   const { user } = useAuth();
@@ -195,6 +196,7 @@ export default function OwnerLoyalty() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-4">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
+            <OwnerMenuButton />
             <Award className="w-6 h-6 text-orange-500" />
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--app-text)]">Loyalty Points & Rewards Studio</h1>
           </div>

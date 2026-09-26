@@ -2332,21 +2332,6 @@ export default function OwnerLayout() {
                     </div>
                 )}
 
-                {/* Non-Dashboard top-left Menu button ☰ (Hidden on pages like Menu Studio that render their own aligned header menu button) */}
-                {!isDashboardRoute && !location.pathname.startsWith("/owner/menu") && (
-                    <div className="pt-3 px-3 sm:px-4 md:px-6 flex items-center justify-start">
-                        <button
-                            type="button"
-                            onClick={() => setSidebarOpen(true)}
-                            className="theme-icon-button theme-icon-button-primary inline-flex items-center justify-center rounded-xl p-2.5 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                            aria-label="Open navigation menu"
-                            title="Open navigation menu"
-                        >
-                            <Menu size={20} />
-                        </button>
-                    </div>
-                )}
-
                 {/* Page */}
                 <main className={`px-3 sm:px-4 md:px-6 pt-1 sm:pt-1.5 pb-4 md:pb-6 ${isDashboardRoute ? "hidden" : ""}`}>
                     {visibleNavItems.length === 0 ? (

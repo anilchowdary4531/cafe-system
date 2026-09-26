@@ -4,6 +4,7 @@ import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import { loadGoogleMaps, getGoogleMapsApiKey } from "../../utils/googleMapsLoader";
 import { MAP_CONFIG } from "../../utils/mapConfig";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const DELIVERY_STATUS_TABS = [
   { key: "ALL", label: "All Deliveries" },
@@ -126,7 +127,8 @@ export default function OwnerDeliveryManager() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl flex items-center gap-3">
+            <OwnerMenuButton />
             <Truck className="text-amber-500" size={28} />
             Delivery Studio & Live Tracking
           </h1>

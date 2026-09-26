@@ -6,6 +6,7 @@ import {
     markOwnerNotificationRead,
     subscribeOwnerNotifications,
 } from "../../utils/ownerNotifications";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const formatTime = (value) => {
     const dt = new Date(value);
@@ -50,7 +51,10 @@ export default function OwnerNotifications() {
         <section className="space-y-5">
             <article className="px-1 py-1">
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <h3 className="text-3xl font-bold">Notifications</h3>
+                    <h3 className="text-3xl font-bold flex items-center gap-3">
+                        <OwnerMenuButton />
+                        Notifications
+                    </h3>
                     <p className="theme-muted text-sm">{unreadCount} unread</p>
                     <button
                         type="button"

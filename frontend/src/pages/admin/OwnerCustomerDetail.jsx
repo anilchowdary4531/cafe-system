@@ -31,6 +31,8 @@ import { api } from "../../utils/apiClient";
 import { useAuth } from "../../context/AuthContext";
 import { showToast } from "../../utils/toast";
 
+import OwnerMenuButton from "../../components/OwnerMenuButton";
+
 export default function OwnerCustomerDetail() {
   const { customerId } = useParams();
   const navigate = useNavigate();
@@ -195,7 +197,8 @@ export default function OwnerCustomerDetail() {
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold text-[color:var(--app-text)] sm:text-2xl">
+                <h1 className="text-xl font-bold text-[color:var(--app-text)] sm:text-2xl flex items-center gap-3">
+                  <OwnerMenuButton />
                   {customer.name || "Guest Customer"}
                 </h1>
                 <span

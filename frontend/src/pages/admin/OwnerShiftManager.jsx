@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { API } from "../../config";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const DENOMINATIONS = [500, 200, 100, 50, 20, 10];
 
@@ -275,6 +276,7 @@ export default function OwnerShiftManager() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-[color:var(--app-border)]/40 pb-5">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-3 text-[color:var(--app-text)]">
+            <OwnerMenuButton />
             <Wallet className="w-7 h-7 text-amber-500" />
             Cashier Shift & Day Closing
           </h1>

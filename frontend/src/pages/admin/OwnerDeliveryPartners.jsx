@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, Search, Truck, Phone, Mail, Edit3, Trash2, CheckCircle2, XCircle, Loader2, User } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const VEHICLE_TYPES = [
   { value: "BIKE", label: "Motorcycle / Bike 🏍️" },
@@ -116,7 +117,8 @@ export default function OwnerDeliveryPartners() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl flex items-center gap-3">
+            <OwnerMenuButton />
             <Truck className="text-amber-500" size={28} />
             Delivery Partners
           </h1>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 import {
     ChefHat,
     CheckCircle2,
@@ -628,11 +629,14 @@ export default function OwnerKitchenLive() {
             {/* Top Title & Contextual Header */}
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-[color:var(--app-border)]/40 pb-3">
                 <div>
-                    <div className="flex items-center gap-2">
-                        <ChefHat className="text-orange-500" size={26} />
-                        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[color:var(--app-heading)]">
-                            Kitchen Operations
-                        </h1>
+                    <div className="flex items-center gap-3">
+                        <OwnerMenuButton />
+                        <div className="flex items-center gap-2">
+                            <ChefHat className="text-orange-500" size={26} />
+                            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[color:var(--app-heading)]">
+                                Kitchen Operations
+                            </h1>
+                        </div>
                     </div>
                     <p className="mt-0.5 text-xs text-[color:var(--app-muted)]">
                         Manage live kitchen orders, KOT history, audit activity, and kitchen hardware from one place.

@@ -21,6 +21,7 @@ import { API } from "../../config";
 import { useStaffSocket } from "../../context/StaffSocketContext";
 import { showToast } from "../../utils/toast";
 import ReservationModal from "../../components/ReservationModal";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const toInr = (val) => Number(val || 0).toFixed(2);
 
@@ -239,6 +240,7 @@ export default function OwnerReservations() {
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
                 <div>
                     <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
+                        <OwnerMenuButton />
                         <Calendar className="h-8 w-8 text-orange-400" />
                         Table Reservation Management
                     </h1>

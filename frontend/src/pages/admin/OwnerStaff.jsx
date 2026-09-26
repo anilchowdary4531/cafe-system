@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { API } from "../../config";
 import { showToast } from "../../utils/toast";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const DESIGNATION_OPTIONS = [
     "Chef",
@@ -545,7 +546,10 @@ export default function OwnerStaff() {
 
             <article className="p-1">
                 <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <h4 className="text-lg font-semibold">Staff Directory</h4>
+                    <h4 className="text-lg font-semibold flex items-center gap-3">
+                        <OwnerMenuButton />
+                        Staff Directory
+                    </h4>
                     <div className="flex w-full items-center gap-2">
                         <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-[#0f172a] px-3 py-2">
                             <Search size={15} className="text-gray-400" />

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 import {
   BarChart3,
   Calendar,
@@ -150,10 +151,13 @@ export default function OwnerReports() {
       {/* HEADER BAR */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[color:var(--app-border)]/40">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-[color:var(--app-text)] tracking-tight flex items-center gap-3">
-            <BarChart3 className="w-7 h-7 text-amber-500" />
-            Centralized Business Reports & Analytics
-          </h1>
+          <div className="flex items-center gap-3">
+            <OwnerMenuButton />
+            <h1 className="text-2xl md:text-3xl font-bold text-[color:var(--app-text)] tracking-tight flex items-center gap-3">
+              <BarChart3 className="w-7 h-7 text-amber-500" />
+              Centralized Business Reports & Analytics
+            </h1>
+          </div>
           <p className="theme-muted text-sm mt-1">
             Backend-authoritative financial, operational, sales, tax, kitchen, and inventory intelligence
           </p>

@@ -16,6 +16,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 export default function PrinterSettings() {
     const { user } = useAuth();
@@ -252,7 +253,8 @@ export default function PrinterSettings() {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p className="theme-muted text-sm font-medium">Hardware & Routing</p>
-                    <h3 className="text-3xl font-bold flex items-center gap-2">
+                    <h3 className="text-3xl font-bold flex items-center gap-3">
+                        <OwnerMenuButton />
                         <Printer className="text-orange-500" size={28} />
                         Thermal Printers & Kitchen Stations
                     </h3>

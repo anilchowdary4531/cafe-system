@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import axios from "axios";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 import {
     Activity,
     AlertCircle,
@@ -232,13 +233,16 @@ export default function OwnerAnalytics() {
             <header className="pb-3 border-b border-[color:var(--app-border)]/50">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                        <div className="flex items-center gap-2">
-                            <h2 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl">
-                                {data?.restaurant?.name || "Café King"} Intelligence
-                            </h2>
-                            <span className="inline-flex items-center rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-semibold text-[var(--app-primary)]">
-                                ENTERPRISE CONSOLE
-                            </span>
+                        <div className="flex items-center gap-3">
+                            <OwnerMenuButton />
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl">
+                                    {data?.restaurant?.name || "Café King"} Intelligence
+                                </h2>
+                                <span className="inline-flex items-center rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-semibold text-[var(--app-primary)]">
+                                    ENTERPRISE CONSOLE
+                                </span>
+                            </div>
                         </div>
                         <p className="theme-muted text-xs mt-0.5">
                             Real-time restaurant performance, sales, orders, customers, kitchen and operational intelligence.

@@ -31,6 +31,7 @@ import {
 } from "recharts";
 import { API } from "../../config";
 import SettlementDashboard from "../owner/SettlementDashboard";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const RANGE_OPTIONS = ["24h", "7d", "30d"];
 const PAYMENT_BUCKET_ORDER = ["Digital", "Cash", "Online", "Due"];
@@ -504,7 +505,8 @@ export default function OwnerFinance() {
                         <p className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">
                             Dashboard
                         </p>
-                        <h3 className="mt-1 text-3xl font-bold">
+                        <h3 className="mt-1 text-3xl font-bold flex items-center gap-3">
+                            <OwnerMenuButton />
                             {data?.restaurant?.name || "Restaurant"} Finance Overview
                         </h3>
                         <p className="theme-muted mt-1 text-sm">

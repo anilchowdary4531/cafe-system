@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { LoaderCircle, RefreshCw, Search, X, ShoppingBag, ArrowLeft } from "lucide-react";
 import { API } from "../../config";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const STATUSES = ["PLACED", "ACCEPTED", "PREPARING", "READY", "DELIVERED", "CANCELLED"];
 const ACTIVE_STATUSES = new Set(["PLACED", "ACCEPTED", "PREPARING", "READY"]);
@@ -251,10 +252,13 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
             {/* Header Title & Subtitle */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-[color:var(--app-border)]/40 pb-3 gap-2">
                 <div>
-                    <h1 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl">
-                        {pageTitle}
-                    </h1>
-                    <p className="text-xs text-[color:var(--app-muted)]">
+                    <div className="flex items-center gap-3">
+                        <OwnerMenuButton />
+                        <h1 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl">
+                            {pageTitle}
+                        </h1>
+                    </div>
+                    <p className="mt-0.5 text-xs text-[color:var(--app-muted)]">
                         {activeCount} {activeLabel}
                     </p>
                 </div>

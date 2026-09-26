@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 import { API } from "../../config";
 import { useStaffSocket } from "../../context/StaffSocketContext";
 import { showToast } from "../../utils/toast";
@@ -988,7 +989,10 @@ export default function OwnerTables() {
             {/* Header & Controls */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-3">
                 <div>
-                    <h3 className="text-3xl font-bold">Tables & Live Sessions</h3>
+                    <div className="flex items-center gap-3">
+                        <OwnerMenuButton />
+                        <h3 className="text-3xl font-bold">Tables & Live Sessions</h3>
+                    </div>
                     <p className="mt-1 text-sm theme-muted">
                         Manage live table sessions, running KOT totals, guest counts, and share QR ordering links.
                     </p>

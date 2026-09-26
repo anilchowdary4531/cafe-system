@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import { useStaffSocket } from "../../context/StaffSocketContext";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 import { Package, AlertTriangle, Plus, Search, Layers, RefreshCw, FileSpreadsheet, ArrowUpRight, ArrowDownRight, DollarSign, History, Settings2, Trash2, Edit3, CheckCircle } from "lucide-react";
 
 const CATEGORIES = ["All", "Produce", "Meat", "Dairy", "Dry Goods", "Beverages", "Spices", "Packaging", "General"];
@@ -320,9 +321,12 @@ export default function OwnerInventory() {
             {/* Page Header */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-[color:var(--app-border)]/40 pb-3">
                 <div>
-                    <h1 className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-[color:var(--app-heading)] sm:text-2xl">
-                        <Package className="text-orange-500" size={24} /> Raw Material Inventory & BOM
-                    </h1>
+                    <div className="flex items-center gap-3">
+                        <OwnerMenuButton />
+                        <h1 className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-[color:var(--app-heading)] sm:text-2xl">
+                            <Package className="text-orange-500" size={24} /> Raw Material Inventory & BOM
+                        </h1>
+                    </div>
                     <p className="mt-0.5 text-xs text-[color:var(--app-muted)]">
                         Manage ingredient master, recipes, stock-ins, kitchen wastage, and automatic order consumption.
                     </p>

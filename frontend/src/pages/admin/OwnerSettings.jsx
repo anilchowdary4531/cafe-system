@@ -19,6 +19,7 @@ import ThemeSelector from "../../components/ThemeSelector";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { uploadToS3Presigned } from "../../utils/s3Upload";
 import MapLocationPicker from "../../components/MapLocationPicker";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 
 const emptyForm = {
     name: "",
@@ -281,7 +282,8 @@ export default function OwnerSettings() {
                         <p className="text-[11px] font-extrabold uppercase tracking-widest text-stone-500">
                             Owner Profile
                         </p>
-                        <h2 className="mt-1 text-3xl font-black text-stone-900 tracking-tight">
+                        <h2 className="mt-1 text-3xl font-black text-stone-900 tracking-tight flex items-center gap-3">
+                            <OwnerMenuButton />
                             Restaurant Settings
                         </h2>
                         <p className="mt-1 max-w-2xl text-xs text-stone-500 font-medium">
