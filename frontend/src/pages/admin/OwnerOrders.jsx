@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { LoaderCircle, RefreshCcw, Search, X } from "lucide-react";
+import { LoaderCircle, RefreshCw, Search, X, ShoppingBag, ArrowLeft } from "lucide-react";
 import { API } from "../../config";
 
 const STATUSES = ["PLACED", "ACCEPTED", "PREPARING", "READY", "DELIVERED", "CANCELLED"];
@@ -25,12 +25,12 @@ const formatTimeAgo = (isoDate) => {
 };
 
 const statusClass = (status) => {
-    if (status === "READY") return "border border-emerald-200 bg-emerald-100 text-emerald-700";
-    if (status === "PREPARING") return "border border-amber-200 bg-amber-100 text-amber-700";
-    if (status === "DELIVERED") return "border border-slate-200 bg-slate-100 text-slate-700";
-    if (status === "CANCELLED") return "border border-rose-200 bg-rose-100 text-rose-700";
-    if (status === "ACCEPTED") return "border border-sky-200 bg-sky-100 text-sky-700";
-    return "border border-indigo-200 bg-indigo-100 text-indigo-700";
+    if (status === "READY") return "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20";
+    if (status === "PREPARING") return "bg-amber-500/10 text-amber-600 border border-amber-500/20";
+    if (status === "DELIVERED") return "bg-slate-500/10 text-slate-600 border border-slate-500/20";
+    if (status === "CANCELLED") return "bg-red-500/10 text-red-600 border border-red-500/20";
+    if (status === "ACCEPTED") return "bg-sky-500/10 text-sky-600 border border-sky-500/20";
+    return "bg-blue-500/10 text-blue-600 border border-blue-500/20";
 };
 
 const sortOrdersForDisplay = (list) =>
@@ -61,7 +61,6 @@ const getOrderTabKey = (order) => {
 
 const getOrderFulfillmentLabel = (order) => {
     const tableNo = String(order?.tableNo || "").trim();
-
     if (isDineInOrder(order)) return tableNo ? `Table ${tableNo}` : "Dine in order";
     return "Online order";
 };
@@ -72,7 +71,6 @@ const formatOrderType = (order) => {
 
 const formatCustomerSummary = (order) => {
     const customerName = String(order?.customerName || "").trim();
-
     if (customerName) return customerName;
     return "Guest";
 };
@@ -207,22 +205,17 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
 
     if (loading) {
         return (
-            <div
-                className={`rounded-2xl p-6 ${
-                    isOnlineOrders
-                        ? "border border-orange-200 bg-white text-amber-900"
-                        : "border border-white/10 bg-[#111827] text-gray-300"
-                }`}
-            >
+            <div className="flex h-36 items-center justify-center text-xs font-medium text-[color:var(--app-muted)]">
                 Loading orders...
             </div>
         );
     }
 
     return (
-        <section className="space-y-5">
+        <div className="px-3 py-1 sm:px-5 sm:py-1.5 max-w-7xl mx-auto space-y-3 text-[color:var(--app-text)] font-sans">
+            {/* Header Tabs (if applicable) */}
             {!isOnlineOrders && (
-                <div className="flex items-center gap-6 overflow-x-auto border-b border-orange-200/60 pb-1">
+                <div className="flex items-center gap-4 overflow-x-auto border-b border-[color:var(--app-border)]/40 pb-1">
                     {ORDER_TABS.map((tab) => {
                         const isActive = sourceTab === tab.key;
                         const count = tabCounts[tab.key] || 0;
@@ -231,18 +224,18 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
                                 key={tab.key}
                                 type="button"
                                 onClick={() => setSourceTab(tab.key)}
-                                className={`inline-flex shrink-0 items-center gap-2 border-b-2 pb-2 text-sm font-semibold transition ${
+                                className={`inline-flex shrink-0 items-center gap-1.5 border-b-2 pb-1.5 text-xs font-semibold transition ${
                                     isActive
-                                        ? "border-orange-500 text-orange-600"
-                                        : "border-transparent text-stone-500 hover:text-stone-700"
+                                        ? "border-amber-500 text-amber-600"
+                                        : "border-transparent text-[color:var(--app-muted)] hover:text-[color:var(--app-text)]"
                                 }`}
                             >
                                 <span>{tab.label}</span>
                                 {tab.key !== "ALL" && count > 0 && (
                                     <span
-                                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${
+                                        className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold tabular-nums ${
                                             isActive
-                                                ? "bg-orange-500 text-white"
+                                                ? "bg-amber-500 text-white"
                                                 : "bg-rose-500 text-white"
                                         }`}
                                     >
@@ -255,23 +248,26 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
                 </div>
             )}
 
-            <div className="flex items-start justify-between gap-3">
+            {/* Header Title & Subtitle */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-[color:var(--app-border)]/40 pb-3 gap-2">
                 <div>
-                    <h3 className="text-3xl font-bold">{pageTitle}</h3>
-                    <p className="mt-1 text-sm text-gray-400">
+                    <h1 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl">
+                        {pageTitle}
+                    </h1>
+                    <p className="text-xs text-[color:var(--app-muted)]">
                         {activeCount} {activeLabel}
                     </p>
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-2">
-                    <p className="text-sm text-gray-400">Order Control</p>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-[color:var(--app-muted)]">Order Control:</span>
                     <select
                         value={status}
                         onChange={(e) => setStatus(e.target.value)}
-                        className="w-40 rounded-xl border border-white/10 bg-[#111827] px-3 py-2 text-sm outline-none"
+                        className="bg-transparent border-b border-[color:var(--app-border)]/60 text-xs font-medium text-[color:var(--app-text)] py-1 outline-none cursor-pointer"
                     >
-                        <option value="">All statuses</option>
+                        <option value="" className="bg-[color:var(--app-bg)]">All statuses</option>
                         {STATUSES.map((value) => (
-                            <option key={value} value={value}>
+                            <option key={value} value={value} className="bg-[color:var(--app-bg)]">
                                 {value}
                             </option>
                         ))}
@@ -279,159 +275,152 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
                 </div>
             </div>
 
-            <div className="flex items-center gap-3">
-                <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-white/10 bg-[#111827] px-3 py-2">
-                    <Search size={16} className="text-gray-400" />
-                    <input
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search order, table, customer, phone..."
-                        className="w-full bg-transparent py-1 text-sm outline-none"
-                    />
-                </label>
-                <button
-                    type="button"
-                    onClick={() => loadOrders({ silent: true })}
-                    disabled={refreshing}
-                    className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 font-semibold text-black disabled:opacity-70"
-                >
-                    {refreshing ? <LoaderCircle size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
-                    Refresh
-                </button>
+            {/* Search & Filter Toolbar */}
+            <div className="border-b border-[color:var(--app-border)]/40 pb-2">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--app-muted)]" size={15} />
+                        <input
+                            type="text"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Search order, table, customer, phone..."
+                            className="w-full bg-transparent border-b border-[color:var(--app-border)]/60 pl-8 pr-3 py-1.5 text-xs text-[color:var(--app-text)] placeholder:text-[color:var(--app-muted)] outline-none focus:border-amber-500"
+                        />
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => loadOrders({ silent: true })}
+                        disabled={refreshing}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-600 shadow-sm disabled:opacity-50 shrink-0"
+                    >
+                        {refreshing ? <LoaderCircle size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                        Refresh
+                    </button>
+                </div>
             </div>
 
             {error && (
-                <div
-                    className={`rounded-xl p-3 text-sm ${
-                        isOnlineOrders
-                            ? "border border-rose-200 bg-rose-50 text-rose-800"
-                            : "border border-red-500/30 bg-red-500/10 text-red-300"
-                    }`}
-                >
+                <div className="rounded-lg bg-red-500/10 p-2.5 text-xs font-medium text-red-500 border border-red-500/20">
                     {error}
                 </div>
             )}
 
-            <div className="overflow-hidden rounded-3xl border border-orange-200/70 bg-white shadow-[0_12px_30px_rgba(120,53,15,0.05)]">
-                <div className="overflow-x-auto">
-                    <table className="min-w-[1100px] w-full border-collapse">
-                        <thead className="bg-slate-50">
-                            <tr className="border-b border-orange-200/80 text-[11px] uppercase tracking-[0.18em] text-amber-800">
-                                <th className="px-4 py-3 text-left font-semibold">Order ID</th>
-                                <th className="px-4 py-3 text-left font-semibold">Type</th>
-                                <th className="px-4 py-3 text-left font-semibold">Customer</th>
-                                <th className="px-4 py-3 text-left font-semibold">Items</th>
-                                <th className="px-4 py-3 text-left font-semibold">Amount</th>
-                                <th className="px-4 py-3 text-left font-semibold">Status</th>
-                                <th className="px-4 py-3 text-left font-semibold">Time</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {visibleOrders.map((order) => {
-                                const normalizedStatus = String(order.status || "PLACED").toUpperCase();
-                                const itemCount = getItemCount(order);
-                                return (
-                                    <tr
-                                        key={order.id}
-                                        className="border-b border-orange-100/80 transition hover:bg-orange-50/70 last:border-b-0"
-                                    >
-                                        <td className="px-4 py-4 align-top">
-                                            <button
-                                                type="button"
-                                                onClick={() => setItemsModalOrder(order)}
-                                                className="text-left font-semibold tracking-tight text-amber-950 underline decoration-transparent underline-offset-4 transition hover:decoration-orange-500"
-                                            >
-                                                {order.orderNo || `#${order.id}`}
-                                            </button>
-                                            <p className="mt-1 text-[11px] text-amber-800/70">
-                                                {order.invoiceNo || "-"}
-                                            </p>
-                                        </td>
-                                        <td className="px-4 py-4 align-top text-sm text-amber-900">
-                                            {formatOrderType(order)}
-                                        </td>
-                                        <td className="px-4 py-4 align-top">
-                                            <p className="font-medium text-amber-950">
+            {/* Orders Table - Clean Paper Design */}
+            <div className="space-y-2">
+                {visibleOrders.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-center">
+                        <ShoppingBag className="h-10 w-10 text-[color:var(--app-muted)] opacity-40" />
+                        <h3 className="mt-2 text-sm font-semibold text-[color:var(--app-text)]">{emptyMessage}</h3>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                            <thead className="border-b border-[color:var(--app-border)]/40 text-[color:var(--app-muted)] uppercase tracking-wider font-semibold text-[10px]">
+                                <tr>
+                                    <th className="py-2 px-3">Order ID</th>
+                                    <th className="py-2 px-3">Type</th>
+                                    <th className="py-2 px-3">Customer</th>
+                                    <th className="py-2 px-3">Items</th>
+                                    <th className="py-2 px-3 text-right">Amount</th>
+                                    <th className="py-2 px-3">Status</th>
+                                    <th className="py-2 px-3 text-right">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[color:var(--app-border)]/20">
+                                {visibleOrders.map((order) => {
+                                    const normalizedStatus = String(order.status || "PLACED").toUpperCase();
+                                    const itemCount = getItemCount(order);
+                                    return (
+                                        <tr
+                                            key={order.id}
+                                            className="hover:bg-[color:var(--app-surface)]/20 transition"
+                                        >
+                                            <td className="py-2 px-3 font-medium text-[color:var(--app-text)]">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setItemsModalOrder(order)}
+                                                    className="font-semibold text-xs text-[color:var(--app-text)] hover:text-amber-600 transition underline-offset-2 hover:underline"
+                                                >
+                                                    {order.orderNo || `#${order.id}`}
+                                                </button>
+                                                <p className="text-[10px] text-[color:var(--app-muted)]">
+                                                    {order.invoiceNo || "-"}
+                                                </p>
+                                            </td>
+                                            <td className="py-2 px-3 font-medium text-[color:var(--app-text)]">
+                                                {formatOrderType(order)}
+                                            </td>
+                                            <td className="py-2 px-3 font-medium text-[color:var(--app-text)]">
                                                 {formatCustomerSummary(order)}
-                                            </p>
-                                        </td>
-                                        <td className="px-4 py-4 align-top">
-                                            <button
-                                                type="button"
-                                                onClick={() => setItemsModalOrder(order)}
-                                                className="font-medium text-amber-900 underline decoration-dotted underline-offset-4 transition hover:text-orange-600"
-                                            >
-                                                {itemCount} item{itemCount === 1 ? "" : "s"}
-                                            </button>
-                                        </td>
-                                        <td className="px-4 py-4 align-top font-semibold text-amber-950">
-                                            {formatMoney(order.total)}
-                                        </td>
-                                        <td className="px-4 py-4 align-top">
-                                            <span
-                                                className={`inline-flex w-fit rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide ${statusClass(normalizedStatus)}`}
-                                            >
-                                                {normalizedStatus}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-4 align-top text-sm text-amber-900">
-                                            {formatTimeAgo(order.createdAt)}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setItemsModalOrder(order)}
+                                                    className="font-semibold text-xs text-amber-600 hover:underline"
+                                                >
+                                                    {itemCount} item{itemCount === 1 ? "" : "s"}
+                                                </button>
+                                            </td>
+                                            <td className="py-2 px-3 text-right font-bold text-emerald-600">
+                                                {formatMoney(order.total)}
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                <span
+                                                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${statusClass(normalizedStatus)}`}
+                                                >
+                                                    {normalizedStatus}
+                                                </span>
+                                            </td>
+                                            <td className="py-2 px-3 text-right text-[color:var(--app-muted)]">
+                                                {formatTimeAgo(order.createdAt)}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
 
-            {visibleOrders.length === 0 && (
-                <div
-                    className={`rounded-2xl border border-dashed p-8 text-center ${
-                        isOnlineOrders
-                            ? "border-orange-200 bg-[#fffaf2] text-amber-800"
-                            : "border-white/10 bg-[#111827] text-gray-400"
-                    }`}
-                >
-                    {emptyMessage}
-                </div>
-            )}
-
+            {/* ORDER ITEMS MODAL */}
             {itemsModalOrder && (
                 <div
-                    className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4"
+                    className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
                     onClick={() => setItemsModalOrder(null)}
                 >
                     <div
                         role="dialog"
                         aria-modal="true"
-                        className="theme-panel w-full max-w-xl overflow-hidden rounded-[28px] p-4 text-black sm:p-5"
+                        className="w-full max-w-md rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-5 shadow-xl text-[color:var(--app-text)] text-xs"
                         onClick={(event) => event.stopPropagation()}
                     >
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start justify-between border-b border-[color:var(--app-border)] pb-3">
                             <div>
-                                <p className="text-xs uppercase tracking-[0.24em] text-black">Order Items</p>
-                                <h4 className="mt-1 text-lg font-semibold text-black">
+                                <p className="text-[10px] uppercase font-bold tracking-wider text-amber-600">Order Items</p>
+                                <h4 className="mt-0.5 text-base font-bold text-[color:var(--app-text)]">
                                     {itemsModalOrder.orderNo || `#${itemsModalOrder.id}`}
                                 </h4>
-                                <p className="mt-1 text-sm text-black">
-                        {getOrderFulfillmentLabel(itemsModalOrder)}
-                                    {itemsModalOrder.customerName ? ` - ${itemsModalOrder.customerName}` : ""}
+                                <p className="mt-0.5 text-xs text-[color:var(--app-muted)]">
+                                    {getOrderFulfillmentLabel(itemsModalOrder)}
+                                    {itemsModalOrder.customerName ? ` • ${itemsModalOrder.customerName}` : ""}
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setItemsModalOrder(null)}
-                                className="rounded-xl border border-gray-300 bg-white p-2 text-black transition hover:bg-gray-100"
+                                className="rounded-lg p-1 text-[color:var(--app-muted)] hover:bg-[color:var(--app-surface-2)]"
                                 aria-label="Close items popup"
                             >
                                 <X size={16} />
                             </button>
                         </div>
 
-                        <div className="mt-4 max-h-[52vh] space-y-0 overflow-y-auto pr-1">
+                        <div className="mt-3 max-h-[50vh] space-y-2 overflow-y-auto pr-1">
                             {(itemsModalOrder.items || []).length === 0 ? (
-                                <p className="rounded-2xl border border-dashed border-gray-300 px-4 py-4 text-sm text-black">
+                                <p className="py-4 text-center text-xs text-[color:var(--app-muted)]">
                                     No items found for this order.
                                 </p>
                             ) : (
@@ -442,17 +431,13 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
                                     return (
                                         <div
                                             key={item?.id || `${label}-${index}`}
-                                            className="flex items-start justify-between gap-3 rounded-none border-b border-dashed border-gray-200 py-3 last:border-b-0"
+                                            className="flex items-start justify-between gap-3 border-b border-[color:var(--app-border)]/20 py-2 last:border-b-0"
                                         >
                                             <div className="min-w-0">
-                                                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-black">
-                                                    {qty}x item
-                                                </p>
-                                                <p className="mt-1 truncate text-sm font-semibold text-black">
-                                                    {label}
-                                                </p>
+                                                <span className="font-bold text-amber-600">{qty}x</span>{" "}
+                                                <span className="font-semibold text-[color:var(--app-text)]">{label}</span>
                                             </div>
-                                            <p className="shrink-0 text-sm font-semibold tabular-nums text-black">
+                                            <p className="shrink-0 font-semibold tabular-nums text-[color:var(--app-text)]">
                                                 {formatMoney(lineTotal)}
                                             </p>
                                         </div>
@@ -461,45 +446,33 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
                             )}
                         </div>
 
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                            <p className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold text-black">
-                                <span className="h-2 w-2 rounded-full bg-black" />
-                                {(itemsModalOrder.items || []).reduce((sum, item) => sum + Number(item?.qty || 0), 0)} items
-                            </p>
-                            <p className="text-sm font-semibold text-black">
+                        <div className="mt-3 flex items-center justify-between gap-3 border-t border-[color:var(--app-border)]/30 pt-3">
+                            <span className="text-xs text-[color:var(--app-muted)]">
+                                Total Items: {(itemsModalOrder.items || []).reduce((sum, item) => sum + Number(item?.qty || 0), 0)}
+                            </span>
+                            <span className="text-sm font-bold text-emerald-600">
                                 Total: {formatMoney(itemsModalOrder.total)}
-                            </p>
+                            </span>
                         </div>
 
                         {itemsModalOrder.deliveryAddress && (
-                            <div className="mt-4 rounded-[24px] bg-white p-4">
-                                <p className="text-xs uppercase tracking-[0.22em] text-black">Delivery Address</p>
-                                <p className="mt-1 whitespace-pre-line text-sm text-black">
+                            <div className="mt-3 rounded-lg bg-[color:var(--app-surface-2)] p-2.5 text-xs">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--app-muted)]">Delivery Address</p>
+                                <p className="mt-0.5 whitespace-pre-line text-[color:var(--app-text)]">
                                     {itemsModalOrder.deliveryAddress}
                                 </p>
                             </div>
                         )}
 
-                        {!isDineInOrder(itemsModalOrder) && (
-                            <div className="mt-4 rounded-[24px] bg-white p-4">
-                                <p className="text-xs uppercase tracking-[0.22em] text-black">Online Order</p>
-                                <p className="mt-1 text-sm text-black">
-                                    Online order. Check the customer notes or address above if available.
-                                </p>
-                            </div>
-                        )}
-
-                        <div className="mt-4 inline-flex w-fit flex-col items-start rounded-[24px] bg-white p-4">
-                            <p className="text-xs uppercase tracking-[0.22em] text-black">Current State</p>
-                            <p
-                                className={`mt-2 inline-flex rounded-full border border-gray-300 bg-white px-3 py-1 text-sm font-semibold tracking-wide text-black`}
-                            >
+                        <div className="mt-3 flex items-center justify-between pt-1">
+                            <span className="text-xs text-[color:var(--app-muted)]">Current Status:</span>
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${statusClass(String(itemsModalOrder.status || "PLACED").toUpperCase())}`}>
                                 {String(itemsModalOrder.status || "PLACED").toUpperCase()}
-                            </p>
+                            </span>
                         </div>
                     </div>
                 </div>
             )}
-        </section>
+        </div>
     );
 }
