@@ -1239,7 +1239,7 @@ export default function NewOrder() {
             <OfflineConflictModal />
             <div className="lg:min-h-screen lg:flex lg:flex-col">
                 <header className="border-b border-[color:var(--app-border)]/40">
-                    <div className="px-4 py-2.5 space-y-2.5">
+                    <div className="px-2 py-2 space-y-2.5">
                         <div className="grid w-full grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] lg:items-center">
                             <div className="min-w-0">
                                 <button
@@ -1390,7 +1390,7 @@ export default function NewOrder() {
                     </div>
                 </header>
 
-                <main className="grid w-full gap-3 px-3 py-2 sm:px-4 lg:flex-1 lg:grid-cols-[200px_minmax(0,1fr)] lg:pr-4">
+                <main className="grid w-full gap-3 px-1 py-1 lg:flex-1 lg:grid-cols-[200px_minmax(0,1fr)]">
                     <CategorySidebar
                         categories={categories}
                         activeKey={String(activeCategory || "ALL").toUpperCase()}

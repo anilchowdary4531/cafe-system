@@ -625,7 +625,7 @@ export default function OwnerKitchenLive() {
     }
 
     return (
-        <div className="px-3 py-1 sm:px-5 sm:py-1.5 w-full space-y-4 text-[color:var(--app-text)] font-sans">
+        <div className="px-1 py-1 w-full space-y-4 text-[color:var(--app-text)] font-sans">
             {/* Top Title & Contextual Header */}
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-[color:var(--app-border)]/40 pb-3">
                 <div>

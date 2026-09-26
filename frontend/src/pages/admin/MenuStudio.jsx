@@ -453,7 +453,7 @@ export default function MenuStudio() {
     }, [filteredItems]);
 
     return (
-        <div className="theme-page min-h-screen px-4 py-6 md:px-8">
+        <div className="theme-page min-h-screen px-1 py-2 sm:px-2 w-full">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <div className="flex items-center gap-3">

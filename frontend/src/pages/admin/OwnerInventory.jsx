@@ -317,7 +317,7 @@ export default function OwnerInventory() {
     };
 
     return (
-        <div className="px-3 py-1 sm:px-5 sm:py-1.5 w-full flex flex-col gap-3.5 text-[color:var(--app-text)] font-sans">
+        <div className="px-1 py-1 w-full flex flex-col gap-3.5 text-[color:var(--app-text)] font-sans">
             {/* Page Header */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-[color:var(--app-border)]/40 pb-3">
                 <div>
