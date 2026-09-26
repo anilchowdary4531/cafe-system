@@ -1395,6 +1395,17 @@ export default function OwnerLayout() {
                                     <Wallet size={18} />
                                 </button>
                             )}
+                            {access.kitchen && (
+                                <button
+                                    type="button"
+                                    onClick={() => navigate("/owner/kitchen")}
+                                    className="theme-icon-button rounded-2xl p-2.5 sm:p-3"
+                                    title="Kitchen Operations"
+                                    aria-label="Open Kitchen Operations"
+                                >
+                                    <ChefHat size={18} />
+                                </button>
+                            )}
                             {access.notifications && (
                                 <button
                                     onClick={() => navigate("/owner/notifications")}
