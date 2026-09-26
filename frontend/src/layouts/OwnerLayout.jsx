@@ -453,7 +453,7 @@ export default function OwnerLayout() {
     const [tableZoom, setTableZoom] = useState(() => {
         try {
             const saved = localStorage.getItem("owner_table_zoom_level");
-            return saved ? Math.min(180, Math.max(70, Number(saved))) : 100;
+            return saved ? Math.min(180, Math.max(40, Number(saved))) : 100;
         } catch {
             return 100;
         }
@@ -462,7 +462,7 @@ export default function OwnerLayout() {
     const changeTableZoom = (updater) => {
         setTableZoom((prev) => {
             const next = typeof updater === "function" ? updater(prev) : updater;
-            const clamped = Math.min(180, Math.max(70, next));
+            const clamped = Math.min(180, Math.max(40, next));
             try {
                 localStorage.setItem("owner_table_zoom_level", String(clamped));
             } catch {}
@@ -1554,8 +1554,8 @@ export default function OwnerLayout() {
                                             <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 rounded-lg p-0.5 border border-[color:var(--app-border)]/40 shadow-xs">
                                                 <button
                                                     type="button"
-                                                    onClick={() => changeTableZoom((prev) => prev - 15)}
-                                                    disabled={tableZoom <= 70}
+                                                    onClick={() => changeTableZoom((prev) => prev - 10)}
+                                                    disabled={tableZoom <= 40}
                                                     className="p-1 rounded-md text-[color:var(--app-muted)] hover:text-[color:var(--app-text)] hover:bg-black/10 dark:hover:bg-white/10 transition disabled:opacity-30"
                                                     title="Decrease table box size (Zoom Out)"
                                                     aria-label="Zoom Out"
@@ -1567,7 +1567,7 @@ export default function OwnerLayout() {
                                                 </span>
                                                 <button
                                                     type="button"
-                                                    onClick={() => changeTableZoom((prev) => prev + 15)}
+                                                    onClick={() => changeTableZoom((prev) => prev + 10)}
                                                     disabled={tableZoom >= 180}
                                                     className="p-1 rounded-md text-[color:var(--app-muted)] hover:text-[color:var(--app-text)] hover:bg-black/10 dark:hover:bg-white/10 transition disabled:opacity-30"
                                                     title="Increase table box size (Zoom In)"
@@ -1637,8 +1637,9 @@ export default function OwnerLayout() {
                                                             style={
                                                                 isDashboardRoute
                                                                     ? {
-                                                                          gridTemplateColumns: `repeat(auto-fill, minmax(${Math.round(
-                                                                              130 * (tableZoom / 100)
+                                                                          gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(
+                                                                              50,
+                                                                              Math.round(130 * (tableZoom / 100))
                                                                           )}px, 1fr))`,
                                                                       }
                                                                     : undefined
@@ -1745,16 +1746,24 @@ export default function OwnerLayout() {
                                                                 : "hover:-translate-y-0.5 z-1"
                                                         }`}
                                                         style={{
-                                                            minHeight: `${Math.round(110 * (tableZoom / 100))}px`,
-                                                            maxWidth: `${Math.round(140 * (tableZoom / 100))}px`,
-                                                            fontSize: `${Math.max(10, Math.round(12 * (tableZoom / 100)))}px`,
+                                                            minHeight: `${Math.max(45, Math.round(110 * (tableZoom / 100)))}px`,
+                                                            maxWidth: `${Math.max(55, Math.round(140 * (tableZoom / 100)))}px`,
+                                                            fontSize: `${Math.max(9, Math.round(12 * (tableZoom / 100)))}px`,
                                                         }}
                                                     >
                                                         <div className="flex h-full flex-col justify-between">
                                                             <div className="flex items-start justify-between gap-2">
                                                                 <div className="min-w-0">
                                                                     <div className="flex items-center gap-1.5">
-                                                                        <p className="truncate text-xl font-bold leading-none">
+                                                                        <p
+                                                                            className="truncate font-bold leading-none"
+                                                                            style={{
+                                                                                fontSize: `${Math.max(
+                                                                                    11,
+                                                                                    Math.round(20 * (tableZoom / 100))
+                                                                                )}px`,
+                                                                            }}
+                                                                        >
                                                                             {tableLabel}
                                                                         </p>
                                                                     </div>
