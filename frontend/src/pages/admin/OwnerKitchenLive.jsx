@@ -437,20 +437,18 @@ export default function OwnerKitchenLive() {
         const yesterdayYmd = getYesterdayYmd();
 
         let targetYmd = historySelectedDate || historyStartDate || "";
-        if (historyPreset === "yesterday" || (!targetYmd && historyPreset !== "today" && historyPreset !== "last7days" && historyPreset !== "last30days" && historyPreset !== "custom")) {
-            targetYmd = yesterdayYmd;
-        } else if (historyPreset === "today") {
-            targetYmd = todayYmd;
-        }
-
-        if (historyPreset === "last7days") {
-            return { label: "Previous 7 Days", subtext: "Past 7 Business Days", ymd: "" };
-        }
-        if (historyPreset === "last30days") {
-            return { label: "Previous 30 Days", subtext: "Past 30 Business Days", ymd: "" };
-        }
-        if (historyPreset === "custom" && historyStartDate && historyEndDate) {
-            return { label: "Custom Range", subtext: `${historyStartDate} to ${historyEndDate}`, ymd: "" };
+        if (!targetYmd) {
+            if (historyPreset === "today") {
+                targetYmd = todayYmd;
+            } else if (historyPreset === "last7days") {
+                return { label: "Previous 7 Days", subtext: "Past 7 Business Days", ymd: "" };
+            } else if (historyPreset === "last30days") {
+                return { label: "Previous 30 Days", subtext: "Past 30 Business Days", ymd: "" };
+            } else if (historyPreset === "custom" && historyStartDate && historyEndDate) {
+                return { label: "Custom Range", subtext: `${historyStartDate} to ${historyEndDate}`, ymd: "" };
+            } else {
+                targetYmd = yesterdayYmd;
+            }
         }
 
         if (targetYmd === todayYmd) {
@@ -477,7 +475,8 @@ export default function OwnerKitchenLive() {
 
     const handleStepDate = (direction) => {
         const todayYmd = getTodayYmd();
-        const currentYmd = historyDateInfo.ymd || historySelectedDate || (historyPreset === "today" ? todayYmd : getYesterdayYmd());
+        const yesterdayYmd = getYesterdayYmd();
+        const currentYmd = historySelectedDate || historyDateInfo.ymd || (historyPreset === "today" ? todayYmd : yesterdayYmd);
         const [y, m, d] = currentYmd.split("-").map(Number);
         const currentDate = new Date(y, m - 1, d);
 
@@ -492,12 +491,14 @@ export default function OwnerKitchenLive() {
 
         if (nextYmd > todayYmd) return;
 
+        const nextPreset = nextYmd === todayYmd ? "today" : nextYmd === yesterdayYmd ? "yesterday" : "custom";
+
         setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
             next.set("tab", "live");
             next.set("view", "history");
             next.set("date", nextYmd);
-            next.delete("preset");
+            next.set("preset", nextPreset);
             return next;
         });
         setHistoryPage(1);
