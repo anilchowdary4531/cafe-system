@@ -542,9 +542,9 @@ export default function OwnerKitchenLive() {
                                     No recent kitchen activity recorded today.
                                 </div>
                             ) : (
-                                <div className="space-y-2">
+                                <div className="divide-y divide-[color:var(--app-border)]/30">
                                     {recentActivityLogs.map((log, idx) => (
-                                        <div key={idx} className="flex items-center justify-between rounded-xl border border-[color:var(--app-border)]/30 bg-black/5 dark:bg-white/5 px-3 py-2 text-xs">
+                                        <div key={idx} className="flex items-center justify-between py-2.5 px-1 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg">
                                             <div className="flex items-center gap-3">
                                                 <span className="font-mono text-zinc-400 text-[11px] font-semibold">{log.time}</span>
                                                 <span className="font-bold text-orange-400">{log.kotNo}</span>
@@ -571,24 +571,24 @@ export default function OwnerKitchenLive() {
                                 </button>
                             </div>
 
-                            <div className="space-y-2.5">
+                            <div className="divide-y divide-[color:var(--app-border)]/30">
                                 {printers.length === 0 ? (
                                     <>
-                                        <div className="flex items-center justify-between p-2.5 rounded-xl border border-[color:var(--app-border)]/30 bg-black/5 dark:bg-white/5 text-xs">
+                                        <div className="flex items-center justify-between py-2.5 px-1 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg">
                                             <div className="flex items-center gap-2">
                                                 <Printer size={15} className="text-emerald-400" />
                                                 <span className="font-semibold">Kitchen Thermal Printer 01</span>
                                             </div>
                                             <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">ONLINE</span>
                                         </div>
-                                        <div className="flex items-center justify-between p-2.5 rounded-xl border border-[color:var(--app-border)]/30 bg-black/5 dark:bg-white/5 text-xs">
+                                        <div className="flex items-center justify-between py-2.5 px-1 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg">
                                             <div className="flex items-center gap-2">
                                                 <Laptop size={15} className="text-emerald-400" />
                                                 <span className="font-semibold">KDS Display Terminal 01</span>
                                             </div>
                                             <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">ONLINE</span>
                                         </div>
-                                        <div className="flex items-center justify-between p-2.5 rounded-xl border border-[color:var(--app-border)]/30 bg-black/5 dark:bg-white/5 text-xs">
+                                        <div className="flex items-center justify-between py-2.5 px-1 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg">
                                             <div className="flex items-center gap-2">
                                                 <Server size={15} className="text-emerald-400" />
                                                 <span className="font-semibold">POS Billing Desk</span>
@@ -598,7 +598,7 @@ export default function OwnerKitchenLive() {
                                     </>
                                 ) : (
                                     printers.map((p) => (
-                                        <div key={p.id} className="flex items-center justify-between p-2.5 rounded-xl border border-[color:var(--app-border)]/30 bg-black/5 dark:bg-white/5 text-xs">
+                                        <div key={p.id} className="flex items-center justify-between py-2.5 px-1 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg">
                                             <div className="flex items-center gap-2">
                                                 <Printer size={15} className={p.isActive !== false ? "text-emerald-400" : "text-rose-400"} />
                                                 <span className="font-semibold">{p.name || `Printer #${p.id}`}</span>
