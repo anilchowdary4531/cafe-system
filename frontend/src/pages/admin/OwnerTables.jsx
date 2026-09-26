@@ -1238,7 +1238,7 @@ export default function OwnerTables() {
 
             {/* VISUAL FLOOR PLAN CANVAS DISPLAY */}
             {viewMode === "FLOOR_PLAN" && !loading && (
-                <div className="mx-auto mt-4 flex w-full max-w-5xl flex-col gap-3">
+                <div className="mt-4 flex w-full flex-col gap-3">
                     {/* Zoom & Canvas Inspector Bar */}
                     <div className="flex items-center justify-between rounded-xl border border-[color:var(--app-border)]/40 bg-transparent px-3 py-1.5 text-xs">
                         <span className="font-semibold text-[color:var(--app-text)]">

@@ -123,7 +123,7 @@ export default function OwnerDeliveryManager() {
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6 px-1 py-1 w-full">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

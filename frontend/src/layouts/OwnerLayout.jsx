@@ -2333,7 +2333,7 @@ export default function OwnerLayout() {
                 )}
 
                 {/* Page */}
-                <main className={`px-3 sm:px-4 md:px-6 pt-1 sm:pt-1.5 pb-4 md:pb-6 ${isDashboardRoute ? "hidden" : ""}`}>
+                <main className={`w-full px-2 sm:px-3 pt-1 pb-4 md:pb-6 ${isDashboardRoute ? "hidden" : ""}`}>
                     {visibleNavItems.length === 0 ? (
                         <div className="theme-panel rounded-2xl p-6 text-sm">
                             No modules are enabled for this account.

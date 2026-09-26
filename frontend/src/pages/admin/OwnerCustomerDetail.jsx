@@ -180,7 +180,7 @@ export default function OwnerCustomerDetail() {
   const activity = customer.activity || [];
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 text-[color:var(--app-text)]">
+    <div className="space-y-6 px-1 py-1 w-full text-[color:var(--app-text)]">
       {/* Top Navigation & Profile Header */}
       <div>
         <Link

@@ -304,7 +304,7 @@ export default function OwnerPayLater() {
     }
 
     return (
-      <div className="space-y-6 p-4 sm:p-6 max-w-6xl mx-auto">
+      <div className="space-y-6 px-1 py-1 w-full">
         <header className="flex items-center gap-3">
           <button
             onClick={() => navigate("/owner/pay-later")}
@@ -641,7 +641,7 @@ export default function OwnerPayLater() {
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 max-w-6xl mx-auto">
+    <div className="space-y-6 px-1 py-1 w-full">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="theme-muted text-xs font-semibold uppercase tracking-widest">Finance Management</p>

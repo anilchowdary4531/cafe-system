@@ -271,7 +271,7 @@ export default function OwnerShiftManager() {
   };
 
   return (
-    <div className="space-y-6 text-[color:var(--app-text)] font-sans">
+    <div className="space-y-6 px-1 py-1 w-full text-[color:var(--app-text)] font-sans">
       {/* HEADER BAR */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-[color:var(--app-border)]/40 pb-5">
         <div>

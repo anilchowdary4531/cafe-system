@@ -204,7 +204,7 @@ export default function OwnerDiscounts() {
   const totalUses = promotions.reduce((sum, p) => sum + Number(p.usageCount || 0), 0);
 
   return (
-    <div className="space-y-4 text-[color:var(--app-text)]">
+    <div className="space-y-4 px-1 py-1 w-full text-[color:var(--app-text)]">
       {/* Header Banner */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-[color:var(--app-border)]/40">
         <div>
