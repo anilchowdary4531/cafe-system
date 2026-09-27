@@ -75,19 +75,12 @@ const getRelativeLabel = (timestamp) => {
     return age === "just now" ? age : `${age} ago`;
 };
 
-function MetricCard({ icon: Icon, label, value, hint, accentColor = "amber" }) {
+function CompactMetricPill({ icon: Icon, label, value, colorClass = "text-amber-500" }) {
     return (
-        <div className="relative overflow-hidden py-2 px-1">
-            <div className="flex items-center gap-3">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-${accentColor}-500/15 text-${accentColor}-500 border border-${accentColor}-500/20`}>
-                    <Icon size={18} />
-                </div>
-                <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-extrabold uppercase tracking-widest theme-muted">{label}</p>
-                    <p className="mt-0.5 text-xl font-black tracking-tight text-[var(--app-text)]">{value}</p>
-                    {hint ? <p className="text-[10px] font-medium theme-muted truncate mt-0.5">{hint}</p> : null}
-                </div>
-            </div>
+        <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-1.5 text-xs font-bold shadow-xs">
+            <Icon size={14} className={colorClass} />
+            <span className="theme-muted text-[11px] font-semibold">{label}:</span>
+            <span className="font-extrabold text-[var(--app-text)]">{value}</span>
         </div>
     );
 }
@@ -117,7 +110,7 @@ function ModernTicketCard({
     }, [menuOpen]);
 
     return (
-        <article className="group relative border-b border-[var(--app-border)]/60 py-3.5 last:border-b-0 transition-colors duration-150">
+        <article className="group relative border-b border-[var(--app-border)]/50 py-2.5 last:border-b-0 transition-colors duration-150">
             <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -604,157 +597,134 @@ export default function KitchenChefDetail() {
             <div className="pointer-events-none fixed top-1/3 -right-40 h-96 w-96 rounded-full bg-[var(--app-accent)]/10 blur-[140px]" />
 
             {/* TOP GLASS NAVIGATION BAR */}
-            <header className="sticky top-0 z-40 theme-nav border-b border-[var(--app-border)] px-4 py-3.5 sm:px-6 md:px-8">
-                <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
+            <header className="sticky top-0 z-40 theme-nav border-b border-[var(--app-border)] px-3 py-2 sm:px-4">
+                <div className="w-full flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
                         <Link
                             to="/kitchen"
-                            className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3.5 py-2 text-xs font-black text-[var(--app-text)] transition hover:border-[var(--app-border-strong)] flex items-center gap-2 shadow-md cursor-pointer"
+                            className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-2.5 py-1.5 text-xs font-bold text-[var(--app-text)] transition hover:border-[var(--app-border-strong)] flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0"
                         >
-                            <ArrowLeft size={16} />
+                            <ArrowLeft size={15} />
                             <span>Kitchen Board</span>
                         </Link>
-                        <div>
-                            <p className="text-[10px] font-extrabold uppercase tracking-[0.25em] theme-brand-text">{restaurantName}</p>
-                            <h1 className="text-lg font-black tracking-tight text-[var(--app-text)] flex items-center gap-2">
-                                {pageTitle}
-                            </h1>
+
+                        <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-black font-extrabold text-sm shadow-xs">
+                                <ChefHat size={18} />
+                            </div>
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                    <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-[var(--app-text)] truncate">
+                                        {pageTitle}
+                                    </h1>
+                                    <span className="rounded-md bg-[color-mix(in_srgb,var(--app-primary)_15%,transparent)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--app-primary)] shrink-0">
+                                        {pageDesignation}
+                                    </span>
+                                </div>
+                                <p className="text-[10px] theme-muted truncate">
+                                    {restaurantName} Kitchen Station
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2 shrink-0">
+                        {/* Compact History Button */}
+                        <button
+                            type="button"
+                            onClick={() => setHistoryOpen(true)}
+                            className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] text-[var(--app-text)] hover:border-[var(--app-primary)] px-2.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                            <History size={14} className="text-[var(--app-primary)]" />
+                            <span className="hidden sm:inline">History</span>
+                            <span className="rounded-full bg-amber-500/20 text-amber-500 text-[10px] px-1.5 py-0.2 font-black">{relevantHistory.length}</span>
+                        </button>
+
                         {/* Live Socket Status */}
-                        <div className="hidden sm:flex items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-1.5 text-xs font-bold theme-muted">
+                        <div className="hidden md:flex items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-2.5 py-1.5 text-xs font-bold theme-muted">
                             <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-                            <span>{connected ? "Socket Live" : "Reconnecting"}</span>
+                            <span className="text-[11px]">{connected ? "Live" : "Offline"}</span>
                         </div>
 
                         {/* Order Sound Alert Trigger */}
                         <button
                             type="button"
                             onClick={() => setSoundModalOpen(true)}
-                            className="rounded-xl border border-[var(--app-border-strong)] bg-[color-mix(in_srgb,var(--app-primary)_15%,transparent)] px-3.5 py-2 text-xs font-black text-[var(--app-primary)] hover:bg-[color-mix(in_srgb,var(--app-primary)_25%,transparent)] transition flex items-center gap-2 shadow-md cursor-pointer"
+                            className="rounded-xl border border-[var(--app-border-strong)] bg-[color-mix(in_srgb,var(--app-primary)_15%,transparent)] px-2.5 py-1.5 text-xs font-bold text-[var(--app-primary)] hover:bg-[color-mix(in_srgb,var(--app-primary)_25%,transparent)] transition flex items-center gap-1.5 shadow-xs cursor-pointer"
                         >
-                            {soundMuted ? <BellOff size={16} className="theme-muted" /> : <Bell size={16} className="animate-pulse" />}
-                            <span className="hidden sm:inline">{soundMuted ? "Muted" : "Alerts On"}</span>
+                            {soundMuted ? <BellOff size={15} className="theme-muted" /> : <Bell size={15} className="animate-pulse" />}
+                            <span className="hidden lg:inline">{soundMuted ? "Muted" : "Alerts On"}</span>
                         </button>
 
                         <button
                             type="button"
                             onClick={refreshBoard}
                             disabled={refreshing || ordersLoading || staffLoading}
-                            className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-2 text-[var(--app-text)] hover:border-[var(--app-border-strong)] transition cursor-pointer"
+                            className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-1.5 text-[var(--app-text)] hover:border-[var(--app-border-strong)] transition cursor-pointer"
                             title="Refresh Board"
                         >
-                            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+                            <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
                         </button>
                     </div>
                 </div>
             </header>
 
             {/* MAIN DASHBOARD CONTENT */}
-            <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:px-8 space-y-6">
-
-                {/* CHEF HERO IDENTITY & METRICS HEADER */}
-                <div className="py-2 pb-6 border-b border-[var(--app-border)]/60 relative overflow-hidden">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-                        
-                        {/* Chef Profile Badge */}
-                        <div className="flex items-center gap-4">
-                            <div className="relative">
-                                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500 text-black font-black text-xl shadow-md border-2 border-amber-400/40">
-                                    <ChefHat size={28} />
-                                </div>
-                                <span className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-emerald-500 text-black border-2 border-[var(--app-bg)]">
-                                    <Check size={10} strokeWidth={3} />
-                                </span>
-                            </div>
-
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--app-text)]">{pageTitle}</h2>
-                                    <span className="rounded-full bg-[color-mix(in_srgb,var(--app-primary)_15%,transparent)] px-3 py-0.5 text-xs font-black text-[var(--app-primary)]">
-                                        {pageDesignation}
-                                    </span>
-                                </div>
-                                <p className="text-xs theme-muted mt-0.5 flex items-center gap-2">
-                                    <span>{restaurantName} Kitchen Station</span>
-                                    <span>•</span>
-                                    <span className="text-emerald-500 font-semibold">Active Dispatch Station</span>
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Quick Action Controls */}
-                        <div className="flex items-center gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setHistoryOpen(true)}
-                                className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] text-[var(--app-text)] hover:border-[var(--app-primary)] px-4 py-2 text-xs font-black transition flex items-center gap-2 shadow-sm cursor-pointer"
-                            >
-                                <History size={16} className="text-[var(--app-primary)]" />
-                                <span>Activity History ({relevantHistory.length})</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Metric Cards Row */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 pt-4 border-t border-[var(--app-border)]/40">
-                        <MetricCard
+            <main className="w-full px-2 sm:px-3 py-2 space-y-3">
+                {/* COMPACT METRIC BAR */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--app-border)]/40 pb-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <CompactMetricPill
                             icon={Flame}
                             label="Live Orders"
                             value={metrics.liveOrdersCount}
-                            hint="Orders currently active on pass"
-                            accentColor="amber"
+                            colorClass="text-amber-500"
                         />
-                        <MetricCard
+                        <CompactMetricPill
                             icon={CheckCircle2}
                             label="Past Completed"
                             value={metrics.pastEvents}
-                            hint="Completed item assignments"
-                            accentColor="emerald"
+                            colorClass="text-emerald-500"
                         />
-                        <MetricCard
+                        <CompactMetricPill
                             icon={Clock}
                             label="Oldest Ticket Wait"
                             value={formatKitchenAge(metrics.oldestMinutes)}
-                            hint="Longest waiting item on board"
-                            accentColor="orange"
+                            colorClass="text-orange-500"
                         />
                     </div>
+                    <p className="text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Active Dispatch Station
+                    </p>
                 </div>
 
                 {/* BOARD COLUMNS: PASS (PICK) VS LIVE LOAD (ASSIGNED) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-2">
-
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* LEFT COLUMN: LIVE ORDERS TO PICK FROM PASS */}
-                    <section className="space-y-3">
-                        <div className="flex items-center justify-between pb-2 border-b border-[var(--app-border)]/60">
-                            <div className="flex items-center gap-2.5">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500">
-                                    <Flame size={16} />
-                                </div>
-                                <div>
-                                    <h3 className="text-base font-black tracking-tight text-[var(--app-text)]">Pick from Pass</h3>
-                                    <p className="text-[11px] theme-muted">Claim an open ticket to add to your live cooking queue</p>
-                                </div>
+                    <section className="space-y-2">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-[var(--app-border)]/50">
+                            <div className="flex items-center gap-2">
+                                <Flame size={15} className="text-orange-500" />
+                                <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--app-text)]">Pick from Pass</h3>
+                                <span className="text-[11px] theme-muted hidden sm:inline">• Claim tickets for cooking</span>
                             </div>
-                            <span className="rounded-full bg-[color-mix(in_srgb,var(--app-primary)_18%,transparent)] px-2.5 py-0.5 text-xs font-black text-[var(--app-primary)]">
+                            <span className="rounded-full bg-[color-mix(in_srgb,var(--app-primary)_18%,transparent)] px-2 py-0.5 text-xs font-extrabold text-[var(--app-primary)]">
                                 {availableTickets.length} Open
                             </span>
                         </div>
 
-                        <div className="min-h-[250px]">
+                        <div>
                             {ordersLoading || staffLoading ? (
-                                <div className="flex flex-col items-center justify-center py-12 theme-muted space-y-2">
-                                    <LoaderCircle size={24} className="animate-spin text-[var(--app-primary)]" />
+                                <div className="flex flex-col items-center justify-center py-8 theme-muted space-y-1">
+                                    <LoaderCircle size={20} className="animate-spin text-[var(--app-primary)]" />
                                     <p className="text-xs font-bold uppercase tracking-wider">Syncing Pass Tickets...</p>
                                 </div>
                             ) : availableTickets.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-12 text-center p-6 space-y-2">
-                                    <UtensilsCrossed size={32} className="theme-muted opacity-40" />
-                                    <h4 className="text-sm font-bold text-[var(--app-text)]">Pass is Clear!</h4>
-                                    <p className="text-xs theme-muted max-w-xs">No unassigned tickets waiting on the pass right now.</p>
+                                <div className="flex flex-col items-center justify-center py-6 text-center p-3 space-y-1">
+                                    <UtensilsCrossed size={22} className="theme-muted opacity-40" />
+                                    <h4 className="text-xs font-bold text-[var(--app-text)]">Pass is Clear!</h4>
+                                    <p className="text-[11px] theme-muted">No unassigned tickets waiting on pass right now.</p>
                                 </div>
                             ) : (
                                 availableTickets.map((ticket) => (
@@ -766,7 +736,7 @@ export default function KitchenChefDetail() {
                                         onAction={handlePickTicket}
                                         onDecline={(t) => setDeclineModalItem(t)}
                                         actionLabel="Pick Ticket"
-                                        actionIcon={<ChefHat size={15} />}
+                                        actionIcon={<ChefHat size={14} />}
                                         isPickAction={true}
                                     />
                                 ))
@@ -775,33 +745,29 @@ export default function KitchenChefDetail() {
                     </section>
 
                     {/* RIGHT COLUMN: CHEF'S LIVE LOAD (ASSIGNED TO THIS CHEF) */}
-                    <section className="space-y-3">
-                        <div className="flex items-center justify-between pb-2 border-b border-[var(--app-border)]/60">
-                            <div className="flex items-center gap-2.5">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
-                                    <ChefHat size={16} />
-                                </div>
-                                <div>
-                                    <h3 className="text-base font-black tracking-tight text-[var(--app-text)]">My Live Cooking Load</h3>
-                                    <p className="text-[11px] theme-muted">Tickets currently assigned to {pageTitle}</p>
-                                </div>
+                    <section className="space-y-2">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-[var(--app-border)]/50">
+                            <div className="flex items-center gap-2">
+                                <ChefHat size={15} className="text-emerald-500" />
+                                <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--app-text)]">My Live Cooking Load</h3>
+                                <span className="text-[11px] theme-muted hidden sm:inline">• Assigned to {pageTitle}</span>
                             </div>
-                            <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-black text-emerald-500">
+                            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-extrabold text-emerald-500">
                                 {currentTickets.length} Active
                             </span>
                         </div>
 
-                        <div className="min-h-[250px]">
+                        <div>
                             {ordersLoading || staffLoading ? (
-                                <div className="flex flex-col items-center justify-center py-12 theme-muted space-y-2">
-                                    <LoaderCircle size={24} className="animate-spin text-emerald-500" />
+                                <div className="flex flex-col items-center justify-center py-8 theme-muted space-y-1">
+                                    <LoaderCircle size={20} className="animate-spin text-emerald-500" />
                                     <p className="text-xs font-bold uppercase tracking-wider">Syncing Live Load...</p>
                                 </div>
                             ) : currentTickets.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-12 text-center p-6 space-y-2">
-                                    <ChefHat size={32} className="theme-muted opacity-40" />
-                                    <h4 className="text-sm font-bold text-[var(--app-text)]">No Active Load</h4>
-                                    <p className="text-xs theme-muted max-w-xs">Pick orders from the left column to start cooking.</p>
+                                <div className="flex flex-col items-center justify-center py-6 text-center p-3 space-y-1">
+                                    <ChefHat size={22} className="theme-muted opacity-40" />
+                                    <h4 className="text-xs font-bold text-[var(--app-text)]">No Active Load</h4>
+                                    <p className="text-[11px] theme-muted">Pick orders from left column to start cooking.</p>
                                 </div>
                             ) : (
                                 currentTickets.map((ticket) => (
@@ -812,14 +778,13 @@ export default function KitchenChefDetail() {
                                         onAction={handleCompleteTicket}
                                         onDecline={(t) => setDeclineModalItem(t)}
                                         actionLabel="Mark Complete"
-                                        actionIcon={<CheckCircle2 size={15} />}
+                                        actionIcon={<CheckCircle2 size={14} />}
                                         isPickAction={false}
                                     />
                                 ))
                             )}
                         </div>
                     </section>
-
                 </div>
             </main>
 
