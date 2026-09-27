@@ -1428,7 +1428,7 @@ export default function OwnerLayout() {
             <div className="flex min-h-screen min-w-0 flex-1 flex-col">
                 {/* Header - Full navbar ONLY on Dashboard page (/owner) */}
                 {isDashboardRoute && (
-                    <header className="theme-nav border-b px-3 py-3 sm:px-4 md:px-6">
+                    <header className="theme-nav border-b px-2 py-2 sm:px-3">
                         <div className="flex items-center justify-between gap-3">
                             {/* Left */}
                             <div className="flex items-start gap-3 min-w-0">
@@ -1517,7 +1517,7 @@ export default function OwnerLayout() {
 
                 {showTableAssignmentStrip && (
                     <div
-                        className={`theme-nav border-b px-3 py-3 sm:px-4 md:px-6 ${
+                        className={`theme-nav border-b px-1 py-1.5 sm:px-2 w-full ${
                             isDashboardRoute ? "flex-1 min-h-[80vh] flex flex-col justify-start gap-4" : ""
                         }`}
                     >
