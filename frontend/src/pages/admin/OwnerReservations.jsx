@@ -235,53 +235,57 @@ export default function OwnerReservations() {
     };
 
     return (
-        <div className="min-h-screen bg-[#090d16] text-white p-6 space-y-6">
+        <div className="min-h-screen bg-[color:var(--app-bg,#f8fafc)] text-[color:var(--app-text,#0f172a)] p-4 space-y-4">
             {/* Page Header */}
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
-                <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
-                        <OwnerMenuButton />
-                        <Calendar className="h-8 w-8 text-orange-400" />
-                        Table Reservation Management
-                    </h1>
-                    <p className="text-xs text-gray-400 mt-1">
-                        Manage table bookings, check-in guests, seat reservations, and prevent double booking conflicts.
-                    </p>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-3">
+                <div className="flex items-center gap-2.5">
+                    <OwnerMenuButton />
+                    <div className="rounded-xl bg-orange-500/10 p-2 text-orange-500 border border-orange-500/20">
+                        <Calendar className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-bold tracking-tight text-[color:var(--app-text)]">
+                            Table Reservation Management
+                        </h1>
+                        <p className="text-xs theme-muted">
+                            Manage table bookings, check-in guests, seat reservations, and prevent double-booking conflicts.
+                        </p>
+                    </div>
                 </div>
                 <button
                     onClick={() => {
                         setEditingReservation(null);
                         setIsModalOpen(true);
                     }}
-                    className="flex items-center gap-2 rounded-2xl bg-orange-500 px-5 py-3 text-sm font-extrabold text-black shadow-lg hover:bg-orange-400 transition"
+                    className="flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-orange-600 transition"
                 >
-                    <Plus className="h-5 w-5" />
+                    <Plus className="h-4 w-4" />
                     + New Reservation
                 </button>
             </div>
 
             {/* Metrics Dashboard Summary */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                 {[
-                    { label: "Total", val: metrics.total, color: "text-gray-200", border: "border-white/10" },
-                    { label: "Confirmed", val: metrics.confirmed, color: "text-amber-400", border: "border-amber-500/30" },
-                    { label: "Checked In", val: metrics.checkedIn, color: "text-sky-400", border: "border-sky-500/30" },
-                    { label: "Seated", val: metrics.seated, color: "text-emerald-400", border: "border-emerald-500/30" },
-                    { label: "Completed", val: metrics.completed, color: "text-purple-400", border: "border-purple-500/30" },
-                    { label: "Cancelled", val: metrics.cancelled, color: "text-red-400", border: "border-red-500/30" },
-                    { label: "No-Show", val: metrics.noShow, color: "text-rose-400", border: "border-rose-500/30" },
+                    { label: "Total", val: metrics.total, color: "text-[color:var(--app-text)]", border: "border-[color:var(--app-border)]/40" },
+                    { label: "Confirmed", val: metrics.confirmed, color: "text-amber-600 dark:text-amber-400", border: "border-amber-500/30" },
+                    { label: "Checked In", val: metrics.checkedIn, color: "text-sky-600 dark:text-sky-400", border: "border-sky-500/30" },
+                    { label: "Seated", val: metrics.seated, color: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/30" },
+                    { label: "Completed", val: metrics.completed, color: "text-purple-600 dark:text-purple-400", border: "border-purple-500/30" },
+                    { label: "Cancelled", val: metrics.cancelled, color: "text-red-600 dark:text-red-400", border: "border-red-500/30" },
+                    { label: "No-Show", val: metrics.noShow, color: "text-rose-600 dark:text-rose-400", border: "border-rose-500/30" },
                 ].map((m, idx) => (
-                    <div key={idx} className={`rounded-2xl border bg-slate-900/60 p-3.5 text-center ${m.border}`}>
-                        <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{m.label}</div>
-                        <div className={`text-2xl font-black mt-1 ${m.color}`}>{m.val}</div>
+                    <div key={idx} className={`rounded-xl border bg-white dark:bg-slate-900 p-2.5 text-center shadow-sm ${m.border}`}>
+                        <div className="text-[10px] font-bold theme-muted uppercase tracking-wider">{m.label}</div>
+                        <div className={`text-xl font-extrabold mt-0.5 ${m.color}`}>{m.val}</div>
                     </div>
                 ))}
             </div>
 
             {/* Filters Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-slate-900/50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 p-2.5 shadow-sm text-xs">
                 {/* Date Quick Tabs */}
-                <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/10">
+                <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 p-1 rounded-lg border border-[color:var(--app-border)]/40">
                     {[
                         { id: "TODAY", label: "Today" },
                         { id: "TOMORROW", label: "Tomorrow" },
@@ -290,7 +294,7 @@ export default function OwnerReservations() {
                         <button
                             key={tab.id}
                             onClick={() => setDateFilter(tab.id)}
-                            className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${dateFilter === tab.id ? "bg-orange-500 text-black" : "text-gray-400 hover:text-white"}`}
+                            className={`rounded-md px-2.5 py-1 text-xs font-bold transition ${dateFilter === tab.id ? "bg-orange-500 text-white shadow-sm" : "theme-muted hover:text-[color:var(--app-text)]"}`}
                         >
                             {tab.label}
                         </button>
@@ -301,18 +305,18 @@ export default function OwnerReservations() {
                             type="date"
                             value={customDate}
                             onChange={(e) => setCustomDate(e.target.value)}
-                            className="bg-[#111827] px-2.5 py-1 rounded-lg text-xs font-bold text-white outline-none border border-white/10"
+                            className="bg-transparent px-2 py-0.5 rounded text-xs font-bold text-[color:var(--app-text)] outline-none border border-[color:var(--app-border)]/40"
                         />
                     )}
                 </div>
 
                 {/* Status Tabs */}
-                <div className="flex items-center gap-1 text-xs overflow-x-auto">
+                <div className="flex items-center gap-1 text-[11px] overflow-x-auto py-0.5">
                     {["ALL", "CONFIRMED", "CHECKED_IN", "SEATED", "COMPLETED", "CANCELLED", "NO_SHOW"].map((st) => (
                         <button
                             key={st}
                             onClick={() => setStatusFilter(st)}
-                            className={`rounded-lg px-2.5 py-1 font-semibold transition ${statusFilter === st ? "bg-purple-600 text-white" : "text-gray-400 hover:text-gray-200"}`}
+                            className={`rounded-md px-2 py-1 font-semibold transition ${statusFilter === st ? "bg-orange-500 text-white shadow-sm" : "theme-muted hover:text-[color:var(--app-text)]"}`}
                         >
                             {st}
                         </button>
@@ -320,30 +324,30 @@ export default function OwnerReservations() {
                 </div>
 
                 {/* Search Bar */}
-                <div className="relative w-full md:w-64">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <div className="relative w-full md:w-56">
+                    <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 theme-muted" />
                     <input
                         type="text"
                         placeholder="Search name, phone, RES#..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full rounded-xl border border-white/10 bg-[#111827] pl-9 pr-4 py-2 text-xs text-white outline-none focus:border-orange-400"
+                        className="w-full rounded-lg border border-[color:var(--app-border)]/40 bg-transparent pl-8 pr-3 py-1.5 text-xs text-[color:var(--app-text)] outline-none focus:border-orange-500"
                     />
                 </div>
             </div>
 
-            {/* Reservations List */}
+            {/* Reservations List - High Density Grid Layout */}
             {loading ? (
-                <div className="flex justify-center p-12">
-                    <LoaderCircle className="h-8 w-8 animate-spin text-orange-400" />
+                <div className="flex justify-center p-10">
+                    <LoaderCircle className="h-7 w-7 animate-spin text-orange-500" />
                 </div>
             ) : reservations.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-white/10 p-12 text-center text-gray-400 space-y-2">
-                    <Calendar className="h-10 w-10 mx-auto text-gray-500" />
-                    <p className="font-bold text-sm">No reservations found for selected date/filter.</p>
+                <div className="rounded-2xl border border-dashed border-[color:var(--app-border)]/60 bg-white/40 dark:bg-slate-900/40 p-10 text-center theme-muted space-y-2">
+                    <Calendar className="h-8 w-8 mx-auto opacity-50" />
+                    <p className="font-bold text-xs">No reservations found for selected date/filter.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {reservations.map((res) => {
                         const isConfirmed = res.status === "CONFIRMED";
                         const isCheckedIn = res.status === "CHECKED_IN";
@@ -354,27 +358,27 @@ export default function OwnerReservations() {
                         return (
                             <div
                                 key={res.id}
-                                className={`flex flex-col justify-between rounded-2xl border p-4 transition space-y-3 ${
+                                className={`flex flex-col justify-between rounded-xl border p-3 transition shadow-sm space-y-2 text-xs bg-white dark:bg-slate-900 ${
                                     isSeated
-                                        ? "border-emerald-500/40 bg-emerald-500/5"
+                                        ? "border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20"
                                         : isCheckedIn
-                                            ? "border-sky-500/40 bg-sky-500/5"
+                                            ? "border-sky-500/40 bg-sky-500/5 dark:bg-sky-950/20"
                                             : isConfirmed
-                                                ? "border-amber-500/40 bg-amber-500/5"
+                                                ? "border-amber-500/40 bg-amber-500/5 dark:bg-amber-950/20"
                                                 : isCancelled || isNoShow
-                                                    ? "opacity-60 border-red-500/30 bg-red-500/5"
-                                                    : "border-white/10 bg-slate-900/60"
+                                                    ? "opacity-60 border-red-500/30 bg-red-500/5 dark:bg-red-950/20"
+                                                    : "border-[color:var(--app-border)]/40"
                                 }`}
                             >
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
                                     {/* Top Row: Ref# & Status Badge */}
                                     <div className="flex justify-between items-center">
-                                        <strong className="text-sm font-mono text-orange-400">{res.reservationNo}</strong>
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                            isSeated ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" :
-                                            isCheckedIn ? "bg-sky-500/20 text-sky-400 border-sky-500/30" :
-                                            isConfirmed ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
-                                            "bg-red-500/20 text-red-400 border-red-500/30"
+                                        <strong className="text-xs font-mono text-orange-500 font-bold">{res.reservationNo}</strong>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                                            isSeated ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" :
+                                            isCheckedIn ? "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30" :
+                                            isConfirmed ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" :
+                                            "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30"
                                         }`}>
                                             {res.status}
                                         </span>
@@ -382,25 +386,25 @@ export default function OwnerReservations() {
 
                                     {/* Customer & Guest Info */}
                                     <div>
-                                        <h4 className="text-base font-bold text-white flex items-center gap-2">
-                                            {res.customerName}
-                                            <span className="text-xs font-normal text-gray-400">({res.guestCount} Guests)</span>
+                                        <h4 className="text-sm font-bold text-[color:var(--app-text)] flex items-center justify-between">
+                                            <span className="truncate max-w-[150px]">{res.customerName}</span>
+                                            <span className="text-[11px] font-normal theme-muted">🪑 {res.guestCount} Guests</span>
                                         </h4>
-                                        <p className="text-xs text-gray-400">📞 {res.customerPhone}</p>
+                                        <p className="text-[11px] theme-muted">📞 {res.customerPhone || "N/A"}</p>
                                     </div>
 
-                                    {/* Time & Table Info */}
-                                    <div className="rounded-xl border border-white/5 bg-black/30 p-2.5 text-xs space-y-1">
-                                        <div className="flex justify-between text-gray-300">
+                                    {/* Time & Table Info Box */}
+                                    <div className="rounded-lg border border-[color:var(--app-border)]/40 bg-black/5 dark:bg-white/5 p-2 text-[11px] space-y-0.5">
+                                        <div className="flex justify-between theme-muted">
                                             <span>Time Slot:</span>
-                                            <strong className="text-amber-300">{res.startTime} – {res.endTime}</strong>
+                                            <strong className="text-orange-500 font-bold">{res.startTime} – {res.endTime}</strong>
                                         </div>
-                                        <div className="flex justify-between text-gray-300">
-                                            <span>Assigned Table:</span>
-                                            <strong className="text-emerald-400">{res.table ? `Table ${res.table.tableNo} (${res.table.seats} seats)` : "Unassigned"}</strong>
+                                        <div className="flex justify-between theme-muted">
+                                            <span>Table:</span>
+                                            <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{res.table ? `Table ${res.table.tableNo} (${res.table.seats} seats)` : "Unassigned"}</strong>
                                         </div>
                                         {res.notes && (
-                                            <div className="text-[11px] text-gray-400 pt-1 border-t border-white/5">
+                                            <div className="text-[10px] theme-muted truncate pt-0.5 border-t border-[color:var(--app-border)]/30">
                                                 Note: {res.notes}
                                             </div>
                                         )}
@@ -408,11 +412,11 @@ export default function OwnerReservations() {
                                 </div>
 
                                 {/* Action Buttons Footer */}
-                                <div className="pt-2 border-t border-white/10 flex flex-wrap gap-1.5">
+                                <div className="pt-1.5 border-t border-[color:var(--app-border)]/40 flex flex-wrap gap-1">
                                     {isConfirmed && (
                                         <button
                                             onClick={() => handleCheckIn(res)}
-                                            className="flex-1 rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-500"
+                                            className="flex-1 rounded-lg bg-sky-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-sky-500"
                                         >
                                             Check In
                                         </button>
@@ -421,7 +425,7 @@ export default function OwnerReservations() {
                                     {(isConfirmed || isCheckedIn) && (
                                         <button
                                             onClick={() => handleSeatGuest(res)}
-                                            className="flex-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-500"
+                                            className="flex-1 rounded-lg bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-500"
                                         >
                                             Seat Guest
                                         </button>
@@ -433,7 +437,7 @@ export default function OwnerReservations() {
                                                 setEditingReservation(res);
                                                 setIsModalOpen(true);
                                             }}
-                                            className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-gray-300 hover:bg-white/10"
+                                            className="rounded-lg border border-[color:var(--app-border)]/40 px-2 py-1 text-[11px] theme-muted hover:bg-black/5 dark:hover:bg-white/5"
                                         >
                                             Edit
                                         </button>
@@ -441,23 +445,23 @@ export default function OwnerReservations() {
 
                                     <button
                                         onClick={() => handlePrintSlip(res)}
-                                        className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-gray-300 hover:bg-white/10"
+                                        className="rounded-lg border border-[color:var(--app-border)]/40 px-2 py-1 text-[11px] theme-muted hover:bg-black/5 dark:hover:bg-white/5"
                                         title="Print Slip"
                                     >
-                                        <Printer className="h-3.5 w-3.5" />
+                                        <Printer className="h-3 w-3" />
                                     </button>
 
                                     {!isCancelled && !isNoShow && !isSeated && (
                                         <>
                                             <button
                                                 onClick={() => handleCancel(res)}
-                                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-xs text-red-300 hover:bg-red-500/20"
+                                                className="rounded-lg border border-red-500/30 text-red-500 px-2 py-1 text-[11px] hover:bg-red-500/10"
                                             >
                                                 Cancel
                                             </button>
                                             <button
                                                 onClick={() => handleNoShow(res)}
-                                                className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-2.5 py-1.5 text-xs text-rose-300 hover:bg-rose-500/20"
+                                                className="rounded-lg border border-rose-500/30 text-rose-500 px-2 py-1 text-[11px] hover:bg-rose-500/10"
                                             >
                                                 No-Show
                                             </button>
