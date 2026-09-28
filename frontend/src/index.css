@@ -806,6 +806,11 @@ body,
     --table-state-bg: color-mix(in srgb, var(--app-surface) 35%, transparent);
 }
 
+.theme-table-box.state-reserved-table {
+    --table-state-color: #c084fc;
+    --table-state-bg: color-mix(in srgb, #c084fc 22%, transparent);
+}
+
 .theme-table-box.state-running-table {
     --table-state-color: #82c6e8;
     --table-state-bg: color-mix(in srgb, #82c6e8 16%, transparent);
@@ -870,6 +875,10 @@ body,
     border-radius: 999px;
     background: color-mix(in srgb, var(--app-border-strong) 60%, #b6bcc8 40%);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, #000 16%, transparent);
+}
+
+.theme-table-legend-item.state-reserved-table .theme-table-legend-dot {
+    background: #c084fc;
 }
 
 .theme-table-legend-item.state-running-table .theme-table-legend-dot {

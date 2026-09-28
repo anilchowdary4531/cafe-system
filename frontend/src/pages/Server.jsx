@@ -1268,14 +1268,13 @@ export default function Server() {
                                                             <button
                                                                 key={table.id}
                                                                 type="button"
-                                                                onClick={() => setTable(table.tableNo)}
-                                                                className={`flex flex-col items-start gap-0.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                                                                                                          className={`flex flex-col items-start gap-0.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
                                                                     isSelected
                                                                         ? "bg-[color:var(--app-primary)] text-white shadow-md scale-[1.02] ring-2 ring-[color:var(--app-primary)]/40"
                                                                         : isOccupied
-                                                                            ? "border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                                                                            ? "border border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20"
                                                                             : isReserved
-                                                                                ? "border border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20"
+                                                                                ? "border border-purple-500/40 bg-purple-500/10 text-purple-700 dark:text-purple-300 hover:bg-purple-500/20"
                                                                                 : "theme-soft-button"
                                                                 }`}
                                                             >
@@ -1285,13 +1284,13 @@ export default function Server() {
                                                                         <span className="opacity-70 text-[10px]">({table.seats}s)</span>
                                                                     ) : null}
                                                                     {isOccupied ? (
-                                                                        <span className={`inline-block w-2 h-2 rounded-full ${isSelected ? "bg-white" : "bg-amber-500"}`} />
-                                                                    ) : isReserved ? (
                                                                         <span className={`inline-block w-2 h-2 rounded-full ${isSelected ? "bg-white" : "bg-blue-500"}`} />
+                                                                    ) : isReserved ? (
+                                                                        <span className={`inline-block w-2 h-2 rounded-full ${isSelected ? "bg-white" : "bg-purple-500"}`} />
                                                                     ) : null}
                                                                 </div>
                                                                 {isReserved && table.activeReservation && (
-                                                                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-blue-500 dark:text-blue-300">
+                                                                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-purple-600 dark:text-purple-300">
                                                                         RESERVED {table.activeReservation.startTime}–{table.activeReservation.endTime}
                                                                     </span>
                                                                 )}

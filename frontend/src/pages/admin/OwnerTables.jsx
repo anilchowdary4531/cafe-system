@@ -1418,13 +1418,13 @@ export default function OwnerTables() {
                                                 : ""
                                         } ${
                                             isOccupied
-                                                ? "border-amber-500/80 bg-gradient-to-br from-amber-950/80 via-[#0f172a] to-amber-900/40 text-amber-200 shadow-amber-500/20 shadow-lg"
+                                                ? "border-blue-500/80 bg-gradient-to-br from-blue-950/80 via-[#0f172a] to-blue-900/40 text-blue-200 shadow-blue-500/20 shadow-lg"
                                                 : isBilling
-                                                ? "border-purple-500/80 bg-gradient-to-br from-purple-950/80 via-[#0f172a] to-purple-900/40 text-purple-200 shadow-purple-500/20 shadow-lg"
+                                                ? "border-amber-500/80 bg-gradient-to-br from-amber-950/80 via-[#0f172a] to-amber-900/40 text-amber-200 shadow-amber-500/20 shadow-lg"
                                                 : isPaid
                                                 ? "border-cyan-500/80 bg-gradient-to-br from-cyan-950/80 via-[#0f172a] to-cyan-900/40 text-cyan-200"
-                                                : resForTable
-                                                ? "border-blue-500/60 bg-gradient-to-br from-[#0f172a] to-blue-950/30 text-gray-200 hover:border-blue-400"
+                                                : resForTable || table.isReserved
+                                                ? "border-purple-500/80 bg-gradient-to-br from-purple-950/80 via-[#0f172a] to-purple-900/40 text-purple-200 shadow-purple-500/20 shadow-lg"
                                                 : "border-emerald-500/40 bg-gradient-to-br from-[#0f172a] to-emerald-950/20 text-gray-200 hover:border-emerald-400"
                                         }`}
                                     >
@@ -1543,11 +1543,13 @@ export default function OwnerTables() {
                                                 key={table.id}
                                                 className={`relative flex flex-col justify-between rounded-xl border p-3.5 transition ${
                                                     isOccupied
-                                                        ? "border-amber-500/50 bg-amber-500/5"
+                                                        ? "border-blue-500/50 bg-blue-500/5"
                                                         : isBilling
-                                                        ? "border-purple-500/50 bg-purple-500/5"
+                                                        ? "border-amber-500/50 bg-amber-500/5"
                                                         : isPaid
                                                         ? "border-cyan-500/50 bg-cyan-500/5"
+                                                        : resForTable || table.isReserved
+                                                        ? "border-purple-500/50 bg-purple-500/5"
                                                         : "border-[color:var(--app-border)]/40 hover:border-orange-500/50"
                                                 }`}
                                             >
@@ -1581,17 +1583,17 @@ export default function OwnerTables() {
                                                         <span
                                                             className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
                                                                 isOccupied
-                                                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                                                    ? "bg-blue-500/20 text-blue-300 border border-blue-500/40"
                                                                     : isBilling
-                                                                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
+                                                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
                                                                     : isPaid
                                                                     ? "bg-cyan-400/20 text-cyan-300 border border-cyan-400/30"
-                                                                    : resForTable
-                                                                    ? "bg-blue-400/20 text-blue-300 border border-blue-400/30"
+                                                                    : resForTable || table.isReserved
+                                                                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
                                                                     : "bg-emerald-400/20 text-emerald-300 border border-emerald-400/30"
                                                             }`}
                                                         >
-                                                            {isOccupied ? "Occupied" : isBilling ? "Billing" : isPaid ? "Paid" : resForTable ? "Reserved" : "Available"}
+                                                            {isOccupied ? "Running" : isBilling ? "Billing" : isPaid ? "Paid" : resForTable || table.isReserved ? "Reserved" : "Available"}
                                                         </span>
 
                                                         <div className="relative" data-table-actions-menu>

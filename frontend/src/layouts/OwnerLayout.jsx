@@ -362,6 +362,7 @@ const normalizeTableRows = (rows) =>
 
 const TABLE_STATE_KEYS = {
     BLANK: "BLANK_TABLE",
+    RESERVED: "RESERVED_TABLE",
     RUNNING: "RUNNING_TABLE",
     PRINTED: "PRINTED_TABLE",
     PAID: "PAID_TABLE",
@@ -370,6 +371,7 @@ const TABLE_STATE_KEYS = {
 
 const TABLE_STATE_LABELS = {
     [TABLE_STATE_KEYS.BLANK]: "Blank Table",
+    [TABLE_STATE_KEYS.RESERVED]: "Reserved Table",
     [TABLE_STATE_KEYS.RUNNING]: "Running Table",
     [TABLE_STATE_KEYS.PRINTED]: "Printed Table",
     [TABLE_STATE_KEYS.PAID]: "Paid Table",
@@ -378,6 +380,7 @@ const TABLE_STATE_LABELS = {
 
 const TABLE_STATE_LEGEND = [
     TABLE_STATE_KEYS.BLANK,
+    TABLE_STATE_KEYS.RESERVED,
     TABLE_STATE_KEYS.RUNNING,
     TABLE_STATE_KEYS.PRINTED,
     TABLE_STATE_KEYS.PAID,
@@ -405,6 +408,10 @@ const resolveTableState = (table, printedTableKeys = new Set()) => {
             ACTIVE_KOT_STATUSES.has(String(order?.status || "").toUpperCase())
         );
         return hasRunningKot ? TABLE_STATE_KEYS.RUNNING_KOT : TABLE_STATE_KEYS.RUNNING;
+    }
+
+    if (table?.isReserved || table?.activeReservation) {
+        return TABLE_STATE_KEYS.RESERVED;
     }
 
     return TABLE_STATE_KEYS.BLANK;
