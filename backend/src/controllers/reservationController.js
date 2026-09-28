@@ -36,16 +36,32 @@ export async function getReservationsController(req, reply) {
 
         const where = { restaurantId };
 
-        if (date) {
-            const reqDate = new Date(date);
-            reqDate.setHours(0, 0, 0, 0);
-            const nextDate = new Date(reqDate);
-            nextDate.setDate(nextDate.getDate() + 1);
-
-            where.reservationDate = {
-                gte: reqDate,
-                lt: nextDate,
-            };
+        if (date && date !== "ALL" && date !== "ALL_TIME") {
+            const now = new Date();
+            if (date === "YESTERDAY") {
+                const yest = new Date(now);
+                yest.setDate(yest.getDate() - 1);
+                yest.setHours(0, 0, 0, 0);
+                const nextDate = new Date(yest);
+                nextDate.setDate(nextDate.getDate() + 1);
+                where.reservationDate = { gte: yest, lt: nextDate };
+            } else if (date === "PAST_7_DAYS") {
+                const start7 = new Date(now);
+                start7.setDate(start7.getDate() - 7);
+                start7.setHours(0, 0, 0, 0);
+                where.reservationDate = { gte: start7 };
+            } else {
+                const reqDate = new Date(date);
+                if (!isNaN(reqDate.getTime())) {
+                    reqDate.setHours(0, 0, 0, 0);
+                    const nextDate = new Date(reqDate);
+                    nextDate.setDate(nextDate.getDate() + 1);
+                    where.reservationDate = {
+                        gte: reqDate,
+                        lt: nextDate,
+                    };
+                }
+            }
         }
 
         if (status && status !== "ALL") {
