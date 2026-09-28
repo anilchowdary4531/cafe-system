@@ -6,6 +6,7 @@ import {
     Clock,
     Filter,
     Search,
+    Volume2,
 } from "lucide-react";
 import {
     getOwnerNotifications,
@@ -34,6 +35,7 @@ export default function OwnerNotifications() {
     const [notifications, setNotifications] = useState(() => getOwnerNotifications());
     const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | ORDERS | SUCCESS | INFO
     const [searchQuery, setSearchQuery] = useState("");
+    const [showSoundSettings, setShowSoundSettings] = useState(false);
 
     const unreadCount = useMemo(
         () => notifications.reduce((sum, item) => sum + (item.read ? 0 : 1), 0),
@@ -105,6 +107,20 @@ export default function OwnerNotifications() {
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
+                        onClick={() => setShowSoundSettings((prev) => !prev)}
+                        className={`flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-bold transition ${
+                            showSoundSettings
+                                ? "border-orange-500 bg-orange-500 text-white shadow-sm"
+                                : "border-[color:var(--app-border)]/60 bg-white dark:bg-slate-900 theme-muted hover:text-[color:var(--app-text)]"
+                        }`}
+                        title="Adjust Notification Sound"
+                    >
+                        <Volume2 className="h-3.5 w-3.5" />
+                        <span>Sound Settings</span>
+                    </button>
+
+                    <button
+                        type="button"
                         onClick={onMarkAllRead}
                         disabled={unreadCount === 0}
                         className="rounded-lg bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow-sm hover:bg-orange-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
@@ -114,8 +130,12 @@ export default function OwnerNotifications() {
                 </div>
             </div>
 
-            {/* Notification Sound Picker & Audio Controller - Compact collapsible */}
-            <NotificationSoundPicker defaultExpanded={false} />
+            {/* Notification Sound Picker - Hidden by default, toggled via Sound Settings button */}
+            {showSoundSettings && (
+                <div className="animate-in fade-in duration-200">
+                    <NotificationSoundPicker defaultExpanded={true} />
+                </div>
+            )}
 
             {/* Filter & Search Bar - High Density */}
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 p-2 shadow-sm text-xs">
