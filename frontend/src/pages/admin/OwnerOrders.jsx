@@ -214,6 +214,36 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
 
     return (
         <div className="px-1 py-1 w-full space-y-3 text-[color:var(--app-text)] font-sans">
+            {/* Header Title & Subtitle */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-[color:var(--app-border)]/40 pb-3 gap-2">
+                <div>
+                    <div className="flex items-center gap-3">
+                        <OwnerMenuButton />
+                        <h1 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl">
+                            {pageTitle}
+                        </h1>
+                    </div>
+                    <p className="mt-0.5 text-xs text-[color:var(--app-muted)]">
+                        {activeCount} {activeLabel}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-[color:var(--app-muted)]">Order Control:</span>
+                    <select
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value)}
+                        className="bg-transparent border-b border-[color:var(--app-border)]/60 text-xs font-medium text-[color:var(--app-text)] py-1 outline-none cursor-pointer"
+                    >
+                        <option value="" className="bg-[color:var(--app-bg)]">All statuses</option>
+                        {STATUSES.map((value) => (
+                            <option key={value} value={value} className="bg-[color:var(--app-bg)]">
+                                {value}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
             {/* Header Tabs (if applicable) */}
             {!isOnlineOrders && (
                 <div className="flex items-center gap-4 overflow-x-auto border-b border-[color:var(--app-border)]/40 pb-1">
@@ -248,36 +278,6 @@ export default function OwnerOrders({ sourceFilter = "" } = {}) {
                     })}
                 </div>
             )}
-
-            {/* Header Title & Subtitle */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-[color:var(--app-border)]/40 pb-3 gap-2">
-                <div>
-                    <div className="flex items-center gap-3">
-                        <OwnerMenuButton />
-                        <h1 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl">
-                            {pageTitle}
-                        </h1>
-                    </div>
-                    <p className="mt-0.5 text-xs text-[color:var(--app-muted)]">
-                        {activeCount} {activeLabel}
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-xs text-[color:var(--app-muted)]">Order Control:</span>
-                    <select
-                        value={status}
-                        onChange={(e) => setStatus(e.target.value)}
-                        className="bg-transparent border-b border-[color:var(--app-border)]/60 text-xs font-medium text-[color:var(--app-text)] py-1 outline-none cursor-pointer"
-                    >
-                        <option value="" className="bg-[color:var(--app-bg)]">All statuses</option>
-                        {STATUSES.map((value) => (
-                            <option key={value} value={value} className="bg-[color:var(--app-bg)]">
-                                {value}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            </div>
 
             {/* Search & Filter Toolbar */}
             <div className="border-b border-[color:var(--app-border)]/40 pb-2">

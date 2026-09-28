@@ -75,7 +75,8 @@ export default function ReservationModal({
         const runCheck = async () => {
             try {
                 setCheckingAvailability(true);
-                const rid = restaurantId || 1;
+                const storedRid = Number(JSON.parse(localStorage.getItem("user") || "{}")?.restaurantId);
+                const rid = restaurantId || storedRid || 1;
                 const params = {
                     tableId: selectedTableId,
                     date: reservationDate,
@@ -128,7 +129,8 @@ export default function ReservationModal({
 
         try {
             setSubmitting(true);
-            const rid = restaurantId || 1;
+            const storedRid = Number(JSON.parse(localStorage.getItem("user") || "{}")?.restaurantId);
+            const rid = restaurantId || storedRid || 1;
             const payload = {
                 tableId: selectedTableId ? Number(selectedTableId) : null,
                 reservationDate,

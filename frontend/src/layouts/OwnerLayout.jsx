@@ -322,6 +322,9 @@ const normalizeTableRows = (rows) =>
             ...table,
             tableNo: String(table?.tableNo || "").trim(),
             isOccupied: Boolean(table?.isOccupied),
+            isReserved: Boolean(table?.isReserved || table?.is_reserved || table?.activeReservation || table?.upcomingReservation),
+            activeReservation: table?.activeReservation || null,
+            upcomingReservation: table?.upcomingReservation || null,
             occupiedSince: table?.occupiedSince || null,
             activeOrderCount: Number(table?.activeOrderCount || 0),
             activeItemCount: Number(table?.activeItemCount || 0),
@@ -410,7 +413,7 @@ const resolveTableState = (table, printedTableKeys = new Set()) => {
         return hasRunningKot ? TABLE_STATE_KEYS.RUNNING_KOT : TABLE_STATE_KEYS.RUNNING;
     }
 
-    if (table?.isReserved || table?.activeReservation) {
+    if (table?.isReserved || table?.activeReservation || table?.upcomingReservation || table?.is_reserved) {
         return TABLE_STATE_KEYS.RESERVED;
     }
 

@@ -569,6 +569,11 @@ export default async function ownerRoutes(app, deps) {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
+      const startOfDay = new Date(today);
+      startOfDay.setDate(startOfDay.getDate() - 1);
+      const endOfDay = new Date(tomorrow);
+      endOfDay.setDate(endOfDay.getDate() + 1);
+
       const [tables, activeOrders, latestTableOrders, activeSessions, reservationsToday] = await Promise.all([
         prisma.diningTable.findMany({
           where: { restaurantId },
@@ -625,9 +630,9 @@ export default async function ownerRoutes(app, deps) {
         prisma.reservation.findMany({
           where: {
             restaurantId,
-            reservationDate: { gte: today, lt: tomorrow },
             status: { in: ["PENDING", "CONFIRMED", "CHECKED_IN", "SEATED"] },
           },
+          include: { table: true },
           orderBy: { startTime: "asc" },
         }),
       ]);
@@ -639,10 +644,21 @@ export default async function ownerRoutes(app, deps) {
       }, {});
 
       const reservationsByTableId = reservationsToday.reduce((acc, res) => {
-        if (!res.tableId) return acc;
-        const tid = Number(res.tableId);
-        if (!acc[tid]) acc[tid] = [];
-        acc[tid].push(res);
+        if (res.tableId) {
+          const tid = Number(res.tableId);
+          if (!acc[tid]) acc[tid] = [];
+          acc[tid].push(res);
+        }
+        if (res.table?.tableNo) {
+          const tKey = String(res.table.tableNo).trim().toLowerCase();
+          if (!acc[tKey]) acc[tKey] = [];
+          acc[tKey].push(res);
+        }
+        if (res.tableNo) {
+          const tKey = String(res.tableNo).trim().toLowerCase();
+          if (!acc[tKey]) acc[tKey] = [];
+          acc[tKey].push(res);
+        }
         return acc;
       }, {});
 
@@ -708,7 +724,11 @@ export default async function ownerRoutes(app, deps) {
           const tableActiveOrders = activeOrdersByTable[tableKey] || [];
           const latestOrder = latestOrderByTable[tableKey] || null;
           const activeSession = activeSessionsByTable[tableKey] || null;
-          const tableResList = reservationsByTableId[table.id] || [];
+          
+          const resById = reservationsByTableId[table.id] || [];
+          const resByNo = reservationsByTableId[tableKey] || [];
+          const combinedRes = [...resById, ...resByNo];
+          const tableResList = Array.from(new Map(combinedRes.map((r) => [r.id, r])).values());
 
           const now = new Date();
           const currentMin = now.getHours() * 60 + now.getMinutes();
@@ -721,12 +741,16 @@ export default async function ownerRoutes(app, deps) {
             let endMin = helperTimeToMinutes(res.endTime);
             if (endMin <= startMin) endMin += 1440;
 
-            if (currentMin >= Math.max(0, startMin - 15) && currentMin < endMin) {
+            if (currentMin >= Math.max(0, startMin - 60) && currentMin < endMin) {
               activeRes = res;
               break;
             } else if (startMin > currentMin && !upcomingRes) {
               upcomingRes = res;
             }
+          }
+
+          if (!activeRes && tableResList.length > 0) {
+            activeRes = tableResList[0];
           }
 
           const activeItemCount = tableActiveOrders.reduce(
@@ -742,7 +766,7 @@ export default async function ownerRoutes(app, deps) {
           );
 
           const isOccupied = Boolean(activeSession) || tableActiveOrders.length > 0;
-          const isReserved = !isOccupied && Boolean(activeRes);
+          const isReserved = !isOccupied && (Boolean(activeRes) || tableResList.length > 0);
 
           return {
             isOccupied,

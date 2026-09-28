@@ -74,9 +74,18 @@ export function getEffectiveStatus(res, now = new Date()) {
     return res.status;
 }
 
+const readStoredUser = () => {
+    try {
+        return JSON.parse(localStorage.getItem("user")) || {};
+    } catch {
+        return {};
+    }
+};
+
 export default function OwnerReservations() {
     const { socket } = useStaffSocket();
-    const restaurantId = 1; // Default or context restaurant ID
+    const user = useMemo(() => readStoredUser(), []);
+    const restaurantId = Number(user?.restaurantId || localStorage.getItem("restaurantId") || 1);
 
     // View Tab: "ACTIVE" | "HISTORY"
     const [viewTab, setViewTab] = useState("ACTIVE");

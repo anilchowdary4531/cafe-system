@@ -1536,7 +1536,11 @@ export default function OwnerTables() {
                                         const isBilling = sessionStatus === "BILLING";
                                         const isPaid = sessionStatus === "PAID";
                                         const isAvailable = !session;
-                                        const resForTable = reservations.find((r) => Number(r.tableId) === Number(table.id));
+                                        const resForTable = reservations.find((r) =>
+                                            Number(r.tableId) === Number(table.id) ||
+                                            (r.tableNo && String(r.tableNo).trim().toLowerCase() === String(table.tableNo).trim().toLowerCase()) ||
+                                            (r.table?.tableNo && String(r.table.tableNo).trim().toLowerCase() === String(table.tableNo).trim().toLowerCase())
+                                        );
 
                                         return (
                                             <article
