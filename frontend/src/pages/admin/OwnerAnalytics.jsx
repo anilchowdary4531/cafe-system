@@ -99,7 +99,12 @@ export default function OwnerAnalytics() {
         }
     }, []);
 
-    const restaurantId = Number(user?.restaurantId);
+    const restaurantId = Number(
+        user?.restaurantId ||
+        localStorage.getItem("restaurantId") ||
+        localStorage.getItem("activeRestaurantId") ||
+        1
+    );
 
     const fetchAnalytics = async ({ silent = false } = {}) => {
         if (!restaurantId) {

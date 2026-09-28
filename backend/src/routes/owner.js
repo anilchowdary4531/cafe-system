@@ -1063,29 +1063,36 @@ export default async function ownerRoutes(app, deps) {
       const [orders, prevOrders, menuItems, tables, inventoryStocks, customers, payments, staffUsers] = await Promise.all([
         prisma.order.findMany({
           where: { restaurantId, createdAt: { gte: seriesStart, lte: seriesEnd } },
-          include: { items: true, customer: true, waiter: true, payments: true },
+          include: { items: true, customer: true, payments: true },
           orderBy: { createdAt: "desc" },
+        }).catch((err) => {
+          console.error("[Analytics] Order fetch error:", err.message);
+          return [];
         }),
         prisma.order.findMany({
           where: { restaurantId, createdAt: { gte: prevSeriesStart, lte: prevSeriesEnd } },
           select: { id: true, total: true, status: true, customerId: true },
+        }).catch((err) => {
+          console.error("[Analytics] PrevOrder fetch error:", err.message);
+          return [];
         }),
         prisma.menuItem.findMany({
           where: { restaurantId },
           select: { id: true, name: true, category: true, isAvailable: true, price: true },
-        }),
+        }).catch(() => []),
         prisma.diningTable.findMany({
           where: { restaurantId },
           select: { id: true, tableNo: true, isActive: true, seats: true, groupName: true, isOccupied: true },
-        }),
+        }).catch(() => []),
         prisma.inventoryStock.findMany({
           where: { restaurantId },
         }).catch(() => []),
         prisma.customer.findMany({
+          where: { restaurantId },
           select: { id: true, name: true, phone: true, createdAt: true },
         }).catch(() => []),
         prisma.payment.findMany({
-          where: { order: { restaurantId }, createdAt: { gte: seriesStart, lte: seriesEnd } },
+          where: { restaurantId, createdAt: { gte: seriesStart, lte: seriesEnd } },
         }).catch(() => []),
         prisma.user.findMany({
           where: { restaurantId },
@@ -1515,8 +1522,8 @@ export default async function ownerRoutes(app, deps) {
         }
       };
     } catch (err) {
-      console.log(err);
-      return reply.code(500).send({ message: "Failed to fetch analytics" });
+      console.error("[Analytics] Unexpected handler error:", err);
+      return reply.code(500).send({ message: "Failed to fetch analytics", error: err.message });
     }
   });
 
