@@ -564,7 +564,12 @@ export default async function ownerRoutes(app, deps) {
       });
       if (!restaurant) return reply.code(404).send({ message: "Restaurant not found" });
       const activeStatuses = ["PLACED", "ACCEPTED", "PREPARING", "READY"];
-      const [tables, activeOrders, latestTableOrders, activeSessions] = await Promise.all([
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const [tables, activeOrders, latestTableOrders, activeSessions, reservationsToday] = await Promise.all([
         prisma.diningTable.findMany({
           where: { restaurantId },
           orderBy: { id: "desc" },
@@ -617,11 +622,27 @@ export default async function ownerRoutes(app, deps) {
             status: { in: ["OPEN", "BILLING", "PAID"] },
           },
         }),
+        prisma.reservation.findMany({
+          where: {
+            restaurantId,
+            reservationDate: { gte: today, lt: tomorrow },
+            status: { in: ["PENDING", "CONFIRMED", "CHECKED_IN", "SEATED"] },
+          },
+          orderBy: { startTime: "asc" },
+        }),
       ]);
 
       const activeSessionsByTable = activeSessions.reduce((acc, session) => {
         const tableKey = String(session.tableNo || "").trim().toLowerCase();
         if (tableKey) acc[tableKey] = session;
+        return acc;
+      }, {});
+
+      const reservationsByTableId = reservationsToday.reduce((acc, res) => {
+        if (!res.tableId) return acc;
+        const tid = Number(res.tableId);
+        if (!acc[tid]) acc[tid] = [];
+        acc[tid].push(res);
         return acc;
       }, {});
 
@@ -657,6 +678,20 @@ export default async function ownerRoutes(app, deps) {
         return acc;
       }, {});
 
+      const helperTimeToMinutes = (timeStr) => {
+        if (!timeStr || typeof timeStr !== "string") return 0;
+        const str = timeStr.trim().toUpperCase();
+        const isPM = str.includes("PM");
+        const isAM = str.includes("AM");
+        const cleaned = str.replace(/[^\d:]/g, "");
+        const parts = cleaned.split(":");
+        let h = parseInt(parts[0], 10) || 0;
+        const m = parseInt(parts[1], 10) || 0;
+        if (isPM && h < 12) h += 12;
+        if (isAM && h === 12) h = 0;
+        return h * 60 + m;
+      };
+
       return tables.map((table) => {
         let token = table.qrToken;
         if (!token) {
@@ -673,6 +708,27 @@ export default async function ownerRoutes(app, deps) {
           const tableActiveOrders = activeOrdersByTable[tableKey] || [];
           const latestOrder = latestOrderByTable[tableKey] || null;
           const activeSession = activeSessionsByTable[tableKey] || null;
+          const tableResList = reservationsByTableId[table.id] || [];
+
+          const now = new Date();
+          const currentMin = now.getHours() * 60 + now.getMinutes();
+
+          let activeRes = null;
+          let upcomingRes = null;
+
+          for (const res of tableResList) {
+            const startMin = helperTimeToMinutes(res.startTime);
+            let endMin = helperTimeToMinutes(res.endTime);
+            if (endMin <= startMin) endMin += 1440;
+
+            if (currentMin >= Math.max(0, startMin - 15) && currentMin < endMin) {
+              activeRes = res;
+              break;
+            } else if (startMin > currentMin && !upcomingRes) {
+              upcomingRes = res;
+            }
+          }
+
           const activeItemCount = tableActiveOrders.reduce(
             (sum, order) =>
               sum +
@@ -685,8 +741,31 @@ export default async function ownerRoutes(app, deps) {
             0
           );
 
+          const isOccupied = Boolean(activeSession) || tableActiveOrders.length > 0;
+          const isReserved = !isOccupied && Boolean(activeRes);
+
           return {
-            isOccupied: Boolean(activeSession) || tableActiveOrders.length > 0,
+            isOccupied,
+            isReserved,
+            activeReservation: activeRes ? {
+              id: activeRes.id,
+              reservationNo: activeRes.reservationNo,
+              startTime: activeRes.startTime,
+              endTime: activeRes.endTime,
+              customerName: activeRes.customerName,
+              customerPhone: activeRes.customerPhone,
+              guestCount: activeRes.guestCount,
+              status: activeRes.status,
+            } : null,
+            upcomingReservation: upcomingRes ? {
+              id: upcomingRes.id,
+              reservationNo: upcomingRes.reservationNo,
+              startTime: upcomingRes.startTime,
+              endTime: upcomingRes.endTime,
+              customerName: upcomingRes.customerName,
+              guestCount: upcomingRes.guestCount,
+              status: upcomingRes.status,
+            } : null,
             occupiedSince: activeSession?.openedAt || tableActiveOrders[0]?.createdAt || null,
             activeOrderCount: tableActiveOrders.length,
             activeItemCount,

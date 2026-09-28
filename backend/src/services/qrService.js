@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { getOrCreateActiveSession, recalculateSessionTotals } from "./tableSessionService.js";
 import { createOrderByStaff } from "./orderService.js";
+import { timeToMinutes } from "./reservationService.js";
 
 /**
  * Generate a cryptographically random, unguessable token for QR codes.
@@ -164,6 +165,41 @@ export const resolveQrToken = async (token, prisma) => {
     },
   });
 
+  // Check today's reservations for this table
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const reservationsToday = await prisma.reservation.findMany({
+    where: {
+      restaurantId: table.restaurantId,
+      tableId: table.id,
+      reservationDate: { gte: today, lt: tomorrow },
+      status: { in: ["PENDING", "CONFIRMED", "CHECKED_IN", "SEATED"] },
+    },
+    orderBy: { startTime: "asc" },
+  });
+
+  const now = new Date();
+  const currentMin = now.getHours() * 60 + now.getMinutes();
+
+  let activeRes = null;
+  let upcomingRes = null;
+
+  for (const res of reservationsToday) {
+    const startMin = timeToMinutes(res.startTime);
+    let endMin = timeToMinutes(res.endTime);
+    if (endMin <= startMin) endMin += 1440;
+
+    if (currentMin >= Math.max(0, startMin - 15) && currentMin < endMin) {
+      activeRes = res;
+      break;
+    } else if (startMin > currentMin && !upcomingRes) {
+      upcomingRes = res;
+    }
+  }
+
   // Fetch full available menu for the restaurant
   const menuItems = await prisma.menuItem.findMany({
     where: {
@@ -188,6 +224,74 @@ export const resolveQrToken = async (token, prisma) => {
     orderBy: [{ category: "asc" }, { name: "asc" }],
   });
 
+  // Scenario B: Table is currently in an active reservation window and NO activeSession open
+  if (activeRes && !activeSession) {
+    const allTables = await prisma.diningTable.findMany({
+      where: { restaurantId: table.restaurantId, isActive: true },
+      select: { id: true, tableNo: true, section: true, seats: true, qrToken: true },
+    });
+    const availableTables = allTables.filter((t) => t.id !== table.id);
+
+    return {
+      restaurant: table.restaurant,
+      table: {
+        tableNo: table.tableNo,
+        section: table.section || "Main Floor",
+        seats: table.seats,
+        qrToken: table.qrToken,
+        isReserved: true,
+      },
+      isReserved: true,
+      message: "This table is reserved for this time slot. Please select another available table.",
+      reservationEndTime: activeRes.endTime,
+      reservationDetails: {
+        reservationNo: activeRes.reservationNo,
+        startTime: activeRes.startTime,
+        endTime: activeRes.endTime,
+        customerName: activeRes.customerName,
+        guestCount: activeRes.guestCount,
+      },
+      availableTables,
+      menu: menuItems,
+    };
+  }
+
+  // Scenario C: Upcoming Reservation within 45 mins buffer and NO activeSession open
+  if (upcomingRes && !activeSession) {
+    const upcomingStartMin = timeToMinutes(upcomingRes.startTime);
+    if (upcomingStartMin - currentMin < 45) {
+      const allTables = await prisma.diningTable.findMany({
+        where: { restaurantId: table.restaurantId, isActive: true },
+        select: { id: true, tableNo: true, section: true, seats: true, qrToken: true },
+      });
+      const availableTables = allTables.filter((t) => t.id !== table.id);
+
+      return {
+        restaurant: table.restaurant,
+        table: {
+          tableNo: table.tableNo,
+          section: table.section || "Main Floor",
+          seats: table.seats,
+          qrToken: table.qrToken,
+          isReserved: true,
+        },
+        hasUpcomingReservation: true,
+        isReserved: true,
+        message: `This table is reserved starting at ${upcomingRes.startTime}. Dine-in session requires at least 45 minutes buffer. Please select another available table.`,
+        reservationStartTime: upcomingRes.startTime,
+        upcomingReservationDetails: {
+          reservationNo: upcomingRes.reservationNo,
+          startTime: upcomingRes.startTime,
+          endTime: upcomingRes.endTime,
+          customerName: upcomingRes.customerName,
+          guestCount: upcomingRes.guestCount,
+        },
+        availableTables,
+        menu: menuItems,
+      };
+    }
+  }
+
   return {
     restaurant: table.restaurant,
     table: {
@@ -196,6 +300,10 @@ export const resolveQrToken = async (token, prisma) => {
       seats: table.seats,
       qrToken: table.qrToken,
     },
+    upcomingReservation: upcomingRes ? {
+      startTime: upcomingRes.startTime,
+      endTime: upcomingRes.endTime,
+    } : null,
     activeSession: activeSession
       ? {
           sessionId: activeSession.id,
@@ -264,6 +372,52 @@ export const placeQrOrder = async ({
   }
 
   const restaurantId = table.restaurantId;
+
+  // Authoritative Reservation Check before creating new TableSession
+  const existingActiveSession = await prisma.tableSession.findFirst({
+    where: {
+      tableId: table.id,
+      restaurantId: table.restaurantId,
+      status: { in: ["OPEN", "BILLING", "PAID"] },
+    },
+  });
+
+  if (!existingActiveSession) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const reservationsToday = await prisma.reservation.findMany({
+      where: {
+        restaurantId: table.restaurantId,
+        tableId: table.id,
+        reservationDate: { gte: today, lt: tomorrow },
+        status: { in: ["PENDING", "CONFIRMED", "CHECKED_IN", "SEATED"] },
+      },
+    });
+
+    const now = new Date();
+    const currentMin = now.getHours() * 60 + now.getMinutes();
+
+    for (const res of reservationsToday) {
+      const startMin = timeToMinutes(res.startTime);
+      let endMin = timeToMinutes(res.endTime);
+      if (endMin <= startMin) endMin += 1440;
+
+      if (
+        (currentMin >= Math.max(0, startMin - 15) && currentMin < endMin) ||
+        (startMin > currentMin && startMin - currentMin < 45)
+      ) {
+        const err = new Error("This table is reserved for this time slot. Please select another available table.");
+        err.statusCode = 403;
+        err.code = "table_reserved";
+        err.isReserved = true;
+        err.reservationEndTime = res.endTime;
+        throw err;
+      }
+    }
+  }
 
   // 1. Get or create active session for table
   const session = await getOrCreateActiveSession({

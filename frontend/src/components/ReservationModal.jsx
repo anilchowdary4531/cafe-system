@@ -116,8 +116,8 @@ export default function ReservationModal({
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!customerName || !customerPhone || !reservationDate || !startTime || !endTime) {
-            showToast({ title: "Required Fields", message: "Fill name, phone, date, start time, and end time.", variant: "warning" });
+        if (!reservationDate || !startTime || !endTime) {
+            showToast({ title: "Required Fields", message: "Fill date, start time, and end time.", variant: "warning" });
             return;
         }
 
@@ -135,8 +135,8 @@ export default function ReservationModal({
                 startTime,
                 endTime,
                 guestCount: Number(guestCount || 1),
-                customerName: customerName.trim(),
-                customerPhone: customerPhone.trim(),
+                customerName: customerName ? customerName.trim() : "Guest",
+                customerPhone: customerPhone ? customerPhone.trim() : null,
                 customerEmail: customerEmail ? customerEmail.trim() : null,
                 notes: notes ? notes.trim() : null,
                 status,
@@ -197,24 +197,22 @@ export default function ReservationModal({
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">Customer Name *</label>
+                                <label className="block text-xs font-semibold text-gray-300 mb-1">Customer Name (Optional)</label>
                                 <input
                                     type="text"
-                                    placeholder="e.g. Rahul Kumar"
+                                    placeholder="e.g. Rahul Kumar or Guest"
                                     value={customerName}
                                     onChange={(e) => setCustomerName(e.target.value)}
-                                    required
                                     className="w-full rounded-xl border border-white/10 bg-[#111827] px-3.5 py-2 text-sm text-white outline-none focus:border-orange-400"
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">Phone Number *</label>
+                                <label className="block text-xs font-semibold text-gray-300 mb-1">Phone Number (Optional)</label>
                                 <input
                                     type="tel"
                                     placeholder="e.g. 9876543210"
                                     value={customerPhone}
                                     onChange={(e) => setCustomerPhone(e.target.value)}
-                                    required
                                     className="w-full rounded-xl border border-white/10 bg-[#111827] px-3.5 py-2 text-sm text-white outline-none focus:border-orange-400"
                                 />
                             </div>
@@ -239,29 +237,23 @@ export default function ReservationModal({
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-gray-300 mb-1">Start Time *</label>
-                                <select
+                                <input
+                                    type="time"
                                     value={startTime}
                                     onChange={(e) => setStartTime(e.target.value)}
                                     required
                                     className="w-full rounded-xl border border-white/10 bg-[#111827] px-3.5 py-2 text-sm text-white outline-none focus:border-orange-400"
-                                >
-                                    {defaultTimes.map((t) => (
-                                        <option key={t} value={t}>{t}</option>
-                                    ))}
-                                </select>
+                                />
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-gray-300 mb-1">End Time *</label>
-                                <select
+                                <input
+                                    type="time"
                                     value={endTime}
                                     onChange={(e) => setEndTime(e.target.value)}
                                     required
                                     className="w-full rounded-xl border border-white/10 bg-[#111827] px-3.5 py-2 text-sm text-white outline-none focus:border-orange-400"
-                                >
-                                    {defaultTimes.map((t) => (
-                                        <option key={t} value={t}>{t}</option>
-                                    ))}
-                                </select>
+                                />
                             </div>
                         </div>
                     </div>

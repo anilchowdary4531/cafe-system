@@ -1,18 +1,26 @@
 import { getOrCreateActiveSession } from "./tableSessionService.js";
 
 /**
- * Helper to convert "HH:MM" (e.g. "19:30") to total minutes from midnight
+ * Helper to convert "HH:MM" (e.g. "19:30" or "07:30 PM") to total minutes from midnight
  */
-function timeToMinutes(timeStr) {
+export function timeToMinutes(timeStr) {
     if (!timeStr || typeof timeStr !== "string") return 0;
-    const [h, m] = timeStr.split(":").map((n) => parseInt(n, 10) || 0);
+    const str = timeStr.trim().toUpperCase();
+    const isPM = str.includes("PM");
+    const isAM = str.includes("AM");
+    const cleaned = str.replace(/[^\d:]/g, "");
+    const parts = cleaned.split(":");
+    let h = parseInt(parts[0], 10) || 0;
+    const m = parseInt(parts[1], 10) || 0;
+    if (isPM && h < 12) h += 12;
+    if (isAM && h === 12) h = 0;
     return h * 60 + m;
 }
 
 /**
  * 1. CHECK TABLE AVAILABILITY & CONFLICT PREVENTION
  * Checks if table is available for given date, start time, and end time.
- * Enforces turnover buffer minutes (default 15 mins).
+ * Enforces turnover buffer minutes (default 0 for exact slot checks or 15 mins).
  */
 export const checkTableAvailability = async ({
     prisma,
@@ -21,7 +29,7 @@ export const checkTableAvailability = async ({
     date,
     startTime,
     endTime,
-    bufferMinutes = 15,
+    bufferMinutes = 0,
     excludeReservationId = null,
 } = {}) => {
     const rid = Number(restaurantId);
@@ -37,7 +45,7 @@ export const checkTableAvailability = async ({
     const reqStartMin = timeToMinutes(startTime);
     let reqEndMin = timeToMinutes(endTime);
     if (reqEndMin <= reqStartMin) {
-        reqEndMin = reqStartMin + 90; // default 90 min duration if invalid
+        reqEndMin = reqStartMin + 90; // default 90 min duration if invalid or midnight cross
     }
 
     // Apply buffer
@@ -79,7 +87,8 @@ export const checkTableAvailability = async ({
     const conflicting = [];
     for (const res of existingReservations) {
         const resStartMin = timeToMinutes(res.startTime);
-        const resEndMin = timeToMinutes(res.endTime);
+        let resEndMin = timeToMinutes(res.endTime);
+        if (resEndMin <= resStartMin) resEndMin += 1440;
 
         // Interval overlap formula: existing.start < requested.end AND existing.end > requested.start
         if (resStartMin < reqEndWithBuffer && resEndMin > reqStartWithBuffer) {
@@ -121,8 +130,8 @@ export const createReservation = async ({
         startTime,
         endTime,
         guestCount = 1,
-        customerName,
-        customerPhone,
+        customerName = null,
+        customerPhone = null,
         customerEmail = null,
         notes = null,
         source = "POS",
@@ -130,11 +139,14 @@ export const createReservation = async ({
         clientOperationId = null,
     } = data;
 
-    if (!rid || !reservationDate || !startTime || !endTime || !customerName || !customerPhone) {
-        const err = new Error("restaurantId, reservationDate, startTime, endTime, customerName, and customerPhone are required");
+    if (!rid || !reservationDate || !startTime || !endTime) {
+        const err = new Error("restaurantId, reservationDate, startTime, and endTime are required");
         err.code = "invalid_input";
         throw err;
     }
+
+    const safeCustomerName = customerName && String(customerName).trim() ? String(customerName).trim() : "Guest";
+    const safeCustomerPhone = customerPhone && String(customerPhone).trim() ? String(customerPhone).trim() : "0000000000";
 
     // Check clientOperationId idempotency
     if (clientOperationId) {
@@ -177,7 +189,7 @@ export const createReservation = async ({
 
     return await prisma.$transaction(async (tx) => {
         // Auto-link or create Customer by phone
-        const cleanPhone = String(customerPhone).trim();
+        const cleanPhone = safeCustomerPhone;
         let customer = await tx.customer.findUnique({
             where: { restaurantId_phone: { restaurantId: rid, phone: cleanPhone } },
         });
@@ -186,16 +198,16 @@ export const createReservation = async ({
             customer = await tx.customer.create({
                 data: {
                     restaurantId: rid,
-                    name: String(customerName).trim(),
+                    name: safeCustomerName,
                     phone: cleanPhone,
                     email: customerEmail ? String(customerEmail).trim() : null,
                 },
             });
-        } else if (customerName && (!customer.name || customer.name !== String(customerName).trim())) {
+        } else if (customerName && (!customer.name || customer.name !== safeCustomerName)) {
             // Update customer name if provided
             customer = await tx.customer.update({
                 where: { id: customer.id },
-                data: { name: String(customerName).trim() },
+                data: { name: safeCustomerName },
             });
         }
 
@@ -217,7 +229,7 @@ export const createReservation = async ({
                 startTime,
                 endTime,
                 guestCount: Number(guestCount || 1),
-                customerName: String(customerName).trim(),
+                customerName: safeCustomerName,
                 customerPhone: cleanPhone,
                 customerEmail: customerEmail ? String(customerEmail).trim() : null,
                 notes: notes ? String(notes).trim() : null,

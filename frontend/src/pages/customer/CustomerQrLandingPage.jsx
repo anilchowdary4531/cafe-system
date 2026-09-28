@@ -19,6 +19,7 @@ import {
   AlertCircle,
   Users,
   ChevronDown,
+  Calendar,
 } from "lucide-react";
 import { API } from "../../config";
 import { showToast } from "../../utils/toast";
@@ -35,6 +36,12 @@ export default function CustomerQrLandingPage() {
   const [table, setTable] = useState(null);
   const [activeSession, setActiveSession] = useState(null);
   const [menu, setMenu] = useState([]);
+
+  // Reservation restriction state
+  const [isReserved, setIsReserved] = useState(false);
+  const [reservedMessage, setReservedMessage] = useState("");
+  const [reservationDetails, setReservationDetails] = useState(null);
+  const [availableTables, setAvailableTables] = useState([]);
 
   // UI state
   const [searchQuery, setSearchQuery] = useState("");
@@ -76,6 +83,16 @@ export default function CustomerQrLandingPage() {
           setTable(res.data.table);
           setActiveSession(res.data.activeSession);
           setMenu(res.data.menu || []);
+          if (res.data.isReserved) {
+            setIsReserved(true);
+            setReservedMessage(res.data.message || "This table is reserved for this time slot. Please select another available table.");
+            setReservationDetails(res.data.reservationDetails || res.data.upcomingReservationDetails || null);
+            setAvailableTables(res.data.availableTables || []);
+          } else {
+            setIsReserved(false);
+            setReservationDetails(null);
+            setAvailableTables([]);
+          }
         }
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load table ordering session");
@@ -291,6 +308,49 @@ export default function CustomerQrLandingPage() {
         >
           Go to Home
         </button>
+      </div>
+    );
+  }
+
+  if (isReserved) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center p-6 text-center">
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-3xl mb-4 shadow-xl">
+          <Calendar className="w-12 h-12" />
+        </div>
+        <h2 className="text-xl font-extrabold text-white">Table {table?.tableNo} Reserved</h2>
+        <p className="text-sm text-gray-300 mt-2 max-w-sm">
+          {reservedMessage || "This table is reserved for this time slot. Please select another available table."}
+        </p>
+        {reservationDetails?.endTime && (
+          <p className="text-xs text-amber-400 font-semibold mt-2">
+            Reserved Time Slot: {reservationDetails.startTime} – {reservationDetails.endTime}
+          </p>
+        )}
+
+        {/* Available Tables Switcher */}
+        {availableTables.length > 0 ? (
+          <div className="mt-6 w-full max-w-sm bg-gray-900 border border-gray-800 rounded-2xl p-4 text-left space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+              Select An Available Table
+            </h3>
+            <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+              {availableTables.map((t) => (
+                <button
+                  key={t.id || t.tableNo}
+                  type="button"
+                  onClick={() => navigate(`/order/table/${t.qrToken}`)}
+                  className="p-3 bg-gray-950 hover:bg-amber-500/10 hover:border-amber-500/50 text-white rounded-xl border border-gray-800 text-xs font-bold text-center transition flex flex-col items-center"
+                >
+                  <span className="text-amber-400 font-extrabold text-sm">Table {t.tableNo}</span>
+                  <span className="text-[10px] text-gray-400">{t.seats} Seats • {t.section || "Main"}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500 mt-4">No other open tables available right now. Please ask staff for assistance.</p>
+        )}
       </div>
     );
   }
