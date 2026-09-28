@@ -729,26 +729,45 @@ export default async function ownerRoutes(app, deps) {
           const tableResList = Array.from(new Map(combinedRes.map((r) => [r.id, r])).values());
 
           const now = new Date();
+          const localYear = now.getFullYear();
+          const localMonth = String(now.getMonth() + 1).padStart(2, "0");
+          const localDay = String(now.getDate()).padStart(2, "0");
+          const todayStr = `${localYear}-${localMonth}-${localDay}`;
           const currentMin = now.getHours() * 60 + now.getMinutes();
 
           let activeRes = null;
           let upcomingRes = null;
 
           for (const res of tableResList) {
+            if (["COMPLETED", "CANCELLED", "NO_SHOW"].includes(String(res.status || "").toUpperCase())) {
+              continue;
+            }
+
+            const resDateObj = new Date(res.reservationDate);
+            const resYear = resDateObj.getFullYear();
+            const resMonth = String(resDateObj.getMonth() + 1).padStart(2, "0");
+            const resDay = String(resDateObj.getDate()).padStart(2, "0");
+            const resDateStr = `${resYear}-${resMonth}-${resDay}`;
+
+            if (resDateStr < todayStr) continue;
+            if (resDateStr > todayStr) {
+              if (!upcomingRes) upcomingRes = res;
+              continue;
+            }
+
             const startMin = helperTimeToMinutes(res.startTime);
             let endMin = helperTimeToMinutes(res.endTime);
             if (endMin <= startMin) endMin += 1440;
 
+            if (currentMin >= endMin) {
+              continue;
+            }
+
             if (currentMin >= Math.max(0, startMin - 60) && currentMin < endMin) {
-              activeRes = res;
-              break;
+              if (!activeRes) activeRes = res;
             } else if (startMin > currentMin && !upcomingRes) {
               upcomingRes = res;
             }
-          }
-
-          if (!activeRes && tableResList.length > 0) {
-            activeRes = tableResList[0];
           }
 
           const activeItemCount = tableActiveOrders.reduce(
@@ -764,7 +783,7 @@ export default async function ownerRoutes(app, deps) {
           );
 
           const isOccupied = Boolean(activeSession) || tableActiveOrders.length > 0;
-          const isReserved = !isOccupied && (Boolean(activeRes) || tableResList.length > 0);
+          const isReserved = !isOccupied && Boolean(activeRes);
 
           return {
             isOccupied,
