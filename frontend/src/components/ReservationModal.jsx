@@ -168,119 +168,119 @@ export default function ReservationModal({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-            <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-[#0f172a] shadow-2xl text-white overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-slate-900/60">
-                    <div className="flex items-center gap-3">
-                        <div className="rounded-2xl bg-orange-500/20 p-2.5 text-orange-400 border border-orange-500/30">
-                            <Calendar className="h-6 w-6" />
+                <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 px-5 py-3.5 bg-slate-50/70 dark:bg-slate-800/50">
+                    <div className="flex items-center gap-2.5">
+                        <div className="rounded-xl bg-orange-500/10 p-2 text-orange-500 border border-orange-500/20">
+                            <Calendar className="h-5 w-5" />
                         </div>
                         <div>
-                            <h3 className="text-xl font-extrabold tracking-tight">
+                            <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
                                 {reservationToEdit ? `Edit Reservation ${reservationToEdit.reservationNo}` : "New Table Reservation"}
                             </h3>
-                            <p className="text-xs text-gray-400">Book table slots with server-side conflict detection</p>
+                            <p className="text-[11px] theme-muted">Book table slots with real-time conflict check</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-white/10 hover:text-white">
-                        <X className="h-5 w-5" />
+                    <button onClick={onClose} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-white transition">
+                        <X className="h-4 w-4" />
                     </button>
                 </div>
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
-                    {/* Customer Info */}
-                    <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 space-y-3">
-                        <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <User className="h-4 w-4" /> Guest Information
+                {/* Form - Flowing like words on paper */}
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4 space-y-4 text-xs">
+                    {/* Section 1: Guest Information */}
+                    <div className="space-y-2">
+                        <h4 className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-gray-100 dark:border-slate-800">
+                            <User className="h-3.5 w-3.5" /> Guest Information
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">Customer Name (Optional)</label>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Customer Name (Optional)</label>
                                 <input
                                     type="text"
                                     placeholder="e.g. Rahul Kumar or Guest"
                                     value={customerName}
                                     onChange={(e) => setCustomerName(e.target.value)}
-                                    className="w-full rounded-xl border border-white/10 bg-[#111827] px-3.5 py-2 text-sm text-white outline-none focus:border-orange-400"
+                                    className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:border-orange-500 focus:bg-white dark:focus:bg-slate-900 transition"
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">Phone Number (Optional)</label>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Phone Number (Optional)</label>
                                 <input
                                     type="tel"
                                     placeholder="e.g. 9876543210"
                                     value={customerPhone}
                                     onChange={(e) => setCustomerPhone(e.target.value)}
-                                    className="w-full rounded-xl border border-white/10 bg-[#111827] px-3.5 py-2 text-sm text-white outline-none focus:border-orange-400"
+                                    className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:border-orange-500 focus:bg-white dark:focus:bg-slate-900 transition"
                                 />
                             </div>
                         </div>
                     </div>
 
-                    {/* Date & Time Scheduling */}
-                    <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 space-y-3">
-                        <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <Clock className="h-4 w-4" /> Schedule & Time Slot
+                    {/* Section 2: Schedule & Time Slot */}
+                    <div className="space-y-2">
+                        <h4 className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-gray-100 dark:border-slate-800">
+                            <Clock className="h-3.5 w-3.5" /> Schedule & Time Slot
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">Date *</label>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Date *</label>
                                 <input
                                     type="date"
                                     value={reservationDate}
                                     onChange={(e) => setReservationDate(e.target.value)}
                                     required
-                                    className="w-full rounded-xl border border-white/10 bg-[#111827] px-3.5 py-2 text-sm text-white outline-none focus:border-orange-400"
+                                    className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:border-orange-500 focus:bg-white dark:focus:bg-slate-900 transition"
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">Start Time *</label>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Start Time *</label>
                                 <input
                                     type="time"
                                     value={startTime}
                                     onChange={(e) => setStartTime(e.target.value)}
                                     required
-                                    className="w-full rounded-xl border border-white/10 bg-[#111827] px-3.5 py-2 text-sm text-white outline-none focus:border-orange-400"
+                                    className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:border-orange-500 focus:bg-white dark:focus:bg-slate-900 transition"
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">End Time *</label>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">End Time *</label>
                                 <input
                                     type="time"
                                     value={endTime}
                                     onChange={(e) => setEndTime(e.target.value)}
                                     required
-                                    className="w-full rounded-xl border border-white/10 bg-[#111827] px-3.5 py-2 text-sm text-white outline-none focus:border-orange-400"
+                                    className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:border-orange-500 focus:bg-white dark:focus:bg-slate-900 transition"
                                 />
                             </div>
                         </div>
                     </div>
 
-                    {/* Table Assignment & Capacity */}
-                    <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 space-y-3">
-                        <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <Utensils className="h-4 w-4" /> Table Assignment & Guests
+                    {/* Section 3: Table Assignment & Guests */}
+                    <div className="space-y-2">
+                        <h4 className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-gray-100 dark:border-slate-800">
+                            <Utensils className="h-3.5 w-3.5" /> Table Assignment & Guests
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">Guest Count</label>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Guest Count</label>
                                 <input
                                     type="number"
                                     min="1"
                                     max="50"
                                     value={guestCount}
                                     onChange={(e) => setGuestCount(e.target.value)}
-                                    className="w-full rounded-xl border border-white/10 bg-[#111827] px-3.5 py-2 text-sm text-white outline-none focus:border-orange-400"
+                                    className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:border-orange-500 focus:bg-white dark:focus:bg-slate-900 transition"
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">Assign Table (Optional)</label>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Assign Table (Optional)</label>
                                 <select
                                     value={selectedTableId}
                                     onChange={(e) => setSelectedTableId(e.target.value)}
-                                    className="w-full rounded-xl border border-white/10 bg-[#111827] px-3.5 py-2 text-sm text-white outline-none focus:border-orange-400"
+                                    className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:border-orange-500 focus:bg-white dark:focus:bg-slate-900 transition"
                                 >
                                     <option value="">-- Unassigned / Flexible --</option>
                                     {tables.map((t) => (
@@ -292,56 +292,57 @@ export default function ReservationModal({
                             </div>
                         </div>
 
-                        {/* Capacity Exceeded Warning */}
+                        {/* Capacity Warning */}
                         {isCapacityExceeded && (
-                            <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-300">
-                                <AlertCircle className="h-4 w-4 shrink-0" />
+                            <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-2 text-xs text-amber-800 dark:text-amber-300">
+                                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                                 <span>Guest count ({guestCount}) exceeds Table {targetTableObj?.tableNo} capacity ({targetTableObj?.seats} seats).</span>
                             </div>
                         )}
 
                         {/* Availability Feedback */}
                         {checkingAvailability && (
-                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
                                 <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Checking slot availability...
                             </div>
                         )}
 
                         {availabilityResult && !availabilityResult.available && (
-                            <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300 space-y-1">
+                            <div className="rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/30 p-2 text-xs text-red-700 dark:text-red-300 space-y-0.5">
                                 <strong>⚠️ Slot Conflict:</strong> {availabilityResult.message}
                             </div>
                         )}
 
                         {availabilityResult && availabilityResult.available && selectedTableId && (
-                            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-2.5 text-xs text-emerald-300 font-semibold flex items-center gap-2">
+                            <div className="rounded-lg border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 p-2 text-xs text-emerald-700 dark:text-emerald-300 font-medium flex items-center gap-1.5">
                                 <span>✓ Table {targetTableObj?.tableNo} is AVAILABLE for {startTime} – {endTime}.</span>
                             </div>
                         )}
                     </div>
 
-                    {/* Notes & Status */}
-                    <div>
-                        <label className="block text-xs font-semibold text-gray-300 mb-1">Special Notes / Requests</label>
+                    {/* Section 4: Special Notes */}
+                    <div className="pt-1">
+                        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Special Notes / Requests</label>
                         <input
                             type="text"
                             placeholder="e.g. High chair needed, Birthday celebration"
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
-                            className="w-full rounded-xl border border-white/10 bg-[#111827] px-3.5 py-2 text-xs text-white outline-none focus:border-orange-400"
+                            className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:border-orange-500 focus:bg-white dark:focus:bg-slate-900 transition"
                         />
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
-                        <button type="button" onClick={onClose} className="rounded-xl border border-white/20 px-5 py-2.5 text-sm font-semibold text-gray-300 hover:bg-white/5">
+                    {/* Footer Buttons */}
+                    <div className="flex justify-end items-center gap-2 pt-3 border-t border-gray-100 dark:border-slate-800">
+                        <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={submitting || (availabilityResult && !availabilityResult.available)}
-                            className="rounded-xl bg-orange-500 px-6 py-2.5 text-sm font-bold text-black hover:bg-orange-400 disabled:opacity-50 flex items-center gap-2"
+                            className="rounded-xl bg-orange-500 px-5 py-2 text-xs font-bold text-white hover:bg-orange-600 disabled:opacity-50 transition shadow-sm flex items-center gap-1.5"
                         >
-                            {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+                            {submitting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : null}
                             {reservationToEdit ? "Save Changes" : "Confirm Reservation"}
                         </button>
                     </div>
