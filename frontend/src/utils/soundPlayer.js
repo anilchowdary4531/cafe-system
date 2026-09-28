@@ -19,6 +19,41 @@ export const BUILTIN_SOUNDS = [
   { id: "luxury", name: "Luxury Sparkle", type: "builtin", freq: 1318.5 },
 ];
 
+let lastPlayTime = 0;
+let isAudioUnlocked = false;
+
+/**
+ * Prime audio playback context on first user interaction
+ */
+const unlockAudio = () => {
+  if (isAudioUnlocked) return;
+  isAudioUnlocked = true;
+
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
+      if (ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
+      }
+    }
+  } catch {
+    // Ignore unlock errors
+  }
+
+  if (typeof window !== "undefined") {
+    window.removeEventListener("pointerdown", unlockAudio);
+    window.removeEventListener("keydown", unlockAudio);
+    window.removeEventListener("click", unlockAudio);
+  }
+};
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pointerdown", unlockAudio, { once: true });
+  window.addEventListener("keydown", unlockAudio, { once: true });
+  window.addEventListener("click", unlockAudio, { once: true });
+}
+
 /**
  * Play synthesized chime tone using Web Audio API as fallback
  */
@@ -27,6 +62,9 @@ const playSynthesizedChime = (freq = 880) => {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -84,6 +122,13 @@ export const saveSoundConfig = (soundConfig) => {
  * Play current active notification sound
  */
 export const playNotificationSound = (overrideConfig = null) => {
+  const now = Date.now();
+  // Prevent double audio triggers within 150ms
+  if (now - lastPlayTime < 150) {
+    return;
+  }
+  lastPlayTime = now;
+
   const config = overrideConfig || getActiveSoundConfig();
 
   if (!config) return;

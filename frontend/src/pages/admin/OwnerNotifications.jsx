@@ -7,6 +7,7 @@ import {
     subscribeOwnerNotifications,
 } from "../../utils/ownerNotifications";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
+import NotificationSoundPicker from "../../components/NotificationSoundPicker";
 
 const formatTime = (value) => {
     const dt = new Date(value);
@@ -66,6 +67,9 @@ export default function OwnerNotifications() {
                     </button>
                 </div>
             </article>
+
+            {/* Notification Sound Picker & Audio Controller */}
+            <NotificationSoundPicker defaultExpanded={false} />
 
             {notifications.length === 0 ? (
                 <div className="px-2 py-3">

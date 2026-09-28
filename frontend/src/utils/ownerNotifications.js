@@ -1,3 +1,5 @@
+import { playNotificationSound } from "./soundPlayer.js";
+
 const STORAGE_KEY = "owner_notifications_v1";
 const CHANGE_EVENT = "owner-notifications:changed";
 const MAX_NOTIFICATIONS = 100;
@@ -120,6 +122,7 @@ export const appendOwnerNotification = ({
     message = "You have a new update.",
     type = "info",
     read = false,
+    playSound = true,
 } = {}) => {
     const newItem = normalizeOne({
         id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -133,6 +136,11 @@ export const appendOwnerNotification = ({
     const updated = [newItem, ...getOwnerNotifications()].slice(0, MAX_NOTIFICATIONS);
     writeRaw(updated);
     emitChange();
+
+    if (playSound) {
+        playNotificationSound();
+    }
+
     return newItem;
 };
 

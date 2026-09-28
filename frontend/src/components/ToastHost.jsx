@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
+import { playNotificationSound } from "../utils/soundPlayer";
 import { appendOwnerNotification } from "../utils/ownerNotifications";
 
 const DEFAULT_DURATION_MS = 3200;
@@ -39,6 +40,7 @@ export default function ToastHost() {
             };
 
             setToasts((prev) => [...prev.slice(-2), toast]);
+            playNotificationSound();
 
             const pathname = String(window.location?.pathname || "");
             if (pathname.startsWith("/owner")) {
