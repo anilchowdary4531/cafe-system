@@ -1290,11 +1290,12 @@ export default function OwnerLayout() {
 
     return (
         <div className="theme-page flex min-h-screen overflow-x-hidden">
-            {/* Backdrop Overlay */}
+            {/* Transparent backdrop overlay for navigation drawer (click-to-close without dimming) */}
             {sidebarOpen && (
                 <div
-                    className="fixed inset-0 z-40 bg-black/70"
+                    className="fixed inset-0 z-40 bg-transparent"
                     onClick={() => setSidebarOpen(false)}
+                    aria-hidden="true"
                 />
             )}
             {(openOrdersTableKey || openStaffTableKey || openMoreTableKey) && (
@@ -1318,15 +1319,6 @@ export default function OwnerLayout() {
                         setOpenMoreTableKey("");
                         setReceiptActionError("");
                     }}
-                />
-            )}
-
-            {/* Backdrop overlay for navigation drawer */}
-            {sidebarOpen && (
-                <div
-                    className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs transition-opacity"
-                    onClick={() => setSidebarOpen(false)}
-                    aria-hidden="true"
                 />
             )}
 
