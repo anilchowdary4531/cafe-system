@@ -1394,11 +1394,6 @@ export default function OwnerLayout() {
                                         </span>
                                         <span>{item.label}</span>
                                     </div>
-                                    {(isCurrentActive) && (
-                                        <span className="rounded bg-gray-900 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white">
-                                            ACTIVE
-                                        </span>
-                                    )}
                                 </NavLink>
                             );
                         })}
