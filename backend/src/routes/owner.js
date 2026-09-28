@@ -643,24 +643,22 @@ export default async function ownerRoutes(app, deps) {
         return acc;
       }, {});
 
-      const reservationsByTableId = reservationsToday.reduce((acc, res) => {
+      const reservationsByTableId = new Map();
+      const reservationsByTableNo = new Map();
+
+      for (const res of reservationsToday) {
         if (res.tableId) {
           const tid = Number(res.tableId);
-          if (!acc[tid]) acc[tid] = [];
-          acc[tid].push(res);
+          if (!reservationsByTableId.has(tid)) reservationsByTableId.set(tid, []);
+          reservationsByTableId.get(tid).push(res);
         }
-        if (res.table?.tableNo) {
-          const tKey = String(res.table.tableNo).trim().toLowerCase();
-          if (!acc[tKey]) acc[tKey] = [];
-          acc[tKey].push(res);
+        const tNo = res.table?.tableNo || res.tableNo;
+        if (tNo) {
+          const tKey = String(tNo).trim().toLowerCase();
+          if (!reservationsByTableNo.has(tKey)) reservationsByTableNo.set(tKey, []);
+          reservationsByTableNo.get(tKey).push(res);
         }
-        if (res.tableNo) {
-          const tKey = String(res.tableNo).trim().toLowerCase();
-          if (!acc[tKey]) acc[tKey] = [];
-          acc[tKey].push(res);
-        }
-        return acc;
-      }, {});
+      }
 
       const activeOrdersByTable = activeOrders.reduce((acc, order) => {
         const tableKey = String(order.tableNo || "").trim().toLowerCase();
@@ -725,8 +723,8 @@ export default async function ownerRoutes(app, deps) {
           const latestOrder = latestOrderByTable[tableKey] || null;
           const activeSession = activeSessionsByTable[tableKey] || null;
           
-          const resById = reservationsByTableId[table.id] || [];
-          const resByNo = reservationsByTableId[tableKey] || [];
+          const resById = reservationsByTableId.get(Number(table.id)) || [];
+          const resByNo = reservationsByTableNo.get(tableKey) || [];
           const combinedRes = [...resById, ...resByNo];
           const tableResList = Array.from(new Map(combinedRes.map((r) => [r.id, r])).values());
 

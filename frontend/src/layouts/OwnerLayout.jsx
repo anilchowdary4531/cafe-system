@@ -1138,7 +1138,10 @@ export default function OwnerLayout() {
         }
     }, [openOrdersTableKey]);
 
-    const freeTables = Math.max(0, tableOverview.total - tableOverview.occupied);
+    const reservedTables = tableOverview.tables.filter(
+        (t) => resolveTableState(t, printedTableKeys) === TABLE_STATE_KEYS.RESERVED
+    ).length;
+    const freeTables = Math.max(0, tableOverview.total - tableOverview.occupied - reservedTables);
 
     useEffect(() => {
         if (!restaurantId) return;
@@ -1549,6 +1552,11 @@ export default function OwnerLayout() {
                                             </span>
                                             Occupied: {tableOverview.occupied}
                                         </span>
+                                        {reservedTables > 0 && (
+                                            <span className="inline-flex items-center gap-1.5 font-bold text-purple-600 dark:text-purple-400">
+                                                Reserved: {reservedTables}
+                                            </span>
+                                        )}
                                         <span className="inline-flex items-center gap-1.5 font-bold theme-muted">
                                             Free: {freeTables}
                                         </span>
@@ -2199,7 +2207,7 @@ export default function OwnerLayout() {
                                                             <div
                                                                 onClick={(event) => event.stopPropagation()}
                                                                 onMouseDown={(event) => event.stopPropagation()}
-                                                                className={`theme-table-popover absolute right-0 z-[60] w-44 rounded-xl p-2 text-[11px] shadow-2xl transition-opacity duration-150 ${morePopoverYClass}`}
+                                                                className={`theme-table-popover absolute right-0 z-[60] w-48 rounded-xl p-2.5 text-[11px] shadow-2xl transition-opacity duration-150 ${morePopoverYClass}`}
                                                             >
                                                                 <div className="theme-table-order-row rounded-md px-2 py-1.5">
                                                                     <p className="theme-muted text-[10px] uppercase tracking-[0.08em]">
@@ -2212,6 +2220,36 @@ export default function OwnerLayout() {
                                                                             : "s"}
                                                                     </p>
                                                                 </div>
+                                                                {(table.activeReservation || table.upcomingReservation) && (
+                                                                    <div className="mt-2 rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-1.5 text-purple-700 dark:text-purple-300">
+                                                                        <p className="text-[10px] font-bold uppercase tracking-[0.08em] opacity-75">
+                                                                            Reservation Info
+                                                                        </p>
+                                                                        <p className="font-semibold truncate">
+                                                                            {(table.activeReservation || table.upcomingReservation).customerName || "Guest"}
+                                                                        </p>
+                                                                        {(table.activeReservation || table.upcomingReservation).startTime && (
+                                                                            <p className="text-[10px]">
+                                                                                {(table.activeReservation || table.upcomingReservation).startTime} – {(table.activeReservation || table.upcomingReservation).endTime}
+                                                                            </p>
+                                                                        )}
+                                                                        <p className="text-[10px]">
+                                                                            {(table.activeReservation || table.upcomingReservation).guestCount || 1} Guests
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+                                                                {tableStateKey === TABLE_STATE_KEYS.RESERVED && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(event) => {
+                                                                            event.stopPropagation();
+                                                                            navigate("/owner/reservations");
+                                                                        }}
+                                                                        className="theme-button mt-2 w-full rounded-md px-2 py-1 text-[10px] font-semibold text-center transition"
+                                                                    >
+                                                                        View Reservations
+                                                                    </button>
+                                                                )}
                                                                 <button
                                                                     type="button"
                                                                     onClick={(event) => {
