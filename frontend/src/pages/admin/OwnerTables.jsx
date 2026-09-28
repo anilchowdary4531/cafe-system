@@ -793,7 +793,7 @@ export default function OwnerTables() {
                 message: `Session started for Table ${tableNo}`,
                 variant: "success",
             });
-            navigate(`/admin/new-order?table=${encodeURIComponent(tableNo)}`);
+            navigate(`/owner/new-order?table=${encodeURIComponent(tableNo)}`);
         } catch (err) {
             setError(getErrorMessage(err, "Failed to open table session."));
         }
@@ -1130,7 +1130,7 @@ export default function OwnerTables() {
                         <span>📋</span> Grid List View
                     </button>
                     <Link
-                        to="/admin/reservations"
+                        to="/owner/reservations"
                         className="flex items-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-500 transition hover:bg-blue-500/20"
                     >
                         <span>📅</span> Reservations
@@ -1474,7 +1474,7 @@ export default function OwnerTables() {
                                                 ) : (
                                                     <button
                                                         type="button"
-                                                        onClick={(e) => { e.stopPropagation(); navigate(`/admin/new-order?table=${encodeURIComponent(table.tableNo)}`); }}
+                                                        onClick={(e) => { e.stopPropagation(); navigate(`/owner/new-order?table=${encodeURIComponent(table.tableNo)}`); }}
                                                         className="w-full rounded bg-orange-500/80 py-0.5 font-bold text-black hover:bg-orange-400"
                                                     >
                                                         Order
@@ -1763,7 +1763,7 @@ export default function OwnerTables() {
                                                         <>
                                                             <button
                                                                 type="button"
-                                                                onClick={() => navigate(`/admin/new-order?table=${encodeURIComponent(table.tableNo)}`)}
+                                                                onClick={() => navigate(`/owner/new-order?table=${encodeURIComponent(table.tableNo)}`)}
                                                                 className="flex-1 rounded-xl bg-orange-500 px-3 py-2 text-xs font-bold text-black hover:bg-orange-400"
                                                             >
                                                                 + Add Items
