@@ -807,11 +807,15 @@ export default function OwnerLayout() {
         socket.on("order:created", handleNewOrder);
         socket.on("new_order", handleNewOrder);
         socket.on("notification:new", loadTableOverview);
+        socket.on("reservation:updated", loadTableOverview);
+        socket.on("table:updated", loadTableOverview);
 
         return () => {
             socket.off("order:created", handleNewOrder);
             socket.off("new_order", handleNewOrder);
             socket.off("notification:new", loadTableOverview);
+            socket.off("reservation:updated", loadTableOverview);
+            socket.off("table:updated", loadTableOverview);
         };
     }, [loadTableOverview, socket]);
 

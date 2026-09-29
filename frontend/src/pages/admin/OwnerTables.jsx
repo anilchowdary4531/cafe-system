@@ -449,20 +449,26 @@ export default function OwnerTables() {
             });
         };
 
+        const handleReservationChange = () => {
+            loadTables();
+            loadActiveSessions();
+            loadReservations();
+        };
+
         socket.on("table:session_updated", onSessionUpdated);
-        socket.on("table:updated", loadActiveSessions);
+        socket.on("table:updated", handleReservationChange);
         socket.on("table:layout_updated", loadTables);
         socket.on("order:created", loadActiveSessions);
         socket.on("order:updated", loadActiveSessions);
-        socket.on("reservation:updated", loadReservations);
+        socket.on("reservation:updated", handleReservationChange);
 
         return () => {
             socket.off("table:session_updated", onSessionUpdated);
-            socket.off("table:updated", loadActiveSessions);
+            socket.off("table:updated", handleReservationChange);
             socket.off("table:layout_updated", loadTables);
             socket.off("order:created", loadActiveSessions);
             socket.off("order:updated", loadActiveSessions);
-            socket.off("reservation:updated", loadReservations);
+            socket.off("reservation:updated", handleReservationChange);
         };
     }, [socket]);
 
