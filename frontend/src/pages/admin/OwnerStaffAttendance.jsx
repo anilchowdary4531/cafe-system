@@ -15,6 +15,7 @@ import { API } from "../../config";
 import { showToast } from "../../utils/toast";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
 import StaffSubNav from "../../components/StaffSubNav";
+import StaffDirectoryDrawer from "../../components/StaffDirectoryDrawer";
 import { useAuth } from "../../context/AuthContext";
 
 export default function OwnerStaffAttendance() {
@@ -24,6 +25,7 @@ export default function OwnerStaffAttendance() {
     const [attendanceLogs, setAttendanceLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("live"); // "live" | "corrections"
+    const [showDirectoryDrawer, setShowDirectoryDrawer] = useState(false);
 
     const fetchAttendance = async () => {
         if (!restaurantId) return;
@@ -86,7 +88,15 @@ export default function OwnerStaffAttendance() {
 
     return (
         <div className="min-h-screen bg-neutral-50/60 p-4 sm:p-6 lg:p-8 space-y-6">
-            <StaffSubNav />
+            <StaffSubNav
+                onToggleDirectory={() => setShowDirectoryDrawer((prev) => !prev)}
+                isDirectoryOpen={showDirectoryDrawer}
+            />
+            <StaffDirectoryDrawer
+                isOpen={showDirectoryDrawer}
+                onClose={() => setShowDirectoryDrawer(false)}
+                restaurantId={restaurantId}
+            />
             {/* Header Toolbar */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-neutral-200/80">
                 <div className="flex items-center gap-3">

@@ -17,6 +17,7 @@ import { API } from "../../config";
 import { showToast } from "../../utils/toast";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
 import StaffSubNav from "../../components/StaffSubNav";
+import StaffDirectoryDrawer from "../../components/StaffDirectoryDrawer";
 import { useAuth } from "../../context/AuthContext";
 
 export default function OwnerStaffTasks() {
@@ -27,6 +28,7 @@ export default function OwnerStaffTasks() {
     const [staffList, setStaffList] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("CHECKLIST"); // "CHECKLIST" | "ADHOC"
+    const [showDirectoryDrawer, setShowDirectoryDrawer] = useState(false);
 
     const [showModal, setShowModal] = useState(false);
     const [taskForm, setTaskForm] = useState({
@@ -108,7 +110,15 @@ export default function OwnerStaffTasks() {
 
     return (
         <div className="min-h-screen bg-neutral-50/60 p-4 sm:p-6 lg:p-8 space-y-6">
-            <StaffSubNav />
+            <StaffSubNav
+                onToggleDirectory={() => setShowDirectoryDrawer((prev) => !prev)}
+                isDirectoryOpen={showDirectoryDrawer}
+            />
+            <StaffDirectoryDrawer
+                isOpen={showDirectoryDrawer}
+                onClose={() => setShowDirectoryDrawer(false)}
+                restaurantId={restaurantId}
+            />
             {/* Top Toolbar */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-neutral-200/80">
                 <div className="flex items-center gap-3">
