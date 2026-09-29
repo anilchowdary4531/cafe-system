@@ -18,6 +18,7 @@ import {
 import { API } from "../../config";
 import { showToast } from "../../utils/toast";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
+import StaffSubNav from "../../components/StaffSubNav";
 import { useAuth } from "../../context/AuthContext";
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -188,6 +189,7 @@ export default function OwnerStaffSchedules() {
 
     return (
         <div className="min-h-screen bg-neutral-50/60 p-4 sm:p-6 lg:p-8 space-y-6">
+            <StaffSubNav />
             {/* Top Toolbar Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-neutral-200/80">
                 <div className="flex items-center gap-3">

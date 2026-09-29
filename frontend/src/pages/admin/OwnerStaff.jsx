@@ -15,6 +15,7 @@ import {
 import { API } from "../../config";
 import { showToast } from "../../utils/toast";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
+import StaffSubNav from "../../components/StaffSubNav";
 
 const DESIGNATION_OPTIONS = [
     "Chef",
@@ -434,6 +435,7 @@ export default function OwnerStaff() {
 
     return (
         <section className="space-y-5">
+            <StaffSubNav />
             {error && (
                 <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
                     {error}
