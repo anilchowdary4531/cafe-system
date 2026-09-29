@@ -3,78 +3,80 @@ import { Users, Calendar, Clock, CheckSquare } from "lucide-react";
 
 export default function StaffSubNav({ onToggleDirectory, isDirectoryOpen }) {
     return (
-        <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-neutral-200/80 shadow-xs mb-5">
-            {onToggleDirectory ? (
-                <button
-                    type="button"
-                    onClick={onToggleDirectory}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all ${
-                        isDirectoryOpen
-                            ? "bg-orange-600 text-white shadow-sm"
-                            : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 border border-neutral-200"
-                    }`}
-                >
-                    <Users size={16} />
-                    {isDirectoryOpen ? "Hide Staff Directory" : "Staff Directory"}
-                </button>
-            ) : (
+        <nav className="border-b border-[color:var(--app-border)]/50 overflow-x-auto scrollbar-none">
+            <div className="flex min-w-max gap-1">
+                {onToggleDirectory ? (
+                    <button
+                        type="button"
+                        onClick={onToggleDirectory}
+                        className={`relative px-3.5 py-2 text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                            isDirectoryOpen
+                                ? "text-[var(--app-primary)] border-b-2 border-[var(--app-primary)] font-bold"
+                                : "theme-muted hover:text-[color:var(--app-text)]"
+                        }`}
+                    >
+                        <Users size={14} />
+                        {isDirectoryOpen ? "Hide Staff Directory" : "Staff Directory"}
+                    </button>
+                ) : (
+                    <NavLink
+                        to="/owner/staff"
+                        end
+                        className={({ isActive }) =>
+                            `relative px-3.5 py-2 text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                                isActive
+                                    ? "text-[var(--app-primary)] border-b-2 border-[var(--app-primary)] font-bold"
+                                    : "theme-muted hover:text-[color:var(--app-text)]"
+                            }`
+                        }
+                    >
+                        <Users size={14} />
+                        Staff Directory
+                    </NavLink>
+                )}
+
                 <NavLink
                     to="/owner/staff"
-                    end
                     className={({ isActive }) =>
-                        `flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all ${
-                            isActive
-                                ? "bg-orange-600 text-white shadow-sm"
-                                : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
+                        `relative px-3.5 py-2 text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                            isActive || window.location.pathname.startsWith("/owner/staff-schedules")
+                                ? "text-[var(--app-primary)] border-b-2 border-[var(--app-primary)] font-bold"
+                                : "theme-muted hover:text-[color:var(--app-text)]"
                         }`
                     }
                 >
-                    <Users size={16} />
-                    Staff Directory
+                    <Calendar size={14} />
+                    Shift Schedules (7shifts)
                 </NavLink>
-            )}
 
-            <NavLink
-                to="/owner/staff"
-                className={({ isActive }) =>
-                    `flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all ${
-                        isActive || window.location.pathname.startsWith("/owner/staff-schedules")
-                            ? "bg-orange-600 text-white shadow-sm"
-                            : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
-                    }`
-                }
-            >
-                <Calendar size={16} />
-                Shift Schedules (7shifts)
-            </NavLink>
+                <NavLink
+                    to="/owner/staff-attendance"
+                    className={({ isActive }) =>
+                        `relative px-3.5 py-2 text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                            isActive
+                                ? "text-[var(--app-primary)] border-b-2 border-[var(--app-primary)] font-bold"
+                                : "theme-muted hover:text-[color:var(--app-text)]"
+                        }`
+                    }
+                >
+                    <Clock size={14} />
+                    Attendance & Time Clock
+                </NavLink>
 
-            <NavLink
-                to="/owner/staff-attendance"
-                className={({ isActive }) =>
-                    `flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all ${
-                        isActive
-                            ? "bg-orange-600 text-white shadow-sm"
-                            : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
-                    }`
-                }
-            >
-                <Clock size={16} />
-                Attendance & Time Clock
-            </NavLink>
-
-            <NavLink
-                to="/owner/staff-tasks"
-                className={({ isActive }) =>
-                    `flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all ${
-                        isActive
-                            ? "bg-orange-600 text-white shadow-sm"
-                            : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
-                    }`
-                }
-            >
-                <CheckSquare size={16} />
-                Tasks & Checklists
-            </NavLink>
-        </div>
+                <NavLink
+                    to="/owner/staff-tasks"
+                    className={({ isActive }) =>
+                        `relative px-3.5 py-2 text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                            isActive
+                                ? "text-[var(--app-primary)] border-b-2 border-[var(--app-primary)] font-bold"
+                                : "theme-muted hover:text-[color:var(--app-text)]"
+                        }`
+                    }
+                >
+                    <CheckSquare size={14} />
+                    Tasks & Checklists
+                </NavLink>
+            </div>
+        </nav>
     );
 }

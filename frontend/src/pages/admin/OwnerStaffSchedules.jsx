@@ -190,7 +190,86 @@ export default function OwnerStaffSchedules() {
     };
 
     return (
-        <div data-testid="owner-staff" className="min-h-screen bg-neutral-50/60 p-4 sm:p-6 lg:p-8 space-y-6">
+        <section data-testid="owner-staff" className="space-y-4 font-sans text-sm text-[color:var(--app-text)] pb-12">
+            {/* Top Toolbar Header Console Bar */}
+            <header className="pb-3 border-b border-[color:var(--app-border)]/50">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <div className="flex items-center gap-3">
+                            <OwnerMenuButton />
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl">
+                                    Shift Schedules
+                                </h2>
+                                <span className="inline-flex items-center rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-semibold text-[var(--app-primary)]">
+                                    7SHIFTS PLANNER
+                                </span>
+                            </div>
+                        </div>
+                        <p className="theme-muted text-xs mt-0.5">
+                            Plan and publish weekly & monthly staff shifts (7shifts style)
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                        {/* View Switcher Pills */}
+                        <div className="inline-flex items-center rounded-lg border border-[color:var(--app-border)] p-0.5 bg-[color:var(--app-bg)]/50">
+                            <button
+                                type="button"
+                                onClick={() => setViewMode("weekly")}
+                                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                                    viewMode === "weekly"
+                                        ? "bg-[var(--app-primary)] text-white shadow-sm"
+                                        : "theme-muted hover:text-[color:var(--app-text)] hover:bg-[color:var(--app-border)]/30"
+                                }`}
+                            >
+                                Weekly
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setViewMode("monthly")}
+                                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                                    viewMode === "monthly"
+                                        ? "bg-[var(--app-primary)] text-white shadow-sm"
+                                        : "theme-muted hover:text-[color:var(--app-text)] hover:bg-[color:var(--app-border)]/30"
+                                }`}
+                            >
+                                Monthly
+                            </button>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={handleCopyPreviousWeek}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--app-border)] px-2.5 py-1 text-xs font-semibold theme-muted hover:text-[color:var(--app-text)] hover:bg-[color:var(--app-border)]/30 transition-all"
+                            title="Copy shifts from last week"
+                        >
+                            <Copy size={13} />
+                            Copy Last Week
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handlePublishSchedules}
+                            disabled={publishing}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-orange-700 transition-all disabled:opacity-50"
+                        >
+                            <Send size={13} />
+                            {publishing ? "Publishing..." : "Publish Schedule"}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => handleOpenShiftModal()}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-neutral-800 transition-all"
+                        >
+                            <Plus size={13} />
+                            Add Shift
+                        </button>
+                    </div>
+                </div>
+            </header>
+
             <StaffSubNav
                 onToggleDirectory={() => setShowDirectoryDrawer((prev) => !prev)}
                 isDirectoryOpen={showDirectoryDrawer}
@@ -200,105 +279,44 @@ export default function OwnerStaffSchedules() {
                 onClose={() => setShowDirectoryDrawer(false)}
                 restaurantId={restaurantId}
             />
-            {/* Top Toolbar Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-neutral-200/80">
-                <div className="flex items-center gap-3">
-                    <OwnerMenuButton />
-                    <div>
-                        <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 flex items-center gap-2">
-                            <CalendarIcon className="w-6 h-6 text-orange-600" />
-                            Shift Schedules
-                        </h1>
-                        <p className="text-xs sm:text-sm text-neutral-500">
-                            Plan and publish weekly & monthly staff shifts (7shifts style)
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                    {/* View Switcher */}
-                    <div className="flex items-center bg-neutral-100 p-1 rounded-xl border border-neutral-200">
-                        <button
-                            onClick={() => setViewMode("weekly")}
-                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                                viewMode === "weekly" ? "bg-white text-orange-600 shadow-sm" : "text-neutral-600 hover:text-neutral-900"
-                            }`}
-                        >
-                            Weekly
-                        </button>
-                        <button
-                            onClick={() => setViewMode("monthly")}
-                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                                viewMode === "monthly" ? "bg-white text-orange-600 shadow-sm" : "text-neutral-600 hover:text-neutral-900"
-                            }`}
-                        >
-                            Monthly
-                        </button>
-                    </div>
-
-                    <button
-                        onClick={handleCopyPreviousWeek}
-                        className="px-3 py-2 text-xs font-medium text-neutral-700 bg-white border border-neutral-200 rounded-xl hover:bg-neutral-50 transition-colors flex items-center gap-1.5"
-                        title="Copy shifts from last week"
-                    >
-                        <Copy className="w-3.5 h-3.5" />
-                        Copy Last Week
-                    </button>
-
-                    <button
-                        onClick={handlePublishSchedules}
-                        disabled={publishing}
-                        className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                        <Send className="w-3.5 h-3.5" />
-                        {publishing ? "Publishing..." : "Publish Schedule"}
-                    </button>
-
-                    <button
-                        onClick={() => handleOpenShiftModal()}
-                        className="px-4 py-2 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-xl shadow-sm transition-all flex items-center gap-1.5"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Add Shift
-                    </button>
-                </div>
-            </div>
 
             {/* Date Navigation & Period Label */}
-            <div className="flex items-center justify-between bg-white p-3 px-5 rounded-xl border border-neutral-200/80 shadow-xs">
+            <div className="flex items-center justify-between py-1 text-xs theme-muted">
                 <div className="flex items-center gap-2">
                     <button
+                        type="button"
                         onClick={handlePrevPeriod}
-                        className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-600 transition-colors"
+                        className="p-1 hover:bg-[color:var(--app-border)]/30 rounded text-[color:var(--app-text)] transition-colors"
                     >
-                        <ChevronLeft className="w-5 h-5" />
+                        <ChevronLeft className="w-4 h-4" />
                     </button>
                     <button
+                        type="button"
                         onClick={handleNextPeriod}
-                        className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-600 transition-colors"
+                        className="p-1 hover:bg-[color:var(--app-border)]/30 rounded text-[color:var(--app-text)] transition-colors"
                     >
-                        <ChevronRight className="w-5 h-5" />
+                        <ChevronRight className="w-4 h-4" />
                     </button>
-                    <span className="text-sm font-semibold text-neutral-900">
+                    <span className="font-semibold text-[color:var(--app-text)]">
                         {weekDates[0]?.toLocaleDateString("en-IN", { month: "short", day: "numeric" })} - {" "}
                         {weekDates[6]?.toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}
                     </span>
                 </div>
-                <div className="text-xs text-neutral-500 font-medium">
-                    Total Shifts: <span className="font-bold text-neutral-800">{shifts.length}</span>
+                <div className="font-medium theme-muted">
+                    Total Shifts: <strong className="text-[color:var(--app-text)]">{shifts.length}</strong>
                 </div>
             </div>
 
             {/* 7shifts-inspired Weekly Grid View */}
-            <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm overflow-x-auto">
+            <div className="overflow-x-auto border-t border-b border-[color:var(--app-border)]/50">
                 <table className="w-full min-w-[900px] border-collapse">
                     <thead>
-                        <tr className="bg-neutral-50/80 border-b border-neutral-200 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                            <th className="p-4 w-48 border-r border-neutral-200">Staff Member</th>
+                        <tr className="bg-[color:var(--app-bg)]/50 border-b border-[color:var(--app-border)]/50 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
+                            <th className="p-3 w-48 border-r border-[color:var(--app-border)]/40">Staff Member</th>
                             {weekDates.map((dateObj, idx) => (
-                                <th key={idx} className="p-3 text-center border-r border-neutral-200/60 last:border-r-0">
-                                    <div className="text-neutral-800 font-bold">{DAYS_OF_WEEK[idx]}</div>
-                                    <div className="text-[11px] text-neutral-500 font-normal">
+                                <th key={idx} className="p-2.5 text-center border-r border-[color:var(--app-border)]/40 last:border-r-0">
+                                    <div className="text-[color:var(--app-text)] font-bold">{DAYS_OF_WEEK[idx]}</div>
+                                    <div className="text-[11px] theme-muted font-normal">
                                         {dateObj.toLocaleDateString("en-IN", { month: "short", day: "numeric" })}
                                     </div>
                                 </th>
@@ -508,6 +526,6 @@ export default function OwnerStaffSchedules() {
                     </div>
                 </div>
             )}
-        </div>
+        </section>
     );
 }

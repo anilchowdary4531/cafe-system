@@ -87,7 +87,46 @@ export default function OwnerStaffAttendance() {
     };
 
     return (
-        <div className="min-h-screen bg-neutral-50/60 p-4 sm:p-6 lg:p-8 space-y-6">
+        <section className="space-y-4 font-sans text-sm text-[color:var(--app-text)] pb-12">
+            {/* Header Console Bar */}
+            <header className="pb-3 border-b border-[color:var(--app-border)]/50">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <div className="flex items-center gap-3">
+                            <OwnerMenuButton />
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl">
+                                    Attendance & Time Clock
+                                </h2>
+                                <span className="inline-flex items-center rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-semibold text-[var(--app-primary)]">
+                                    LIVE MONITOR
+                                </span>
+                            </div>
+                        </div>
+                        <p className="theme-muted text-xs mt-0.5">
+                            Track live staff clock-ins, GPS verification, and correction requests
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={exportToExcel}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--app-border)] px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50/50 transition-all"
+                        >
+                            <FileSpreadsheet size={13} /> Export Excel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={exportToPDF}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--app-border)] px-2.5 py-1 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50/50 transition-all"
+                        >
+                            <FileText size={13} /> Export PDF
+                        </button>
+                    </div>
+                </div>
+            </header>
+
             <StaffSubNav
                 onToggleDirectory={() => setShowDirectoryDrawer((prev) => !prev)}
                 isDirectoryOpen={showDirectoryDrawer}
@@ -97,92 +136,58 @@ export default function OwnerStaffAttendance() {
                 onClose={() => setShowDirectoryDrawer(false)}
                 restaurantId={restaurantId}
             />
-            {/* Header Toolbar */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-neutral-200/80">
-                <div className="flex items-center gap-3">
-                    <OwnerMenuButton />
+
+            {/* Summary KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 rounded-lg border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)]/50 flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 flex items-center gap-2">
-                            <Clock className="w-6 h-6 text-orange-600" />
-                            Attendance & Time Clock
-                        </h1>
-                        <p className="text-xs sm:text-sm text-neutral-500">
-                            Track live staff clock-ins, GPS verification, and correction requests
-                        </p>
+                        <div className="text-xs font-medium theme-muted">Currently On Duty</div>
+                        <div className="text-xl font-bold text-[color:var(--app-text)]">{onDutyCount}</div>
                     </div>
+                    <UserCheck className="w-5 h-5 text-emerald-500" />
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={exportToExcel}
-                        className="px-3.5 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-xl transition-colors flex items-center gap-1.5"
-                    >
-                        <FileSpreadsheet className="w-4 h-4" /> Export Excel
-                    </button>
-                    <button
-                        onClick={exportToPDF}
-                        className="px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 rounded-xl transition-colors flex items-center gap-1.5"
-                    >
-                        <FileText className="w-4 h-4" /> Export PDF
-                    </button>
-                </div>
-            </div>
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-white p-5 rounded-2xl border border-neutral-200/80 shadow-xs flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-emerald-100 text-emerald-700 font-bold">
-                        <UserCheck className="w-6 h-6" />
-                    </div>
+                <div className="p-3 rounded-lg border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)]/50 flex items-center justify-between">
                     <div>
-                        <div className="text-2xl font-black text-neutral-900">{onDutyCount}</div>
-                        <div className="text-xs text-neutral-500 font-medium">Currently On Duty</div>
+                        <div className="text-xs font-medium theme-muted">Pending Corrections</div>
+                        <div className="text-xl font-bold text-[color:var(--app-text)]">{pendingCorrections.length}</div>
                     </div>
+                    <AlertCircle className="w-5 h-5 text-amber-500" />
                 </div>
 
-                <div className="bg-white p-5 rounded-2xl border border-neutral-200/80 shadow-xs flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-amber-100 text-amber-700 font-bold">
-                        <AlertCircle className="w-6 h-6" />
-                    </div>
+                <div className="p-3 rounded-lg border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)]/50 flex items-center justify-between">
                     <div>
-                        <div className="text-2xl font-black text-neutral-900">{pendingCorrections.length}</div>
-                        <div className="text-xs text-neutral-500 font-medium">Pending Corrections</div>
-                    </div>
-                </div>
-
-                <div className="bg-white p-5 rounded-2xl border border-neutral-200/80 shadow-xs flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-orange-100 text-orange-700 font-bold">
-                        <Clock className="w-6 h-6" />
-                    </div>
-                    <div>
-                        <div className="text-2xl font-black text-neutral-900">
+                        <div className="text-xs font-medium theme-muted">Total Hours Tracked</div>
+                        <div className="text-xl font-bold text-[color:var(--app-text)]">
                             {(attendanceLogs.reduce((acc, l) => acc + (l.totalMinutes || 0), 0) / 60).toFixed(1)} hrs
                         </div>
-                        <div className="text-xs text-neutral-500 font-medium">Total Hours Tracked</div>
                     </div>
+                    <Clock className="w-5 h-5 text-orange-500" />
                 </div>
             </div>
 
-            {/* Tabs & Table Container */}
-            <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm overflow-hidden">
-                <div className="flex border-b border-neutral-200 px-6 pt-4 gap-6 text-sm font-semibold">
+            {/* Sub-tabs & Table Container */}
+            <div className="border-t border-b border-[color:var(--app-border)]/50 overflow-hidden">
+                <div className="flex border-b border-[color:var(--app-border)]/40 gap-4 text-xs font-semibold">
                     <button
+                        type="button"
                         onClick={() => setActiveTab("live")}
-                        className={`pb-3 border-b-2 transition-all ${
-                            activeTab === "live" ? "border-orange-600 text-orange-600" : "border-transparent text-neutral-500 hover:text-neutral-900"
+                        className={`py-2 border-b-2 transition-all ${
+                            activeTab === "live" ? "border-orange-500 text-orange-600 font-bold" : "border-transparent theme-muted hover:text-[color:var(--app-text)]"
                         }`}
                     >
                         Live Attendance Logs ({attendanceLogs.length})
                     </button>
                     <button
+                        type="button"
                         onClick={() => setActiveTab("corrections")}
-                        className={`pb-3 border-b-2 transition-all flex items-center gap-2 ${
-                            activeTab === "corrections" ? "border-orange-600 text-orange-600" : "border-transparent text-neutral-500 hover:text-neutral-900"
+                        className={`py-2 border-b-2 transition-all flex items-center gap-1.5 ${
+                            activeTab === "corrections" ? "border-orange-500 text-orange-600 font-bold" : "border-transparent theme-muted hover:text-[color:var(--app-text)]"
                         }`}
                     >
                         Correction Requests
                         {pendingCorrections.length > 0 && (
-                            <span className="bg-orange-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                            <span className="bg-orange-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">
                                 {pendingCorrections.length}
                             </span>
                         )}
@@ -193,16 +198,16 @@ export default function OwnerStaffAttendance() {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-neutral-50/80 border-b border-neutral-200 text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                                    <th className="p-4">Staff Member</th>
-                                    <th className="p-4">Clock In</th>
-                                    <th className="p-4">Clock Out</th>
-                                    <th className="p-4">Duration</th>
-                                    <th className="p-4">GPS Geofence</th>
-                                    <th className="p-4">Status</th>
+                                <tr className="bg-[color:var(--app-bg)]/50 border-b border-[color:var(--app-border)]/50 text-xs font-semibold text-neutral-600 uppercase tracking-wider">
+                                    <th className="p-3">Staff Member</th>
+                                    <th className="p-3">Clock In</th>
+                                    <th className="p-3">Clock Out</th>
+                                    <th className="p-3">Duration</th>
+                                    <th className="p-3">GPS Geofence</th>
+                                    <th className="p-3">Status</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-neutral-200/70 text-xs sm:text-sm">
+                            <tbody className="divide-y divide-[color:var(--app-border)]/30 text-xs sm:text-sm">
                                 {loading ? (
                                     <tr>
                                         <td colSpan={6} className="p-8 text-center text-neutral-400">Loading attendance...</td>
@@ -213,23 +218,23 @@ export default function OwnerStaffAttendance() {
                                     </tr>
                                 ) : (
                                     attendanceLogs.map((log) => (
-                                        <tr key={log.id} className="hover:bg-neutral-50/50">
-                                            <td className="p-4 font-semibold text-neutral-900">
+                                        <tr key={log.id} className="hover:bg-[color:var(--app-bg)]/40">
+                                            <td className="p-3 font-semibold text-[color:var(--app-text)]">
                                                 <div>{log.user?.name}</div>
-                                                <div className="text-xs font-normal text-neutral-500">{log.user?.designation || log.user?.role}</div>
+                                                <div className="text-xs font-normal theme-muted">{log.user?.designation || log.user?.role}</div>
                                             </td>
-                                            <td className="p-4 text-neutral-700 font-medium">
+                                            <td className="p-3 theme-muted font-medium">
                                                 {new Date(log.clockInTime).toLocaleString("en-IN", { hour: "numeric", minute: "2-digit", day: "numeric", month: "short" })}
                                             </td>
-                                            <td className="p-4 text-neutral-700 font-medium">
+                                            <td className="p-3 theme-muted font-medium">
                                                 {log.clockOutTime
                                                     ? new Date(log.clockOutTime).toLocaleString("en-IN", { hour: "numeric", minute: "2-digit", day: "numeric", month: "short" })
                                                     : <span className="text-emerald-600 font-bold">Active On Duty</span>}
                                             </td>
-                                            <td className="p-4 font-semibold text-neutral-800">
+                                            <td className="p-3 font-semibold text-[color:var(--app-text)]">
                                                 {(log.totalMinutes / 60).toFixed(2)} hrs
                                             </td>
-                                            <td className="p-4">
+                                            <td className="p-3">
                                                 {log.isGeofenced ? (
                                                     <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-xs font-semibold border border-emerald-200">
                                                         <MapPin className="w-3 h-3" /> Geofenced
@@ -240,7 +245,7 @@ export default function OwnerStaffAttendance() {
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="p-4">
+                                            <td className="p-3">
                                                 <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                                                     log.status === "ON_DUTY"
                                                         ? "bg-emerald-100 text-emerald-800"
@@ -256,29 +261,31 @@ export default function OwnerStaffAttendance() {
                         </table>
                     </div>
                 ) : (
-                    <div className="p-6 space-y-4">
+                    <div className="py-4 space-y-3">
                         {pendingCorrections.length === 0 ? (
                             <div className="text-center py-8 text-neutral-400 text-sm">No pending correction requests.</div>
                         ) : (
                             pendingCorrections.map((corr) => (
-                                <div key={corr.id} className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                <div key={corr.id} className="p-3 rounded-lg border border-[color:var(--app-border)]/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                     <div>
-                                        <div className="font-bold text-neutral-900 text-sm">{corr.user?.name}</div>
-                                        <div className="text-xs text-neutral-600 mt-0.5">
+                                        <div className="font-bold text-[color:var(--app-text)] text-xs">{corr.user?.name}</div>
+                                        <div className="text-xs theme-muted mt-0.5">
                                             Requested: {new Date(corr.requestedIn).toLocaleTimeString()} - {new Date(corr.requestedOut).toLocaleTimeString()}
                                         </div>
-                                        <div className="text-xs italic text-neutral-500 mt-1">Reason: "{corr.reason}"</div>
+                                        <div className="text-xs italic theme-muted mt-0.5">Reason: "{corr.reason}"</div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button
+                                            type="button"
                                             onClick={() => handleReviewCorrection(corr.id, true)}
-                                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1"
+                                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
                                         >
                                             <CheckCircle2 className="w-3.5 h-3.5" /> Approve
                                         </button>
                                         <button
+                                            type="button"
                                             onClick={() => handleReviewCorrection(corr.id, false)}
-                                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1"
+                                            className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
                                         >
                                             <XCircle className="w-3.5 h-3.5" /> Reject
                                         </button>
@@ -289,6 +296,6 @@ export default function OwnerStaffAttendance() {
                     </div>
                 )}
             </div>
-        </div>
+        </section>
     );
 }
