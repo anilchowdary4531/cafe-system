@@ -278,11 +278,15 @@ export default function ReservationModal({
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Assign Table (Optional)</label>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Assign Table (Select for Dashboard grid reservation)</label>
                                 <select
                                     value={selectedTableId}
                                     onChange={(e) => setSelectedTableId(e.target.value)}
-                                    className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:border-orange-500 focus:bg-white dark:focus:bg-slate-900 transition"
+                                    className={`w-full rounded-xl border px-3 py-1.5 text-xs outline-none transition ${
+                                        selectedTableId
+                                            ? "border-emerald-500/60 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-white"
+                                            : "border-amber-400/60 bg-amber-500/5 dark:bg-amber-950/20 text-slate-900 dark:text-white"
+                                    }`}
                                 >
                                     <option value="">-- Unassigned / Flexible --</option>
                                     {tables.map((t) => (
@@ -293,6 +297,13 @@ export default function ReservationModal({
                                 </select>
                             </div>
                         </div>
+
+                        {!selectedTableId && (
+                            <div className="rounded-lg border border-amber-300/50 bg-amber-50 dark:bg-amber-950/20 p-2 text-[11px] text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                                <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                                <span>Notice: Table is unassigned. Assign a specific table so it turns purple on the main Dashboard table grid during reservation time.</span>
+                            </div>
+                        )}
 
                         {/* Capacity Warning */}
                         {isCapacityExceeded && (

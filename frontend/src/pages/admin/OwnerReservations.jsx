@@ -318,6 +318,38 @@ export default function OwnerReservations() {
         }
     };
 
+    const handleQuickAssignTable = async (res, targetTableId) => {
+        if (!targetTableId) return;
+        const selectedT = tables.find(t => t.id === Number(targetTableId));
+        try {
+            const dateStr = new Date(res.reservationDate).toISOString().split("T")[0];
+            const payload = {
+                tableId: Number(targetTableId),
+                reservationDate: dateStr,
+                startTime: res.startTime,
+                endTime: res.endTime,
+                guestCount: Number(res.guestCount || 1),
+                customerName: res.customerName,
+                customerPhone: res.customerPhone,
+                customerEmail: res.customerEmail,
+                notes: res.notes,
+                status: res.status,
+            };
+            const apiRes = await axios.put(`${API}/owner/${restaurantId}/reservations/${res.id}`, payload);
+            if (apiRes.data?.success) {
+                showToast({
+                    title: "Table Assigned",
+                    message: `${res.reservationNo} assigned to Table ${selectedT?.tableNo || targetTableId}`,
+                    variant: "success",
+                });
+                fetchReservationsAndTables();
+            }
+        } catch (err) {
+            const errMsg = err.response?.data?.message || err.message || "Failed to assign table.";
+            showToast({ title: "Table Assignment Error", message: errMsg, variant: "error" });
+        }
+    };
+
     const handlePrintSlip = (res) => {
         const printWindow = window.open("", "_blank");
         if (!printWindow) return;
@@ -622,9 +654,24 @@ export default function OwnerReservations() {
                                             <span>Time Slot:</span>
                                             <strong className="text-orange-500 font-bold">{res.startTime} – {res.endTime}</strong>
                                         </div>
-                                        <div className="flex justify-between theme-muted">
+                                        <div className="flex justify-between items-center theme-muted">
                                             <span>Table:</span>
-                                            <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{res.table ? `Table ${res.table.tableNo} (${res.table.seats} seats)` : "Unassigned"}</strong>
+                                            {res.table ? (
+                                                <strong className="text-emerald-600 dark:text-emerald-400 font-bold">Table {res.table.tableNo} ({res.table.seats} seats)</strong>
+                                            ) : (
+                                                <select
+                                                    value=""
+                                                    onChange={(e) => handleQuickAssignTable(res, e.target.value)}
+                                                    className="rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40 text-[10px] font-bold px-1.5 py-0.5 outline-none cursor-pointer hover:bg-amber-500/25 transition"
+                                                >
+                                                    <option value="" disabled>⚡ Assign Table</option>
+                                                    {tables.map((t) => (
+                                                        <option key={t.id} value={t.id}>
+                                                            Table {t.tableNo} ({t.seats}s)
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
                                         </div>
                                         {res.notes && (
                                             <div className="text-[10px] theme-muted truncate pt-0.5 border-t border-[color:var(--app-border)]/30">

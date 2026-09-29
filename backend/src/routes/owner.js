@@ -744,10 +744,17 @@ export default async function ownerRoutes(app, deps) {
             }
 
             const resDateObj = new Date(res.reservationDate);
-            const resYear = resDateObj.getFullYear();
-            const resMonth = String(resDateObj.getMonth() + 1).padStart(2, "0");
-            const resDay = String(resDateObj.getDate()).padStart(2, "0");
-            const resDateStr = `${resYear}-${resMonth}-${resDay}`;
+            const resYearUTC = resDateObj.getUTCFullYear();
+            const resMonthUTC = String(resDateObj.getUTCMonth() + 1).padStart(2, "0");
+            const resDayUTC = String(resDateObj.getUTCDate()).padStart(2, "0");
+            const resDateStrUTC = `${resYearUTC}-${resMonthUTC}-${resDayUTC}`;
+
+            const resYearLoc = resDateObj.getFullYear();
+            const resMonthLoc = String(resDateObj.getMonth() + 1).padStart(2, "0");
+            const resDayLoc = String(resDateObj.getDate()).padStart(2, "0");
+            const resDateStrLoc = `${resYearLoc}-${resMonthLoc}-${resDayLoc}`;
+
+            const resDateStr = (resDateStrUTC === todayStr || resDateStrLoc === todayStr) ? todayStr : resDateStrUTC;
 
             if (resDateStr < todayStr) continue;
             if (resDateStr > todayStr) {
