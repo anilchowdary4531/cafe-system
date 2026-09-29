@@ -26,8 +26,11 @@ import {
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -91,6 +94,8 @@ export default function OwnerReports() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
+  const [itemChartMetric, setItemChartMetric] = useState("qty");
+
 
   const handlePresetSelect = (preset) => {
     setDatePreset(preset.label);
@@ -384,6 +389,226 @@ export default function OwnerReports() {
               </div>
             </div>
           )}
+
+          {/* ITEM SALES BAR CHART */}
+          {activeTab === "items" && reportData.items && reportData.items.length > 0 && (
+            <div className="py-4 border-b border-[color:var(--app-border)]/40 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <BarChart3 size={16} className="text-amber-500" />
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--app-primary)]">
+                      Item Performance Visualizer (Bar Graph)
+                    </h3>
+                  </div>
+                  <p className="theme-muted text-[11px] mt-0.5">
+                    Visual comparison of sales quantity and gross revenue for each menu item.
+                  </p>
+                </div>
+
+                <div className="inline-flex items-center rounded-lg border border-[color:var(--app-border)] p-0.5 bg-[color:var(--app-bg)]/50 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setItemChartMetric("qty")}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                      itemChartMetric === "qty"
+                        ? "bg-[var(--app-primary)] text-white shadow-xs"
+                        : "theme-muted hover:text-[color:var(--app-text)]"
+                    }`}
+                  >
+                    Quantity Sold (Qty)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setItemChartMetric("grossSales")}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                      itemChartMetric === "grossSales"
+                        ? "bg-[var(--app-primary)] text-white shadow-xs"
+                        : "theme-muted hover:text-[color:var(--app-text)]"
+                    }`}
+                  >
+                    Gross Sales (₹)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setItemChartMetric("both")}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                      itemChartMetric === "both"
+                        ? "bg-[var(--app-primary)] text-white shadow-xs"
+                        : "theme-muted hover:text-[color:var(--app-text)]"
+                    }`}
+                  >
+                    Dual View
+                  </button>
+                </div>
+              </div>
+
+              <div className="h-72 w-full pt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={reportData.items}
+                    margin={{ top: 15, right: 15, left: 10, bottom: 45 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--app-border)" opacity={0.3} />
+                    <XAxis
+                      dataKey="itemName"
+                      stroke="var(--app-muted)"
+                      fontSize={11}
+                      tickLine={false}
+                      interval={0}
+                      tick={({ x, y, payload }) => (
+                        <g transform={`translate(${x},${y})`}>
+                          <text
+                            x={0}
+                            y={0}
+                            dy={12}
+                            textAnchor="end"
+                            fill="var(--app-text)"
+                            fontSize={10}
+                            fontWeight={600}
+                            transform="rotate(-25)"
+                          >
+                            {payload.value.length > 16 ? `${payload.value.slice(0, 15)}…` : payload.value}
+                          </text>
+                        </g>
+                      )}
+                    />
+                    <YAxis
+                      yAxisId="left"
+                      orientation="left"
+                      stroke="var(--app-muted)"
+                      fontSize={11}
+                      tickFormatter={(v) => itemChartMetric === "grossSales" ? `₹${v}` : v}
+                    />
+                    {itemChartMetric === "both" && (
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        stroke="#10b981"
+                        fontSize={11}
+                        tickFormatter={(v) => `₹${v}`}
+                      />
+                    )}
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-bg)] p-3 shadow-xl text-xs space-y-1 z-50">
+                              <p className="font-extrabold text-[color:var(--app-text)]">{data.itemName}</p>
+                              {data.variantName && data.variantName !== "-" && (
+                                <p className="theme-muted text-[10px]">Variant: {data.variantName}</p>
+                              )}
+                              <div className="pt-1.5 space-y-0.5 border-t border-[color:var(--app-border)]/40 text-[11px]">
+                                <p className="text-amber-500 font-bold">Qty Sold: {data.qty}</p>
+                                <p className="text-emerald-500 font-extrabold">Gross Sales: ₹{data.grossSales?.toLocaleString()}</p>
+                                <p className="theme-muted">Unit Price: ₹{data.unitPrice}</p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: 10, fontSize: 11 }} />
+
+                    {(itemChartMetric === "qty" || itemChartMetric === "both") && (
+                      <Bar
+                        yAxisId="left"
+                        dataKey="qty"
+                        name="Quantity Sold (Qty)"
+                        fill="#f59e0b"
+                        radius={[6, 6, 0, 0]}
+                        barSize={36}
+                      >
+                        {itemChartMetric === "qty" &&
+                          reportData.items.map((_, index) => (
+                            <Cell key={`cell-qty-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                      </Bar>
+                    )}
+
+                    {(itemChartMetric === "grossSales" || itemChartMetric === "both") && (
+                      <Bar
+                        yAxisId={itemChartMetric === "both" ? "right" : "left"}
+                        dataKey="grossSales"
+                        name="Gross Sales (₹)"
+                        fill="#10b981"
+                        radius={[6, 6, 0, 0]}
+                        barSize={36}
+                      >
+                        {itemChartMetric === "grossSales" &&
+                          reportData.items.map((_, index) => (
+                            <Cell key={`cell-gross-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                      </Bar>
+                    )}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* CATEGORY SALES BAR CHART */}
+          {activeTab === "categories" && (reportData.categories || reportData.rows) && (
+            <div className="py-4 border-b border-[color:var(--app-border)]/40 space-y-4">
+              <div className="flex items-center gap-2">
+                <BarChart3 size={16} className="text-purple-500" />
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--app-primary)]">
+                  Category Revenue Breakdown (Bar Graph)
+                </h3>
+              </div>
+              <div className="h-64 w-full pt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={reportData.categories || reportData.rows}
+                    margin={{ top: 10, right: 10, left: 10, bottom: 25 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--app-border)" opacity={0.3} />
+                    <XAxis dataKey="category" stroke="var(--app-muted)" fontSize={11} />
+                    <YAxis stroke="var(--app-muted)" fontSize={11} tickFormatter={(v) => `₹${v}`} />
+                    <Tooltip contentStyle={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-text)" }} />
+                    <Bar dataKey="grossSales" name="Gross Sales (₹)" fill="#8b5cf6" radius={[6, 6, 0, 0]}>
+                      {(reportData.categories || reportData.rows || []).map((_, index) => (
+                        <Cell key={`cat-cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* SERVER PERFORMANCE BAR CHART */}
+          {activeTab === "waiters" && reportData.waiters && reportData.waiters.length > 0 && (
+            <div className="py-4 border-b border-[color:var(--app-border)]/40 space-y-4">
+              <div className="flex items-center gap-2">
+                <BarChart3 size={16} className="text-blue-500" />
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--app-primary)]">
+                  Server Revenue & Volume (Bar Graph)
+                </h3>
+              </div>
+              <div className="h-64 w-full pt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={reportData.waiters}
+                    margin={{ top: 10, right: 10, left: 10, bottom: 25 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--app-border)" opacity={0.3} />
+                    <XAxis dataKey="waiterName" stroke="var(--app-muted)" fontSize={11} />
+                    <YAxis stroke="var(--app-muted)" fontSize={11} tickFormatter={(v) => `₹${v}`} />
+                    <Tooltip contentStyle={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-text)" }} />
+                    <Bar dataKey="netSales" name="Net Sales (₹)" fill="#3b82f6" radius={[6, 6, 0, 0]}>
+                      {reportData.waiters.map((_, index) => (
+                        <Cell key={`waiter-cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
 
           {/* MAIN DATA TABLE SECTION */}
           <div className="py-2 space-y-3">
