@@ -681,13 +681,6 @@ export default function OwnerLayout() {
             accessKey: "staff",
         },
         {
-            label: "Shift Schedules",
-            path: "/owner/staff-schedules",
-            icon: <Calendar size={18} />,
-            accessKey: "schedules",
-            fallbackKey: "staff",
-        },
-        {
             label: "Attendance & Clock",
             path: "/owner/staff-attendance",
             icon: <Clock size={18} />,
