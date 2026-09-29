@@ -702,40 +702,46 @@ export default function OwnerSupplyMarketplace() {
                             <p className="text-center theme-muted py-8 text-sm font-medium">Your supply cart is empty.</p>
                         ) : (
                             <div className="space-y-3">
-                                {cart.items?.map((item) => (
-                                    <div key={item.id} className="flex items-center justify-between border-b theme-border pb-3">
-                                        <div>
-                                            <p className="font-bold text-sm">{item.product?.name}</p>
-                                            <p className="text-xs theme-muted">₹{item.unitPrice} / {item.product?.unit}</p>
-                                        </div>
+                                {cart.items?.map((item) => {
+                                    const itemName = item.name || item.productName || item.product?.name || item.title || "Supply Item";
+                                    const itemUnit = item.unit || item.product?.unit || "Unit";
+                                    const itemPrice = item.finalPrice || item.unitPrice || item.basePrice || item.price || item.product?.prices?.[0]?.basePrice || 0;
 
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleUpdateCartItem(item.id, Math.max(1, item.quantity - 1))}
-                                                className="rounded-lg theme-button-secondary p-1"
-                                            >
-                                                <Minus size={14} />
-                                            </button>
-                                            <span className="text-sm font-bold px-1">{item.quantity}</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleUpdateCartItem(item.id, item.quantity + 1)}
-                                                className="rounded-lg theme-button-secondary p-1"
-                                            >
-                                                <Plus size={14} />
-                                            </button>
+                                    return (
+                                        <div key={item.id || item.productId} className="flex items-center justify-between border-b theme-border pb-3">
+                                            <div>
+                                                <p className="font-bold text-sm text-[color:var(--app-text)]">{itemName}</p>
+                                                <p className="text-xs theme-muted">₹{itemPrice} / {itemUnit}</p>
+                                            </div>
 
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRemoveCartItem(item.id)}
-                                                className="text-red-500 hover:text-red-400 ml-2 text-xs font-bold"
-                                            >
-                                                Remove
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateCartItem(item.id, Math.max(1, item.quantity - 1))}
+                                                    className="rounded-lg theme-button-secondary p-1 cursor-pointer"
+                                                >
+                                                    <Minus size={14} />
+                                                </button>
+                                                <span className="text-sm font-bold px-1">{item.quantity}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateCartItem(item.id, item.quantity + 1)}
+                                                    className="rounded-lg theme-button-secondary p-1 cursor-pointer"
+                                                >
+                                                    <Plus size={14} />
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveCartItem(item.id)}
+                                                    className="text-red-500 hover:text-red-400 ml-2 text-xs font-bold cursor-pointer"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
 
                                 <div className="flex items-center justify-between border-t theme-border pt-3">
                                     <span className="font-bold text-base">Total Order Cost</span>
