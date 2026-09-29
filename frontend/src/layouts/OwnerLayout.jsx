@@ -681,20 +681,6 @@ export default function OwnerLayout() {
             accessKey: "staff",
         },
         {
-            label: "Attendance & Clock",
-            path: "/owner/staff-attendance",
-            icon: <Clock size={18} />,
-            accessKey: "attendance",
-            fallbackKey: "staff",
-        },
-        {
-            label: "Tasks & Checklists",
-            path: "/owner/staff-tasks",
-            icon: <CheckSquare size={18} />,
-            accessKey: "tasks",
-            fallbackKey: "staff",
-        },
-        {
             label: "Profile",
             path: "/owner/settings",
             icon: <User size={18} />,
