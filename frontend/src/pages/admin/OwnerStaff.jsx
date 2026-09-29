@@ -35,12 +35,23 @@ const DEFAULT_DESIGNATION_BY_ROLE = {
 };
 const ACCESS_LABELS = {
     dashboard: "Dashboard",
-    orders: "Orders",
-    menu: "Menu",
-    tables: "Tables",
-    kitchen: "Kitchen",
+    billing: "Billing Desk",
+    orders: "Live Orders",
+    menu: "Menu Studio",
+    inventory: "Inventory & BOM",
+    tables: "Tables & QR",
+    kitchen: "Kitchen Operations",
+    printers: "Printers",
     analytics: "Analytics",
-    finance: "Finance",
+    reports: "Reports & Insights",
+    paylater: "Pay Later",
+    shifts: "Shift & Day Close",
+    supply: "Supply Marketplace",
+    delivery: "Delivery Studio",
+    delivery_partners: "Delivery Partners",
+    customers: "Customers",
+    discounts: "Discounts & Offers",
+    loyalty: "Loyalty & Rewards",
     staff: "Staff",
     settings: "Settings",
     notifications: "Notifications",
@@ -50,71 +61,26 @@ const defaultAccessByRole = (role) => {
     const normalizedRole = String(role || "STAFF").toUpperCase();
     if (normalizedRole === "MANAGER") {
         return {
-            dashboard: true,
-            orders: true,
-            menu: true,
-            tables: true,
-            kitchen: true,
-            analytics: true,
-            finance: false,
-            staff: false,
-            settings: false,
-            notifications: true,
+            dashboard: true, billing: true, orders: true, menu: true, inventory: true, tables: true, kitchen: true, printers: true, analytics: true, reports: true, paylater: true, shifts: true, supply: true, delivery: true, delivery_partners: true, customers: true, discounts: true, loyalty: true, staff: false, settings: false, notifications: true
         };
     }
     if (normalizedRole === "CHEF") {
         return {
-            dashboard: true,
-            orders: true,
-            menu: false,
-            tables: false,
-            kitchen: true,
-            analytics: false,
-            finance: false,
-            staff: false,
-            settings: false,
-            notifications: true,
+            dashboard: true, billing: false, orders: true, menu: false, inventory: true, tables: false, kitchen: true, printers: true, analytics: false, reports: false, paylater: false, shifts: false, supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false, loyalty: false, staff: false, settings: false, notifications: true
         };
     }
     if (normalizedRole === "WAITER") {
         return {
-            dashboard: true,
-            orders: true,
-            menu: true,
-            tables: true,
-            kitchen: false,
-            analytics: false,
-            finance: false,
-            staff: false,
-            settings: false,
-            notifications: true,
+            dashboard: true, billing: true, orders: true, menu: true, inventory: false, tables: true, kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false, supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false, loyalty: false, staff: false, settings: false, notifications: true
         };
     }
     if (normalizedRole === "CASHIER") {
         return {
-            dashboard: true,
-            orders: true,
-            menu: false,
-            tables: false,
-            kitchen: false,
-            analytics: true,
-            finance: true,
-            staff: false,
-            settings: false,
-            notifications: true,
+            dashboard: true, billing: true, orders: true, menu: false, inventory: false, tables: false, kitchen: false, printers: true, analytics: true, reports: true, paylater: true, shifts: true, supply: false, delivery: false, delivery_partners: false, customers: true, discounts: true, loyalty: true, staff: false, settings: false, notifications: true
         };
     }
     return {
-        dashboard: true,
-        orders: false,
-        menu: false,
-        tables: false,
-        kitchen: false,
-        analytics: false,
-        finance: false,
-        staff: false,
-        settings: false,
-        notifications: true,
+        dashboard: true, billing: false, orders: false, menu: false, inventory: false, tables: false, kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false, supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false, loyalty: false, staff: false, settings: false, notifications: true
     };
 };
 

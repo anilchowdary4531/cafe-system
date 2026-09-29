@@ -49,20 +49,26 @@ import { playNotificationSound } from "../utils/soundPlayer";
 
 const MODULES = [
     "dashboard",
+    "billing",
     "orders",
     "menu",
+    "inventory",
     "tables",
     "kitchen",
+    "printers",
     "analytics",
-    "finance",
+    "reports",
+    "paylater",
+    "shifts",
+    "supply",
+    "delivery",
+    "delivery_partners",
     "customers",
     "discounts",
     "loyalty",
     "staff",
     "settings",
     "notifications",
-    "supply",
-    "inventory",
 ];
 
 const defaultAccessByRole = (role) => {
@@ -74,12 +80,20 @@ const defaultAccessByRole = (role) => {
 
     return {
         dashboard: true,
+        billing: true,
         orders: true,
         menu: true,
+        inventory: true,
         tables: true,
         kitchen: true,
+        printers: true,
         analytics: true,
-        finance: false,
+        reports: true,
+        paylater: false,
+        shifts: false,
+        supply: true,
+        delivery: true,
+        delivery_partners: true,
         customers: true,
         discounts: true,
         loyalty: true,
@@ -87,6 +101,13 @@ const defaultAccessByRole = (role) => {
         settings: false,
         notifications: true,
     };
+};
+
+const hasModuleAccess = (access, accessKey, fallbackKey) => {
+    if (!access) return false;
+    if (access[accessKey] !== undefined) return Boolean(access[accessKey]);
+    if (fallbackKey && access[fallbackKey] !== undefined) return Boolean(access[fallbackKey]);
+    return false;
 };
 
 const normalizeAccess = (rawAccess, role) => {
@@ -544,7 +565,8 @@ export default function OwnerLayout() {
             label: "Billing Desk",
             path: "/owner/billing",
             icon: <ClipboardPlus size={18} />,
-            accessKey: "orders",
+            accessKey: "billing",
+            fallbackKey: "orders",
         },
         {
             label: "Live Orders",
@@ -563,6 +585,7 @@ export default function OwnerLayout() {
             path: "/owner/inventory",
             icon: <Package size={18} />,
             accessKey: "inventory",
+            fallbackKey: "menu",
         },
         {
             label: "Tables & QR",
@@ -580,7 +603,8 @@ export default function OwnerLayout() {
             label: "Printers",
             path: "/owner/printers",
             icon: <Printer size={18} />,
-            accessKey: "kitchen",
+            accessKey: "printers",
+            fallbackKey: "kitchen",
         },
         {
             label: "Analytics",
@@ -592,19 +616,22 @@ export default function OwnerLayout() {
             label: "Reports & Insights",
             path: "/owner/reports",
             icon: <FileText size={18} />,
-            accessKey: "analytics",
+            accessKey: "reports",
+            fallbackKey: "analytics",
         },
         {
             label: "Pay Later",
             path: "/owner/pay-later",
             icon: <IndianRupee size={18} />,
-            accessKey: "finance",
+            accessKey: "paylater",
+            fallbackKey: "finance",
         },
         {
             label: "Shift & Day Close",
             path: "/owner/shifts",
             icon: <Wallet size={18} />,
-            accessKey: "finance",
+            accessKey: "shifts",
+            fallbackKey: "finance",
         },
         {
             label: "Supply Marketplace",
@@ -616,13 +643,15 @@ export default function OwnerLayout() {
             label: "Delivery Studio",
             path: "/owner/delivery",
             icon: <Truck size={18} />,
-            accessKey: "orders",
+            accessKey: "delivery",
+            fallbackKey: "orders",
         },
         {
             label: "Delivery Partners",
             path: "/owner/delivery-partners",
             icon: <Users size={18} />,
-            accessKey: "orders",
+            accessKey: "delivery_partners",
+            fallbackKey: "orders",
         },
         {
             label: "Customers",
@@ -656,7 +685,9 @@ export default function OwnerLayout() {
         },
     ];
 
-    const visibleNavItems = navItems.filter((item) => access[item.accessKey]);
+    const visibleNavItems = navItems.filter((item) =>
+        hasModuleAccess(access, item.accessKey, item.fallbackKey)
+    );
 
     const firstAllowedPath = visibleNavItems[0]?.path || "/owner";
 
@@ -670,7 +701,7 @@ export default function OwnerLayout() {
     const canAccessCurrentRoute = (() => {
         const match = findRouteAccess(location.pathname);
         if (!match) return true;
-        return access[match.accessKey];
+        return hasModuleAccess(access, match.accessKey, match.fallbackKey);
     })();
     const isDashboardRoute = location.pathname === "/owner" || location.pathname === "/owner/";
     const showTableAssignmentStrip = isDashboardRoute;

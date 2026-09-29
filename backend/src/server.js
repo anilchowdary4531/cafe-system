@@ -53,17 +53,49 @@ if (runtime.NODE_ENV === "production" && process.env.VALIDATE_BOOT !== "1") {
   }
 }
 
-const STAFF_ACCESS_MODULES = ["dashboard", "orders", "menu", "tables", "kitchen", "analytics", "finance", "staff", "settings", "notifications"];
+const STAFF_ACCESS_MODULES = [
+  "dashboard",
+  "billing",
+  "orders",
+  "menu",
+  "inventory",
+  "tables",
+  "kitchen",
+  "printers",
+  "analytics",
+  "reports",
+  "paylater",
+  "shifts",
+  "supply",
+  "delivery",
+  "delivery_partners",
+  "customers",
+  "discounts",
+  "loyalty",
+  "staff",
+  "settings",
+  "notifications",
+];
 const STAFF_ALLOWED_ROLES = ["OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STAFF"];
 
 const defaultAccessByRole = (role) => {
   const normalizedRole = String(role || "STAFF").toUpperCase();
   if (normalizedRole === "OWNER") return STAFF_ACCESS_MODULES.reduce((acc, key) => ({ ...acc, [key]: true }), {});
-  if (normalizedRole === "MANAGER") return { dashboard: true, orders: true, menu: true, tables: true, kitchen: true, analytics: true, finance: false, staff: false, settings: false, notifications: true };
-  if (normalizedRole === "CHEF") return { dashboard: true, orders: true, menu: false, tables: false, kitchen: true, analytics: false, finance: false, staff: false, settings: false, notifications: true };
-  if (normalizedRole === "WAITER") return { dashboard: true, orders: true, menu: true, tables: true, kitchen: false, analytics: false, finance: false, staff: false, settings: false, notifications: true };
-  if (normalizedRole === "CASHIER") return { dashboard: true, orders: true, menu: false, tables: false, kitchen: false, analytics: true, finance: true, staff: false, settings: false, notifications: true };
-  return { dashboard: true, orders: false, menu: false, tables: false, kitchen: false, analytics: false, finance: false, staff: false, settings: false, notifications: true };
+  if (normalizedRole === "MANAGER") return {
+    dashboard: true, billing: true, orders: true, menu: true, inventory: true, tables: true, kitchen: true, printers: true, analytics: true, reports: true, paylater: true, shifts: true, supply: true, delivery: true, delivery_partners: true, customers: true, discounts: true, loyalty: true, staff: false, settings: false, notifications: true
+  };
+  if (normalizedRole === "CHEF") return {
+    dashboard: true, billing: false, orders: true, menu: false, inventory: true, tables: false, kitchen: true, printers: true, analytics: false, reports: false, paylater: false, shifts: false, supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false, loyalty: false, staff: false, settings: false, notifications: true
+  };
+  if (normalizedRole === "WAITER") return {
+    dashboard: true, billing: true, orders: true, menu: true, inventory: false, tables: true, kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false, supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false, loyalty: false, staff: false, settings: false, notifications: true
+  };
+  if (normalizedRole === "CASHIER") return {
+    dashboard: true, billing: true, orders: true, menu: false, inventory: false, tables: false, kitchen: false, printers: true, analytics: true, reports: true, paylater: true, shifts: true, supply: false, delivery: false, delivery_partners: false, customers: true, discounts: true, loyalty: true, staff: false, settings: false, notifications: true
+  };
+  return {
+    dashboard: true, billing: false, orders: false, menu: false, inventory: false, tables: false, kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false, supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false, loyalty: false, staff: false, settings: false, notifications: true
+  };
 };
 
 const normalizeAccess = (rawAccess, role) => {
