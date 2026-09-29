@@ -213,21 +213,31 @@ export default function OwnerSupplyMarketplace() {
         }
     };
 
-    const handleUpdateCartItem = async (itemId, quantity) => {
+    const handleUpdateCartItem = async (itemOrId, quantity) => {
         try {
-            const res = await api.put(`/supply-cart/items/${itemId}`, { quantity });
+            const targetId = typeof itemOrId === "object" ? (itemOrId.productId || itemOrId.id) : itemOrId;
+            const res = await api.post("/supply-cart/items", {
+                productId: targetId,
+                quantity,
+            });
             if (res.data?.cart) setCart(res.data.cart);
+            else if (res.data?.items) setCart(res.data);
             else loadData();
         } catch (err) {
             showToast(err?.response?.data?.error || "Failed to update item quantity", { type: "error" });
         }
     };
 
-    const handleRemoveCartItem = async (itemId) => {
+    const handleRemoveCartItem = async (itemOrId) => {
         try {
-            const res = await api.delete(`/supply-cart/items/${itemId}`);
+            const targetId = typeof itemOrId === "object" ? (itemOrId.productId || itemOrId.id) : itemOrId;
+            const res = await api.post("/supply-cart/items", {
+                productId: targetId,
+                quantity: 0,
+            });
             showToast("Item removed from supply cart");
             if (res.data?.cart) setCart(res.data.cart);
+            else if (res.data?.items) setCart(res.data);
             else loadData();
         } catch (err) {
             showToast("Failed to remove item", { type: "error" });
@@ -717,23 +727,32 @@ export default function OwnerSupplyMarketplace() {
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleUpdateCartItem(item.id, Math.max(1, item.quantity - 1))}
+                                                    onClick={() => {
+                                                        const newQty = item.quantity - 1;
+                                                        if (newQty <= 0) {
+                                                            handleRemoveCartItem(item);
+                                                        } else {
+                                                            handleUpdateCartItem(item, newQty);
+                                                        }
+                                                    }}
                                                     className="rounded-lg theme-button-secondary p-1 cursor-pointer"
+                                                    title="Decrease quantity"
                                                 >
                                                     <Minus size={14} />
                                                 </button>
                                                 <span className="text-sm font-bold px-1">{item.quantity}</span>
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleUpdateCartItem(item.id, item.quantity + 1)}
+                                                    onClick={() => handleUpdateCartItem(item, item.quantity + 1)}
                                                     className="rounded-lg theme-button-secondary p-1 cursor-pointer"
+                                                    title="Increase quantity"
                                                 >
                                                     <Plus size={14} />
                                                 </button>
 
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleRemoveCartItem(item.id)}
+                                                    onClick={() => handleRemoveCartItem(item)}
                                                     className="text-red-500 hover:text-red-400 ml-2 text-xs font-bold cursor-pointer"
                                                 >
                                                     Remove

@@ -34,11 +34,23 @@ export default async function supplyMarketplaceRoutes(app) {
     const updateCartItemHandler = async (req, reply) => {
         try {
             const restaurantId = req.user?.restaurantId || req.body?.restaurantId || 1;
-            const { productId, quantity } = req.body || {};
-            const cart = await updateSupplyCartItem(restaurantId, productId, quantity);
+            const targetId = req.params?.id || req.body?.productId || req.body?.id;
+            const quantity = req.body?.quantity !== undefined ? req.body.quantity : 1;
+            const cart = await updateSupplyCartItem(restaurantId, targetId, quantity);
             return reply.code(200).send(cart);
         } catch (err) {
             return reply.code(err.statusCode || 500).send({ error: err.message || "Failed to update cart" });
+        }
+    };
+
+    const removeCartItemHandler = async (req, reply) => {
+        try {
+            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || req.query?.restaurantId || 1;
+            const targetId = req.params?.id || req.body?.productId || req.body?.id;
+            const cart = await updateSupplyCartItem(restaurantId, targetId, 0);
+            return reply.code(200).send(cart);
+        } catch (err) {
+            return reply.code(err.statusCode || 500).send({ error: err.message || "Failed to remove item from cart" });
         }
     };
 
@@ -113,6 +125,22 @@ export default async function supplyMarketplaceRoutes(app) {
     app.post("/supply-cart/items", { preHandler: [authUser] }, updateCartItemHandler);
     app.post("/api/supply-cart/items", { preHandler: [authUser] }, updateCartItemHandler);
     app.post("/api/v1/supply-cart/items", { preHandler: [authUser] }, updateCartItemHandler);
+
+    app.put("/supply-cart/items", { preHandler: [authUser] }, updateCartItemHandler);
+    app.put("/api/supply-cart/items", { preHandler: [authUser] }, updateCartItemHandler);
+    app.put("/api/v1/supply-cart/items", { preHandler: [authUser] }, updateCartItemHandler);
+
+    app.put("/supply-cart/items/:id", { preHandler: [authUser] }, updateCartItemHandler);
+    app.put("/api/supply-cart/items/:id", { preHandler: [authUser] }, updateCartItemHandler);
+    app.put("/api/v1/supply-cart/items/:id", { preHandler: [authUser] }, updateCartItemHandler);
+
+    app.delete("/supply-cart/items", { preHandler: [authUser] }, removeCartItemHandler);
+    app.delete("/api/supply-cart/items", { preHandler: [authUser] }, removeCartItemHandler);
+    app.delete("/api/v1/supply-cart/items", { preHandler: [authUser] }, removeCartItemHandler);
+
+    app.delete("/supply-cart/items/:id", { preHandler: [authUser] }, removeCartItemHandler);
+    app.delete("/api/supply-cart/items/:id", { preHandler: [authUser] }, removeCartItemHandler);
+    app.delete("/api/v1/supply-cart/items/:id", { preHandler: [authUser] }, removeCartItemHandler);
 
     app.post("/supply-orders", { preHandler: [authUser] }, placeOrderHandler);
     app.post("/api/supply-orders", { preHandler: [authUser] }, placeOrderHandler);

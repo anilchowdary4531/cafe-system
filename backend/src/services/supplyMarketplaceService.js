@@ -144,16 +144,31 @@ export async function getSupplyCart(restaurantId) {
     };
 }
 
-export async function updateSupplyCartItem(restaurantId, productId, quantity) {
+export async function updateSupplyCartItem(restaurantId, productIdOrItemId, quantity) {
     const rId = Number(restaurantId);
-    const pId = Number(productId);
+    let pId = Number(productIdOrItemId);
     const qty = Number(quantity);
 
-    if (!rId || !pId || isNaN(qty)) throw { statusCode: 400, message: "Invalid parameters" };
+    if (!rId || isNaN(pId) || isNaN(qty)) throw { statusCode: 400, message: "Invalid parameters" };
 
     let cart = await prisma.supplyCart.findUnique({ where: { restaurantId: rId } });
     if (!cart) {
         cart = await prisma.supplyCart.create({ data: { restaurantId: rId } });
+    }
+
+    // Resolve cart item if pId refers to a SupplyCartItem id rather than SupplyProduct id directly
+    const cartItem = await prisma.supplyCartItem.findFirst({
+        where: {
+            cartId: cart.id,
+            OR: [
+                { id: pId },
+                { productId: pId }
+            ]
+        }
+    });
+
+    if (cartItem) {
+        pId = cartItem.productId;
     }
 
     if (qty <= 0) {
