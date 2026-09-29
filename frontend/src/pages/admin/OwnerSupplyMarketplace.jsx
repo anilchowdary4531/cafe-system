@@ -500,11 +500,11 @@ export default function OwnerSupplyMarketplace() {
 
                 if (filtered.length === 0) {
                     return (
-                        <div className="py-8 text-center space-y-3 my-2">
-                            <Package size={44} className="mx-auto theme-accent-text opacity-80" />
+                        <div className="py-6 text-center space-y-2.5 my-2">
+                            <Package size={36} className="mx-auto theme-accent-text opacity-80" />
                             <div>
-                                <h3 className="text-base font-bold">No products match your filters</h3>
-                                <p className="theme-muted text-xs mt-1 max-w-md mx-auto">
+                                <h3 className="text-sm font-bold">No products match your filters</h3>
+                                <p className="theme-muted text-xs mt-0.5 max-w-md mx-auto">
                                     {selectedCategory === "All Categories" && selectedSupplier === "All Suppliers"
                                         ? "No supply products found matching your search term."
                                         : `No products found under category "${selectedCategory}" for supplier "${selectedSupplier}". Click below to reset.`}
@@ -513,7 +513,7 @@ export default function OwnerSupplyMarketplace() {
                             <button
                                 type="button"
                                 onClick={() => { setSelectedCategory("All Categories"); setSelectedSupplier("All Suppliers"); setSearch(""); setSortBy("default"); }}
-                                className="theme-button rounded-xl px-5 py-2.5 text-xs font-extrabold transition  cursor-pointer inline-flex items-center gap-1.5"
+                                className="theme-button rounded-lg px-4 py-2 text-xs font-extrabold transition cursor-pointer inline-flex items-center gap-1.5"
                             >
                                 ✨ Reset All Filters ({products.length} Products Available)
                             </button>
@@ -522,71 +522,76 @@ export default function OwnerSupplyMarketplace() {
                 }
 
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
                         {filtered.map((p) => {
                             const imgUrl = getSupplyProductImageUrl(p);
                             const displaySupplierName = p.supplierName || p.supplier?.profile?.businessName || p.supplier?.businessName || "SocialSea";
                             const displayPrice = p.prices?.[0]?.basePrice || p.basePrice || p.finalPrice || 100;
 
                             return (
-                                <div key={p.id} className="py-1 space-y-2 transition">
-                                    <div className="h-40 w-full rounded-xl overflow-hidden relative flex items-center justify-center bg-black/5">
-                                        {imgUrl ? (
-                                            <img
-                                                src={imgUrl}
-                                                alt={p.name}
-                                                className="h-full w-full object-cover hover:scale-105 transition duration-300"
-                                                onError={(e) => {
-                                                    e.target.onerror = null;
-                                                    e.target.src = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80";
-                                                }}
-                                            />
-                                        ) : (
-                                            <div className="h-full w-full flex flex-col items-center justify-center p-4 text-center bg-amber-500/10 theme-muted">
-                                                <Package size={36} className="theme-accent-text mb-1 opacity-80" />
-                                                <span className="text-[11px] font-bold uppercase tracking-wider">{p.category?.name || p.category || "Raw Supply"}</span>
-                                            </div>
-                                        )}
-                                    </div>
+                                <div key={p.id} className="p-2.5 rounded-xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)]/50 space-y-2 flex flex-col justify-between hover:border-amber-400/50 transition-all shadow-2xs">
+                                    <div className="space-y-2">
+                                        <div className="h-24 sm:h-28 w-full rounded-lg overflow-hidden relative flex items-center justify-center bg-black/5">
+                                            {imgUrl ? (
+                                                <img
+                                                    src={imgUrl}
+                                                    alt={p.name}
+                                                    className="h-full w-full object-cover hover:scale-105 transition duration-300"
+                                                    onError={(e) => {
+                                                        e.target.onerror = null;
+                                                        e.target.src = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80";
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div className="h-full w-full flex flex-col items-center justify-center p-2 text-center bg-amber-500/10 theme-muted">
+                                                    <Package size={28} className="theme-accent-text mb-1 opacity-80" />
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider">{p.category?.name || p.category || "Raw Supply"}</span>
+                                                </div>
+                                            )}
+                                        </div>
 
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div>
-                                            <h3 className="font-bold text-base leading-snug">{p.name}</h3>
-                                            <p className="text-xs mt-1.5 flex items-center gap-1.5 flex-wrap">
-                                                <span className="theme-muted font-medium">Supplier:</span>
-                                                <span className="font-extrabold text-amber-500 inline-flex items-center gap-1 text-[11px]">
-                                                    <Building2 size={12} />
-                                                    {displaySupplierName}
+                                        <div className="space-y-1">
+                                            <div className="flex items-start justify-between gap-1.5">
+                                                <h3 className="font-bold text-xs leading-snug line-clamp-2 flex-1" title={p.name}>{p.name}</h3>
+                                                <span className="theme-button-secondary rounded-md px-1.5 py-0.5 text-[11px] font-black whitespace-nowrap shrink-0">
+                                                    ₹{displayPrice}/{p.unit}
                                                 </span>
+                                            </div>
+                                            <p className="text-[11px] theme-muted flex items-center gap-1 truncate">
+                                                <Building2 size={11} className="text-amber-500 shrink-0" />
+                                                <span className="font-semibold text-amber-500 truncate">{displaySupplierName}</span>
                                             </p>
                                         </div>
-                                        <span className="theme-button-secondary rounded-full px-3 py-1 text-xs font-black whitespace-nowrap">
-                                            ₹{displayPrice} / {p.unit}
-                                        </span>
+
+                                        <div className="text-[10px] space-y-0.5 theme-muted pt-0.5 border-t border-[color:var(--app-border)]/30">
+                                            <p className="flex justify-between">
+                                                <span>MOQ:</span>
+                                                <span className="font-bold text-[color:var(--app-text)]">{p.moq} {p.unit}</span>
+                                            </p>
+                                            <p className="flex justify-between">
+                                                <span>Stock:</span>
+                                                <span className="font-bold theme-accent-text">{p.inventory?.availableStock || p.availableStock || 250} {p.unit}</span>
+                                            </p>
+                                        </div>
                                     </div>
 
-                                    <div className="text-xs space-y-0.5 theme-muted pt-0.5">
-                                        <p>Min Order Qty (MOQ): <span className="font-bold text-white">{p.moq} {p.unit}</span></p>
-                                        <p>Available Stock: <span className="font-bold theme-accent-text">{p.inventory?.availableStock || p.availableStock || 250} {p.unit}</span></p>
-                                    </div>
-
-                                    <div className="flex items-center gap-2 pt-1">
+                                    <div className="flex items-center gap-1.5 pt-1">
                                         <button
                                             type="button"
                                             onClick={() => handleAddToCart(p, p.moq)}
-                                            className="theme-button flex-1 rounded-xl py-2.5 text-xs font-extrabold transition flex items-center justify-center gap-1.5  cursor-pointer"
+                                            className="theme-button flex-1 rounded-lg py-1.5 px-1.5 text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
                                         >
-                                            <Plus size={15} />
+                                            <Plus size={13} />
                                             Add {p.moq} {p.unit}
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => handleOpenBargain(p)}
-                                            className="theme-button-secondary rounded-xl py-2.5 px-3 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                                            title="Negotiate Price with Supplier"
+                                            className="theme-button-secondary rounded-lg py-1.5 px-2 text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                            title="Negotiate Price"
                                         >
-                                            <Handshake size={15} className="theme-accent-text" />
-                                            Bargain Price
+                                            <Handshake size={13} className="theme-accent-text" />
+                                            Bargain
                                         </button>
                                     </div>
                                 </div>
