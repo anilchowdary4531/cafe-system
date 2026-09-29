@@ -326,11 +326,19 @@ export default function OwnerStaff() {
         setOpenActionMenuFor(null);
         setSelectedAccessUserId(null);
         setEditingStaffId(staffUser.id);
+        const currentDesig = resolveDesignation(staffUser);
+        const isStandard = DESIGNATION_OPTIONS.includes(currentDesig);
+
         setEditDraft({
             name: String(staffUser?.name || ""),
             email: String(staffUser?.email || ""),
             phone: String(staffUser?.phone || ""),
-            designation: String(resolveDesignation(staffUser) || ""),
+            role: String(staffUser?.role || "STAFF"),
+            designationOption: isStandard ? currentDesig : "OTHER",
+            customDesignation: isStandard ? "" : currentDesig,
+            password: "",
+            isActive: Boolean(staffUser?.isActive),
+            access: staffUser.access ? { ...staffUser.access } : defaultAccessByRole(staffUser.role),
         });
     };
 
@@ -340,7 +348,12 @@ export default function OwnerStaff() {
             name: "",
             email: "",
             phone: "",
-            designation: "",
+            role: "STAFF",
+            designationOption: "Staff",
+            customDesignation: "",
+            password: "",
+            isActive: true,
+            access: {},
         });
     };
 
@@ -348,7 +361,10 @@ export default function OwnerStaff() {
         const name = String(editDraft.name || "").trim();
         const email = String(editDraft.email || "").trim().toLowerCase();
         const phone = String(editDraft.phone || "").trim();
-        const designation = String(editDraft.designation || "").trim();
+        const designation =
+            editDraft.designationOption === "OTHER"
+                ? String(editDraft.customDesignation || "").trim()
+                : String(editDraft.designationOption || "").trim();
 
         if (!name || !email) {
             setError("Name and email are required to update staff.");
@@ -358,12 +374,33 @@ export default function OwnerStaff() {
         try {
             setSavingEditFor(staffUser.id);
             setError("");
-            await axios.put(`${API}/owner/${restaurantId}/staff/${staffUser.id}`, {
+
+            const payload = {
                 name,
                 email,
                 phone,
                 designation,
+                role: String(editDraft.role || "STAFF").toUpperCase(),
+                isActive: Boolean(editDraft.isActive),
+            };
+            if (editDraft.password) {
+                payload.password = editDraft.password;
+            }
+
+            await axios.put(`${API}/owner/${restaurantId}/staff/${staffUser.id}`, payload);
+
+            if (editDraft.access && staffUser.role !== "OWNER") {
+                await axios.put(`${API}/owner/${restaurantId}/staff/${staffUser.id}/access`, {
+                    access: editDraft.access,
+                });
+            }
+
+            showToast({
+                title: "Staff user updated",
+                message: `Successfully saved updates for ${name}.`,
+                variant: "success",
             });
+
             cancelEditRow();
             await loadStaff({ silent: true });
         } catch (err) {
@@ -586,69 +623,204 @@ export default function OwnerStaff() {
                                     <div className="flex flex-col gap-3">
                                         <div>
                                             {isEditing ? (
-                                                <div className="space-y-2">
-                                                    <div className="grid gap-2 md:grid-cols-2">
-                                                        <input
-                                                            value={editDraft.name}
-                                                            onChange={(e) =>
-                                                                setEditDraft((prev) => ({
-                                                                    ...prev,
-                                                                    name: e.target.value,
-                                                                }))
-                                                            }
-                                                            placeholder="Full name"
-                                                            className="rounded-lg bg-[#0f172a] px-3 py-2 text-sm outline-none"
-                                                        />
-                                                        <input
-                                                            value={editDraft.designation}
-                                                            onChange={(e) =>
-                                                                setEditDraft((prev) => ({
-                                                                    ...prev,
-                                                                    designation: e.target.value,
-                                                                }))
-                                                            }
-                                                            placeholder="Designation"
-                                                            className="rounded-lg bg-[#0f172a] px-3 py-2 text-sm outline-none"
-                                                        />
-                                                        <input
-                                                            type="email"
-                                                            value={editDraft.email}
-                                                            onChange={(e) =>
-                                                                setEditDraft((prev) => ({
-                                                                    ...prev,
-                                                                    email: e.target.value,
-                                                                }))
-                                                            }
-                                                            placeholder="Email"
-                                                            className="rounded-lg bg-[#0f172a] px-3 py-2 text-sm outline-none"
-                                                        />
-                                                        <input
-                                                            value={editDraft.phone}
-                                                            onChange={(e) =>
-                                                                setEditDraft((prev) => ({
-                                                                    ...prev,
-                                                                    phone: e.target.value,
-                                                                }))
-                                                            }
-                                                            placeholder="Phone"
-                                                            className="rounded-lg bg-[#0f172a] px-3 py-2 text-sm outline-none"
-                                                        />
+                                                <div className="space-y-4 rounded-xl border border-amber-500/30 bg-[#0b1329] p-4 shadow-xl">
+                                                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                                                        <h5 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-wide text-amber-400">
+                                                            <Pencil size={15} />
+                                                            Edit Staff Member Profile & Access
+                                                        </h5>
+                                                        <button
+                                                            type="button"
+                                                            onClick={cancelEditRow}
+                                                            className="text-xs text-gray-400 hover:text-white"
+                                                        >
+                                                            Cancel
+                                                        </button>
                                                     </div>
-                                                    <div className="flex items-center gap-2">
+
+                                                    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                                                        <div>
+                                                            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                                Full Name *
+                                                            </label>
+                                                            <input
+                                                                value={editDraft.name}
+                                                                onChange={(e) =>
+                                                                    setEditDraft((prev) => ({
+                                                                        ...prev,
+                                                                        name: e.target.value,
+                                                                    }))
+                                                                }
+                                                                placeholder="Full name"
+                                                                className="w-full rounded-lg bg-[#0f172a] px-3 py-2 text-xs text-white outline-none border border-white/10 focus:border-amber-500"
+                                                            />
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                                Email Address *
+                                                            </label>
+                                                            <input
+                                                                type="email"
+                                                                value={editDraft.email}
+                                                                onChange={(e) =>
+                                                                    setEditDraft((prev) => ({
+                                                                        ...prev,
+                                                                        email: e.target.value,
+                                                                    }))
+                                                                }
+                                                                placeholder="Email"
+                                                                className="w-full rounded-lg bg-[#0f172a] px-3 py-2 text-xs text-white outline-none border border-white/10 focus:border-amber-500"
+                                                            />
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                                Phone Number
+                                                            </label>
+                                                            <input
+                                                                value={editDraft.phone}
+                                                                onChange={(e) =>
+                                                                    setEditDraft((prev) => ({
+                                                                        ...prev,
+                                                                        phone: e.target.value,
+                                                                    }))
+                                                                }
+                                                                placeholder="Phone number"
+                                                                className="w-full rounded-lg bg-[#0f172a] px-3 py-2 text-xs text-white outline-none border border-white/10 focus:border-amber-500"
+                                                            />
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                                Designation
+                                                            </label>
+                                                            <select
+                                                                value={editDraft.designationOption}
+                                                                onChange={(e) =>
+                                                                    setEditDraft((prev) => ({
+                                                                        ...prev,
+                                                                        designationOption: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="w-full rounded-lg bg-[#0f172a] px-3 py-2 text-xs text-white outline-none border border-white/10 focus:border-amber-500"
+                                                            >
+                                                                {DESIGNATION_OPTIONS.map((designation) => (
+                                                                    <option key={designation} value={designation}>
+                                                                        {designation}
+                                                                    </option>
+                                                                ))}
+                                                                <option value="OTHER">Other (Custom)</option>
+                                                            </select>
+                                                        </div>
+
+                                                        {editDraft.designationOption === "OTHER" && (
+                                                            <div>
+                                                                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                                    Custom Designation
+                                                                </label>
+                                                                <input
+                                                                    value={editDraft.customDesignation}
+                                                                    onChange={(e) =>
+                                                                        setEditDraft((prev) => ({
+                                                                            ...prev,
+                                                                            customDesignation: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    placeholder="Custom designation"
+                                                                    className="w-full rounded-lg bg-[#0f172a] px-3 py-2 text-xs text-white outline-none border border-white/10 focus:border-amber-500"
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                        <div>
+                                                            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                                New Password (Optional)
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={editDraft.password}
+                                                                onChange={(e) =>
+                                                                    setEditDraft((prev) => ({
+                                                                        ...prev,
+                                                                        password: e.target.value,
+                                                                    }))
+                                                                }
+                                                                placeholder="Leave blank to keep current"
+                                                                className="w-full rounded-lg bg-[#0f172a] px-3 py-2 text-xs text-white outline-none border border-white/10 focus:border-amber-500"
+                                                            />
+                                                        </div>
+
+                                                        <div className="flex items-end">
+                                                            <label className="flex items-center gap-2 rounded-lg bg-[#0f172a] px-3 py-2 text-xs text-gray-300 border border-white/10 w-full cursor-pointer">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={Boolean(editDraft.isActive)}
+                                                                    onChange={(e) =>
+                                                                        setEditDraft((prev) => ({
+                                                                            ...prev,
+                                                                            isActive: e.target.checked,
+                                                                        }))
+                                                                    }
+                                                                />
+                                                                <span className="font-semibold">Active Account</span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+
+                                                    {staffUser.role !== "OWNER" && (
+                                                        <div className="pt-2 border-t border-white/10">
+                                                            <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                                                                Module Access Permissions
+                                                            </p>
+                                                            <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+                                                                {modules.map((key) => (
+                                                                    <label key={key} className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={Boolean(editDraft.access?.[key])}
+                                                                            onChange={(e) =>
+                                                                                setEditDraft((prev) => ({
+                                                                                    ...prev,
+                                                                                    access: {
+                                                                                        ...prev.access,
+                                                                                        [key]: e.target.checked,
+                                                                                    },
+                                                                                }))
+                                                                            }
+                                                                        />
+                                                                        {ACCESS_LABELS[key] || key}
+                                                                    </label>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                                                        <button
+                                                            type="button"
+                                                            onClick={cancelEditRow}
+                                                            className="rounded-lg border border-white/20 px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:bg-white/5 transition"
+                                                        >
+                                                            Cancel
+                                                        </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => saveEditedRow(staffUser)}
                                                             disabled={savingEditFor === staffUser.id}
-                                                            className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-60"
+                                                            className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-1.5 text-xs font-bold text-black shadow-xs transition hover:bg-orange-400 disabled:opacity-60 cursor-pointer"
                                                         >
-                                                            {savingEditFor === staffUser.id ? "Saving..." : "Save"}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={cancelEditRow}
-                                                            className="rounded-lg border border-white/20 px-3 py-1.5 text-xs"
-                                                        >
-                                                            Cancel
+                                                            {savingEditFor === staffUser.id ? (
+                                                                <>
+                                                                    <LoaderCircle size={13} className="animate-spin" />
+                                                                    <span>Saving...</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Pencil size={13} />
+                                                                    <span>Save Staff Updates</span>
+                                                                </>
+                                                            )}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -703,7 +875,18 @@ export default function OwnerStaff() {
                                             )}
                                         </div>
 
-                                        <div className="absolute right-4 top-4" data-staff-actions-menu>
+                                        <div className="absolute right-4 top-4 flex items-center gap-2" data-staff-actions-menu>
+                                            {!isEditing && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => startEditRow(staffUser)}
+                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-bold text-amber-500 transition hover:bg-amber-500 hover:text-black cursor-pointer shadow-xs"
+                                                    title="Edit staff member profile and permissions"
+                                                >
+                                                    <Pencil size={13} />
+                                                    <span>Edit</span>
+                                                </button>
+                                            )}
                                             <button
                                                 type="button"
                                                 onClick={() =>
@@ -711,21 +894,21 @@ export default function OwnerStaff() {
                                                         prev === staffUser.id ? null : staffUser.id
                                                     )
                                                 }
-                                                className="inline-flex items-center justify-center rounded-lg bg-[#111827] p-2 text-gray-200 hover:bg-[#1b2438]"
+                                                className="inline-flex items-center justify-center rounded-lg bg-[#111827] p-2 text-gray-200 hover:bg-[#1b2438] cursor-pointer"
                                                 aria-label="Open staff actions"
                                             >
                                                 <MoreVertical size={16} />
                                             </button>
 
                                             {openActionMenuFor === staffUser.id && (
-                                                <div className="absolute right-0 z-20 mt-2 w-44 rounded-lg border border-white/10 bg-[#111827] p-1 shadow-xl">
+                                                <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-lg border border-white/10 bg-[#111827] p-1 shadow-xl">
                                                     <button
                                                         type="button"
                                                         onClick={() => startEditRow(staffUser)}
                                                         className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-amber-200 hover:bg-amber-500/10"
                                                     >
                                                         <Pencil size={13} />
-                                                        Edit
+                                                        Edit Profile
                                                     </button>
                                                     <button
                                                         type="button"
