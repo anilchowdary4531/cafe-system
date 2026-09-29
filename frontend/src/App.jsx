@@ -556,7 +556,7 @@ export default function App() {
                         <Route path="customers/:customerId" element={<OwnerCustomerDetail />} />
                         <Route path="discounts" element={<OwnerDiscounts />} />
                         <Route path="loyalty" element={<OwnerLoyalty />} />
-                        <Route path="staff" element={<OwnerStaff />} />
+                        <Route path="staff" element={<OwnerStaffSchedules />} />
                         <Route path="staff-schedules" element={<OwnerStaffSchedules />} />
                         <Route path="staff-attendance" element={<OwnerStaffAttendance />} />
                         <Route path="staff-tasks" element={<OwnerStaffTasks />} />

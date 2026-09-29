@@ -53,6 +53,7 @@ vi.mock("../layouts/AdminLayout", () => ({
 
 vi.mock("../context/AuthContext", () => ({
     default: ({ children }) => <>{children}</>,
+    useAuth: () => ({ user: { id: 1, name: "Test Owner", role: "OWNER", restaurantId: 1 } }),
 }));
 
 vi.mock("../routes/ProtectedRoute", () => ({

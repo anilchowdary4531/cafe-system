@@ -190,7 +190,7 @@ export default function OwnerStaffSchedules() {
     };
 
     return (
-        <div className="min-h-screen bg-neutral-50/60 p-4 sm:p-6 lg:p-8 space-y-6">
+        <div data-testid="owner-staff" className="min-h-screen bg-neutral-50/60 p-4 sm:p-6 lg:p-8 space-y-6">
             <StaffSubNav
                 onToggleDirectory={() => setShowDirectoryDrawer((prev) => !prev)}
                 isDirectoryOpen={showDirectoryDrawer}

@@ -35,10 +35,10 @@ export default function StaffSubNav({ onToggleDirectory, isDirectoryOpen }) {
             )}
 
             <NavLink
-                to="/owner/staff-schedules"
+                to="/owner/staff"
                 className={({ isActive }) =>
                     `flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all ${
-                        isActive
+                        isActive || window.location.pathname.startsWith("/owner/staff-schedules")
                             ? "bg-orange-600 text-white shadow-sm"
                             : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
                     }`
