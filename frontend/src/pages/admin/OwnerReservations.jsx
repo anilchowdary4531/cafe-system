@@ -424,10 +424,10 @@ export default function OwnerReservations() {
                         setEditingReservation(null);
                         setIsModalOpen(true);
                     }}
-                    className="flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-orange-600 transition"
+                    className="flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-orange-600 transition cursor-pointer"
                 >
                     <Plus className="h-4 w-4" />
-                    + New Reservation
+                    New Reservation
                 </button>
             </div>
 
