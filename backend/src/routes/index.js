@@ -26,6 +26,7 @@ import shiftRoutes from "./shift.routes.js";
 import reportRoutes from "./report.routes.js";
 import deliveryRoutes from "./delivery.routes.js";
 import qrRoutes from "./qr.routes.js";
+import staffManagementRoutes from "./staffManagement.js";
 
 // Single route entrypoint to keep server.js simple.
 export default async function routes(app, deps) {
@@ -41,6 +42,7 @@ export default async function routes(app, deps) {
   await authRoutes(app, deps);
   await customerRoutes(app, deps);
   await staffRoutes(app, deps);
+  await staffManagementRoutes(app, deps);
   await ownerRoutes(app, deps);
   await superAdminRoutes(app, deps);
   await kitchenRoutes(app, deps);

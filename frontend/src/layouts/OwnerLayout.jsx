@@ -27,6 +27,9 @@ import {
     ZoomOut,
     Eye,
     EyeOff,
+    Calendar,
+    Clock,
+    CheckSquare,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
@@ -672,10 +675,31 @@ export default function OwnerLayout() {
             accessKey: "loyalty",
         },
         {
-            label: "Staff",
+            label: "Staff Directory",
             path: "/owner/staff",
             icon: <Users size={18} />,
             accessKey: "staff",
+        },
+        {
+            label: "Shift Schedules",
+            path: "/owner/staff-schedules",
+            icon: <Calendar size={18} />,
+            accessKey: "schedules",
+            fallbackKey: "staff",
+        },
+        {
+            label: "Attendance & Clock",
+            path: "/owner/staff-attendance",
+            icon: <Clock size={18} />,
+            accessKey: "attendance",
+            fallbackKey: "staff",
+        },
+        {
+            label: "Tasks & Checklists",
+            path: "/owner/staff-tasks",
+            icon: <CheckSquare size={18} />,
+            accessKey: "tasks",
+            fallbackKey: "staff",
         },
         {
             label: "Profile",

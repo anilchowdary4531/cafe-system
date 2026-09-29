@@ -58,6 +58,10 @@ import OwnerKitchenLive from "./pages/admin/OwnerKitchenLive";
 import OwnerAnalytics from "./pages/admin/OwnerAnalytics";
 import OwnerFinance from "./pages/admin/OwnerFinance";
 import OwnerStaff from "./pages/admin/OwnerStaff";
+import OwnerStaffSchedules from "./pages/admin/OwnerStaffSchedules";
+import OwnerStaffAttendance from "./pages/admin/OwnerStaffAttendance";
+import OwnerStaffTasks from "./pages/admin/OwnerStaffTasks";
+import StaffDashboard from "./pages/staff/StaffDashboard";
 import OwnerSettings from "./pages/admin/OwnerSettings";
 import OwnerNotifications from "./pages/admin/OwnerNotifications";
 import OwnerPayLater from "./pages/admin/OwnerPayLater";
@@ -553,6 +557,9 @@ export default function App() {
                         <Route path="discounts" element={<OwnerDiscounts />} />
                         <Route path="loyalty" element={<OwnerLoyalty />} />
                         <Route path="staff" element={<OwnerStaff />} />
+                        <Route path="staff-schedules" element={<OwnerStaffSchedules />} />
+                        <Route path="staff-attendance" element={<OwnerStaffAttendance />} />
+                        <Route path="staff-tasks" element={<OwnerStaffTasks />} />
                         <Route path="settings" element={<OwnerSettings />} />
                         <Route path="notifications" element={<OwnerNotifications />} />
                         <Route path="supply" element={<OwnerSupplyMarketplace />} />
@@ -560,6 +567,14 @@ export default function App() {
                         <Route path="delivery-partners" element={<OwnerDeliveryPartners />} />
                         <Route path="driver-portal" element={<DriverDeliveryStudio />} />
                     </Route>
+                    <Route
+                        path="/staff/dashboard"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF", "WAITER", "CASHIER", "STAFF"]}>
+                                <StaffDashboard />
+                            </ProtectedRoute>
+                        }
+                    />
 
                     {/* ================================= */}
                     {/* SUPPLIER PORTAL ROUTES */}

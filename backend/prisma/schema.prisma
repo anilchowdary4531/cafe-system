@@ -115,6 +115,10 @@ model Restaurant {
   deliveryPartners     DeliveryPartner[]
   deliveries           Delivery[]
   coupons              Coupon[]
+  customRoles          CustomRole[]
+  staffShifts          StaffShift[]
+  staffAttendances     StaffAttendance[]
+  staffTasks           StaffTask[]
 
   @@map("restaurants")
 }
@@ -150,6 +154,12 @@ model User {
   approvedShifts     CashierShift[] @relation("ApprovedShifts")
   closedDayClosings  DayClosing[]   @relation("ClosedDayClosings")
   deliveryPartners   DeliveryPartner[]
+  staffShifts          StaffShift[]
+  requestedSwaps       ShiftSwapRequest[]     @relation("SwapRequester")
+  targetSwaps          ShiftSwapRequest[]     @relation("SwapTarget")
+  staffAttendances     StaffAttendance[]
+  attendanceCorrections AttendanceCorrection[] @relation("CorrectionUser")
+  assignedTasks        StaffTask[]            @relation("AssignedTasks")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -2358,6 +2368,136 @@ model AuditLog {
   @@index([restaurantId, entity, entityId])
   @@index([restaurantId, actorUserId])
   @@map("audit_logs")
+}
+
+model CustomRole {
+  id           Int        @id @default(autoincrement())
+  restaurantId Int        @map("restaurant_id")
+  name         String
+  description  String?
+  access       Json
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("custom_roles")
+}
+
+model StaffShift {
+  id           Int        @id @default(autoincrement())
+  restaurantId Int        @map("restaurant_id")
+  branchId     Int?       @map("branch_id")
+  userId       Int        @map("user_id")
+  role         String
+  shiftDate    DateTime   @map("shift_date")
+  startTime    String     @map("start_time")
+  endTime      String     @map("end_time")
+  breakMins    Int        @default(30) @map("break_mins")
+  notes        String?
+  status       String     @default("DRAFT")
+  publishedAt  DateTime?  @map("published_at")
+
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  swapRequests ShiftSwapRequest[]
+
+  @@index([restaurantId, shiftDate])
+  @@index([userId, shiftDate])
+  @@map("staff_shifts")
+}
+
+model ShiftSwapRequest {
+  id           Int        @id @default(autoincrement())
+  restaurantId Int        @map("restaurant_id")
+  shiftId      Int        @map("shift_id")
+  requesterId  Int        @map("requester_id")
+  targetUserId Int        @map("target_user_id")
+  status       String     @default("PENDING")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  shift        StaffShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  requester    User       @relation("SwapRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  targetUser   User       @relation("SwapTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, status])
+  @@index([targetUserId, status])
+  @@map("shift_swap_requests")
+}
+
+model StaffAttendance {
+  id           Int        @id @default(autoincrement())
+  restaurantId Int        @map("restaurant_id")
+  userId       Int        @map("user_id")
+  clockInTime  DateTime   @map("clock_in_time")
+  clockOutTime DateTime?  @map("clock_out_time")
+  clockInLat   Float?     @map("clock_in_lat")
+  clockInLng   Float?     @map("clock_in_lng")
+  clockOutLat  Float?     @map("clock_out_lat")
+  clockOutLng  Float?     @map("clock_out_lng")
+  isGeofenced  Boolean    @default(true) @map("is_geofenced")
+  totalMinutes Int        @default(0) @map("total_minutes")
+  status       String     @default("ON_DUTY")
+
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  corrections  AttendanceCorrection[]
+
+  @@index([restaurantId, userId, clockInTime])
+  @@map("staff_attendances")
+}
+
+model AttendanceCorrection {
+  id           Int             @id @default(autoincrement())
+  attendanceId Int             @map("attendance_id")
+  userId       Int             @map("user_id")
+  requestedIn  DateTime        @map("requested_in")
+  requestedOut DateTime        @map("requested_out")
+  reason       String
+  status       String          @default("PENDING")
+  reviewedBy   Int?            @map("reviewed_by")
+  reviewNotes  String?         @map("review_notes")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @default(now()) @updatedAt @map("updated_at")
+
+  attendance   StaffAttendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  user         User            @relation("CorrectionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([attendanceId])
+  @@index([userId, status])
+  @@map("attendance_corrections")
+}
+
+model StaffTask {
+  id           Int        @id @default(autoincrement())
+  restaurantId Int        @map("restaurant_id")
+  title        String
+  description  String?
+  category     String     @default("CHECKLIST")
+  assignedTo   Int?       @map("assigned_to")
+  roleTarget   String?    @map("role_target")
+  priority     String     @default("MEDIUM")
+  dueDate      DateTime?  @map("due_date")
+  isCompleted  Boolean    @default(false) @map("is_completed")
+  completedAt  DateTime?  @map("completed_at")
+  completedBy  Int?       @map("completed_by")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  assignedUser User?      @relation("AssignedTasks", fields: [assignedTo], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, category])
+  @@index([assignedTo, isCompleted])
+  @@map("staff_tasks")
 }
 
 
