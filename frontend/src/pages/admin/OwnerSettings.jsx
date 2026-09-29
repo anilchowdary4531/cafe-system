@@ -48,11 +48,11 @@ const emptyForm = {
     isActive: true,
 };
 
-const sectionClass = "space-y-3 pb-3 border-b border-orange-200/60";
+const sectionClass = "space-y-2 pb-2.5 border-b border-orange-200/60";
 const fieldLabelClass =
     "mb-0.5 block text-[10px] font-extrabold uppercase tracking-wider text-stone-500";
 const inputClass =
-    "w-full bg-transparent border-b border-stone-300 py-1 text-xs sm:text-sm font-bold text-stone-900 placeholder:text-stone-400 outline-none focus:border-stone-800 transition";
+    "w-full bg-transparent border-b border-stone-300 py-0.5 text-xs sm:text-sm font-bold text-stone-900 placeholder:text-stone-400 outline-none focus:border-stone-800 transition";
 
 const buildLogoPreviewSources = (rawLogo) => {
     const value = String(rawLogo || "").trim();
@@ -87,8 +87,8 @@ function SectionHeader({ icon, title, subtitle, logoSrc = "" }) {
     const Icon = icon;
 
     return (
-        <div className="flex items-center gap-2.5">
-            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-100/70 text-orange-600">
+        <div className="flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-orange-100/70 text-orange-600">
                 {logoSrc ? (
                     <img
                         src={logoSrc}
@@ -96,12 +96,12 @@ function SectionHeader({ icon, title, subtitle, logoSrc = "" }) {
                         className="h-full w-full rounded-lg object-cover"
                     />
                 ) : (
-                    <Icon size={16} />
+                    <Icon size={15} />
                 )}
             </span>
             <div>
-                <h3 className="text-base font-bold leading-tight text-stone-900">{title}</h3>
-                <p className="text-[11px] text-stone-500">{subtitle}</p>
+                <h3 className="text-sm sm:text-base font-bold leading-tight text-stone-900">{title}</h3>
+                <p className="text-[10px] text-stone-500">{subtitle}</p>
             </div>
         </div>
     );
@@ -112,7 +112,7 @@ function Field({ label, hint, className = "", children }) {
         <label className={`block ${className}`}>
             <span className={fieldLabelClass}>{label}</span>
             {children}
-            {hint ? <span className="mt-0.5 block text-[10px] text-stone-400">{hint}</span> : null}
+            {hint ? <span className="mt-0.5 block text-[9px] text-stone-400">{hint}</span> : null}
         </label>
     );
 }
@@ -253,9 +253,9 @@ export default function OwnerSettings() {
 
     if (loading) {
         return (
-            <div className="py-10 text-center text-sm font-semibold text-stone-500">
+            <div className="py-8 text-center text-xs font-semibold text-stone-500">
                 <div className="inline-flex items-center gap-2">
-                    <LoaderCircle size={16} className="animate-spin text-orange-600" />
+                    <LoaderCircle size={15} className="animate-spin text-orange-600" />
                     Loading settings...
                 </div>
             </div>
@@ -263,26 +263,26 @@ export default function OwnerSettings() {
     }
 
     return (
-        <section className="space-y-3.5 pb-4">
+        <section className="space-y-2.5 pb-2">
             {error && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs font-semibold text-rose-800">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-2 text-xs font-semibold text-rose-800">
                     {error}
                 </div>
             )}
             {success && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-xs font-semibold text-emerald-800">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-2 text-xs font-semibold text-emerald-800">
                     {success}
                 </div>
             )}
 
-            {/* Header Section - Words on Paper (No Container Box) */}
-            <div className="pb-2.5 border-b border-orange-200/60">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            {/* Header Section - Words on Paper */}
+            <div className="pb-1.5 border-b border-orange-200/60">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <p className="text-[10px] font-extrabold uppercase tracking-widest text-stone-500">
                             Owner Profile
                         </p>
-                        <h2 className="mt-0.5 text-2xl font-black text-stone-900 tracking-tight flex items-center gap-2.5">
+                        <h2 className="mt-0.5 text-xl sm:text-2xl font-black text-stone-900 tracking-tight flex items-center gap-2">
                             <OwnerMenuButton />
                             Restaurant Settings
                         </h2>
@@ -291,15 +291,15 @@ export default function OwnerSettings() {
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 border border-orange-200/60 px-2.5 py-0.5 text-xs font-bold text-orange-800">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 border border-orange-200/60 px-2 py-0.5 text-xs font-bold text-orange-800">
                             Profile: {completionPercent}%
                         </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 text-xs font-bold text-emerald-800">
                             {Boolean(form.isActive) ? "Active" : "Inactive"}
                         </span>
                     </div>
                 </div>
-                <div className="mt-2 h-1 overflow-hidden rounded-full bg-stone-100">
+                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-stone-100">
                     <div
                         className="h-full rounded-full bg-orange-500 transition-all"
                         style={{ width: `${completionPercent}%` }}
@@ -307,7 +307,7 @@ export default function OwnerSettings() {
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3.5">
+            <form onSubmit={handleSubmit} className="space-y-2.5">
                 <article className={sectionClass}>
                     <SectionHeader
                         icon={Building2}
@@ -315,7 +315,7 @@ export default function OwnerSettings() {
                         subtitle="Public profile information shown on receipts and in owner tools."
                         logoSrc={logoPreviewSrc}
                     />
-                    <div className="mt-2 grid gap-x-4 gap-y-2 md:grid-cols-2">
+                    <div className="mt-1.5 grid gap-x-4 gap-y-1.5 md:grid-cols-2">
                         <Field label="Restaurant Name">
                             <input
                                 className={inputClass}
@@ -349,7 +349,7 @@ export default function OwnerSettings() {
                                 onChange={setField("email")}
                             />
                         </Field>
-                        <Field label="Business Phone" className="md:col-span-2">
+                        <Field label="Business Phone">
                             <input
                                 className={inputClass}
                                 placeholder="+91 9999999999"
@@ -359,10 +359,10 @@ export default function OwnerSettings() {
                         </Field>
                     </div>
 
-                    <div className="mt-2.5 pt-2.5 border-t border-stone-200/60">
+                    <div className="mt-2 pt-2 border-t border-stone-200/60">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex items-center gap-2.5">
-                                <div className="h-9 w-9 overflow-hidden rounded-lg border border-stone-200 bg-stone-50 shrink-0">
+                            <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 overflow-hidden rounded-lg border border-stone-200 bg-stone-50 shrink-0">
                                     {logoPreviewSrc ? (
                                         <img
                                             src={logoPreviewSrc}
@@ -372,7 +372,7 @@ export default function OwnerSettings() {
                                         />
                                     ) : (
                                         <div className="flex h-full w-full items-center justify-center">
-                                            <Upload size={16} className="text-stone-400" />
+                                            <Upload size={14} className="text-stone-400" />
                                         </div>
                                     )}
                                 </div>
@@ -402,7 +402,7 @@ export default function OwnerSettings() {
                             </label>
                         </div>
 
-                        <Field label="Logo URL" className="mt-2">
+                        <Field label="Logo URL" className="mt-1.5">
                             <input
                                 className={inputClass}
                                 placeholder="https://example.com/logo.png"
@@ -413,14 +413,14 @@ export default function OwnerSettings() {
                     </div>
                 </article>
 
-                <div className="grid gap-3.5 lg:grid-cols-2">
+                <div className="grid gap-3 lg:grid-cols-2">
                     <article className={sectionClass}>
                         <SectionHeader
                             icon={MapPin}
                             title="Address & Identity"
                             subtitle="Used for invoices, legal records, and compliance."
                         />
-                        <div className="mt-2 grid gap-x-4 gap-y-2 md:grid-cols-2">
+                        <div className="mt-1.5 grid gap-x-4 gap-y-1.5 md:grid-cols-2">
                             <Field label="Address Line" className="md:col-span-2">
                                 <input
                                     className={inputClass}
@@ -461,7 +461,7 @@ export default function OwnerSettings() {
                                     onChange={setField("pincode")}
                                 />
                             </Field>
-                            <Field label="GST Number" className="md:col-span-2">
+                            <Field label="GST Number">
                                 <input
                                     className={inputClass}
                                     placeholder="29ABCDE1234F1Z5"
@@ -471,7 +471,7 @@ export default function OwnerSettings() {
                             </Field>
                         </div>
 
-                        <div className="mt-2.5 pt-2.5 border-t border-stone-200/60">
+                        <div className="mt-2 pt-2 border-t border-stone-200/60">
                             <MapLocationPicker
                                 latitude={form.latitude}
                                 longitude={form.longitude}
@@ -491,8 +491,8 @@ export default function OwnerSettings() {
                             subtitle="Control tax mode, service charge, and invoice numbering."
                         />
 
-                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                            <label className="flex cursor-pointer items-center justify-between gap-2 border-b border-stone-200/60 py-1">
+                        <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
+                            <label className="flex cursor-pointer items-center justify-between gap-2 border-b border-stone-200/60 py-0.5">
                                 <div>
                                     <p className="text-xs font-bold text-stone-900">Tax Enabled</p>
                                     <p className="text-[10px] text-stone-500">{taxStatusText}</p>
@@ -505,7 +505,7 @@ export default function OwnerSettings() {
                                 />
                             </label>
 
-                            <label className="flex cursor-pointer items-center justify-between gap-2 border-b border-stone-200/60 py-1">
+                            <label className="flex cursor-pointer items-center justify-between gap-2 border-b border-stone-200/60 py-0.5">
                                 <div>
                                     <p className="text-xs font-bold text-stone-900">Service Charge</p>
                                     <p className="text-[10px] text-stone-500">{serviceChargeText}</p>
@@ -519,7 +519,7 @@ export default function OwnerSettings() {
                             </label>
                         </div>
 
-                        <div className="mt-2 grid gap-x-4 gap-y-2 md:grid-cols-2">
+                        <div className="mt-1.5 grid gap-x-4 gap-y-1.5 md:grid-cols-2">
                             <Field label="Tax Type">
                                 <select
                                     className={inputClass}
@@ -560,7 +560,7 @@ export default function OwnerSettings() {
                                     onChange={setField("invoicePrefix")}
                                 />
                             </Field>
-                            <Field label="Next Invoice Number" className="md:col-span-2">
+                            <Field label="Next Invoice Number">
                                 <input
                                     type="number"
                                     min="1"
@@ -581,7 +581,7 @@ export default function OwnerSettings() {
                         title="Operations"
                         subtitle="Core running preferences for timezone, currency, and availability."
                     />
-                    <div className="mt-2 grid gap-x-4 gap-y-2 md:grid-cols-2">
+                    <div className="mt-1.5 grid gap-x-4 gap-y-1.5 md:grid-cols-2">
                         <Field label="Timezone">
                             <input
                                 className={inputClass}
@@ -598,7 +598,7 @@ export default function OwnerSettings() {
                                 onChange={setField("currency")}
                             />
                         </Field>
-                        <label className="flex cursor-pointer items-center justify-between border-t border-stone-200/60 pt-2 md:col-span-2">
+                        <label className="flex cursor-pointer items-center justify-between border-t border-stone-200/60 pt-1.5 md:col-span-2">
                             <div className="flex items-center gap-2">
                                 <ShieldCheck size={15} className="text-orange-600" />
                                 <div>
@@ -624,31 +624,31 @@ export default function OwnerSettings() {
                         title="Appearance"
                         subtitle="Choose the restaurant theme shown across staff and customer screens."
                     />
-                    <div className="mt-2 max-w-xl">
-                        <p className="text-xs font-bold text-stone-700 mb-1.5">UI Theme</p>
+                    <div className="mt-1.5 max-w-xl">
+                        <p className="text-xs font-bold text-stone-700 mb-1">UI Theme</p>
                         <ThemeSelector variant="compact" />
                     </div>
                 </article>
 
-                <article className="pb-3 border-b border-rose-200/60">
-                    <div className="flex items-start justify-between gap-2.5">
-                        <div className="flex items-center gap-2.5">
-                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
-                                <Trash2 size={15} />
+                <article className="pb-2 border-b border-rose-200/60">
+                    <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
+                                <Trash2 size={14} />
                             </span>
                             <div>
                                 <p className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600">Danger Zone</p>
-                                <h3 className="text-sm sm:text-base font-bold text-rose-800">Delete Account</h3>
-                                <p className="text-[11px] text-stone-500">
+                                <h3 className="text-xs sm:text-sm font-bold text-rose-800">Delete Account</h3>
+                                <p className="text-[10px] text-stone-500">
                                     Permanently delete your account, restaurant data, and access.
                                 </p>
                             </div>
                         </div>
                     </div>
-                    <div className="mt-2">
+                    <div className="mt-1.5">
                         <Link
                             to="/delete-account"
-                            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1 text-xs font-bold text-rose-800 transition"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 text-xs font-bold text-rose-800 transition"
                         >
                             <Trash2 size={13} />
                             Delete Account
