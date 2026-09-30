@@ -42,6 +42,7 @@ import TableBlockModal from "../components/TableBlockModal";
 import MealShiftConfigModal from "../components/MealShiftConfigModal";
 import ReservationModal from "../components/ReservationModal";
 import OwnerMenuButton from "../components/OwnerMenuButton";
+import BrandLogo from "../components/BrandLogo";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
 
@@ -297,12 +298,15 @@ export default function Server() {
             <header className="sticky top-0 z-30 border-b border-[color:var(--app-border)]/50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 py-3 shadow-xs flex flex-wrap items-center justify-between gap-3">
                 {/* Brand & Branch Info */}
                 <div className="flex items-center gap-3">
-                    <OwnerMenuButton />
-                    <div className="rounded-xl bg-orange-500/10 p-2 text-orange-500 border border-orange-500/20">
-                        <UtensilsCrossed className="h-5 w-5" />
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1 shadow-[0_4px_14px_rgba(104,70,37,0.12)]">
+                        <BrandLogo className="h-full w-full" title="Tiffzy logo" />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
+                            <span className="text-base font-black tracking-tight text-orange-500">
+                                Tiffzy
+                            </span>
+                            <span className="text-sm font-extrabold text-[color:var(--app-muted)]">•</span>
                             <h1 className="text-base font-extrabold tracking-tight text-[color:var(--app-text)]">{restaurantName}</h1>
                             <span className="rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 px-2 py-0.5 text-[10px] font-bold border border-orange-500/30">
                                 Server Station
