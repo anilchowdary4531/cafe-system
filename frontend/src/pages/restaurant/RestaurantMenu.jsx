@@ -201,7 +201,7 @@ export default function RestaurantMenu() {
     // URL is source-of-truth when present. Otherwise keep the last selected table from local storage.
     const tableNo = tableFromUrl || tableFromContext || "";
     const vegModeEnabled = Boolean(restaurantContext?.vegOnly);
-    const { addToCart, cart, total } = useCart();
+    const { addToCart, increaseQty, decreaseQty, cart, total } = useCart();
 
     const { data, loading } = useCachedGet(`/r/${slug}/menu`, {
         ttlMs: 5_000,
@@ -257,6 +257,7 @@ export default function RestaurantMenu() {
 
     const sectionRefs = useRef(new Map());
     const menuStartRef = useRef(null);
+    const isManualScrollingRef = useRef(false);
 
     useEffect(() => {
         // Keep global restaurant context in sync with the URL immediately,
@@ -420,6 +421,7 @@ export default function RestaurantMenu() {
 
         const observer = new IntersectionObserver(
             (entries) => {
+                if (isManualScrollingRef.current) return;
                 const visible = entries
                     .filter((entry) => entry.isIntersecting)
                     .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
@@ -458,17 +460,21 @@ export default function RestaurantMenu() {
 
     const scrollToSection = useCallback(
         (key) => {
+            isManualScrollingRef.current = true;
+            setActiveSection(key);
+
             if (key === "all") {
-                setActiveSection("all");
                 menuStartRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                return;
+            } else {
+                const node = sectionRefs.current.get(key);
+                if (node) {
+                    node.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
             }
 
-            const node = sectionRefs.current.get(key);
-            if (!node) return;
-
-            setActiveSection(key);
-            node.scrollIntoView({ behavior: "smooth", block: "start" });
+            setTimeout(() => {
+                isManualScrollingRef.current = false;
+            }, 800);
         },
         [setActiveSection]
     );
@@ -619,6 +625,8 @@ export default function RestaurantMenu() {
                             favoriteKeySet={favoriteKeySet}
                             onToggleFavorite={handleToggleFavorite}
                             onAdd={handleAddToCart}
+                            onIncrease={increaseQty}
+                            onDecrease={decreaseQty}
                             sectionRef={registerSectionRef(section.key)}
                             cart={cart}
                         />
@@ -686,7 +694,7 @@ export default function RestaurantMenu() {
     );
 }
 
-function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, onAdd, sectionRef, cart = [] }) {
+function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, onAdd, onIncrease, onDecrease, sectionRef, cart = [] }) {
     if (!Array.isArray(items) || !items.length) return null;
 
     const Icon = section?.Icon || Tags;
@@ -722,6 +730,8 @@ function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, o
                             isFavorite={favoriteKeySet.has(`${String(slug || "").trim()}:${Number(item?.id || 0)}`)}
                             onToggleFavorite={onToggleFavorite}
                             onAdd={onAdd}
+                            onIncrease={onIncrease}
+                            onDecrease={onDecrease}
                             quantity={qty}
                         />
                     );
@@ -731,7 +741,7 @@ function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, o
     );
 }
 
-function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, quantity = 0 }) {
+function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, onIncrease, onDecrease, quantity = 0 }) {
     const imageSrc = resolveImageUrl(item?.image) || FALLBACK_IMAGE;
     const dietBadge = getDietBadge(item);
     const itemPrice = Number(item?.price || 0);
@@ -755,7 +765,7 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, quantity = 0 
             }}
             className={`group flex w-[130px] shrink-0 cursor-pointer flex-col gap-1.5 rounded-2xl p-1.5 text-left transition duration-300 sm:w-full sm:cursor-default sm:flex-row sm:gap-3.5 sm:p-3 sm:rounded-2xl border ${
                 quantity > 0
-                    ? "bg-[linear-gradient(180deg,rgba(16,185,129,0.12)_0%,rgba(16,185,129,0.04)_100%)] border-emerald-500/30 shadow-[0_8px_20px_rgba(16,185,129,0.08)]"
+                    ? "bg-emerald-500/10 border-emerald-500/50 shadow-[0_8px_20px_rgba(16,185,129,0.12)]"
                     : "bg-white/[0.02] border-white/5 sm:border-transparent sm:bg-transparent hover:bg-white/[0.04] sm:hover:bg-white/[0.02] sm:hover:border-white/10"
             }`}
         >
@@ -825,16 +835,39 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, quantity = 0 
                     </div>
 
                     {quantity > 0 ? (
-                        <div className="hidden shrink-0 items-center gap-1.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 text-[11px] font-bold sm:inline-flex">
-                            <span>{quantity} selected</span>
+                        <div className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-1 text-xs font-bold sm:px-2.5">
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDecrease && onDecrease(item.id);
+                                }}
+                                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white font-black hover:bg-emerald-600 transition active:scale-90"
+                                aria-label="Decrease quantity"
+                            >
+                                -
+                            </button>
+                            <span className="px-1 font-black text-emerald-300 tabular-nums">{quantity}</span>
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onIncrease ? onIncrease(item.id) : onAdd && onAdd(item);
+                                }}
+                                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white font-black hover:bg-emerald-600 transition active:scale-90"
+                                aria-label="Increase quantity"
+                            >
+                                +
+                            </button>
                         </div>
                     ) : (
                         <button
+                            type="button"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onAdd && onAdd(item);
                             }}
-                            className="theme-button hidden shrink-0 items-center justify-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-semibold sm:inline-flex sm:px-3"
+                            className="theme-button inline-flex shrink-0 items-center justify-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-semibold sm:px-3 active:scale-95 transition"
                         >
                             <Plus size={11} />
                             Add
