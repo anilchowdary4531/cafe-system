@@ -520,7 +520,7 @@ export default function RestaurantMenu() {
     return (
         <div className="theme-page min-h-screen">
             <div className="theme-nav sticky top-0 z-30 border-b px-2 py-2 sm:px-4 md:px-6">
-                <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+                <div className="mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
                     <div className="flex min-w-0 items-center gap-3 justify-self-start">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1.5 shadow-[0_4px_14px_rgba(104,70,37,0.12)] sm:h-12 sm:w-12">
                             <BrandLogo className="h-full w-full" title="Tiffzy logo" />
@@ -581,7 +581,7 @@ export default function RestaurantMenu() {
                 </div>
             </div>
 
-            <div className="w-full px-1 py-4 pb-28 sm:px-4 md:px-6 md:py-5 md:pb-10">
+            <div className="mx-auto w-full max-w-7xl px-2 py-4 pb-28 sm:px-4 md:px-6 md:py-5 md:pb-10">
                 <div ref={menuStartRef} className="scroll-mt-32">
                     <div className="mb-3 space-y-3 sm:mb-4">
                         <div className="flex justify-end">
@@ -725,25 +725,25 @@ function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, o
     const Icon = section?.Icon || Tags;
 
     return (
-        <section ref={sectionRef} data-section-key={section.key} className="scroll-mt-28">
-            <div className="mb-2 flex items-end justify-between gap-3 px-0.5">
+        <section ref={sectionRef} data-section-key={section.key} className="scroll-mt-28 mb-6 sm:mb-8">
+            <div className="mb-2.5 flex items-end justify-between gap-3 px-0.5">
                 <div className="flex items-center gap-2">
                     <span className="theme-pill inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl">
                         <Icon size={16} className="theme-accent-text" />
                     </span>
                     <div>
-                        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] sm:text-base">
+                        <h2 className="text-sm font-bold uppercase tracking-[0.18em] sm:text-base">
                             {section.title}
                         </h2>
                         {section.key === "recommended" ? (
-                            <p className="theme-muted mt-0.5 hidden text-xs sm:block">Popular picks surfaced first</p>
+                            <p className="theme-muted mt-0.5 text-xs">Popular picks surfaced first</p>
                         ) : null}
                     </div>
                 </div>
                 <span className="theme-muted text-xs tabular-nums sm:text-sm">{items.length} items</span>
             </div>
 
-            <div className="flex gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-col sm:overflow-visible sm:pb-0 sm:space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4">
                 {items.map((item) => {
                     const cartItem = cart.find((i) => i.id === item.id);
                     const qty = cartItem ? cartItem.quantity : 0;
@@ -793,24 +793,24 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, onIncrease, o
                     handleCardClick();
                 }
             }}
-            className={`group flex w-[130px] shrink-0 cursor-pointer flex-col gap-1.5 rounded-2xl p-1.5 text-left transition duration-300 sm:w-full sm:cursor-default sm:flex-row sm:gap-3.5 sm:p-3 sm:rounded-2xl border ${
+            className={`group relative flex w-full cursor-pointer flex-row items-start gap-3 rounded-2xl p-2.5 sm:p-3 text-left transition duration-300 border ${
                 quantity > 0
-                    ? "bg-emerald-500/10 border-emerald-500/50 shadow-[0_8px_20px_rgba(16,185,129,0.12)]"
-                    : "bg-white/[0.02] border-white/5 sm:border-transparent sm:bg-transparent hover:bg-white/[0.04] sm:hover:bg-white/[0.02] sm:hover:border-white/10"
+                    ? "bg-emerald-500/10 border-emerald-500/50 shadow-[0_4px_16px_rgba(16,185,129,0.12)]"
+                    : "bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20"
             }`}
         >
-            <div className="relative h-22 w-full shrink-0 overflow-hidden rounded-2xl border border-white/8 bg-black/10 sm:h-24 sm:w-24">
+            <div className="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-black/10">
                 <img
                     src={imageSrc}
                     className="h-full w-full object-cover"
                     alt={String(item?.name || "Menu item")}
                     loading="lazy"
                 />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/55 to-transparent" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/60 to-transparent" />
 
-                <div className="absolute bottom-1.5 right-1.5">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#fff8e6] drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
-                        <Star size={10} className="text-[#ffd24d]" />
+                <div className="absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5">
+                    <span className="inline-flex items-center gap-0.5 rounded-md bg-black/60 px-1 py-0.5 text-[9px] sm:text-[10px] font-bold text-[#fff8e6] backdrop-blur-xs">
+                        <Star size={9} className="text-[#ffd24d] fill-[#ffd24d]" />
                         {Number(item?.rating || 4.5).toFixed(1)}
                     </span>
                 </div>
@@ -821,109 +821,111 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, onIncrease, o
                         e.stopPropagation();
                         onToggleFavorite && onToggleFavorite(item);
                     }}
-                    className={`absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border transition ${
+                    className={`absolute right-1 top-1 sm:right-1.5 sm:top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border transition ${
                         isFavorite
-                            ? "border-red-500/40 bg-red-500/10 text-red-300"
-                            : "border-white/10 bg-black/10 text-white/90"
+                            ? "border-red-500/40 bg-red-500/20 text-red-400"
+                            : "border-white/20 bg-black/40 text-white/90 hover:bg-black/60"
                     }`}
                     aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
                 >
-                    <Heart size={12} fill={isFavorite ? "currentColor" : "none"} />
+                    <Heart size={11} fill={isFavorite ? "currentColor" : "none"} />
                 </button>
             </div>
 
-            <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2 sm:gap-3">
-                    <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                            <h3 className="text-[11px] font-bold leading-tight sm:text-[15px]">{item?.name}</h3>
-                            {dietBadge ? (
-                                <span
-                                    className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[7px] font-semibold sm:gap-1.5 sm:text-[8px] ${dietBadge.className}`}
-                                >
-                                    <dietBadge.Icon size={9} />
-                                    {dietBadge.label}
-                                </span>
-                            ) : null}
-                        </div>
+            <div className="min-w-0 flex-1 flex flex-col justify-between self-stretch">
+                <div>
+                    <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <h3 className="text-xs sm:text-[15px] font-bold leading-tight text-[color:var(--app-text)] line-clamp-1">
+                                    {item?.name}
+                                </h3>
+                                {dietBadge ? (
+                                    <span
+                                        className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[7px] font-semibold sm:text-[8px] ${dietBadge.className}`}
+                                    >
+                                        <dietBadge.Icon size={8} />
+                                        {dietBadge.label}
+                                    </span>
+                                ) : null}
+                            </div>
 
-                        {hasDiscount ? (
-                            <div className="mt-0.5 flex flex-wrap items-center gap-1 sm:gap-2">
-                                <p className="text-[9px] text-[color:var(--app-muted)] line-through sm:text-[11px]">
-                                    {formatPrice(originalPrice)}
-                                </p>
-                                <p className="text-[10px] font-semibold text-[color:var(--app-accent)] sm:text-[13px]">
+                            {hasDiscount ? (
+                                <div className="mt-0.5 flex flex-wrap items-center gap-1 sm:gap-1.5">
+                                    <p className="text-[10px] text-[color:var(--app-muted)] line-through sm:text-xs">
+                                        {formatPrice(originalPrice)}
+                                    </p>
+                                    <p className="text-xs font-bold text-[color:var(--app-accent)] sm:text-sm">
+                                        {formatPrice(itemPrice)}
+                                    </p>
+                                    <span className="inline-flex items-center rounded-full border border-orange-500/30 bg-orange-500/10 px-1.5 py-0.2 text-[8px] font-extrabold uppercase text-orange-500">
+                                        {Math.round(discountPercent)}% OFF
+                                    </span>
+                                </div>
+                            ) : (
+                                <p className="mt-0.5 text-xs font-bold text-[color:var(--app-accent)] sm:text-sm">
                                     {formatPrice(itemPrice)}
                                 </p>
-                                <span className="inline-flex items-center rounded-full border border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,var(--app-primary)_16%,transparent)] px-1 py-0.5 text-[7px] font-semibold uppercase tracking-[0.14em] text-[color:var(--app-primary)] sm:px-2 sm:text-[9px]">
-                                    {Math.round(discountPercent)}% off
-                                </span>
-                            </div>
-                        ) : (
-                            <p className="mt-0.5 text-[10px] font-semibold text-[color:var(--app-accent)] sm:text-[13px]">{formatPrice(itemPrice)}</p>
-                        )}
+                            )}
+                        </div>
+
+                        <div className="shrink-0 flex items-center justify-end pl-1">
+                            {quantity > 0 ? (
+                                <div className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-1 text-xs font-bold sm:px-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onDecrease && onDecrease(item.id);
+                                        }}
+                                        className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white font-black hover:bg-emerald-600 transition active:scale-90"
+                                        aria-label="Decrease quantity"
+                                    >
+                                        -
+                                    </button>
+                                    <span className="px-1 font-black text-emerald-300 tabular-nums text-xs sm:text-sm">{quantity}</span>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onIncrease ? onIncrease(item.id) : onAdd && onAdd(item);
+                                        }}
+                                        className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white font-black hover:bg-emerald-600 transition active:scale-90"
+                                        aria-label="Increase quantity"
+                                    >
+                                        +
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onAdd && onAdd(item);
+                                    }}
+                                    className="theme-button inline-flex shrink-0 items-center justify-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-bold active:scale-95 transition"
+                                >
+                                    <Plus size={11} />
+                                    Add
+                                </button>
+                            )}
+                        </div>
                     </div>
 
-                    {quantity > 0 ? (
-                        <div className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-1 text-xs font-bold sm:px-2.5">
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDecrease && onDecrease(item.id);
-                                }}
-                                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white font-black hover:bg-emerald-600 transition active:scale-90"
-                                aria-label="Decrease quantity"
-                            >
-                                -
-                            </button>
-                            <span className="px-1 font-black text-emerald-300 tabular-nums">{quantity}</span>
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onIncrease ? onIncrease(item.id) : onAdd && onAdd(item);
-                                }}
-                                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white font-black hover:bg-emerald-600 transition active:scale-90"
-                                aria-label="Increase quantity"
-                            >
-                                +
-                            </button>
-                        </div>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onAdd && onAdd(item);
-                            }}
-                            className="theme-button inline-flex shrink-0 items-center justify-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-semibold sm:px-3 active:scale-95 transition"
-                        >
-                            <Plus size={11} />
-                            Add
-                        </button>
-                    )}
+                    <p className="theme-muted mt-1 text-[11px] sm:text-xs leading-tight sm:leading-snug line-clamp-2">
+                        {item?.description || "Freshly prepared, premium quality ingredients."}
+                    </p>
                 </div>
 
-                <p
-                    className="theme-muted mt-1 hidden text-[10px] leading-4 sm:mt-1.5 sm:block sm:text-[13px] sm:leading-5"
-                    style={{
-                        display: "-webkit-box",
-                        WebkitBoxOrient: "vertical",
-                        WebkitLineClamp: 1,
-                        overflow: "hidden",
-                    }}
-                >
-                    {item?.description || "Freshly prepared, premium quality ingredients."}
-                </p>
-
-                <div className="mt-1 hidden flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[color:var(--app-muted)] sm:mt-2 sm:flex">
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] text-[color:var(--app-muted)]">
                     {Number(item?.orderCount || 0) > 0 ? (
                         <span>{Number(item?.orderCount || 0).toLocaleString("en-IN")} orders</span>
                     ) : null}
-
+                    {Number(item?.orderCount || 0) > 0 && Number(item?.reviewCount || 0) > 0 ? (
+                        <span>•</span>
+                    ) : null}
                     {Number(item?.reviewCount || 0) > 0 ? (
-                        <span className="uppercase tracking-[0.14em]">{Number(item?.reviewCount || 0)} ratings</span>
+                        <span className="uppercase tracking-wider">{Number(item?.reviewCount || 0)} RATINGS</span>
                     ) : null}
                 </div>
             </div>
