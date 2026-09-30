@@ -1099,32 +1099,35 @@ export default function OwnerLayout() {
     const handleFreeTable = async (table, assignmentKey) => {
         const activeOrders = Array.isArray(table?.activeOrders) ? table.activeOrders : [];
         const hasAssignment = Boolean(tableAssignments[assignmentKey]);
-        if ((!activeOrders.length && !hasAssignment) || !restaurantId) {
+        const targetTableId = table?.id || (table?.tableNo ? Number(table.tableNo) : null);
+
+        if (!restaurantId || !targetTableId) {
             setOpenOrdersTableKey("");
             setOpenMoreTableKey("");
-            showToast({
-                title: "Table already free",
-                message: `Table ${table?.tableNo || "--"} is already free.`,
-                variant: "info",
-            });
             return;
         }
 
         setCompletingTableKey(assignmentKey);
         setReceiptActionError("");
         try {
-            await Promise.all(
-                activeOrders.map((order) =>
-                    axios.put(
-                        `${API}/owner/${restaurantId}/orders/${order.id}/status`,
-                        {
-                            status: "DELIVERED",
-                            changedByName: user?.name || "Owner",
-                        }
+            // Call backend API to force clear table session & waiter assignment
+            await axios.post(`${API}/owner/${restaurantId}/tables/${targetTableId}/clear`).catch(() => {});
+
+            if (activeOrders.length > 0) {
+                await Promise.all(
+                    activeOrders.map((order) =>
+                        axios.put(
+                            `${API}/owner/${restaurantId}/orders/${order.id}/status`,
+                            {
+                                status: "DELIVERED",
+                                changedByName: user?.name || "Owner",
+                            }
+                        ).catch(() => {})
                     )
-                )
-            );
-            if (hasAssignment) {
+                );
+            }
+
+            if (hasAssignment && assignmentKey) {
                 clearTableAssignment(assignmentKey);
             }
             if (assignmentKey) {
@@ -1139,14 +1142,14 @@ export default function OwnerLayout() {
             setOpenStaffTableKey("");
             setOpenMoreTableKey("");
             showToast({
-                title: "Table freed",
-                message: `Table ${table?.tableNo || "--"} is now free.`,
+                title: "Table Freed 🎉",
+                message: `Table ${table?.tableNo || "--"} is now free and available.`,
                 variant: "success",
             });
         } catch (err) {
-            console.log(err);
+            console.error("Error freeing table:", err);
             setReceiptActionError(
-                err?.response?.data?.message || "Failed to free the table."
+                err?.response?.data?.message || err?.message || "Failed to free the table."
             );
         } finally {
             setCompletingTableKey("");

@@ -1035,6 +1035,71 @@ export default async function ownerRoutes(app, deps) {
     }
   });
 
+  // Force Clear & Free Table Endpoint
+  app.post("/owner/:restaurantId/tables/:tableId/clear", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const tableId = Number(req.params.tableId);
+
+      const table = await prisma.diningTable.findFirst({
+        where: { id: tableId, restaurantId },
+      });
+
+      if (!table) {
+        return reply.code(404).send({ success: false, message: "Table not found" });
+      }
+
+      // Close all active table sessions for this table
+      await prisma.tableSession.updateMany({
+        where: {
+          tableId,
+          restaurantId,
+          status: { in: ["OPEN", "BILLING", "PAID"] },
+        },
+        data: {
+          status: "CLOSED",
+          closedAt: new Date(),
+        },
+      });
+
+      // Mark any open orders for this table as delivered / closed
+      await prisma.order.updateMany({
+        where: {
+          tableId,
+          restaurantId,
+          status: { in: ["PLACED", "ACCEPTED", "PREPARING", "READY", "OPEN", "BILLING"] },
+        },
+        data: {
+          status: "DELIVERED",
+        },
+      }).catch(() => {});
+
+      // Clear waiter assignment on table
+      const updatedTable = await prisma.diningTable.update({
+        where: { id: tableId },
+        data: {
+          assignedWaiterId: null,
+          assignedWaiterName: null,
+        },
+      });
+
+      if (realtime?.io) {
+        realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId });
+        realtime.io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableId });
+        realtime.io.to(`restaurant_${restaurantId}`).emit("table:layout_updated", { restaurantId });
+      }
+
+      return reply.send({
+        success: true,
+        message: `Table ${table.tableNo} cleared and marked free!`,
+        table: updatedTable,
+      });
+    } catch (err) {
+      console.error("Error clearing table:", err);
+      return reply.code(500).send({ success: false, message: err.message || "Failed to clear table" });
+    }
+  });
+
   // Update Restaurant Shift Timings
   app.put("/owner/:restaurantId/settings/shifts", async (req, reply) => {
     try {

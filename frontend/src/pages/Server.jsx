@@ -292,6 +292,34 @@ export default function Server() {
         }
     };
 
+    const handleClearTable = async (tableToClear) => {
+        const target = tableToClear || selectedTable;
+        if (!target || !restaurantId) return;
+
+        try {
+            const res = await axios.post(`${API}/owner/${restaurantId}/tables/${target.id}/clear`);
+            if (res.data?.success) {
+                showToast({
+                    title: "Table Freed 🎉",
+                    message: `Table ${target.tableNo} is now free.`,
+                    variant: "success",
+                });
+                if (selectedTable?.id === target.id) {
+                    setSelectedTable(null);
+                    setCart({});
+                    setViewMode("FLOOR_PLAN");
+                }
+                refreshTables();
+            }
+        } catch (err) {
+            showToast({
+                title: "Error",
+                message: err.response?.data?.message || err.message || "Failed to free table.",
+                variant: "error",
+            });
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[color:var(--app-bg,#f8fafc)] text-[color:var(--app-text,#0f172a)] font-sans flex flex-col">
             {/* Top Navigation & Status Bar */}
@@ -546,11 +574,29 @@ export default function Server() {
                                                 {isBlocked ? "Unblock" : "Block"}
                                             </button>
 
-                                            {!isBlocked && (
-                                                <span className="font-bold text-orange-500 group-hover:translate-x-0.5 transition">
-                                                    Select →
-                                                </span>
-                                            )}
+                                            <div className="flex items-center gap-2">
+                                                {isOccupied && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (window.confirm(`Are you sure you want to free Table ${table.tableNo}?`)) {
+                                                                handleClearTable(table);
+                                                            }
+                                                        }}
+                                                        className="px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-bold transition flex items-center gap-1"
+                                                        title="Free / Clear Table"
+                                                    >
+                                                        <Trash2 className="h-2.5 w-2.5" /> Free
+                                                    </button>
+                                                )}
+
+                                                {!isBlocked && (
+                                                    <span className="font-bold text-orange-500 group-hover:translate-x-0.5 transition">
+                                                        Select →
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -570,12 +616,25 @@ export default function Server() {
                                     <span className="text-xs theme-muted">({selectedTable?.seats} Seats)</span>
                                 </h2>
                             </div>
-                            <button
-                                onClick={() => setViewMode("FLOOR_PLAN")}
-                                className="rounded-xl border border-[color:var(--app-border)]/40 px-3 py-1 text-xs font-bold theme-muted hover:bg-black/5"
-                            >
-                                ← Back to Floor Plan
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (window.confirm(`Are you sure you want to free Table ${selectedTable?.tableNo}?`)) {
+                                            handleClearTable(selectedTable);
+                                        }
+                                    }}
+                                    className="rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-3 py-1 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition flex items-center gap-1"
+                                >
+                                    <Trash2 className="h-3 w-3" /> Free Table
+                                </button>
+                                <button
+                                    onClick={() => setViewMode("FLOOR_PLAN")}
+                                    className="rounded-xl border border-[color:var(--app-border)]/40 px-3 py-1 text-xs font-bold theme-muted hover:bg-black/5"
+                                >
+                                    ← Back to Floor Plan
+                                </button>
+                            </div>
                         </div>
 
                         {/* Menu Categories */}
