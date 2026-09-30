@@ -22,6 +22,7 @@ import {
 import { useCart } from "../../context/CartContext";
 import { useRestaurantContext } from "../../context/RestaurantContext";
 import CartDrawer from "../../components/CartDrawer";
+import ItemCustomizationModal from "../../components/ItemCustomizationModal";
 import BrandLogo from "../../components/BrandLogo";
 import Footer from "../../components/Footer";
 import VegModeToggle from "../../components/VegModeToggle";
@@ -219,6 +220,7 @@ export default function RestaurantMenu() {
     const [favorites, setFavorites] = useState(() => getCustomerFavorites());
     const [showAgeModal, setShowAgeModal] = useState(false);
     const [pendingTobaccoItem, setPendingTobaccoItem] = useState(null);
+    const [selectedDetailItem, setSelectedDetailItem] = useState(null);
 
     const isTobaccoSearch = useMemo(() => {
         return isTobaccoText(search) || activeSection === "cigarettes-tobacco";
@@ -230,6 +232,15 @@ export default function RestaurantMenu() {
         } else {
             scrollToSection("cigarettes-tobacco");
         }
+    };
+
+    const handleOpenDetail = (item) => {
+        if (isTobaccoItem(item) && !isTobaccoAgeConfirmed()) {
+            setPendingTobaccoItem(item);
+            setShowAgeModal(true);
+            return;
+        }
+        setSelectedDetailItem(item);
     };
 
     const handleAddToCart = (item) => {
@@ -627,6 +638,7 @@ export default function RestaurantMenu() {
                             onAdd={handleAddToCart}
                             onIncrease={increaseQty}
                             onDecrease={decreaseQty}
+                            onOpenDetail={handleOpenDetail}
                             sectionRef={registerSectionRef(section.key)}
                             cart={cart}
                         />
@@ -673,13 +685,13 @@ export default function RestaurantMenu() {
             {cartCount > 0 && (
                 <button
                     onClick={() => setCartOpen(true)}
-                    className="theme-button fixed bottom-3 left-3 right-3 z-30 inline-flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold shadow-2xl md:bottom-4 md:left-auto md:right-6 md:w-[340px] md:px-5 md:py-4 md:text-base"
+                    className="fixed bottom-3 left-3 right-3 z-30 inline-flex items-center justify-between rounded-2xl bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 text-sm font-black shadow-2xl shadow-orange-500/40 transition active:scale-98 md:bottom-4 md:left-auto md:right-6 md:w-[360px] md:px-5 md:py-4 md:text-base"
                 >
                     <span className="inline-flex items-center gap-2">
                         <ShoppingBag size={18} />
-                        View order ({cartCount})
+                        <span>View order ({cartCount})</span>
                     </span>
-                    <span>Rs {total}</span>
+                    <span className="text-base font-black">₹{Math.round(total)}</span>
                 </button>
             )}
 
@@ -690,11 +702,24 @@ export default function RestaurantMenu() {
                 onConfirm={handleAgeConfirm}
                 onCancel={handleAgeCancel}
             />
+
+            {/* Item Details View Modal */}
+            {selectedDetailItem && (
+                <ItemCustomizationModal
+                    isOpen={Boolean(selectedDetailItem)}
+                    item={selectedDetailItem}
+                    onClose={() => setSelectedDetailItem(null)}
+                    onSave={(customizedPayload) => {
+                        addToCart(customizedPayload);
+                        setSelectedDetailItem(null);
+                    }}
+                />
+            )}
         </div>
     );
 }
 
-function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, onAdd, onIncrease, onDecrease, sectionRef, cart = [] }) {
+function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, onAdd, onIncrease, onDecrease, onOpenDetail, sectionRef, cart = [] }) {
     if (!Array.isArray(items) || !items.length) return null;
 
     const Icon = section?.Icon || Tags;
@@ -732,6 +757,7 @@ function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, o
                             onAdd={onAdd}
                             onIncrease={onIncrease}
                             onDecrease={onDecrease}
+                            onOpenDetail={onOpenDetail}
                             quantity={qty}
                         />
                     );
@@ -741,7 +767,7 @@ function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, o
     );
 }
 
-function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, onIncrease, onDecrease, quantity = 0 }) {
+function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, onIncrease, onDecrease, onOpenDetail, quantity = 0 }) {
     const imageSrc = resolveImageUrl(item?.image) || FALLBACK_IMAGE;
     const dietBadge = getDietBadge(item);
     const itemPrice = Number(item?.price || 0);
@@ -749,7 +775,11 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, onIncrease, o
     const discountPercent = Number(item?.discountPercent || 0);
     const hasDiscount = discountPercent > 0 && originalPrice > itemPrice;
     const handleCardClick = () => {
-        if (onAdd) onAdd(item);
+        if (onOpenDetail) {
+            onOpenDetail(item);
+        } else if (onAdd) {
+            onAdd(item);
+        }
     };
 
     return (
