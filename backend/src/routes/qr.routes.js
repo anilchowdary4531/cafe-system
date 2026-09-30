@@ -9,6 +9,8 @@ import {
   updatePublicMenuSettings,
   resolvePublicMenuToken,
   placePublicMenuOrder,
+  callWaiterForTable,
+  requestBillForTable,
 } from "../services/qrService.js";
 
 export default async function qrRoutes(app, deps = {}) {
@@ -94,6 +96,67 @@ export default async function qrRoutes(app, deps = {}) {
 
   app.post("/api/public/qr/order", handlePlaceQrOrder);
   app.post("/public/qr/order", handlePlaceQrOrder);
+
+  /**
+   * Public Call Waiter Endpoint
+   * Customer triggers "Call Waiter" from QR menu context.
+   */
+  const handleCallWaiter = async (req, reply) => {
+    try {
+      const { token, reason } = req.body || {};
+      if (!token) {
+        return reply.code(400).send({ message: "QR token is required" });
+      }
+
+      const result = await callWaiterForTable({
+        token,
+        reason,
+        prisma,
+        io: app.io || io,
+      });
+
+      return reply.code(200).send(result);
+    } catch (err) {
+      const statusCode = err.statusCode || 500;
+      return reply.code(statusCode).send({
+        message: err.message || "Failed to send waiter call alert",
+        code: err.code || "waiter_call_error",
+      });
+    }
+  };
+
+  app.post("/api/public/qr/call-waiter", handleCallWaiter);
+  app.post("/public/qr/call-waiter", handleCallWaiter);
+
+  /**
+   * Public Request Bill Endpoint
+   * Customer triggers "Request Bill" from QR menu context.
+   */
+  const handleRequestBill = async (req, reply) => {
+    try {
+      const { token } = req.body || {};
+      if (!token) {
+        return reply.code(400).send({ message: "QR token is required" });
+      }
+
+      const result = await requestBillForTable({
+        token,
+        prisma,
+        io: app.io || io,
+      });
+
+      return reply.code(200).send(result);
+    } catch (err) {
+      const statusCode = err.statusCode || 500;
+      return reply.code(statusCode).send({
+        message: err.message || "Failed to send bill request",
+        code: err.code || "bill_request_error",
+      });
+    }
+  };
+
+  app.post("/api/public/qr/request-bill", handleRequestBill);
+  app.post("/public/qr/request-bill", handleRequestBill);
 
   /**
    * Public Digital Menu Resolution Endpoint (/menu/:token)

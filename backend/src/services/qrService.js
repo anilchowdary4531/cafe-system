@@ -2,6 +2,8 @@ import crypto from "crypto";
 import { getOrCreateActiveSession, recalculateSessionTotals } from "./tableSessionService.js";
 import { createOrderByStaff } from "./orderService.js";
 import { timeToMinutes } from "./reservationService.js";
+import { createAndDispatchNotification } from "./notificationService.js";
+import { RECIPIENT_TYPES, NOTIFICATION_TYPES } from "../constants/notificationTypes.js";
 
 /**
  * Generate a cryptographically random, unguessable token for QR codes.
@@ -747,4 +749,182 @@ export const placePublicMenuOrder = async ({
   }
 
   return { order };
+};
+
+/**
+ * Send real-time Call Waiter request for a dining table scanned via QR token.
+ */
+export const callWaiterForTable = async ({ token, reason = "Assistance requested", prisma, io }) => {
+  const cleanToken = String(token || "").trim();
+  if (!cleanToken) {
+    const err = new Error("QR token is required");
+    err.statusCode = 400;
+    err.code = "invalid_token";
+    throw err;
+  }
+
+  const table = await prisma.diningTable.findUnique({
+    where: { qrToken: cleanToken },
+  });
+
+  if (!table || !table.isActive) {
+    const err = new Error("Invalid or inactive table QR code");
+    err.statusCode = 404;
+    err.code = "table_not_found";
+    throw err;
+  }
+
+  const rid = table.restaurantId;
+  const activeSession = await prisma.tableSession.findFirst({
+    where: {
+      tableId: table.id,
+      restaurantId: rid,
+      status: { in: ["OPEN", "BILLING", "PAID"] },
+    },
+  });
+
+  const payload = {
+    tableId: table.id,
+    tableNo: table.tableNo,
+    section: table.section || "Main Floor",
+    sessionId: activeSession?.id || null,
+    reason: String(reason || "Assistance / Service"),
+    requestedAt: new Date(),
+  };
+
+  // Broadcast to realtime staff & restaurant rooms
+  if (io) {
+    try {
+      io.to(`restaurant_${rid}`).emit("waiter:called", payload);
+      io.to(`restaurant:${rid}`).emit("waiter:called", payload);
+      if (io.of) {
+        io.of("/staff").to(`restaurant:${rid}`).emit("waiter:called", payload);
+      }
+    } catch (_) {}
+  }
+
+  // Dispatch notification for staff & owner dashboards
+  try {
+    await createAndDispatchNotification({
+      prisma,
+      realtime: { io },
+      recipientType: RECIPIENT_TYPES.RESTAURANT,
+      recipientId: rid,
+      restaurantId: rid,
+      notificationType: NOTIFICATION_TYPES.IMPORTANT_ORDER_ALERT,
+      title: `🔔 Waiter Call — Table ${table.tableNo}`,
+      message: `Guest at Table ${table.tableNo} (${table.section || "Main Floor"}) called for waiter: ${payload.reason}`,
+      data: payload,
+      idempotencyKey: `waiter_call_${table.id}_${Math.floor(Date.now() / 30000)}`, // 30 sec cooldown key
+    }).catch(() => {});
+  } catch (_) {}
+
+  return {
+    success: true,
+    message: `Waiter alert sent for Table ${table.tableNo}`,
+    tableNo: table.tableNo,
+  };
+};
+
+/**
+ * Send real-time Request Bill action for a dining table scanned via QR token.
+ */
+export const requestBillForTable = async ({ token, prisma, io }) => {
+  const cleanToken = String(token || "").trim();
+  if (!cleanToken) {
+    const err = new Error("QR token is required");
+    err.statusCode = 400;
+    err.code = "invalid_token";
+    throw err;
+  }
+
+  const table = await prisma.diningTable.findUnique({
+    where: { qrToken: cleanToken },
+  });
+
+  if (!table || !table.isActive) {
+    const err = new Error("Invalid or inactive table QR code");
+    err.statusCode = 404;
+    err.code = "table_not_found";
+    throw err;
+  }
+
+  const rid = table.restaurantId;
+  const activeSession = await prisma.tableSession.findFirst({
+    where: {
+      tableId: table.id,
+      restaurantId: rid,
+      status: { in: ["OPEN", "BILLING", "PAID"] },
+    },
+    include: {
+      orders: { where: { status: { not: "CANCELLED" } } },
+    },
+  });
+
+  if (!activeSession) {
+    const err = new Error("No active dining session found for this table. Please place an order first.");
+    err.statusCode = 400;
+    err.code = "no_active_session";
+    throw err;
+  }
+
+  // Transition session to BILLING state if currently OPEN
+  if (activeSession.status === "OPEN") {
+    await prisma.tableSession.update({
+      where: { id: activeSession.id },
+      data: { status: "BILLING" },
+    });
+  }
+
+  const payload = {
+    tableId: table.id,
+    tableNo: table.tableNo,
+    section: table.section || "Main Floor",
+    sessionId: activeSession.id,
+    subtotal: activeSession.subtotal,
+    taxAmount: activeSession.taxAmount,
+    serviceChargeAmount: activeSession.serviceChargeAmount,
+    total: activeSession.total,
+    orderCount: activeSession.orders.length,
+    requestedAt: new Date(),
+  };
+
+  // Broadcast to realtime staff & restaurant rooms
+  if (io) {
+    try {
+      io.to(`restaurant_${rid}`).emit("bill:requested", payload);
+      io.to(`restaurant:${rid}`).emit("bill:requested", payload);
+      io.to(`restaurant_${rid}`).emit("table_session_updated", {
+        tableId: table.id,
+        session: { ...activeSession, status: "BILLING" },
+      });
+      if (io.of) {
+        io.of("/staff").to(`restaurant:${rid}`).emit("bill:requested", payload);
+        io.of("/staff").to(`restaurant:${rid}`).emit("table:session_updated", { ...activeSession, status: "BILLING" });
+      }
+    } catch (_) {}
+  }
+
+  // Dispatch notification for staff & owner dashboards
+  try {
+    await createAndDispatchNotification({
+      prisma,
+      realtime: { io },
+      recipientType: RECIPIENT_TYPES.RESTAURANT,
+      recipientId: rid,
+      restaurantId: rid,
+      notificationType: NOTIFICATION_TYPES.IMPORTANT_ORDER_ALERT,
+      title: `💳 Bill Requested — Table ${table.tableNo}`,
+      message: `Table ${table.tableNo} requested bill. Total: ₹${Math.round(activeSession.total)}`,
+      data: payload,
+      idempotencyKey: `bill_request_${activeSession.id}_${Math.floor(Date.now() / 60000)}`, // 1 min cooldown key
+    }).catch(() => {});
+  } catch (_) {}
+
+  return {
+    success: true,
+    message: `Bill request submitted for Table ${table.tableNo}`,
+    tableNo: table.tableNo,
+    total: activeSession.total,
+  };
 };

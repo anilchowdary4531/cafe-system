@@ -116,6 +116,15 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
         socket.join(`restaurant:${rid}`);
       }
     });
+
+    socket.on("join_table_room", (payload) => {
+      const sid = payload?.sessionId || payload?.tableSessionId;
+      const tid = payload?.tableId;
+      const rid = payload?.restaurantId;
+      if (sid) socket.join(`session_${sid}`);
+      if (tid) socket.join(`table_${tid}`);
+      if (rid) socket.join(`restaurant_${rid}`);
+    });
   });
 
   const emitOrderCreated = async (order) => {
@@ -185,6 +194,13 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     let chain = staff.to(restaurantRoom(rid));
     if (bid) chain = chain.to(branchRoom(rid, bid));
     chain.emit("order:updated", order);
+    if (io) {
+      io.to(`restaurant_${rid}`).emit("order:updated", order);
+      io.to(`restaurant:${rid}`).emit("order:updated", order);
+      if (order?.tableSessionId) {
+        io.to(`session_${order.tableSessionId}`).emit("order:status_updated", order);
+      }
+    }
   };
 
   const emitTableSessionUpdated = (session) => {
