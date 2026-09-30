@@ -26,6 +26,7 @@ import ItemCustomizationModal from "../../components/ItemCustomizationModal";
 import BrandLogo from "../../components/BrandLogo";
 import Footer from "../../components/Footer";
 import VegModeToggle from "../../components/VegModeToggle";
+import { getCategoryFallbackImage } from "../../components/PopularCategories";
 import useCachedGet from "../../hooks/useCachedGet";
 import { useAuth } from "../../context/AuthContext";
 import { getCustomerFavorites, toggleFavoriteMenuItem } from "../../utils/customerFavorites";
@@ -588,25 +589,60 @@ export default function RestaurantMenu() {
                             </div>
                         </div>
 
-                        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                            {navigationSections.map((section) => (
-                                <button
-                                    key={section.key}
-                                    type="button"
-                                    onClick={() => scrollToSection(section.key)}
-                                    className={[
-                                        "theme-chip inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition sm:px-4 sm:py-2 sm:text-sm",
-                                        resolvedActiveSection === section.key ? "theme-chip-active" : "",
-                                    ]
-                                        .filter(Boolean)
-                                        .join(" ")}
-                                >
-                                    <span>{section.label}</span>
-                                    <span className="theme-pill rounded-full px-2 py-0.5 text-[11px] tabular-nums">
-                                        {section.count}
-                                    </span>
-                                </button>
-                            ))}
+                        <div className="flex flex-nowrap items-center gap-3 sm:gap-4 overflow-x-auto pb-2 pt-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                            {navigationSections.map((section) => {
+                                const isAll = section.key === "all";
+                                const isActive = resolvedActiveSection === section.key;
+                                const sectionData = menuSections.find((s) => s.key === section.key);
+                                const firstItemImage = sectionData?.items?.[0]?.image;
+                                const catImg = resolveImageUrl(firstItemImage) || getCategoryFallbackImage(section.label);
+
+                                return (
+                                    <button
+                                        key={section.key}
+                                        type="button"
+                                        onClick={() => scrollToSection(section.key)}
+                                        className="group flex w-[62px] shrink-0 snap-start flex-col items-center gap-1 focus:outline-none sm:w-[72px]"
+                                    >
+                                        <div
+                                            className={`relative h-[54px] w-[54px] rounded-full p-[2.5px] transition duration-300 sm:h-[64px] sm:w-[64px] ${
+                                                isActive
+                                                    ? "bg-[linear-gradient(135deg,#ff8a1f_0%,#d97706_100%)] shadow-md shadow-orange-500/35 scale-105"
+                                                    : "border border-[var(--app-border)] bg-white/10 hover:border-orange-500/50 hover:scale-105"
+                                            }`}
+                                        >
+                                            <div className="relative h-full w-full overflow-hidden rounded-full bg-zinc-900">
+                                                <img
+                                                    src={catImg}
+                                                    alt={section.label}
+                                                    className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
+                                                    loading="lazy"
+                                                    onError={(e) => {
+                                                        e.target.onerror = null;
+                                                        e.target.src = getCategoryFallbackImage(section.label);
+                                                    }}
+                                                />
+                                                {isAll ? (
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[1px]">
+                                                        <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-white">
+                                                            ALL
+                                                        </span>
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                        <span
+                                            className={`truncate text-center text-[10px] sm:text-[11.5px] font-bold max-w-[62px] sm:max-w-[72px] mt-0.5 ${
+                                                isActive
+                                                    ? "text-orange-500 font-extrabold"
+                                                    : "text-[color:var(--app-muted)] group-hover:text-[color:var(--app-text)]"
+                                            }`}
+                                        >
+                                            {section.label}
+                                        </span>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
