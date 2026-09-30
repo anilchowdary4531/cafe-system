@@ -21,6 +21,7 @@ import ppiWalletRoutes from "./ppiWallet.routes.js";
 import tableSessionRoutes from "./tableSessions.js";
 import offlineSyncRoutes from "./offlineSync.js";
 import reservationRoutes from "./reservation.js";
+import waitlistRoutes from "./waitlist.routes.js";
 import inventoryRoutes from "./inventory.js";
 import shiftRoutes from "./shift.routes.js";
 import reportRoutes from "./report.routes.js";
@@ -55,6 +56,7 @@ export default async function routes(app, deps) {
   await tableSessionRoutes(app, deps);
   await offlineSyncRoutes(app, deps);
   await reservationRoutes(app, deps);
+  await waitlistRoutes(app, deps);
   await inventoryRoutes(app, deps);
   await shiftRoutes(app, deps);
   await reportRoutes(app, deps);

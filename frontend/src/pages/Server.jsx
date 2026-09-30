@@ -1,63 +1,49 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
+    AlertTriangle,
+    Bell,
+    Calendar,
+    Check,
     ChefHat,
+    Clock,
+    Filter,
+    Grid,
+    LayoutGrid,
     LoaderCircle,
+    Lock,
+    LogOut,
+    MapPin,
     Minus,
     Plus,
     RefreshCw,
     Search,
+    Settings2,
+    ShoppingBag,
     Trash2,
+    Unlock,
+    UserCheck,
+    UserPlus,
+    Users,
+    UtensilsCrossed,
 } from "lucide-react";
+import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import useCachedGet from "../hooks/useCachedGet";
+import { API } from "../config";
 import { api } from "../utils/apiClient";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
 import { showToast } from "../utils/toast";
 import { playNotificationSound } from "../utils/soundPlayer";
-import { appendOwnerNotification } from "../utils/ownerNotifications";
 import ItemCustomizationModal from "../components/ItemCustomizationModal";
+import WaitlistDrawer from "../components/WaitlistDrawer";
+import TableBlockModal from "../components/TableBlockModal";
+import MealShiftConfigModal from "../components/MealShiftConfigModal";
+import ReservationModal from "../components/ReservationModal";
+import OwnerMenuButton from "../components/OwnerMenuButton";
 
-const ACTIVE_STATUSES = new Set(["PLACED", "ACCEPTED", "PREPARING", "READY"]);
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
-const TABLE_STAFF_ASSIGNMENTS_PREFIX = "owner_table_staff_assignments_v1";
-
-const getTableStaffStorageKey = (restaurantId) =>
-    `${TABLE_STAFF_ASSIGNMENTS_PREFIX}_${restaurantId}`;
-
-const readTableStaffAssignments = (restaurantId) => {
-    if (typeof window === "undefined" || !restaurantId) return {};
-
-    try {
-        const raw = window.localStorage.getItem(getTableStaffStorageKey(restaurantId));
-        if (!raw) return {};
-
-        const parsed = JSON.parse(raw);
-        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-
-        return Object.entries(parsed).reduce((acc, [tableKey, staffId]) => {
-            if (!tableKey) return acc;
-            acc[String(tableKey)] = String(staffId || "");
-            return acc;
-        }, {});
-    } catch {
-        return {};
-    }
-};
-
-const writeTableStaffAssignments = (restaurantId, assignments) => {
-    if (typeof window === "undefined" || !restaurantId) return;
-
-    try {
-        window.localStorage.setItem(
-            getTableStaffStorageKey(restaurantId),
-            JSON.stringify(assignments || {})
-        );
-    } catch {
-        // Ignore localStorage write failures.
-    }
-};
 
 const formatMoney = (value) => {
     const amount = Number(value || 0);
@@ -65,1592 +51,659 @@ const formatMoney = (value) => {
     return `₹${amount.toFixed(2)}`;
 };
 
-const normalizeStatus = (status) => {
-    const raw = String(status || "PLACED").trim().toUpperCase();
-    return raw === "SERVED" ? "DELIVERED" : raw;
-};
-
-const getMinutesSince = (isoDate) => {
-    if (!isoDate) return null;
-    const time = new Date(isoDate).getTime();
-    if (Number.isNaN(time)) return null;
-    return Math.max(0, Math.floor((Date.now() - time) / 60000));
-};
-
-const categoryIconFor = (category) => {
-    const value = String(category || "").toLowerCase();
-    if (value.includes("coffee") || value.includes("latte") || value.includes("espresso") || value.includes("cappuccino")) {
-        return "☕";
-    }
-    if (value.includes("pizza")) return "🍕";
-    if (value.includes("burger") || value.includes("sandwich") || value.includes("wrap")) return "🥪";
-    if (value.includes("salad")) return "🥗";
-    if (value.includes("soup")) return "🥣";
-    if (value.includes("dessert") || value.includes("sweet") || value.includes("ice")) return "🍨";
-    return "•";
-};
-
-const mergeQty = (prev, menuItem, delta, defaultChefName = "") => {
-    const next = { ...(prev || {}) };
-    const id = menuItem?.cartKey || menuItem?.id || Number(menuItem?.id || 0);
-    if (!id) return next;
-
-    const existing = next[id] || null;
-    const qty = Math.max(0, Number(existing?.qty || 0) + Number(delta || 0));
-
-    if (qty <= 0) {
-        delete next[id];
-        return next;
-    }
-
-    next[id] = {
-        ...(existing || {}),
-        id,
-        menuItemId: menuItem.menuItemId || Number(menuItem?.id || 0),
-        name: String(menuItem?.name || "").trim(),
-        category: String(menuItem?.category || "").trim() || "General",
-        price: Number(menuItem?.price || 0),
-        qty,
-        chefName: String(existing?.chefName || menuItem?.chefName || defaultChefName || "").trim(),
-        image: String(menuItem?.image || "").trim(),
-    };
-    return next;
-};
-
-const formatOrderTypeLabel = (order) => {
-    const source = String(order?.orderSource || "").trim().toUpperCase();
-    const tableNo = String(order?.tableNo || "").trim();
-    const fulfillment = String(order?.fulfillment || "").trim().toUpperCase();
-
-    if (fulfillment === "PICKUP") return "Pickup";
-    if (fulfillment === "DELIVERY") return "Delivery";
-    if (fulfillment === "DINEIN" || tableNo) return "Dine In";
-    if (source === "ONLINE") return "Online";
-    if (source === "POS") return "Pickup";
-    return "Order";
-};
-
-function MenuCard({ item, qty, disabled, onAdd }) {
-    const imageSrc = resolveImageUrl(item.image) || FALLBACK_IMAGE;
-    const icon = categoryIconFor(item.category);
-
-    return (
-        <button
-            type="button"
-            disabled={disabled}
-            onClick={() => onAdd(item)}
-            className="group relative w-full max-w-[190px] overflow-hidden rounded-2xl border-0 bg-transparent p-0 text-left transition hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:w-[180px] sm:max-w-[180px] sm:flex-none"
-        >
-            <img
-                src={imageSrc}
-                alt={item.name}
-                loading="lazy"
-                className="mb-2 h-20 w-full rounded-2xl object-cover transition duration-300 group-hover:scale-[1.02] sm:h-24"
-                onError={(event) => {
-                    event.currentTarget.src = FALLBACK_IMAGE;
-                }}
-            />
-            <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold sm:text-sm">{item.name}</p>
-                    <p className="theme-muted mt-1 truncate text-[11px] sm:text-xs">
-                        <span className="mr-1">{icon}</span>
-                        {item.category || "General"} - {formatMoney(item.price)}
-                    </p>
-                </div>
-                {qty > 0 ? (
-                    <span className="theme-pos-qty-badge inline-flex h-7 min-w-7 items-center justify-center rounded-2xl px-2 text-xs font-bold tabular-nums">
-                        {qty}
-                    </span>
-                ) : null}
-            </div>
-        </button>
-    );
-}
-
-function CartRow({ item, chefOptions, onAdd, onSub, onRemove, onSetChef, onEdit }) {
-    const qty = Math.max(0, Number(item?.qty || 0));
-    const variantLabel = item?.variantName || item?.variant?.name || null;
-    const modifiersList = Array.isArray(item?.selectedModifiers) ? item.selectedModifiers : [];
-
-    return (
-        <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface)_58%,transparent)] px-3 py-3">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-                <div className="min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                                <p className="truncate text-sm font-semibold leading-tight">{item?.name || "Item"}</p>
-                                {variantLabel && (
-                                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30">
-                                        {variantLabel}
-                                    </span>
-                                )}
-                                {(variantLabel || modifiersList.length > 0) && onEdit && (
-                                    <button
-                                        type="button"
-                                        onClick={() => onEdit(item)}
-                                        className="text-[10px] font-semibold text-amber-400 hover:underline"
-                                    >
-                                        Edit
-                                    </button>
-                                )}
-                            </div>
-                            {modifiersList.length > 0 && (
-                                <p className="mt-0.5 text-[11px] font-medium text-amber-300/90 truncate">
-                                    + {modifiersList.map((m) => m.name).join(", ")}
-                                </p>
-                            )}
-                            {item?.notes && (
-                                <p className="mt-0.5 text-[11px] italic text-[color:var(--app-muted)] truncate">Note: {item.notes}</p>
-                            )}
-                            <p className="theme-muted mt-0.5 text-[11px]">
-                                {item?.category || "General"} - {formatMoney(item?.price)}
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => onRemove?.(item)}
-                            className="theme-soft-button inline-flex h-7 w-7 items-center justify-center rounded-full"
-                            aria-label={`Remove ${item?.name || "item"}`}
-                            title="Remove item"
-                        >
-                            <Trash2 size={13} />
-                        </button>
-                    </div>
-
-                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                        <label className="block min-w-0 w-full sm:w-[220px]">
-                            <span className="theme-muted mb-1 block text-[9px] uppercase tracking-[0.16em]">
-                                Chef
-                            </span>
-                            <select
-                                value={item?.chefName || ""}
-                                onChange={(event) => onSetChef?.(item, event.target.value)}
-                                className="theme-input w-full rounded-lg px-2 py-1.5 text-xs outline-none"
-                            >
-                                <option value="">Unassigned</option>
-                                {chefOptions.map((chef) => (
-                                    <option key={chef.key} value={chef.value}>
-                                        {chef.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-
-                        <div className="min-w-0 w-full rounded-lg border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2)_70%,transparent)] px-2 py-1.5 sm:w-[220px]">
-                            <p className="theme-muted text-[9px] uppercase tracking-[0.16em]">Assigned</p>
-                            <p className="mt-0.5 truncate text-xs font-semibold">
-                                {String(item?.chefName || "").trim() || "Unassigned"}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex flex-col items-end gap-2 sm:items-end">
-                    <div className="inline-flex items-center gap-1 rounded-xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2)_70%,transparent)] p-0.5">
-                        <button
-                            type="button"
-                            onClick={() => onSub?.(item)}
-                            className="theme-soft-button rounded-lg px-2.5 py-1 text-sm font-bold leading-none"
-                            aria-label={`Decrease quantity of ${item?.name || "item"}`}
-                        >
-                            <Minus size={13} />
-                        </button>
-                        <span className="min-w-10 px-2 text-center text-sm font-bold tabular-nums">{qty}</span>
-                        <button
-                            type="button"
-                            onClick={() => onAdd?.(item)}
-                            className="theme-button rounded-lg px-2.5 py-1 text-sm font-bold leading-none"
-                            aria-label={`Increase quantity of ${item?.name || "item"}`}
-                        >
-                            <Plus size={13} />
-                        </button>
-                    </div>
-                    <p className="whitespace-nowrap text-sm font-semibold tabular-nums">
-                        {formatMoney(Number(item?.price || 0) * qty)}
-                    </p>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function LiveOrderCard({ order }) {
-    const tableNo = String(order?.tableNo || "").trim();
-    const status = normalizeStatus(order?.status);
-    const prepMins = getMinutesSince(order?.createdAt);
-
-    return (
-        <article className="px-1 py-2">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                    <p className="text-sm font-semibold">{order.orderNo || `Order #${order.id}`}</p>
-                    <p className="theme-muted mt-0.5 text-xs">
-                        {formatOrderTypeLabel(order)}
-                        {tableNo ? ` • Table ${tableNo}` : ""}
-                    </p>
-                </div>
-                <span className="theme-pill rounded-full px-2 py-1 text-[10px] font-semibold">{status}</span>
-            </div>
-
-            <div className="mt-3 space-y-1">
-                {(order.items || []).map((item) => (
-                    <div
-                        key={`${order.id}-${item.id || item.itemName}`}
-                        className="flex items-start justify-between gap-3 py-1 text-xs"
-                    >
-                        <div className="min-w-0">
-                            <p className="truncate font-medium">
-                                {item.qty}x {item.itemName}
-                            </p>
-                            <p className="theme-muted mt-0.5">
-                                Chef: {String(item.preparedByName || "").trim() || "Unassigned"}
-                            </p>
-                        </div>
-                        <span className="theme-muted-strong whitespace-nowrap font-semibold">
-                            {formatMoney(item.total)}
-                        </span>
-                    </div>
-                ))}
-            </div>
-
-            <div className="theme-muted-strong mt-3 flex items-center justify-between border-t border-dashed border-[color:var(--app-border)] pt-2 text-xs">
-                <span>Total: {formatMoney(order.total)}</span>
-                <span className="theme-muted inline-flex items-center gap-1">
-                    <ChefHat size={13} />
-                    {prepMins === null ? "--" : `${prepMins} min`}
-                </span>
-            </div>
-        </article>
-    );
-}
-
 export default function Server() {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const { user, logout } = useAuth();
-    const { socket, connected, error: socketError } = useStaffSocket();
+    const { socket } = useStaffSocket();
 
-    const restaurantId = Number(user?.restaurantId || 0);
-    const restaurantName = String(user?.restaurant?.name || "Restaurant").trim() || "Restaurant";
+    const restaurantId = Number(user?.restaurantId || localStorage.getItem("restaurantId") || 1);
+    const restaurantName = String(user?.restaurant?.name || "Tiffzy Restaurant").trim();
 
-    const [cart, setCart] = useState({});
-    const [query, setQuery] = useState("");
-    const [activeCategory, setActiveCategory] = useState("ALL");
-    const [notes, setNotes] = useState("");
-    const [orders, setOrders] = useState([]);
-    const [ordersLoading, setOrdersLoading] = useState(true);
-    const [refreshingOrders, setRefreshingOrders] = useState(false);
-    const [ordersError, setOrdersError] = useState("");
-    const [placing, setPlacing] = useState(false);
-    const [settlingBill, setSettlingBill] = useState(false);
-    const [sendMode, setSendMode] = useState("NORMAL");
-    const [billPaymentMethod, setBillPaymentMethod] = useState("CASH");
-    const [showBillPanel, setShowBillPanel] = useState(false);
-    const [tableAssignments, setTableAssignments] = useState({});
-    const [tableGroups, setTableGroups] = useState({});
-    const [activeGroupFilter, setActiveGroupFilter] = useState("All");
-
-    const selectedTableNo = String(searchParams.get("table") || "").trim();
-
+    // Time ticker for local clock
+    const [currentTime, setCurrentTime] = useState(new Date());
     useEffect(() => {
-        if (!restaurantId) return;
-        const key = `owner_table_groups_v1_${restaurantId}`;
-        const loadGroups = () => {
-            try {
-                const raw = localStorage.getItem(key);
-                if (raw) {
-                    const parsed = JSON.parse(raw);
-                    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-                        setTableGroups(parsed);
-                    } else {
-                        setTableGroups({});
-                    }
-                } else {
-                    setTableGroups({});
-                }
-            } catch {
-                setTableGroups({});
-            }
-        };
-        loadGroups();
-        const handleStorageChange = (e) => {
-            if (!e.key || e.key === key) loadGroups();
-        };
-        window.addEventListener("storage", handleStorageChange);
-        return () => window.removeEventListener("storage", handleStorageChange);
-    }, [restaurantId]);
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
 
-    const getTableGroup = useCallback(
-        (table) => {
-            if (table?.groupName && String(table.groupName).trim()) {
-                return String(table.groupName).trim();
-            }
-            const idKey = String(table?.id || "");
-            if (idKey && tableGroups[idKey] && String(tableGroups[idKey]).trim()) {
-                return String(tableGroups[idKey]).trim();
-            }
-            const noKey = String(table?.tableNo || "").trim();
-            if (noKey && tableGroups[noKey] && String(tableGroups[noKey]).trim()) {
-                return String(tableGroups[noKey]).trim();
-            }
+    // Active View Mode: "FLOOR_PLAN" | "ORDERING"
+    const [viewMode, setViewMode] = useState("FLOOR_PLAN");
 
-            if (noKey) {
-                if (/^\d+$/.test(noKey)) {
-                    return "Main Hall";
-                }
-                const letterMatch = noKey.match(/^([A-Za-z]+)\s*\d+$/);
-                if (letterMatch) {
-                    const prefix = letterMatch[1].toUpperCase();
-                    return prefix === "T" ? "Section T" : `Section ${prefix}`;
-                }
-            }
+    // Meal Shift Selection: "BREAKFAST" | "LUNCH" | "DINNER"
+    const [activeShift, setActiveShift] = useState("LUNCH");
+    const [shiftConfig, setShiftConfig] = useState({
+        breakfast: { start: "07:00", end: "11:30" },
+        lunch: { start: "11:30", end: "16:00" },
+        dinner: { start: "16:00", end: "23:00" },
+    });
 
-            return "Main Area";
-        },
-        [tableGroups]
-    );
+    // Group section filter: "ALL" | section name
+    const [activeSectionFilter, setActiveSectionFilter] = useState("ALL");
+    const [searchQuery, setSearchQuery] = useState("");
 
+    // Modal & Drawer States
+    const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
+    const [waitlistSummary, setWaitlistSummary] = useState({ waitingCount: 0 });
+
+    const [blockModalTable, setBlockModalTable] = useState(null);
+    const [isShiftConfigOpen, setIsShiftConfigOpen] = useState(false);
+    const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
+    const [editingReservation, setEditingReservation] = useState(null);
+
+    // Ordering / Selected Table state
+    const [selectedTable, setSelectedTable] = useState(null);
+    const [cart, setCart] = useState({});
+    const [activeCategory, setActiveCategory] = useState("ALL");
+    const [customizingItem, setCustomizingItem] = useState(null);
+    const [placingOrder, setPlacingOrder] = useState(false);
+
+    // Data fetching via useCachedGet
     const {
         data: tablesData,
         loading: tablesLoading,
-        error: tablesError,
         refresh: refreshTables,
     } = useCachedGet(restaurantId ? `/owner/${restaurantId}/tables` : "/owner/_/tables", {
         enabled: Boolean(restaurantId),
-        ttlMs: 30_000,
-        staleMs: 5 * 60_000,
-        scope: `server-tables:${restaurantId || "none"}`,
+        ttlMs: 15_000,
+        scope: `server-tables:${restaurantId}`,
     });
 
-    const {
-        data: menuData,
-        loading: menuLoading,
-        error: menuError,
-        refresh: refreshMenu,
-    } = useCachedGet(restaurantId ? `/owner/${restaurantId}/menu` : "/owner/_/menu", {
-        enabled: Boolean(restaurantId),
-        ttlMs: 30_000,
-        staleMs: 5 * 60_000,
-        scope: `server-menu:${restaurantId || "none"}`,
-    });
-
-    const { data: staffData, refresh: refreshStaff } = useCachedGet(
-        restaurantId ? `/owner/${restaurantId}/staff` : "/owner/_/staff",
+    const { data: menuData, loading: menuLoading } = useCachedGet(
+        restaurantId ? `/owner/${restaurantId}/menu` : "/owner/_/menu",
         {
-        enabled: Boolean(restaurantId),
-        ttlMs: 30_000,
-        staleMs: 5 * 60_000,
-        scope: `server-staff:${restaurantId || "none"}`,
+            enabled: Boolean(restaurantId),
+            ttlMs: 60_000,
+            scope: `server-menu:${restaurantId}`,
         }
     );
 
-    const syncTableAssignments = useCallback(() => {
-        setTableAssignments(readTableStaffAssignments(restaurantId));
-    }, [restaurantId]);
-
-    const clearTableAssignment = useCallback(
-        (tableKey) => {
-            const key = String(tableKey || "").trim();
-            if (!restaurantId || !key) return;
-
-            const nextAssignments = readTableStaffAssignments(restaurantId);
-            if (!nextAssignments[key]) return;
-
-            delete nextAssignments[key];
-            writeTableStaffAssignments(restaurantId, nextAssignments);
-            setTableAssignments(nextAssignments);
-        },
-        [restaurantId]
-    );
-
-    useEffect(() => {
-        syncTableAssignments();
-    }, [syncTableAssignments]);
-
-    useEffect(() => {
-        if (!restaurantId) return;
-        refreshTables({ force: true }).catch(() => {
-            // Ignore refresh errors here; the UI can still use cached data temporarily.
-        });
-    }, [refreshTables, restaurantId]);
-
-    useEffect(() => {
-        if (typeof window === "undefined" || !restaurantId) return undefined;
-
-        const handleStorage = (event) => {
-            if (event.key === getTableStaffStorageKey(restaurantId)) {
-                syncTableAssignments();
-                refreshTables({ force: true }).catch(() => {
-                    // Ignore refresh errors here; the next manual refresh can recover.
-                });
-            }
-        };
-
-        window.addEventListener("storage", handleStorage);
-        return () => window.removeEventListener("storage", handleStorage);
-    }, [refreshTables, restaurantId, syncTableAssignments]);
-
-    const allTables = useMemo(() => {
-        const list = Array.isArray(tablesData) ? tablesData : [];
-        return list
-            .filter((table) => table && table.isActive !== false)
-            .map((table) => {
-                const tableNo = String(table.tableNo || "").trim();
-                const assignmentKey = table.id
-                    ? `table-${table.id}`
-                    : `table-${tableNo.toLowerCase()}`;
-                const assignedStaffId = String(
-                    tableAssignments[assignmentKey] ||
-                    tableAssignments[table.key] ||
-                    tableAssignments[String(table.id || "")] ||
-                    tableAssignments[`table-${table.id}`] ||
-                    tableAssignments[String(tableNo)] ||
-                    tableAssignments[`table-${tableNo.toLowerCase()}`] ||
-                    ""
-                ).trim();
-
-                return {
-                    id: table.id,
-                    assignmentKey,
-                    tableNo,
-                    seats: Number(table.seats || 0),
-                    isOccupied: Boolean(table.isOccupied),
-                    isReserved: Boolean(table.isReserved),
-                    activeReservation: table.activeReservation || null,
-                    upcomingReservation: table.upcomingReservation || null,
-                    activeOrderCount: Number(table.activeOrderCount || 0),
-                    activeOrders: Array.isArray(table.activeOrders) ? table.activeOrders : [],
-                    assignedStaffId,
-                    groupName: getTableGroup(table),
-                };
-            })
-            .filter((table) => table.tableNo)
-            .sort((a, b) => a.tableNo.localeCompare(b.tableNo, undefined, { numeric: true }));
-    }, [getTableGroup, tableAssignments, tablesData]);
-
-    const groupedTablesMap = useMemo(() => {
-        const map = {};
-        allTables.forEach((table) => {
-            const group = table.groupName || "Main Area";
-            if (!map[group]) map[group] = [];
-            map[group].push(table);
-        });
-        return map;
-    }, [allTables]);
-
-    const availableGroupNames = useMemo(() => {
-        return Object.keys(groupedTablesMap).sort((a, b) =>
-            a.localeCompare(b, undefined, { sensitivity: "base" })
-        );
-    }, [groupedTablesMap]);
-
-    const filteredGroupEntries = useMemo(() => {
-        if (activeGroupFilter === "All") {
-            return availableGroupNames.map((name) => [name, groupedTablesMap[name]]);
+    const { data: reservationsData, refresh: refreshReservations } = useCachedGet(
+        restaurantId ? `/owner/${restaurantId}/reservations` : "/owner/_/reservations",
+        {
+            enabled: Boolean(restaurantId),
+            ttlMs: 15_000,
+            scope: `server-reservations:${restaurantId}`,
         }
-        const match = availableGroupNames.find(
-            (name) => name.toLowerCase() === activeGroupFilter.toLowerCase()
-        );
-        if (match) return [[match, groupedTablesMap[match]]];
-        return availableGroupNames.map((name) => [name, groupedTablesMap[name]]);
-    }, [activeGroupFilter, availableGroupNames, groupedTablesMap]);
-
-    const selectedTable = useMemo(
-        () => allTables.find((table) => table.tableNo === selectedTableNo) || null,
-        [allTables, selectedTableNo]
     );
 
-    const chefs = useMemo(() => {
-        const list = Array.isArray(staffData?.users) ? staffData.users : [];
-        return list
-            .filter((staff) => String(staff?.role || "").toUpperCase() === "CHEF" && staff?.isActive !== false)
-            .map((staff) => ({
-                key: staff.id,
-                value: String(staff?.name || "").trim(),
-                label: `${String(staff?.name || "").trim()}${String(staff?.designation || "").trim() ? ` • ${String(staff.designation).trim()}` : ""}`,
-            }))
-            .filter((chef) => chef.value)
-            .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
-    }, [staffData]);
+    const tables = useMemo(() => {
+        if (!tablesData) return [];
+        return Array.isArray(tablesData.tables) ? tablesData.tables : Array.isArray(tablesData) ? tablesData : [];
+    }, [tablesData]);
 
-    const defaultChefName = chefs[0]?.value || "";
-
-    const [customizingItem, setCustomizingItem] = useState(null);
-    const [editingCartItemConfig, setEditingCartItemConfig] = useState(null);
-    const [customizationModalOpen, setCustomizationModalOpen] = useState(false);
-
-    const menu = useMemo(() => {
-        const list = Array.isArray(menuData) ? menuData : Array.isArray(menuData?.menu) ? menuData.menu : [];
-        return list
-            .filter((item) => item && item.isAvailable !== false)
-            .map((item) => ({
-                id: Number(item.id),
-                name: String(item.name || "").trim(),
-                category: String(item.category || "").trim() || "General",
-                price: Number(item.price || 0),
-                image: item.image || "",
-                variants: Array.isArray(item.variants) ? item.variants : [],
-                modifierGroups: Array.isArray(item.modifierGroups) ? item.modifierGroups : [],
-            }))
-            .filter((item) => item.id)
-            .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    const menuItems = useMemo(() => {
+        if (!menuData) return [];
+        return Array.isArray(menuData.items) ? menuData.items : Array.isArray(menuData) ? menuData : [];
     }, [menuData]);
 
-    const categories = useMemo(() => {
-        const counts = new Map();
-        for (const item of menu) {
-            const key = String(item.category || "").trim() || "General";
-            counts.set(key, (counts.get(key) || 0) + 1);
-        }
+    const reservations = useMemo(() => {
+        if (!reservationsData) return [];
+        return Array.isArray(reservationsData.reservations) ? reservationsData.reservations : [];
+    }, [reservationsData]);
 
-        const list = [...counts.entries()]
-            .map(([label, count]) => ({
-                key: label.toUpperCase(),
-                label,
-                count,
-                icon: categoryIconFor(label),
-            }))
-            .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+    // Compute unique sections
+    const sections = useMemo(() => {
+        const set = new Set(["ALL"]);
+        tables.forEach((t) => {
+            const sec = String(t.section || "Main Hall").trim();
+            if (sec) set.add(sec);
+        });
+        return Array.from(set);
+    }, [tables]);
 
-        return [{ key: "ALL", label: "All Items", count: menu.length, icon: "•" }, ...list];
-    }, [menu]);
+    // Socket real-time updates
+    useEffect(() => {
+        if (!socket) return;
+        const handleRealtimeUpdate = () => {
+            refreshTables();
+            refreshReservations();
+        };
 
-    const filteredMenu = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        const activeKey = String(activeCategory || "ALL").toUpperCase();
-        return menu.filter((item) => {
-            if (activeKey !== "ALL" && String(item.category || "").trim().toUpperCase() !== activeKey) {
+        socket.on("table:updated", handleRealtimeUpdate);
+        socket.on("table:session_updated", handleRealtimeUpdate);
+        socket.on("reservation:updated", handleRealtimeUpdate);
+        socket.on("waitlist:updated", handleRealtimeUpdate);
+
+        return () => {
+            socket.off("table:updated", handleRealtimeUpdate);
+            socket.off("table:session_updated", handleRealtimeUpdate);
+            socket.off("reservation:updated", handleRealtimeUpdate);
+            socket.off("waitlist:updated", handleRealtimeUpdate);
+        };
+    }, [socket, refreshTables, refreshReservations]);
+
+    // Filter tables based on Section, Search query, and Shift time
+    const filteredTables = useMemo(() => {
+        return tables.filter((t) => {
+            if (activeSectionFilter !== "ALL" && String(t.section || "Main Hall").trim() !== activeSectionFilter) {
                 return false;
             }
-            if (!q) return true;
-            return item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q);
-        });
-    }, [activeCategory, menu, query]);
-
-    const cartItems = useMemo(() => Object.values(cart || {}), [cart]);
-
-    const subtotal = useMemo(
-        () => cartItems.reduce((sum, item) => sum + Number(item.price || 0) * Math.max(1, Number(item.qty || 1)), 0),
-        [cartItems]
-    );
-
-    const totalItems = useMemo(
-        () => cartItems.reduce((sum, item) => sum + Math.max(1, Number(item.qty || 1)), 0),
-        [cartItems]
-    );
-
-    const selectedTableOrders = useMemo(() => {
-        if (!selectedTableNo) return [];
-        return orders.filter((order) => {
-            if (!ACTIVE_STATUSES.has(normalizeStatus(order?.status))) return false;
-            return String(order?.tableNo || "").trim() === selectedTableNo;
-        });
-    }, [orders, selectedTableNo]);
-
-    const selectedTableBillTotal = useMemo(
-        () => selectedTableOrders.reduce((sum, order) => sum + Number(order?.total || 0), 0),
-        [selectedTableOrders]
-    );
-
-    const billPanelVisible = Boolean(selectedTableNo) && showBillPanel;
-
-    const assignServerToTable = useCallback(
-        (targetTableNo) => {
-            const tableNoStr = String(targetTableNo || "").trim();
-            const staffIdStr = String(user?.id || "").trim();
-            if (!restaurantId || !tableNoStr || !staffIdStr) return;
-
-            const currentAssignments = readTableStaffAssignments(restaurantId);
-
-            const tableObj = (allTables || []).find(
-                (t) => String(t.tableNo || "").trim().toLowerCase() === tableNoStr.toLowerCase()
-            );
-
-            let changed = false;
-
-            const keysToSet = new Set([
-                tableNoStr,
-                tableNoStr.toLowerCase(),
-                `table-${tableNoStr.toLowerCase()}`,
-            ]);
-
-            if (tableObj) {
-                if (tableObj.assignmentKey) keysToSet.add(String(tableObj.assignmentKey));
-                if (tableObj.key) keysToSet.add(String(tableObj.key));
-                if (tableObj.id) keysToSet.add(String(tableObj.id));
-                if (tableObj.id) keysToSet.add(`table-${tableObj.id}`);
-            }
-
-            keysToSet.forEach((k) => {
-                if (currentAssignments[k] !== staffIdStr) {
-                    currentAssignments[k] = staffIdStr;
-                    changed = true;
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                const tableNo = String(t.tableNo || "").toLowerCase();
+                const waiter = String(t.assignedWaiterName || "").toLowerCase();
+                const guestName = String(t.activeReservation?.customerName || "").toLowerCase();
+                if (!tableNo.includes(q) && !waiter.includes(q) && !guestName.includes(q)) {
+                    return false;
                 }
+            }
+            return true;
+        });
+    }, [tables, activeSectionFilter, searchQuery]);
+
+    // Table Counts
+    const statusCounts = useMemo(() => {
+        let available = 0;
+        let occupied = 0;
+        let reserved = 0;
+        let blocked = 0;
+
+        tables.forEach((t) => {
+            if (t.isBlocked) blocked++;
+            else if (t.isOccupied) occupied++;
+            else if (t.isReserved || t.activeReservation) reserved++;
+            else available++;
+        });
+
+        return { total: tables.length, available, occupied, reserved, blocked };
+    }, [tables]);
+
+    // Ordering Actions
+    const handleSelectTableForOrder = (table) => {
+        if (table.isBlocked) {
+            showToast({
+                title: "Table Blocked 🔒",
+                message: `Table ${table.tableNo} is BLOCKED (${table.blockReason || "Maintenance"}). Unblock table before placing orders.`,
+                variant: "warning",
             });
-
-            if (changed) {
-                writeTableStaffAssignments(restaurantId, currentAssignments);
-                setTableAssignments(currentAssignments);
-            }
-        },
-        [allTables, restaurantId, user?.id]
-    );
-
-    useEffect(() => {
-        if (selectedTableNo && user?.id) {
-            assignServerToTable(selectedTableNo);
+            return;
         }
-    }, [assignServerToTable, selectedTableNo, user?.id]);
+        setSelectedTable(table);
+        setViewMode("ORDERING");
+    };
 
-    const setTable = useCallback(
-        (tableNo) => {
-            const value = String(tableNo || "").trim();
-            if (value) {
-                assignServerToTable(value);
-            }
-            setSearchParams(
-                (prev) => {
-                    if (value) prev.set("table", value);
-                    else prev.delete("table");
-                    return prev;
+    const handleAddToCart = (item) => {
+        const key = item.id;
+        setCart((prev) => {
+            const existing = prev[key];
+            const newQty = existing ? existing.qty + 1 : 1;
+            return {
+                ...prev,
+                [key]: {
+                    ...item,
+                    qty: newQty,
                 },
-                { replace: true }
-            );
-        },
-        [assignServerToTable, setSearchParams]
-    );
-
-    const addItem = useCallback(
-        (item) => {
-            if (!selectedTableNo) {
-                showToast({
-                    title: "Pick a table",
-                    message: "Select a table first before adding items.",
-                    variant: "error",
-                });
-                return;
-            }
-
-            assignServerToTable(selectedTableNo);
-            setCart((prev) => mergeQty(prev, item, +1, defaultChefName));
-        },
-        [assignServerToTable, defaultChefName, selectedTableNo]
-    );
-
-    const handleItemClick = useCallback(
-        (item) => {
-            if (!selectedTableNo) {
-                showToast({
-                    title: "Pick a table",
-                    message: "Select a table first before adding items.",
-                    variant: "error",
-                });
-                return;
-            }
-            const hasVariants = Array.isArray(item.variants) && item.variants.length > 0;
-            const hasModifiers = Array.isArray(item.modifierGroups) && item.modifierGroups.length > 0;
-            if (hasVariants || hasModifiers) {
-                setCustomizingItem(item);
-                setEditingCartItemConfig(null);
-                setCustomizationModalOpen(true);
-            } else {
-                addItem(item);
-            }
-        },
-        [addItem, selectedTableNo]
-    );
-
-    const handleSaveCustomization = useCallback((payload) => {
-        if (!selectedTableNo) return;
-        assignServerToTable(selectedTableNo);
-        setCart((prev) => {
-            const cartKey = payload.cartKey || `custom_${payload.menuItemId}_${Date.now()}`;
-            const nextCart = { ...(prev || {}) };
-
-            if (editingCartItemConfig?.cartKey && editingCartItemConfig.cartKey !== cartKey) {
-                delete nextCart[editingCartItemConfig.cartKey];
-            }
-
-            const existing = nextCart[cartKey];
-            const qty = existing ? existing.qty + payload.qty : payload.qty;
-
-            nextCart[cartKey] = {
-                id: cartKey,
-                cartKey,
-                menuItemId: payload.menuItemId,
-                name: payload.name,
-                variant: payload.variant,
-                variantId: payload.variantId,
-                variantName: payload.variantName,
-                variantPrice: payload.variantPrice,
-                selectedModifiers: payload.selectedModifiers || [],
-                notes: payload.notes || "",
-                price: payload.unitPrice,
-                qty,
-                chefName: String(existing?.chefName || payload.chefName || defaultChefName || "").trim(),
             };
-            return nextCart;
         });
-        setCustomizationModalOpen(false);
-        setCustomizingItem(null);
-        setEditingCartItemConfig(null);
-    }, [assignServerToTable, defaultChefName, editingCartItemConfig, selectedTableNo]);
+    };
 
-    const handleEditCartItem = useCallback((cartItem) => {
-        const menuItem = menu.find((m) => m.id === cartItem.menuItemId);
-        if (menuItem) {
-            setCustomizingItem(menuItem);
-            setEditingCartItemConfig(cartItem);
-            setCustomizationModalOpen(true);
-        }
-    }, [menu]);
-
-    const subItem = useCallback((item) => {
-        setCart((prev) => mergeQty(prev, item, -1));
-    }, []);
-
-    const removeItem = useCallback((item) => {
+    const handleRemoveFromCart = (itemId) => {
         setCart((prev) => {
-            const id = item?.cartKey || item?.id || Number(item?.id || 0);
-            if (!id) return prev || {};
-            const next = { ...(prev || {}) };
-            delete next[id];
+            const next = { ...prev };
+            delete next[itemId];
             return next;
         });
-    }, []);
+    };
 
-    const setItemChef = useCallback((item, chefName) => {
-        setCart((prev) => {
-            const id = item?.cartKey || item?.id || Number(item?.id || 0);
-            if (!id) return prev || {};
-            const next = { ...(prev || {}) };
-            if (!next[id]) return next;
-            next[id] = {
-                ...next[id],
-                chefName: String(chefName || "").trim(),
-            };
-            return next;
-        });
-    }, []);
+    const cartTotal = useMemo(() => {
+        return Object.values(cart).reduce((sum, item) => sum + item.price * item.qty, 0);
+    }, [cart]);
 
-    const clearDraft = useCallback(() => {
-        setCart({});
-        setNotes("");
-    }, []);
-
-    const loadOrders = useCallback(
-        async ({ silent = false } = {}) => {
-            if (!restaurantId) {
-                setOrdersLoading(false);
-                setOrdersError("Restaurant not linked to current user.");
-                return;
-            }
-
-            try {
-                if (silent) {
-                    setRefreshingOrders(true);
-                } else {
-                    setOrdersLoading(true);
-                }
-
-                const res = await api.get("/orders/live");
-                setOrders(Array.isArray(res?.data?.orders) ? res.data.orders : []);
-                setOrdersError("");
-            } catch (err) {
-                console.log(err);
-                setOrdersError(err?.response?.data?.message || "Failed to load live orders.");
-            } finally {
-                setOrdersLoading(false);
-                setRefreshingOrders(false);
-            }
-        },
-        [restaurantId]
-    );
-
-    useEffect(() => {
-        loadOrders();
-    }, [loadOrders]);
-
-    useEffect(() => {
-        if (!selectedTableNo) {
-            setShowBillPanel(false);
-            return;
-        }
-        setCart({});
-        setNotes("");
-        setBillPaymentMethod("CASH");
-        setShowBillPanel(false);
-    }, [selectedTableNo]);
-
-    useEffect(() => {
-        if (!socket) return undefined;
-
-        const onCreated = (order) => {
-            setOrders((prev) => {
-                const list = Array.isArray(prev) ? prev : [];
-                const id = Number(order?.id || 0);
-                if (!id) return list;
-                const idx = list.findIndex((row) => Number(row?.id || 0) === id);
-                if (idx === -1) return [order, ...list];
-                const copy = list.slice();
-                copy[idx] = order;
-                return copy;
-            });
-            playNotificationSound();
-            const orderNo = order?.orderNo || `#${order?.id || ""}`;
-            const total = order?.total ? `₹${order.total}` : "";
-            const tableInfo = order?.tableNo ? `Table ${order.tableNo}` : "Dine In";
-            appendOwnerNotification({
-                title: "🔔 New Order Received!",
-                message: `Order ${orderNo} (${tableInfo}) for ${total}`,
-                type: "orders",
-            });
-        };
-
-        const onUpdated = (order) => {
-            setOrders((prev) => {
-                const list = Array.isArray(prev) ? prev : [];
-                const id = Number(order?.id || 0);
-                if (!id) return list;
-                const idx = list.findIndex((row) => Number(row?.id || 0) === id);
-                if (idx === -1) return [order, ...list];
-                const copy = list.slice();
-                copy[idx] = order;
-                return copy;
-            });
-        };
-
-        const onSessionUpdated = () => {
-            refreshTables({ force: true }).catch(() => {});
-        };
-
-        const onKotStatusUpdated = (data) => {
-            const kot = data?.kot || data;
-            const status = String(kot?.status || "").toUpperCase();
-            if (status === "READY") {
-                playNotificationSound();
-                showToast({
-                    title: `👨‍🍳 KOT Ready! (${kot?.kotNumber || 'Ticket'})`,
-                    message: `Table ${kot?.order?.tableNo || kot?.tableNo || '--'} items are ready in ${kot?.station?.name || 'Kitchen'}!`,
-                    variant: "success",
-                    durationMs: 4000,
-                });
-            }
-            loadOrders({ silent: true });
-        };
-
-        const onReservationUpdated = () => refreshTables({ force: true });
-
-        socket.on("order:created", onCreated);
-        socket.on("order:updated", onUpdated);
-        socket.on("table:session_updated", onSessionUpdated);
-        socket.on("reservation:updated", onReservationUpdated);
-        socket.on("kot:created", () => loadOrders({ silent: true }));
-        socket.on("kot:status_updated", onKotStatusUpdated);
-        return () => {
-            socket.off("order:created", onCreated);
-            socket.off("order:updated", onUpdated);
-            socket.off("table:session_updated", onSessionUpdated);
-            socket.off("reservation:updated", onReservationUpdated);
-            socket.off("kot:created");
-            socket.off("kot:status_updated", onKotStatusUpdated);
-        };
-    }, [refreshTables, socket]);
-
-    const refreshAll = useCallback(async () => {
-        syncTableAssignments();
-        await Promise.all([
-            refreshTables({ force: true }),
-            refreshMenu({ force: true }),
-            refreshStaff({ force: true }),
-            loadOrders({ silent: true }),
-        ]);
-    }, [loadOrders, refreshMenu, refreshStaff, refreshTables, syncTableAssignments]);
-
-    const settleTableBill = useCallback(async () => {
-        if (!selectedTableNo || !restaurantId) return;
-
-        const activeOrders = Array.isArray(selectedTable?.activeOrders) ? selectedTable.activeOrders : [];
-        const tableKey = selectedTable?.assignmentKey || `table-${selectedTableNo.toLowerCase()}`;
-        const paymentMode = billPaymentMethod === "UPI" ? "UPI" : "CASH";
-
-        if (!activeOrders.length) {
-            showToast({
-                title: "Table already free",
-                message: `Table ${selectedTableNo} has no active bill to settle.`,
-                variant: "success",
-            });
+    const handleSendKOT = async () => {
+        if (!selectedTable) return;
+        const itemsList = Object.values(cart);
+        if (itemsList.length === 0) {
+            showToast({ title: "Cart Empty", message: "Add menu items to place order.", variant: "warning" });
             return;
         }
 
-        setSettlingBill(true);
         try {
-            await api.post(`/owner/${restaurantId}/tables/${encodeURIComponent(selectedTableNo)}/settle-bill`, {
-                paymentMode,
-                changedByName: user?.name || "Server",
-            });
-
-            clearTableAssignment(tableKey);
-            await refreshAll();
-            setShowBillPanel(false);
-            showToast({
-                title: "Bill settled",
-                message: `Table ${selectedTableNo} paid via ${paymentMode} and cleared automatically.`,
-                variant: "success",
-            });
-        } catch (err) {
-            console.log(err);
-            showToast({
-                title: "Unable to settle bill",
-                message: err?.response?.data?.message || "Failed to mark the bill as paid.",
-                variant: "error",
-            });
-        } finally {
-            setSettlingBill(false);
-        }
-    }, [
-        billPaymentMethod,
-        clearTableAssignment,
-        refreshAll,
-        restaurantId,
-        selectedTable,
-        selectedTableNo,
-        user?.name,
-    ]);
-
-    const createOrder = useCallback(() => {
-        if (!socket || !connected) {
-            showToast({ title: "Offline", message: "Server socket is not connected.", variant: "error" });
-            return;
-        }
-        if (!selectedTableNo) {
-            showToast({ title: "Pick a table", message: "Select a table first.", variant: "error" });
-            return;
-        }
-        if (!cartItems.length) {
-            showToast({ title: "Empty order", message: "Add at least one item.", variant: "error" });
-            return;
-        }
-
-        setPlacing(true);
-        socket.emit(
-            "order:create",
-            {
-                orderType: "DINE_IN",
-                tableNo: selectedTableNo,
-                notes: notes ? String(notes).trim() : null,
-                items: cartItems.map((item) => ({
-                    menuItemId: item.menuItemId,
-                    qty: item.qty,
-                    preparedByName: item.chefName || null,
-                    variantId: item.variantId || null,
-                    selectedModifiers: item.selectedModifiers || [],
-                    notes: item.notes || null,
+            setPlacingOrder(true);
+            const payload = {
+                tableNo: selectedTable.tableNo,
+                tableId: selectedTable.id,
+                items: itemsList.map((i) => ({
+                    menuItemId: i.id,
+                    qty: i.qty,
+                    notes: i.notes || null,
                 })),
-            },
-            async (ack) => {
-                try {
-                    if (ack?.ok) {
-                        playNotificationSound();
-                        const orderNo = ack?.order?.orderNo || `#${ack?.order?.id || ""}`;
-                        const total = ack?.order?.total ? `₹${ack.order.total}` : "";
-                        appendOwnerNotification({
-                            title: "🔔 Table Order Placed!",
-                            message: `Table ${selectedTableNo} order ${orderNo} placed (${total})`,
-                            type: "orders",
-                        });
+                orderSource: "POS",
+                fulfillment: "DINEIN",
+            };
 
-                        showToast({
-                            title: "Order created",
-                            message:
-                                sendMode === "ROK"
-                                    ? ack?.order?.orderNo
-                                        ? `${ack.order.orderNo} sent. Draft kept for resend.`
-                                        : "The order has been sent. Draft kept for resend."
-                                    : ack?.order?.orderNo || "The order has been sent to the kitchen.",
-                            variant: "success",
-                        });
-                        if (sendMode !== "ROK") {
-                            clearDraft();
-                        }
-                        await refreshTables({ force: true });
-                        await loadOrders({ silent: true });
-                        return;
-                    }
-
-                    showToast({
-                        title: "Order failed",
-                        message: String(ack?.message || "Unable to create order"),
-                        variant: "error",
-                    });
-                } finally {
-                    setPlacing(false);
-                }
+            const res = await axios.post(`${API}/owner/${restaurantId}/orders`, payload);
+            if (res.data?.success) {
+                showToast({
+                    title: "KOT Sent to Kitchen! 🍳",
+                    message: `Order for Table ${selectedTable.tableNo} placed successfully.`,
+                    variant: "success",
+                });
+                setCart({});
+                setViewMode("FLOOR_PLAN");
+                setSelectedTable(null);
+                refreshTables();
             }
-        );
-    }, [
-        cartItems,
-        clearDraft,
-        connected,
-        loadOrders,
-        notes,
-        refreshTables,
-        selectedTableNo,
-        socket,
-        sendMode,
-    ]);
+        } catch (err) {
+            showToast({ title: "Order Error", message: err.message || "Failed to send KOT.", variant: "error" });
+        } finally {
+            setPlacingOrder(false);
+        }
+    };
 
     return (
-        <div className="theme-page min-h-screen">
-            <header className="theme-nav border-b px-3 py-3 sm:px-4 sm:py-4">
-                <div className="mx-auto flex max-w-7xl flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                        <div className="min-w-0">
-                            <h1 className="text-xl font-bold sm:text-2xl">Server Console</h1>
-                            <p className="theme-muted truncate text-xs sm:text-sm">
-                                {restaurantName} • {connected ? "Live" : "Offline"}
-                                {socketError ? ` (${socketError})` : ""}
-                            </p>
-                        </div>
-                        <span className="theme-pill w-fit rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap">
-                            {selectedTableNo ? `Table ${selectedTableNo}` : "No table selected"}
-                        </span>
+        <div className="min-h-screen bg-[color:var(--app-bg,#f8fafc)] text-[color:var(--app-text,#0f172a)] font-sans flex flex-col">
+            {/* Top Navigation & Status Bar */}
+            <header className="sticky top-0 z-30 border-b border-[color:var(--app-border)]/50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 py-3 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                {/* Brand & Branch Info */}
+                <div className="flex items-center gap-3">
+                    <OwnerMenuButton />
+                    <div className="rounded-xl bg-orange-500/10 p-2 text-orange-500 border border-orange-500/20">
+                        <UtensilsCrossed className="h-5 w-5" />
                     </div>
-                    <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:flex-wrap md:items-center md:justify-end">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-base font-extrabold tracking-tight text-[color:var(--app-text)]">{restaurantName}</h1>
+                            <span className="rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 px-2 py-0.5 text-[10px] font-bold border border-orange-500/30">
+                                Server Station
+                            </span>
+                        </div>
+                        <p className="text-[11px] theme-muted flex items-center gap-2">
+                            <span>🕒 {currentTime.toLocaleTimeString()}</span>
+                            <span>•</span>
+                            <span>📅 {currentTime.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                        </p>
+                    </div>
+                </div>
+
+                {/* Meal Shift Selector */}
+                <div className="flex items-center gap-1.5 bg-black/5 dark:bg-white/5 p-1 rounded-xl border border-[color:var(--app-border)]/40">
+                    {[
+                        { id: "BREAKFAST", label: "🍳 Breakfast", time: `${shiftConfig.breakfast.start}-${shiftConfig.breakfast.end}` },
+                        { id: "LUNCH", label: "🍱 Lunch", time: `${shiftConfig.lunch.start}-${shiftConfig.lunch.end}` },
+                        { id: "DINNER", label: "🕯️ Dinner", time: `${shiftConfig.dinner.start}-${shiftConfig.dinner.end}` },
+                    ].map((shift) => (
                         <button
-                            type="button"
-                            onClick={refreshAll}
-                            className="theme-soft-button inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold md:w-auto md:flex-none"
+                            key={shift.id}
+                            onClick={() => setActiveShift(shift.id)}
+                            className={`flex flex-col items-center rounded-lg px-3 py-1 text-xs font-bold transition ${
+                                activeShift === shift.id
+                                    ? "bg-orange-500 text-white shadow-sm"
+                                    : "theme-muted hover:text-[color:var(--app-text)]"
+                            }`}
                         >
-                            {refreshingOrders || tablesLoading || menuLoading ? (
-                                <LoaderCircle size={16} className="animate-spin" />
-                            ) : (
-                                <RefreshCw size={16} />
-                            )}
-                            Refresh
+                            <span>{shift.label}</span>
+                            <span className="text-[9px] opacity-80 font-normal">{shift.time}</span>
                         </button>
+                    ))}
+                    <button
+                        onClick={() => setIsShiftConfigOpen(true)}
+                        className="p-1.5 text-slate-400 hover:text-orange-500 rounded-lg transition"
+                        title="Configure Shift Timings"
+                    >
+                        <Settings2 className="h-4 w-4" />
+                    </button>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2">
+                    {/* Waitlist Drawer Trigger */}
+                    <button
+                        onClick={() => setIsWaitlistOpen(true)}
+                        className="relative flex items-center gap-1.5 rounded-xl border border-orange-500/30 bg-orange-500/10 px-3.5 py-2 text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 transition cursor-pointer"
+                    >
+                        <Users className="h-4 w-4" />
+                        <span>Waitlist</span>
+                        {waitlistSummary.waitingCount > 0 && (
+                            <span className="rounded-full bg-orange-500 text-white px-1.5 py-0.2 text-[10px]">
+                                {waitlistSummary.waitingCount}
+                            </span>
+                        )}
+                    </button>
+
+                    {/* New Reservation Trigger */}
+                    <button
+                        onClick={() => {
+                            setEditingReservation(null);
+                            setIsReservationModalOpen(true);
+                        }}
+                        className="flex items-center gap-1.5 rounded-xl bg-orange-500 px-3.5 py-2 text-xs font-bold text-white hover:bg-orange-600 transition shadow-xs cursor-pointer"
+                    >
+                        <Plus className="h-4 w-4" />
+                        <span>New Reservation</span>
+                    </button>
+
+                    {/* View Mode Toggle */}
+                    <div className="flex items-center bg-black/5 dark:bg-white/5 p-1 rounded-xl border border-[color:var(--app-border)]/40">
                         <button
-                            type="button"
-                            onClick={logout}
-                            className="w-full rounded-2xl bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/20 md:w-auto md:flex-none"
+                            onClick={() => setViewMode("FLOOR_PLAN")}
+                            className={`p-1.5 rounded-lg text-xs font-bold transition ${
+                                viewMode === "FLOOR_PLAN" ? "bg-orange-500 text-white" : "theme-muted"
+                            }`}
+                            title="Floor Plan Grid View"
                         >
-                            Logout
+                            <LayoutGrid className="h-4 w-4" />
                         </button>
                     </div>
                 </div>
             </header>
 
-            <main className="mx-auto max-w-7xl px-2 py-3 sm:px-4 sm:py-5">
-                <section className="space-y-3 sm:space-y-4">
-                    <article className="theme-panel rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface)_58%,transparent)] p-3 sm:p-4">
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="flex min-w-0 items-center gap-3">
-                                <div>
-                                    <p className="theme-muted text-xs uppercase tracking-[0.24em]">
-                                        {selectedTableNo ? "Table no" : "Table selector"}
-                                    </p>
-                                    <h2 className="mt-1 text-xl font-bold">
-                                        {selectedTableNo ? `Table ${selectedTableNo}` : "Choose a table"}
-                                    </h2>
-                                </div>
-                                {selectedTableNo ? (
-                                    <span className="theme-pill rounded-full px-2 py-1 text-[10px] font-semibold">
-                                        {selectedTableOrders.length} active
-                                    </span>
-                                ) : null}
-                            </div>
-
-                            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-                                <label className="sr-only" htmlFor="table-selector">
-                                    Select table
-                                </label>
-                                <select
-                                    id="table-selector"
-                                    value={selectedTableNo}
-                                    onChange={(event) => setTable(event.target.value)}
-                                    disabled={tablesLoading || allTables.length === 0}
-                                    className="theme-input w-full rounded-2xl px-3 py-2 text-sm outline-none sm:min-w-[220px] sm:w-auto font-medium"
+            {/* Main Content Body */}
+            {viewMode === "FLOOR_PLAN" ? (
+                <div className="flex-1 p-4 space-y-4 max-w-7xl mx-auto w-full">
+                    {/* Status Summary & Section Filters Bar */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 p-3 shadow-xs text-xs">
+                        {/* Section Filter Tabs */}
+                        <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 p-1 rounded-xl overflow-x-auto">
+                            {sections.map((sec) => (
+                                <button
+                                    key={sec}
+                                    onClick={() => setActiveSectionFilter(sec)}
+                                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
+                                        activeSectionFilter === sec
+                                            ? "bg-orange-500 text-white shadow-xs"
+                                            : "theme-muted hover:text-[color:var(--app-text)]"
+                                    }`}
                                 >
-                                    <option value="">
-                                        {tablesLoading
-                                            ? "Loading tables..."
-                                            : allTables.length === 0
-                                                ? "No tables available"
-                                                : "Select a table"}
-                                    </option>
-                                    {availableGroupNames.map((groupName) => (
-                                        <optgroup key={groupName} label={`── ${groupName} ──`}>
-                                            {groupedTablesMap[groupName].map((table) => (
-                                                <option key={table.id} value={table.tableNo}>
-                                                    Table {table.tableNo} {table.isOccupied ? "• Occupied" : "• Free"}
-                                                    {table.seats ? ` • ${table.seats} seats` : ""}
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                    ))}
-                                </select>
-                            </div>
+                                    {sec}
+                                </button>
+                            ))}
                         </div>
 
-                        {allTables.length > 0 ? (
-                            <div className="mt-3 border-t border-[color:var(--app-border)]/50 pt-3">
-                                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                        <span className="text-[11px] font-extrabold uppercase tracking-wider theme-muted mr-1">
-                                            Groups:
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setActiveGroupFilter("All")}
-                                            className={`rounded-full px-2.5 py-0.5 text-xs font-bold transition-all ${
-                                                activeGroupFilter === "All"
-                                                    ? "bg-[color:var(--app-primary)] text-white shadow-sm"
-                                                    : "theme-soft-button"
-                                            }`}
-                                        >
-                                            All ({allTables.length})
-                                        </button>
-                                        {availableGroupNames.map((groupName) => {
-                                            const count = groupedTablesMap[groupName]?.length || 0;
-                                            const isSelected =
-                                                activeGroupFilter.toLowerCase() === groupName.toLowerCase();
-                                            return (
-                                                <button
-                                                    key={groupName}
-                                                    type="button"
-                                                    onClick={() => setActiveGroupFilter(groupName)}
-                                                    className={`rounded-full px-2.5 py-0.5 text-xs font-bold transition-all ${
-                                                        isSelected
-                                                            ? "bg-[color:var(--app-primary)] text-white shadow-sm"
-                                                            : "theme-soft-button"
-                                                    }`}
-                                                >
-                                                    {groupName} ({count})
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
+                        {/* Search Input */}
+                        <div className="relative w-full sm:w-60">
+                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 theme-muted" />
+                            <input
+                                type="text"
+                                placeholder="Search table #, waiter, guest..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full rounded-xl border border-[color:var(--app-border)]/40 bg-transparent pl-8 pr-3 py-1.5 text-xs text-[color:var(--app-text)] outline-none focus:border-orange-500"
+                            />
+                        </div>
 
-                                <div className="grid gap-2 sm:gap-3">
-                                    {filteredGroupEntries.map(([groupName, groupTables]) => {
-                                        const occupiedInGroup = groupTables.filter((t) => t.isOccupied).length;
-                                        return (
-                                            <div
-                                                key={groupName}
-                                                className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:color-mix(in_srgb,var(--app-surface-2)_40%,transparent)] p-2.5"
-                                            >
-                                                <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)]/30 pb-1.5 mb-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-extrabold uppercase tracking-wider text-[color:var(--app-primary)]">
-                                                            {groupName}
-                                                        </span>
-                                                        <span className="rounded-full bg-black/10 dark:bg-white/10 px-2 py-0.5 text-[10px] font-bold theme-muted">
-                                                            {groupTables.length} table{groupTables.length === 1 ? "" : "s"}
-                                                        </span>
-                                                    </div>
-                                                    {occupiedInGroup > 0 ? (
-                                                        <span className="text-[10px] font-bold text-amber-500">
-                                                            {occupiedInGroup} occupied
-                                                        </span>
-                                                    ) : null}
-                                                </div>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {groupTables.map((table) => {
-                                                        const isSelected = table.tableNo === selectedTableNo;
-                                                        const isOccupied = table.isOccupied;
-                                                        const isReserved = table.isReserved && !isOccupied;
-                                                        const hasUpcoming = Boolean(table.upcomingReservation) && !isOccupied && !isReserved;
+                        {/* Table Status Legend Badges */}
+                        <div className="flex items-center gap-2 text-[11px] overflow-x-auto py-0.5">
+                            <span className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
+                                <span className="h-2.5 w-2.5 rounded-full border border-slate-400 bg-white dark:bg-slate-800"></span> Available ({statusCounts.available})
+                            </span>
+                            <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-medium">
+                                <span className="h-2.5 w-2.5 rounded-full bg-purple-500"></span> Reserved ({statusCounts.reserved})
+                            </span>
+                            <span className="flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium">
+                                <span className="h-2.5 w-2.5 rounded-full bg-sky-500"></span> Occupied ({statusCounts.occupied})
+                            </span>
+                            <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-medium">
+                                <span className="h-2.5 w-2.5 rounded-full bg-slate-500"></span> Blocked 🔒 ({statusCounts.blocked})
+                            </span>
+                        </div>
+                    </div>
 
-                                                        return (
-                                                            <button
-                                                                key={table.id}
-                                                                type="button"
-                                                                                                          className={`flex flex-col items-start gap-0.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
-                                                                    isSelected
-                                                                        ? "bg-[color:var(--app-primary)] text-white shadow-md scale-[1.02] ring-2 ring-[color:var(--app-primary)]/40"
-                                                                        : isOccupied
-                                                                            ? "border border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20"
-                                                                            : isReserved
-                                                                                ? "border border-purple-500/40 bg-purple-500/10 text-purple-700 dark:text-purple-300 hover:bg-purple-500/20"
-                                                                                : "theme-soft-button"
-                                                                }`}
-                                                            >
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span>Table {table.tableNo}</span>
-                                                                    {table.seats ? (
-                                                                        <span className="opacity-70 text-[10px]">({table.seats}s)</span>
-                                                                    ) : null}
-                                                                    {isOccupied ? (
-                                                                        <span className={`inline-block w-2 h-2 rounded-full ${isSelected ? "bg-white" : "bg-blue-500"}`} />
-                                                                    ) : isReserved ? (
-                                                                        <span className={`inline-block w-2 h-2 rounded-full ${isSelected ? "bg-white" : "bg-purple-500"}`} />
-                                                                    ) : null}
-                                                                </div>
-                                                                {isReserved && table.activeReservation && (
-                                                                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-purple-600 dark:text-purple-300">
-                                                                        RESERVED {table.activeReservation.startTime}–{table.activeReservation.endTime}
-                                                                    </span>
-                                                                )}
-                                                                {hasUpcoming && table.upcomingReservation && (
-                                                                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-sky-500 dark:text-sky-300">
-                                                                        Up. Res {table.upcomingReservation.startTime}
-                                                                    </span>
-                                                                )}
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ) : null}
+                    {/* Interactive Table Cards Grid */}
+                    {tablesLoading ? (
+                        <div className="flex justify-center p-12">
+                            <LoaderCircle className="h-8 w-8 animate-spin text-orange-500" />
+                        </div>
+                    ) : filteredTables.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-[color:var(--app-border)]/60 bg-white/40 dark:bg-slate-900/40 p-12 text-center theme-muted space-y-2">
+                            <LayoutGrid className="h-8 w-8 mx-auto opacity-40 text-orange-500" />
+                            <p className="font-bold text-xs">No dining tables match selected section or search filter.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                            {filteredTables.map((table) => {
+                                const isBlocked = Boolean(table.isBlocked);
+                                const isOccupied = Boolean(table.isOccupied);
+                                const isReserved = !isOccupied && Boolean(table.isReserved || table.activeReservation);
 
-                        {tablesError ? (
-                            <div className="mt-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
-                                {tablesError}
-                            </div>
-                        ) : null}
-
-                        {selectedTableNo ? (
-                            <div
-                                className={
-                                    billPanelVisible
-                                        ? "mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]"
-                                        : "mt-4"
-                                }
-                            >
-                                <div className="space-y-3">
-                                    <div className="rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2)_58%,transparent)] p-3 sm:p-4">
-                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                                return (
+                                    <div
+                                        key={table.id}
+                                        onClick={() => handleSelectTableForOrder(table)}
+                                        className={`group relative flex flex-col justify-between rounded-2xl border p-3 cursor-pointer transition-all duration-200 shadow-xs hover:-translate-y-0.5 aspect-square text-xs bg-white dark:bg-slate-900 ${
+                                            isBlocked
+                                                ? "border-slate-500/40 bg-slate-500/10 dark:bg-slate-950/40 opacity-75"
+                                                : isOccupied
+                                                    ? "border-sky-500/40 bg-sky-500/5 dark:bg-sky-950/20"
+                                                    : isReserved
+                                                        ? "border-purple-500/40 bg-purple-500/5 dark:bg-purple-950/20"
+                                                        : "border-gray-200 dark:border-slate-800 hover:border-orange-500/50"
+                                        }`}
+                                    >
+                                        {/* Table Header: Table # & Seats */}
+                                        <div className="flex justify-between items-start">
                                             <div>
-                                                <p className="theme-muted text-xs uppercase tracking-[0.22em]">
-                                                    Order details
-                                                </p>
-                                                <p className="mt-1 text-base font-semibold">Live tickets</p>
+                                                <h3 className="text-lg font-black tracking-tight text-[color:var(--app-text)]">
+                                                    {table.tableNo}
+                                                </h3>
+                                                <p className="text-[10px] theme-muted">{table.seats} Seats • {table.section || "Main"}</p>
                                             </div>
-                                            <span className="theme-pill rounded-full px-2 py-1 text-[10px] font-semibold">
-                                                {selectedTableOrders.length} active
-                                            </span>
+
+                                            {/* Status Badge */}
+                                            {isBlocked ? (
+                                                <span className="flex items-center gap-1 rounded-full bg-slate-700 text-white px-2 py-0.5 text-[9px] font-bold">
+                                                    <Lock className="h-2.5 w-2.5" /> BLOCKED
+                                                </span>
+                                            ) : isOccupied ? (
+                                                <span className="rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-400 px-2 py-0.5 text-[9px] font-bold border border-sky-500/30">
+                                                    OCCUPIED
+                                                </span>
+                                            ) : isReserved ? (
+                                                <span className="rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-400 px-2 py-0.5 text-[9px] font-bold border border-purple-500/30">
+                                                    RESERVED
+                                                </span>
+                                            ) : (
+                                                <span className="rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[9px] font-bold border border-emerald-500/30">
+                                                    AVAILABLE
+                                                </span>
+                                            )}
                                         </div>
 
-                                        <div className="mt-3 space-y-3">
-                                            {ordersError ? (
-                                                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
-                                                    {ordersError}
+                                        {/* Table Content Details */}
+                                        <div className="my-1 text-[11px] space-y-1">
+                                            {isBlocked ? (
+                                                <p className="text-slate-600 dark:text-slate-400 italic text-[10px] truncate">
+                                                    Reason: {table.blockReason || "Maintenance"}
+                                                </p>
+                                            ) : isOccupied ? (
+                                                <div className="space-y-0.5">
+                                                    <p className="font-bold text-sky-600 dark:text-sky-400">
+                                                        {table.activeOrderCount || 1} Active Order(s)
+                                                    </p>
+                                                    {table.assignedWaiterName && (
+                                                        <p className="text-[10px] theme-muted truncate">Waiter: {table.assignedWaiterName}</p>
+                                                    )}
                                                 </div>
-                                            ) : null}
-
-                                            {ordersLoading && selectedTableOrders.length === 0 ? (
-                                                <div className="theme-muted text-sm">Loading live orders...</div>
-                                            ) : selectedTableOrders.length === 0 ? (
-                                                <div className="rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface)_54%,transparent)] p-4 text-sm theme-muted">
-                                                    No active order is linked to this table yet. Use the menu below to create one manually.
+                                            ) : isReserved ? (
+                                                <div className="space-y-0.5">
+                                                    <p className="font-bold text-purple-600 dark:text-purple-400 truncate">
+                                                        👤 {table.activeReservation?.customerName || "Reserved"}
+                                                    </p>
+                                                    <p className="text-[10px] theme-muted font-mono">
+                                                        ⏰ {table.activeReservation?.startTime} – {table.activeReservation?.endTime}
+                                                    </p>
                                                 </div>
                                             ) : (
-                                                selectedTableOrders.map((order) => (
-                                                    <LiveOrderCard key={order.id} order={order} />
-                                                ))
+                                                <p className="text-[10px] theme-muted opacity-75">Click to open table & take order</p>
+                                            )}
+                                        </div>
+
+                                        {/* Card Footer Actions */}
+                                        <div className="flex justify-between items-center pt-1.5 border-t border-[color:var(--app-border)]/30 text-[10px]">
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setBlockModalTable(table);
+                                                }}
+                                                className="theme-muted hover:text-slate-900 dark:hover:text-white font-semibold flex items-center gap-1"
+                                            >
+                                                {isBlocked ? <Unlock className="h-3 w-3 text-emerald-500" /> : <Lock className="h-3 w-3 text-slate-400" />}
+                                                {isBlocked ? "Unblock" : "Block"}
+                                            </button>
+
+                                            {!isBlocked && (
+                                                <span className="font-bold text-orange-500 group-hover:translate-x-0.5 transition">
+                                                    Select →
+                                                </span>
                                             )}
                                         </div>
                                     </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            ) : (
+                /* Ordering View Mode (Active Table Order / Cart) */
+                <div className="flex-1 p-4 grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-7xl mx-auto w-full">
+                    {/* Menu Studio Items Column */}
+                    <div className="lg:col-span-2 space-y-3">
+                        <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-2">
+                            <div>
+                                <h2 className="text-base font-bold flex items-center gap-2">
+                                    <span>Ordering for Table {selectedTable?.tableNo}</span>
+                                    <span className="text-xs theme-muted">({selectedTable?.seats} Seats)</span>
+                                </h2>
+                            </div>
+                            <button
+                                onClick={() => setViewMode("FLOOR_PLAN")}
+                                className="rounded-xl border border-[color:var(--app-border)]/40 px-3 py-1 text-xs font-bold theme-muted hover:bg-black/5"
+                            >
+                                ← Back to Floor Plan
+                            </button>
+                        </div>
 
-                                    {selectedTableNo ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowBillPanel((prev) => !prev)}
-                                            className={`inline-flex w-[88px] items-center justify-center whitespace-nowrap rounded-2xl px-2 py-1.5 text-[11px] font-semibold ${
-                                                showBillPanel ? "theme-button" : "theme-soft-button"
-                                            }`}
-                                        >
-                                            {showBillPanel ? "Hide Bill" : "Bill"}
-                                        </button>
-                                    ) : null}
-                                </div>
+                        {/* Menu Categories */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+                            {["ALL", "Coffee", "Breakfast", "Burgers", "Pizza", "Salads", "Desserts"].map((cat) => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setActiveCategory(cat)}
+                                    className={`rounded-xl px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
+                                        activeCategory === cat ? "bg-orange-500 text-white" : "theme-muted bg-black/5 dark:bg-white/5"
+                                    }`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
 
-                                {billPanelVisible ? (
-                                    <div className="space-y-4">
-                                        <article className="theme-panel rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface)_58%,transparent)] p-3 sm:p-4">
-                                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                                <div>
-                                                    <p className="theme-muted text-xs uppercase tracking-[0.24em]">
-                                                        Bill total
-                                                    </p>
-                                                    <p className="mt-1 text-lg font-semibold">Settle payment</p>
-                                                </div>
-                                                <span className="theme-pill rounded-full px-2 py-1 text-[10px] font-semibold">
-                                                    {selectedTableOrders.length} orders
-                                                </span>
+                        {/* Menu Items Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-2">
+                            {menuItems
+                                .filter((i) => activeCategory === "ALL" || i.category === activeCategory)
+                                .map((item) => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => handleAddToCart(item)}
+                                        className="flex flex-col justify-between rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 text-left hover:border-orange-500 transition shadow-xs"
+                                    >
+                                        <div>
+                                            <p className="font-bold text-xs text-[color:var(--app-text)]">{item.name}</p>
+                                            <p className="text-[10px] theme-muted mt-0.5">{item.category}</p>
+                                        </div>
+                                        <div className="flex justify-between items-center mt-3 pt-1 border-t border-gray-100 dark:border-slate-800">
+                                            <span className="font-extrabold text-xs text-orange-500">{formatMoney(item.price)}</span>
+                                            <span className="rounded-lg bg-orange-500 text-white p-1 text-[10px] font-bold">
+                                                + Add
+                                            </span>
+                                        </div>
+                                    </button>
+                                ))}
+                        </div>
+                    </div>
+
+                    {/* Cart & KOT Summary Column */}
+                    <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 p-4 space-y-4 shadow-xs flex flex-col justify-between">
+                        <div className="space-y-3">
+                            <h3 className="font-bold text-sm border-b border-[color:var(--app-border)]/40 pb-2 flex justify-between items-center">
+                                <span>Table {selectedTable?.tableNo} Cart</span>
+                                <span className="text-xs font-mono font-bold text-orange-500">{Object.keys(cart).length} Items</span>
+                            </h3>
+
+                            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                                {Object.values(cart).length === 0 ? (
+                                    <p className="text-xs theme-muted text-center py-8">Select menu items on the left to build order.</p>
+                                ) : (
+                                    Object.values(cart).map((item) => (
+                                        <div key={item.id} className="flex justify-between items-center rounded-xl bg-slate-50 dark:bg-slate-800/50 p-2 text-xs">
+                                            <div>
+                                                <p className="font-bold text-slate-900 dark:text-white">{item.name}</p>
+                                                <p className="text-[10px] theme-muted">{formatMoney(item.price)} each</p>
                                             </div>
-
-                                            <div className="mt-4 space-y-3">
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setBillPaymentMethod("CASH")}
-                                                        className={`rounded-2xl px-3 py-2 text-sm font-semibold transition ${
-                                                            billPaymentMethod === "CASH"
-                                                                ? "theme-button"
-                                                                : "theme-soft-button"
-                                                        }`}
-                                                    >
-                                                        Cash
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setBillPaymentMethod("UPI")}
-                                                        className={`rounded-2xl px-3 py-2 text-sm font-semibold transition ${
-                                                            billPaymentMethod === "UPI"
-                                                                ? "theme-button"
-                                                                : "theme-soft-button"
-                                                        }`}
-                                                    >
-                                                        UPI
-                                                    </button>
-                                                </div>
-
-                                                <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface)_54%,transparent)] p-3">
-                                                    <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-                                                        <span className="theme-muted">Table bill</span>
-                                                        <span className="font-semibold tabular-nums">
-                                                            {selectedTableOrders.length} active
-                                                        </span>
-                                                    </div>
-                                                    <div className="mt-1 flex flex-col gap-1 text-base sm:flex-row sm:items-center sm:justify-between">
-                                                        <span className="font-semibold">Amount due</span>
-                                                        <span className="font-bold tabular-nums">
-                                                            {formatMoney(selectedTableBillTotal)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={settleTableBill}
-                                                    disabled={!selectedTableOrders.length || settlingBill}
-                                                    className="theme-button w-full rounded-2xl px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
-                                                >
-                                                    {settlingBill ? (
-                                                        <span className="inline-flex items-center gap-2">
-                                                            <LoaderCircle size={16} className="animate-spin" />
-                                                            Settling...
-                                                        </span>
-                                                    ) : (
-                                                        "Paid & Clear Table"
-                                                    )}
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono font-bold">x{item.qty}</span>
+                                                <span className="font-bold text-orange-500">{formatMoney(item.price * item.qty)}</span>
+                                                <button onClick={() => handleRemoveFromCart(item.id)} className="text-red-400 hover:text-red-500">
+                                                    <Trash2 className="h-3.5 w-3.5" />
                                                 </button>
-
-                                                <p className="theme-muted text-xs leading-5">
-                                                    Choose Cash or UPI, then tap paid. The active bill will be marked
-                                                    successful and the table will clear automatically.
-                                                </p>
                                             </div>
-                                        </article>
-                                    </div>
-                                ) : null}
+                                        </div>
+                                    ))
+                                )}
                             </div>
-                        ) : (
-                            <div className="mt-4 rounded-3xl border border-dashed border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2)_58%,transparent)] p-6 text-sm theme-muted">
-                                Select a table to start taking an order.
+                        </div>
+
+                        {/* Cart Footer */}
+                        <div className="space-y-3 pt-3 border-t border-[color:var(--app-border)]/40">
+                            <div className="flex justify-between items-center text-sm font-bold">
+                                <span>Subtotal:</span>
+                                <span className="text-orange-500 font-mono text-base">{formatMoney(cartTotal)}</span>
                             </div>
-                        )}
-                    </article>
 
-                    {selectedTableNo ? (
-                        <>
-                            <article className="theme-panel rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface)_58%,transparent)] p-3 sm:p-4">
-                                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                                    <div>
-                                        <p className="theme-muted text-xs uppercase tracking-[0.24em]">Menu</p>
-                                        <p className="mt-1 text-lg font-semibold">Select items to prepare</p>
-                                    </div>
-                                </div>
-
-                                <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                                    <div className="relative w-full lg:max-w-xl">
-                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 theme-muted" size={16} />
-                                        <input
-                                            value={query}
-                                            onChange={(event) => setQuery(event.target.value)}
-                                            placeholder="Search by name or category..."
-                                            className="theme-input w-full rounded-2xl py-2.5 pl-10 pr-4 text-sm outline-none"
-                                        />
-                                    </div>
-
-                                    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                        {categories.map((category) => (
-                                            <button
-                                                key={category.key}
-                                                type="button"
-                                                onClick={() => setActiveCategory(category.key)}
-                                                className={`theme-chip inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                                                    activeCategory === category.key ? "theme-chip-active" : ""
-                                                }`}
-                                            >
-                                                <span>{category.icon}</span>
-                                                <span>{category.label}</span>
-                                                <span className="theme-pill rounded-full px-2 py-0.5 text-[11px] tabular-nums">
-                                                    {category.count}
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {menuError ? (
-                                    <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
-                                        {menuError}
-                                    </div>
-                                ) : null}
-
-                                <div className="mt-4">
-                                    {menuLoading ? (
-                                        <div className="theme-muted text-sm">Loading menu...</div>
-                                    ) : filteredMenu.length === 0 ? (
-                                        <div className="rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface)_54%,transparent)] p-4 text-sm theme-muted">
-                                            No items match your search.
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-wrap items-start justify-center gap-2 md:justify-start">
-                                            {filteredMenu.map((item) => (
-                                                <MenuCard
-                                                    key={item.id}
-                                                    item={item}
-                                                    qty={cart[item.id]?.qty || 0}
-                                                    disabled={!selectedTableNo}
-                                                    onAdd={handleItemClick}
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </article>
-
-                            <article className="theme-panel rounded-3xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface)_58%,transparent)] p-3 sm:p-4">
-                                <div className="flex items-center justify-between gap-2">
-                                    <div>
-                                        <p className="theme-muted text-xs uppercase tracking-[0.24em]">Draft order</p>
-                                        <p className="mt-1 text-lg font-semibold">Manual items selected</p>
-                                    </div>
-                                    <span className="theme-pill rounded-full px-2 py-1 text-[10px] font-semibold">
-                                        {cartItems.length} items
-                                    </span>
-                                </div>
-
-                                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="inline-flex w-fit rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2)_60%,transparent)] p-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => setSendMode("NORMAL")}
-                                            className={`flex-none w-[2cm] rounded-xl px-2 py-1.5 text-xs font-semibold transition ${
-                                                sendMode === "NORMAL"
-                                                    ? "theme-button"
-                                                    : "theme-soft-button"
-                                            }`}
-                                        >
-                                            Fresh
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setSendMode("ROK")}
-                                            className={`flex-none w-[2cm] rounded-xl px-2 py-1.5 text-xs font-semibold transition ${
-                                                sendMode === "ROK"
-                                                    ? "theme-button"
-                                                    : "theme-soft-button"
-                                            }`}
-                                        >
-                                            ROK
-                                        </button>
-                                    </div>
-                                    <p className="theme-muted text-xs">
-                                        ROK keeps the current items after sending so you can send them again.
-                                    </p>
-                                </div>
-
-                                <div className="mt-4 space-y-2">
-                                    {cartItems.length === 0 ? (
-                                        <div className="rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface)_54%,transparent)] p-4 text-sm theme-muted">
-                                            No items selected yet. Tap menu items to add them here.
-                                        </div>
-                                    ) : (
-                                        cartItems.map((item) => (
-                                            <CartRow
-                                                key={item.id}
-                                                item={item}
-                                                chefOptions={chefs}
-                                                onAdd={addItem}
-                                                onSub={subItem}
-                                                onRemove={removeItem}
-                                                onSetChef={setItemChef}
-                                                onEdit={handleEditCartItem}
-                                            />
-                                        ))
-                                    )}
-                                </div>
-
-                                <div className="mt-4 border-t border-[color:var(--app-border)] pt-4">
-                                    <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                                        <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-2)_58%,transparent)] px-3 py-3">
-                                            <div className="flex items-center justify-between text-xs">
-                                                <span className="theme-muted">Items</span>
-                                                <span className="font-semibold tabular-nums">{totalItems}</span>
-                                            </div>
-                                            <div className="mt-1 flex items-center justify-between text-sm">
-                                                <span className="font-semibold">Estimated Total</span>
-                                                <span className="font-bold tabular-nums">{formatMoney(subtotal)}</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                            <button
-                                                type="button"
-                                                onClick={clearDraft}
-                                                className="theme-soft-button inline-flex w-[2cm] items-center justify-center whitespace-nowrap rounded-2xl px-2 py-1.5 text-xs font-semibold"
-                                                disabled={placing}
-                                            >
-                                                Clear
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={createOrder}
-                                                disabled={!connected || placing || !selectedTableNo}
-                                                className="theme-button rounded-2xl px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
-                                            >
-                                                {placing ? (
-                                                    <span className="inline-flex items-center gap-2">
-                                                        <LoaderCircle size={16} className="animate-spin" />
-                                                        Sending...
-                                                    </span>
-                                                ) : (
-                                                    sendMode === "ROK" ? "Send Again" : "Send to Kitchen"
-                                                )}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </article>
-                        </>
-                    ) : null}
-                </section>
-            </main>
-
-            {customizationModalOpen && (
-                <ItemCustomizationModal
-                    isOpen={customizationModalOpen}
-                    onClose={() => {
-                        setCustomizationModalOpen(false);
-                        setCustomizingItem(null);
-                        setEditingCartItemConfig(null);
-                    }}
-                    onSave={handleSaveCustomization}
-                    item={customizingItem}
-                    existingConfig={editingCartItemConfig}
-                />
+                            <button
+                                onClick={handleSendKOT}
+                                disabled={placingOrder || Object.keys(cart).length === 0}
+                                className="w-full rounded-xl bg-orange-500 py-3 text-xs font-bold text-white hover:bg-orange-600 disabled:opacity-50 transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                {placingOrder ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ChefHat className="h-4 w-4" />}
+                                Send KOT to Kitchen
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
+
+            {/* Integrated Modals & Drawers */}
+            <WaitlistDrawer
+                isOpen={isWaitlistOpen}
+                onClose={() => setIsWaitlistOpen(false)}
+                restaurantId={restaurantId}
+                tables={tables}
+                onWaitlistUpdated={() => refreshTables()}
+            />
+
+            <TableBlockModal
+                isOpen={Boolean(blockModalTable)}
+                onClose={() => setBlockModalTable(null)}
+                table={blockModalTable}
+                restaurantId={restaurantId}
+                onSuccess={() => refreshTables()}
+            />
+
+            <MealShiftConfigModal
+                isOpen={isShiftConfigOpen}
+                onClose={() => setIsShiftConfigOpen(false)}
+                restaurantId={restaurantId}
+                initialShifts={shiftConfig}
+                onSaved={(newShifts) => setShiftConfig(newShifts)}
+            />
+
+            <ReservationModal
+                isOpen={isReservationModalOpen}
+                onClose={() => {
+                    setIsReservationModalOpen(false);
+                    setEditingReservation(null);
+                }}
+                restaurantId={restaurantId}
+                reservationToEdit={editingReservation}
+                tables={tables}
+                onSaved={() => {
+                    refreshTables();
+                    refreshReservations();
+                }}
+            />
         </div>
     );
 }

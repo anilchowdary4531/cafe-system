@@ -831,6 +831,11 @@ body,
     --table-state-bg: color-mix(in srgb, #f1d25f 18%, transparent);
 }
 
+.theme-table-box.state-blocked-table {
+    --table-state-color: #94a3b8;
+    --table-state-bg: color-mix(in srgb, #64748b 22%, transparent);
+}
+
 .theme-table-box.is-occupied {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--table-state-color) 40%, transparent);
 }

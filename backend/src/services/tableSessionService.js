@@ -30,12 +30,18 @@ export const getOrCreateActiveSession = async ({
   return prisma.$transaction(async (tx) => {
     const table = await tx.diningTable.findUnique({
       where: { id: tid },
-      select: { id: true, tableNo: true, restaurantId: true, seats: true, assignedWaiterId: true, assignedWaiterName: true },
+      select: { id: true, tableNo: true, restaurantId: true, seats: true, assignedWaiterId: true, assignedWaiterName: true, isBlocked: true, blockReason: true },
     });
 
     if (!table || Number(table.restaurantId) !== rid) {
       const err = new Error("Table not found or restaurant mismatch");
       err.code = "table_not_found";
+      throw err;
+    }
+
+    if (table.isBlocked) {
+      const err = new Error(`Table ${table.tableNo} is BLOCKED (${table.blockReason || "Maintenance"}). Cannot open session or take orders.`);
+      err.code = "table_blocked";
       throw err;
     }
 

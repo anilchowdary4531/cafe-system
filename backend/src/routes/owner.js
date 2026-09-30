@@ -791,10 +791,15 @@ export default async function ownerRoutes(app, deps) {
 
           const isOccupied = Boolean(activeSession) || tableActiveOrders.length > 0;
           const isReserved = !isOccupied && Boolean(activeRes);
+          const isBlocked = Boolean(table.isBlocked);
 
           return {
             isOccupied,
             isReserved,
+            isBlocked,
+            blockReason: table.blockReason || null,
+            blockedAt: table.blockedAt || null,
+            blockedByName: table.blockedByName || null,
             activeReservation: activeRes ? {
               id: activeRes.id,
               reservationNo: activeRes.reservationNo,
@@ -907,6 +912,163 @@ export default async function ownerRoutes(app, deps) {
     } catch (err) {
       console.error("Error updating floor plan layout:", err);
       return reply.code(500).send({ message: err.message || "Failed to save floor plan layout" });
+    }
+  });
+
+  // Block Table for Maintenance / Private Booking / VIP
+  app.post("/owner/:restaurantId/tables/:tableId/block", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const tableId = Number(req.params.tableId);
+      const { blockReason } = req.body || {};
+
+      const table = await prisma.diningTable.findFirst({
+        where: { id: tableId, restaurantId },
+        include: {
+          tableSessions: {
+            where: { status: { in: ["OPEN", "BILLING"] } },
+          },
+        },
+      });
+
+      if (!table) {
+        return reply.code(404).send({ success: false, message: "Table not found" });
+      }
+
+      if (table.tableSessions.length > 0) {
+        return reply.code(400).send({
+          success: false,
+          message: `Table ${table.tableNo} is currently occupied with active orders. Clear session before blocking.`,
+        });
+      }
+
+      const updated = await prisma.diningTable.update({
+        where: { id: tableId },
+        data: {
+          isBlocked: true,
+          blockReason: blockReason ? String(blockReason).trim() : "Maintenance / Private Booking",
+          blockedAt: new Date(),
+          blockedByName: req.user?.name || req.user?.userName || "Staff",
+        },
+      });
+
+      // Audit Log
+      await prisma.tableOperationLog.create({
+        data: {
+          restaurantId,
+          operationType: "TABLE_BLOCKED",
+          sourceTableId: tableId,
+          sourceTableNo: table.tableNo,
+          performedByUserId: req.user?.id || req.user?.userId || null,
+          performedByName: req.user?.name || req.user?.userName || "Staff",
+          performedByUserRole: req.user?.role || "OWNER",
+          details: { blockReason: updated.blockReason },
+        },
+      }).catch(() => {});
+
+      if (realtime?.io) {
+        realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId });
+        realtime.io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableId });
+      }
+
+      return reply.send({
+        success: true,
+        message: `Table ${table.tableNo} blocked successfully (${updated.blockReason})`,
+        table: updated,
+      });
+    } catch (err) {
+      console.error("Error blocking table:", err);
+      return reply.code(500).send({ success: false, message: err.message || "Failed to block table" });
+    }
+  });
+
+  // Unblock Table
+  app.post("/owner/:restaurantId/tables/:tableId/unblock", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const tableId = Number(req.params.tableId);
+
+      const table = await prisma.diningTable.findFirst({
+        where: { id: tableId, restaurantId },
+      });
+
+      if (!table) {
+        return reply.code(404).send({ success: false, message: "Table not found" });
+      }
+
+      const updated = await prisma.diningTable.update({
+        where: { id: tableId },
+        data: {
+          isBlocked: false,
+          blockReason: null,
+          blockedAt: null,
+          blockedByName: null,
+        },
+      });
+
+      // Audit Log
+      await prisma.tableOperationLog.create({
+        data: {
+          restaurantId,
+          operationType: "TABLE_UNBLOCKED",
+          sourceTableId: tableId,
+          sourceTableNo: table.tableNo,
+          performedByUserId: req.user?.id || req.user?.userId || null,
+          performedByName: req.user?.name || req.user?.userName || "Staff",
+          performedByUserRole: req.user?.role || "OWNER",
+        },
+      }).catch(() => {});
+
+      if (realtime?.io) {
+        realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId });
+        realtime.io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableId });
+      }
+
+      return reply.send({
+        success: true,
+        message: `Table ${table.tableNo} is now unblocked and available.`,
+        table: updated,
+      });
+    } catch (err) {
+      console.error("Error unblocking table:", err);
+      return reply.code(500).send({ success: false, message: err.message || "Failed to unblock table" });
+    }
+  });
+
+  // Update Restaurant Shift Timings
+  app.put("/owner/:restaurantId/settings/shifts", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const {
+        breakfastStart, breakfastEnd,
+        lunchStart, lunchEnd,
+        dinnerStart, dinnerEnd,
+      } = req.body || {};
+
+      const updated = await prisma.restaurant.update({
+        where: { id: restaurantId },
+        data: {
+          breakfastStart: breakfastStart || "07:00",
+          breakfastEnd: breakfastEnd || "11:30",
+          lunchStart: lunchStart || "11:30",
+          lunchEnd: lunchEnd || "16:00",
+          dinnerStart: dinnerStart || "16:00",
+          dinnerEnd: dinnerEnd || "23:00",
+        },
+      });
+
+      return reply.send({
+        success: true,
+        message: "Shift timings updated successfully",
+        shifts: {
+          breakfast: { start: updated.breakfastStart, end: updated.breakfastEnd },
+          lunch: { start: updated.lunchStart, end: updated.lunchEnd },
+          dinner: { start: updated.dinnerStart, end: updated.dinnerEnd },
+        },
+      });
+    } catch (err) {
+      console.error("Error updating shift timings:", err);
+      return reply.code(500).send({ success: false, message: err.message || "Failed to update shift timings" });
     }
   });
 

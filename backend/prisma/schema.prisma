@@ -75,6 +75,14 @@ model Restaurant {
   showPricesOnPublicMenu Boolean @default(true) @map("show_prices_on_public_menu")
   showUnavailableItemsOnPublicMenu Boolean @default(true) @map("show_unavailable_items_on_public_menu")
 
+  // SHIFT TIMINGS CONFIGURATION
+  breakfastStart String? @default("07:00") @map("breakfast_start")
+  breakfastEnd   String? @default("11:30") @map("breakfast_end")
+  lunchStart     String? @default("11:30") @map("lunch_start")
+  lunchEnd       String? @default("16:00") @map("lunch_end")
+  dinnerStart    String? @default("16:00") @map("dinner_start")
+  dinnerEnd      String? @default("23:00") @map("dinner_end")
+
   // TIMESTAMPS
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -119,6 +127,7 @@ model Restaurant {
   staffShifts          StaffShift[]
   staffAttendances     StaffAttendance[]
   staffTasks           StaffTask[]
+  waitlists            Waitlist[]
 
   @@map("restaurants")
 }
@@ -453,6 +462,7 @@ model Customer {
   addresses             CustomerAddress[]
   loyaltyAccounts       LoyaltyAccount[]
   loyaltyTransactions   LoyaltyTransaction[]
+  waitlists             Waitlist[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -617,11 +627,18 @@ model DiningTable {
 
   isActive  Boolean @default(true) @map("is_active")
 
+  // BLOCKED STATUS FOR MAINTENANCE / PRIVATE EVENTS
+  isBlocked     Boolean   @default(false) @map("is_blocked")
+  blockReason   String?   @map("block_reason")
+  blockedAt     DateTime? @map("blocked_at")
+  blockedByName String?   @map("blocked_by_name")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   tableSessions TableSession[]
   reservations  Reservation[]
+  waitlists     Waitlist[]
 
   @@unique([restaurantId, tableNo])
   @@index([restaurantId, isActive])
@@ -1842,6 +1859,46 @@ model Reservation {
   @@index([restaurantId, customerId])
   @@index([restaurantId, status])
   @@map("reservations")
+}
+
+///////////////////////////////////////////////////////////
+// WAITLIST MANAGEMENT
+///////////////////////////////////////////////////////////
+
+model Waitlist {
+  id Int @id @default(autoincrement())
+
+  restaurantId Int        @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  customerId Int?      @map("customer_id")
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  customerName  String  @map("customer_name")
+  customerPhone String  @map("customer_phone")
+  guestCount    Int     @default(2) @map("guest_count")
+
+  preferredSection String? @map("preferred_section")
+  status           String  @default("WAITING") // WAITING | NOTIFIED | SEATED | CANCELLED | NO_SHOW
+
+  estimatedWaitMinutes Int       @default(15) @map("estimated_wait_minutes")
+  notifiedAt           DateTime? @map("notified_at")
+  seatedAt             DateTime? @map("seated_at")
+  cancelledAt          DateTime? @map("cancelled_at")
+  notes                String?
+
+  tableId Int?         @map("table_id")
+  table   DiningTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  createdById   Int?    @map("created_by_id")
+  createdByName String? @map("created_by_name")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([restaurantId, status])
+  @@index([restaurantId, createdAt])
+  @@map("waitlists")
 }
 
 ///////////////////////////////////////////////////////////
