@@ -317,7 +317,7 @@ export default function OwnerInventory() {
     };
 
     return (
-        <div className="px-1 py-1 w-full flex flex-col gap-3.5 text-[color:var(--app-text)] font-sans">
+        <div className="px-1 py-1 w-full flex-1 flex flex-col gap-3.5 text-[color:var(--app-text)] font-sans min-h-[calc(100vh-2rem)] min-h-[calc(100dvh-2rem)]">
             {/* Page Header */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-[color:var(--app-border)]/40 pb-3">
                 <div>
@@ -415,7 +415,7 @@ export default function OwnerInventory() {
 
             {/* TAB 1: RAW MATERIALS MASTER */}
             {activeTab === "materials" && (
-                <div className="flex flex-col gap-3">
+                <div className="flex-1 flex flex-col gap-3">
                     <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 theme-muted" size={15} />
@@ -530,7 +530,7 @@ export default function OwnerInventory() {
 
             {/* TAB 2: RECIPE / BOM STUDIO */}
             {activeTab === "recipes" && (
-                <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+                <div className="flex-1 grid gap-6 lg:grid-cols-[320px_1fr]">
                     {/* Menu Item Selector List */}
                     <div className="rounded-2xl border border-white/10 bg-[#111827] p-4 space-y-3">
                         <h2 className="text-sm font-extrabold text-orange-400 uppercase tracking-wider">Select Menu Item</h2>
@@ -680,7 +680,7 @@ export default function OwnerInventory() {
 
             {/* TAB 3: PURCHASES & STOCK-IN */}
             {activeTab === "purchases" && (
-                <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+                <div className="flex-1 grid gap-6 lg:grid-cols-[380px_1fr]">
                     <form onSubmit={handlePurchaseSubmit} className="rounded-2xl border border-white/10 bg-[#111827] p-5 space-y-4">
                         <h2 className="text-sm font-extrabold text-orange-400 uppercase tracking-wider">Record Stock-In / Purchase</h2>
 
@@ -787,7 +787,7 @@ export default function OwnerInventory() {
 
             {/* TAB 4: ADJUSTMENTS & WASTAGE */}
             {activeTab === "adjustments" && (
-                <div className="grid gap-6 lg:grid-cols-2">
+                <div className="flex-1 grid gap-6 lg:grid-cols-2">
                     {/* Manual Adjustment Form */}
                     <form onSubmit={handleAdjustmentSubmit} className="rounded-2xl border border-white/10 bg-[#111827] p-5 space-y-4">
                         <h2 className="text-sm font-extrabold text-blue-400 uppercase tracking-wider">Manual Stock Adjustment</h2>
@@ -885,7 +885,7 @@ export default function OwnerInventory() {
 
             {/* TAB 5: STOCK MOVEMENT LEDGER */}
             {activeTab === "ledger" && (
-                <div className="rounded-2xl border border-white/10 bg-[#111827] p-5 space-y-4">
+                <div className="flex-1 flex flex-col rounded-2xl border border-white/10 bg-[#111827] p-5 space-y-4">
                     <h2 className="text-sm font-extrabold text-orange-400 uppercase tracking-wider">Stock Movement Audit Trail</h2>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">

@@ -728,6 +728,9 @@ export default function OwnerLayout() {
         return hasModuleAccess(access, match.accessKey, match.fallbackKey);
     })();
     const isDashboardRoute = location.pathname === "/owner" || location.pathname === "/owner/";
+    const isKitchenRoute = location.pathname === "/owner/kitchen" || location.pathname.startsWith("/owner/kitchen/");
+    const isInventoryRoute = location.pathname === "/owner/inventory" || location.pathname.startsWith("/owner/inventory/");
+    const isFullHeightWorkspaceRoute = isDashboardRoute || isKitchenRoute || isInventoryRoute;
     const showTableAssignmentStrip = isDashboardRoute;
 
     const dashboardHeaderRef = useRef(null);
@@ -2596,7 +2599,15 @@ export default function OwnerLayout() {
                 )}
 
                 {/* Page */}
-                <main className={`w-full flex-1 px-2 sm:px-3 pt-1 pb-4 md:pb-6 ${isDashboardRoute ? "hidden" : ""}`}>
+                <main
+                    className={`w-full flex-1 px-2 sm:px-3 pt-1 pb-4 md:pb-6 ${
+                        isDashboardRoute ? "hidden" : ""
+                    } ${
+                        isFullHeightWorkspaceRoute
+                            ? "flex flex-col min-h-[calc(100vh-1rem)] min-h-[calc(100dvh-1rem)]"
+                            : ""
+                    }`}
+                >
                     {visibleNavItems.length === 0 ? (
                         <div className="theme-panel rounded-2xl p-6 text-sm">
                             No modules are enabled for this account.
@@ -2605,7 +2616,15 @@ export default function OwnerLayout() {
                         <Outlet context={{ setSidebarOpen, openSidebar: () => setSidebarOpen(true) }} />
                     ) : null}
                 </main>
-                <Footer className={isDashboardRoute ? "mt-0 border-t-0" : "mt-20"} />
+                <Footer
+                    className={
+                        isDashboardRoute
+                            ? "mt-0 border-t-0"
+                            : isKitchenRoute || isInventoryRoute
+                            ? "mt-0"
+                            : "mt-20"
+                    }
+                />
             </div>
             {selectedLiveOrder && (
                 <div

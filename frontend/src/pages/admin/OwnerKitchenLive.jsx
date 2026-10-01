@@ -625,7 +625,7 @@ export default function OwnerKitchenLive() {
     }
 
     return (
-        <div className="px-1 py-1 w-full space-y-4 text-[color:var(--app-text)] font-sans">
+        <div className="px-1 py-1 w-full flex-1 flex flex-col space-y-4 text-[color:var(--app-text)] font-sans min-h-[calc(100vh-2rem)] min-h-[calc(100dvh-2rem)]">
             {/* Top Title & Contextual Header */}
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-[color:var(--app-border)]/40 pb-3">
                 <div>
@@ -710,7 +710,7 @@ export default function OwnerKitchenLive() {
             {/* TAB 1 — OVERVIEW */}
             {/* ========================================================= */}
             {activeTab === "overview" && (
-                <div className="space-y-4">
+                <div className="flex-1 flex flex-col space-y-4">
                     {/* Top Summary Compact Buttons */}
                     <div className="flex flex-wrap items-center gap-2">
                         <button
@@ -756,7 +756,7 @@ export default function OwnerKitchenLive() {
                     </div>
 
                     {/* Main Overview Split Grid */}
-                    <div className="grid gap-4 lg:grid-cols-3">
+                    <div className="flex-1 grid gap-4 lg:grid-cols-3">
                         {/* Kitchen Activity Timeline (Left 2 cols) */}
                         <div className="lg:col-span-2 rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] p-4 space-y-3">
                             <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/30 pb-2">
@@ -849,7 +849,7 @@ export default function OwnerKitchenLive() {
             )}
 
             {activeTab === "live" && (
-                <div className="space-y-4">
+                <div className="flex-1 flex flex-col space-y-4">
                     {/* Secondary Navigation Bar: LIVE KOTS | HISTORY */}
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-3">
                         <div className="flex items-center gap-1.5 rounded-2xl bg-black/5 dark:bg-white/5 p-1 border border-[color:var(--app-border)]/30">
@@ -966,12 +966,12 @@ export default function OwnerKitchenLive() {
                             </div>
 
                             {/* Live KOT Cards Grid */}
-                            <div className="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
+                            <div className="flex-1 grid gap-4 xl:grid-cols-4 md:grid-cols-2">
                                 {STATUS_COLUMNS.map((status) => {
                                     if (liveStatusFilter !== "ALL" && liveStatusFilter !== status) return null;
 
                                     return (
-                                        <div key={status} className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] p-4 space-y-3">
+                                        <div key={status} className="rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)] p-4 space-y-3 flex flex-col">
                                             <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/30 pb-2">
                                                 <h4 className="text-xs font-extrabold uppercase tracking-wider text-orange-400">{status}</h4>
                                                 <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold text-orange-300">
@@ -979,7 +979,7 @@ export default function OwnerKitchenLive() {
                                                 </span>
                                             </div>
 
-                                            <div className="space-y-3">
+                                            <div className="flex-1 space-y-3">
                                                 {liveGroupedOrders[status].map((order) => {
                                                     const cardTimeInfo = getOrderCardTimeInfo(order.createdAt);
                                                     const action = nextActionByStatus(normalizeStatus(order.status));
@@ -1498,7 +1498,7 @@ export default function OwnerKitchenLive() {
             {/* TAB 3 — KOT AUDIT TRAIL */}
             {/* ========================================================= */}
             {activeTab === "audit" && (
-                <div className="space-y-4">
+                <div className="flex-1 flex flex-col space-y-4">
                     {/* Filter Bar */}
                     <div className="flex flex-col gap-3.5 border-b border-[color:var(--app-border)]/40 pb-3">
                         <div className="flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between">
@@ -1608,7 +1608,7 @@ export default function OwnerKitchenLive() {
                     </div>
 
                     {/* KOT Audit Trail Professional Table */}
-                    <div className="overflow-x-auto rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)]">
+                    <div className="flex-1 overflow-x-auto rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-surface-2)]">
                         <table className="w-full text-left text-xs">
                             <thead className="border-b border-[color:var(--app-border)]/40 theme-muted font-bold uppercase tracking-wider text-[11px]">
                                 <tr>
@@ -1775,7 +1775,7 @@ export default function OwnerKitchenLive() {
             {/* TAB 4 — HARDWARE & PRINT LOGS */}
             {/* ========================================================= */}
             {activeTab === "hardware" && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-5">
                     {/* Main Hardware Info & Logs (Left 2 cols) */}
                     <div className="lg:col-span-2 space-y-5">
                         {/* Hardware Overview Top Cards */}

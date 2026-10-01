@@ -483,4 +483,283 @@ describe("Owner Dashboard Tables - Viewport Layout & Footer Positioning Engine",
     });
 });
 
+describe("Kitchen Operations - Full-Height Workspace & Viewport Layout Engine", () => {
+    function calculateKitchenLayout({
+        viewportHeight = 768,
+        headerHeight = 56,
+        contentHeight = 200,
+        zoom = 100,
+    }) {
+        const zoomFactor = zoom / 100;
+        const effectiveViewportHeight = Math.round(viewportHeight / zoomFactor);
+        const minHeight = effectiveViewportHeight - headerHeight;
+        const actualWorkspaceHeight = Math.max(contentHeight, minHeight);
+        const footerTop = headerHeight + actualWorkspaceHeight;
+
+        return {
+            effectiveViewportHeight,
+            minHeight,
+            actualWorkspaceHeight,
+            footerTop,
+            footerAppearsInInitialViewport: footerTop < effectiveViewportHeight,
+            workspaceFillsInitialScreen: actualWorkspaceHeight >= minHeight,
+        };
+    }
+
+    it("Scenario 1: Empty KOT list retains minimum workspace height and footer does not appear prematurely", () => {
+        const layout = calculateKitchenLayout({
+            viewportHeight: 800,
+            headerHeight: 56,
+            contentHeight: 120, // Zero active KOTs empty state
+        });
+
+        expect(layout.minHeight).toBe(744);
+        expect(layout.actualWorkspaceHeight).toBe(744);
+        expect(layout.footerTop).toBe(800);
+        expect(layout.footerAppearsInInitialViewport).toBe(false);
+        expect(layout.workspaceFillsInitialScreen).toBe(true);
+    });
+
+    it("Scenario 2: One or a few KOTs maintains full available screen height", () => {
+        const layout = calculateKitchenLayout({
+            viewportHeight: 900,
+            headerHeight: 56,
+            contentHeight: 280, // 2-3 KOT cards
+        });
+
+        expect(layout.minHeight).toBe(844);
+        expect(layout.actualWorkspaceHeight).toBe(844);
+        expect(layout.footerTop).toBe(900);
+        expect(layout.footerAppearsInInitialViewport).toBe(false);
+    });
+
+    it("Scenario 3: Many KOTs and audit records naturally expands workspace height", () => {
+        const layout = calculateKitchenLayout({
+            viewportHeight: 768,
+            headerHeight: 56,
+            contentHeight: 1650, // 20+ active KOTs or extensive audit trail
+        });
+
+        expect(layout.minHeight).toBe(712);
+        expect(layout.actualWorkspaceHeight).toBe(1650);
+        expect(layout.actualWorkspaceHeight).toBeGreaterThan(layout.minHeight);
+        expect(layout.footerTop).toBe(1706);
+        expect(layout.footerTop).toBeGreaterThan(layout.effectiveViewportHeight);
+    });
+
+    it("Scenario 4: Switching between all kitchen tabs retains full-height layout without clipping", () => {
+        const tabs = [
+            { name: "overview", contentHeight: 350 },
+            { name: "live", contentHeight: 250 },
+            { name: "audit", contentHeight: 200 },
+            { name: "hardware", contentHeight: 400 },
+        ];
+
+        tabs.forEach((tab) => {
+            const layout = calculateKitchenLayout({
+                viewportHeight: 850,
+                headerHeight: 56,
+                contentHeight: tab.contentHeight,
+            });
+
+            expect(layout.actualWorkspaceHeight).toBe(794);
+            expect(layout.footerTop).toBe(850);
+            expect(layout.footerAppearsInInitialViewport).toBe(false);
+        });
+    });
+
+    it("Scenario 5: Visible hardware status panel fits within full-height workspace", () => {
+        const layout = calculateKitchenLayout({
+            viewportHeight: 900,
+            headerHeight: 56,
+            contentHeight: 500, // Hardware overview cards + printer logs
+        });
+
+        expect(layout.actualWorkspaceHeight).toBe(844);
+        expect(layout.footerTop).toBe(900);
+        expect(layout.footerAppearsInInitialViewport).toBe(false);
+    });
+
+    it("Scenario 6: Smaller browser viewport recalibrates workspace minimum height", () => {
+        const smallScreen = calculateKitchenLayout({
+            viewportHeight: 520,
+            headerHeight: 56,
+            contentHeight: 180,
+        });
+
+        expect(smallScreen.minHeight).toBe(464);
+        expect(smallScreen.actualWorkspaceHeight).toBe(464);
+        expect(smallScreen.footerTop).toBe(520);
+    });
+
+    it("Scenario 7: 70% and 100% browser zoom adapts workspace height correctly", () => {
+        const layout100 = calculateKitchenLayout({ viewportHeight: 900, headerHeight: 56, zoom: 100 });
+        const layout70 = calculateKitchenLayout({ viewportHeight: 900, headerHeight: 56, zoom: 70 });
+
+        expect(layout100.minHeight).toBe(844);
+        expect(layout70.effectiveViewportHeight).toBe(1286);
+        expect(layout70.minHeight).toBe(1230);
+        expect(layout100.footerAppearsInInitialViewport).toBe(false);
+        expect(layout70.footerAppearsInInitialViewport).toBe(false);
+    });
+
+    it("Scenario 8: Footer remains below the workspace in normal document flow", () => {
+        const layout = calculateKitchenLayout({
+            viewportHeight: 800,
+            headerHeight: 56,
+            contentHeight: 1400,
+        });
+
+        expect(layout.footerTop).toBe(1456);
+        expect(layout.footerTop - layout.effectiveViewportHeight).toBe(656);
+    });
+});
+
+describe("Raw Material Inventory & BOM - Full-Height Workspace & Viewport Layout Engine", () => {
+    function calculateInventoryLayout({
+        viewportHeight = 768,
+        headerHeight = 56,
+        contentHeight = 200,
+        zoom = 100,
+    }) {
+        const zoomFactor = zoom / 100;
+        const effectiveViewportHeight = Math.round(viewportHeight / zoomFactor);
+        const minHeight = effectiveViewportHeight - headerHeight;
+        const actualWorkspaceHeight = Math.max(contentHeight, minHeight);
+        const footerTop = headerHeight + actualWorkspaceHeight;
+
+        return {
+            effectiveViewportHeight,
+            minHeight,
+            actualWorkspaceHeight,
+            footerTop,
+            footerAppearsInInitialViewport: footerTop < effectiveViewportHeight,
+            workspaceFillsInitialScreen: actualWorkspaceHeight >= minHeight,
+        };
+    }
+
+    it("Scenario 1: Zero raw materials retains minimum workspace height without footer encroaching", () => {
+        const layout = calculateInventoryLayout({
+            viewportHeight: 800,
+            headerHeight: 56,
+            contentHeight: 160, // Empty table state: "No raw materials found"
+        });
+
+        expect(layout.minHeight).toBe(744);
+        expect(layout.actualWorkspaceHeight).toBe(744);
+        expect(layout.footerTop).toBe(800);
+        expect(layout.footerAppearsInInitialViewport).toBe(false);
+        expect(layout.workspaceFillsInitialScreen).toBe(true);
+    });
+
+    it("Scenario 2: A few raw materials maintains full available vertical space", () => {
+        const layout = calculateInventoryLayout({
+            viewportHeight: 900,
+            headerHeight: 56,
+            contentHeight: 280, // 3-4 raw material rows
+        });
+
+        expect(layout.minHeight).toBe(844);
+        expect(layout.actualWorkspaceHeight).toBe(844);
+        expect(layout.footerTop).toBe(900);
+        expect(layout.footerAppearsInInitialViewport).toBe(false);
+    });
+
+    it("Scenario 3: Many raw materials naturally expands workspace height", () => {
+        const layout = calculateInventoryLayout({
+            viewportHeight: 768,
+            headerHeight: 56,
+            contentHeight: 2100, // 40+ raw material rows
+        });
+
+        expect(layout.minHeight).toBe(712);
+        expect(layout.actualWorkspaceHeight).toBe(2100);
+        expect(layout.actualWorkspaceHeight).toBeGreaterThan(layout.minHeight);
+        expect(layout.footerTop).toBe(2156);
+        expect(layout.footerTop).toBeGreaterThan(layout.effectiveViewportHeight);
+    });
+
+    it("Scenario 4: Large purchase and movement ledgers expand workspace beyond initial screen", () => {
+        const layout = calculateInventoryLayout({
+            viewportHeight: 800,
+            headerHeight: 56,
+            contentHeight: 1800, // 50+ stock movement records
+        });
+
+        expect(layout.actualWorkspaceHeight).toBe(1800);
+        expect(layout.footerTop).toBe(1856);
+        expect(layout.footerTop).toBeGreaterThan(layout.effectiveViewportHeight);
+    });
+
+    it("Scenario 5: Switching between inventory tabs maintains minimum height across all tabs", () => {
+        const inventoryTabs = [
+            { name: "materials", contentHeight: 220 },
+            { name: "recipes", contentHeight: 480 },
+            { name: "purchases", contentHeight: 420 },
+            { name: "adjustments", contentHeight: 400 },
+            { name: "ledger", contentHeight: 300 },
+        ];
+
+        inventoryTabs.forEach((tab) => {
+            const layout = calculateInventoryLayout({
+                viewportHeight: 850,
+                headerHeight: 56,
+                contentHeight: tab.contentHeight,
+            });
+
+            expect(layout.actualWorkspaceHeight).toBe(794);
+            expect(layout.footerTop).toBe(850);
+            expect(layout.footerAppearsInInitialViewport).toBe(false);
+        });
+    });
+
+    it("Scenario 6: Search and category filters filtering down to zero items preserves full-height workspace", () => {
+        const layout = calculateInventoryLayout({
+            viewportHeight: 768,
+            headerHeight: 56,
+            contentHeight: 180, // Filtered empty state
+        });
+
+        expect(layout.minHeight).toBe(712);
+        expect(layout.actualWorkspaceHeight).toBe(712);
+        expect(layout.footerTop).toBe(768);
+        expect(layout.footerAppearsInInitialViewport).toBe(false);
+    });
+
+    it("Scenario 7: Smaller browser viewport recalibrates inventory workspace minimum height", () => {
+        const smallScreen = calculateInventoryLayout({
+            viewportHeight: 500,
+            headerHeight: 56,
+            contentHeight: 200,
+        });
+
+        expect(smallScreen.minHeight).toBe(444);
+        expect(smallScreen.actualWorkspaceHeight).toBe(444);
+        expect(smallScreen.footerTop).toBe(500);
+    });
+
+    it("Scenario 8: 70% and 100% browser zoom adapts inventory workspace correctly", () => {
+        const layout100 = calculateInventoryLayout({ viewportHeight: 900, headerHeight: 56, zoom: 100 });
+        const layout70 = calculateInventoryLayout({ viewportHeight: 900, headerHeight: 56, zoom: 70 });
+
+        expect(layout100.minHeight).toBe(844);
+        expect(layout70.effectiveViewportHeight).toBe(1286);
+        expect(layout70.minHeight).toBe(1230);
+        expect(layout100.footerAppearsInInitialViewport).toBe(false);
+        expect(layout70.footerAppearsInInitialViewport).toBe(false);
+    });
+
+    it("Scenario 9: Footer remains below the workspace in normal document flow", () => {
+        const layout = calculateInventoryLayout({
+            viewportHeight: 800,
+            headerHeight: 56,
+            contentHeight: 1500,
+        });
+
+        expect(layout.footerTop).toBe(1556);
+        expect(layout.footerTop - layout.effectiveViewportHeight).toBe(756);
+    });
+});
+
+
 
