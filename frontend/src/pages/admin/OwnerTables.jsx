@@ -1615,7 +1615,7 @@ export default function OwnerTables() {
                                                                 &#8942;
                                                             </button>
                                                             {openMenuId === table.id && (
-                                                                <div className="absolute right-0 z-30 mt-2 w-48 rounded-xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)] p-1.5 shadow-xl text-[color:var(--app-text)]">
+                                                                <div className="absolute right-0 z-50 mt-2 w-52 max-h-[300px] overflow-y-auto rounded-xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)] p-1.5 shadow-2xl text-[color:var(--app-text)]">
                                                                     {session && (
                                                                         <>
                                                                             <button

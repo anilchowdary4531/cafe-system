@@ -1317,7 +1317,6 @@ export default function OwnerLayout() {
     }, [isDashboardRoute, selectedLiveOrder]);
 
     const resolvePopoverPlacement = (event, kind) => {
-        if (!isDashboardRoute) return "bottom";
         const trigger = event?.currentTarget;
         if (!trigger || typeof trigger.closest !== "function") return "bottom";
         const tableCard = trigger.closest("[data-table-card='true']");
@@ -1332,15 +1331,15 @@ export default function OwnerLayout() {
         const spaceAbove = rect.top - edgePadding;
 
         const expectedHeightByKind = {
-            orders: 288,
-            staff: 220,
-            more: 124,
+            orders: 360,
+            staff: 280,
+            more: 240,
         };
-        const requiredHeight = expectedHeightByKind[kind] || 180;
+        const requiredHeight = expectedHeightByKind[kind] || 260;
 
         if (spaceBelow >= requiredHeight) return "bottom";
         if (spaceAbove >= requiredHeight) return "top";
-        return spaceBelow >= spaceAbove ? "bottom" : "top";
+        return spaceAbove >= spaceBelow ? "top" : "bottom";
     };
 
     const setPopoverPlacementFor = (kind, assignmentKey, event) => {
@@ -1754,7 +1753,7 @@ export default function OwnerLayout() {
                                                     <section
                                                         key={groupName}
                                                         className={`relative flex flex-col gap-1 py-0 ${
-                                                            sectionHasActivePopover ? "z-30" : "z-0"
+                                                            sectionHasActivePopover ? "z-40" : "z-0"
                                                         }`}
                                                     >
                                                         <div className="flex items-center justify-between gap-2 border-b border-[color:var(--app-border)]/50 pb-0.5">
@@ -2046,7 +2045,7 @@ export default function OwnerLayout() {
                                                             <div
                                                                 onClick={(event) => event.stopPropagation()}
                                                                 onMouseDown={(event) => event.stopPropagation()}
-                                                                className={`theme-table-popover absolute left-0 z-[60] w-72 rounded-xl p-2 text-[11px] shadow-2xl transition-opacity duration-150 ${ordersPopoverYClass}`}
+                                                                className={`theme-table-popover absolute left-0 z-[100] w-72 sm:w-80 max-h-[min(380px,75vh)] overflow-y-auto rounded-xl p-2.5 text-[11px] shadow-2xl transition-all duration-150 ${ordersPopoverYClass}`}
                                                             >
                                                                 <div className="mb-1 flex items-center justify-between gap-2">
                                                                     <p className="font-semibold">
@@ -2189,7 +2188,7 @@ export default function OwnerLayout() {
                                                             <div
                                                                 onClick={(event) => event.stopPropagation()}
                                                                 onMouseDown={(event) => event.stopPropagation()}
-                                                                className={`theme-table-popover absolute left-0 z-[60] w-64 rounded-xl p-2 text-[11px] shadow-2xl transition-opacity duration-150 ${staffPopoverYClass}`}
+                                                                className={`theme-table-popover absolute left-0 z-[100] w-64 sm:w-72 max-h-[min(320px,75vh)] overflow-y-auto rounded-xl p-2.5 text-[11px] shadow-2xl transition-all duration-150 ${staffPopoverYClass}`}
                                                             >
                                                                 <p className="font-semibold">
                                                                     Assign server for table {tableLabel}
@@ -2260,7 +2259,7 @@ export default function OwnerLayout() {
                                                             <div
                                                                 onClick={(event) => event.stopPropagation()}
                                                                 onMouseDown={(event) => event.stopPropagation()}
-                                                                className={`theme-table-popover absolute right-0 z-[60] w-48 rounded-xl p-2.5 text-[11px] shadow-2xl transition-opacity duration-150 ${morePopoverYClass}`}
+                                                                className={`theme-table-popover absolute right-0 z-[100] w-52 max-h-[min(320px,75vh)] overflow-y-auto rounded-xl p-2.5 text-[11px] shadow-2xl transition-all duration-150 ${morePopoverYClass}`}
                                                             >
                                                                 <div className="theme-table-order-row rounded-md px-2 py-1.5">
                                                                     <p className="theme-muted text-[10px] uppercase tracking-[0.08em]">
