@@ -258,12 +258,13 @@ export default function CustomerDigitalMenuPage() {
         })),
       };
 
-      const res = await axios.post(`${API}/api/public/digital-menu/order`, payload);
+      const targetEndpoint = token ? `${API}/api/public/qr/order` : `${API}/api/public/digital-menu/order`;
+      const res = await axios.post(targetEndpoint, payload);
       if (res.data?.order) {
         setPlacedOrder(res.data.order);
         setCart({});
         setShowCheckoutDrawer(false);
-        showToast("Online Order Placed Successfully!", "success");
+        showToast("Order Placed Successfully! Kitchen Notified.", "success");
       }
     } catch (err) {
       showToast(err.response?.data?.message || "Failed to place order", "error");

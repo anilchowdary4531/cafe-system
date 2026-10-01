@@ -321,6 +321,10 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
             },
           });
         }
+        await tx.diningTable.update({
+          where: { id: dTable.id },
+          data: { isOccupied: true },
+        }).catch(() => {});
         inputTableSessionId = activeSession.id;
       }
     }

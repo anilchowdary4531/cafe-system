@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { buildReadableOrderNo, updateOrderStatus } from "../services/orderService.js";
+import { buildReadableOrderNo, createOrderByStaff, updateOrderStatus } from "../services/orderService.js";
 import { buildUploadController } from "../controllers/uploadController.js";
 import { deleteAssetByKey, uploadRestaurantAsset } from "../services/storageService.js";
 import {
@@ -332,6 +332,56 @@ export default async function ownerRoutes(app, deps) {
     } catch (err) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to fetch owner orders" });
+    }
+  });
+
+  app.post("/owner/:restaurantId/orders", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
+
+      const actor = {
+        restaurantId,
+        role: req.user?.role || "STAFF",
+        userId: req.user?.id || null,
+        userName: req.user?.name || req.user?.email || "Staff",
+      };
+
+      const order = await createOrderByStaff({
+        prisma,
+        actor,
+        input: req.body,
+      });
+
+      // Broadcast Socket.IO events for real-time updates across screens
+      try {
+        const io = req.server?.io || realtime?.io;
+        if (io) {
+          io.to(`restaurant_${restaurantId}`).emit("new_order", order);
+          io.to(`restaurant:${restaurantId}`).emit("new_order", order);
+          io.to(`restaurant_${restaurantId}`).emit("order_created", { order, source: order.orderSource || "POS" });
+          io.to(`restaurant:${restaurantId}`).emit("order_created", { order, source: order.orderSource || "POS" });
+          if (order.tableNo) {
+            io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
+            io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
+            io.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableNo: order.tableNo });
+          }
+        }
+      } catch (e) {
+        console.warn("Socket broadcast error on order creation:", e?.message);
+      }
+
+      return reply.code(201).send({
+        success: true,
+        message: "Order placed successfully",
+        order,
+      });
+    } catch (err) {
+      console.error("Error creating owner/staff order:", err);
+      return reply.code(err.statusCode || 500).send({
+        success: false,
+        message: err.message || "Failed to create order",
+      });
     }
   });
 

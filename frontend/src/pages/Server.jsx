@@ -128,6 +128,15 @@ export default function Server() {
         }
     );
 
+    const { data: liveOrdersData, refresh: refreshLiveOrders } = useCachedGet(
+        restaurantId ? `/owner/${restaurantId}/orders` : "/owner/_/orders",
+        {
+            enabled: Boolean(restaurantId),
+            ttlMs: 5_000,
+            scope: `server-live-orders:${restaurantId}`,
+        }
+    );
+
     const tables = useMemo(() => {
         if (!tablesData) return [];
         return Array.isArray(tablesData.tables) ? tablesData.tables : Array.isArray(tablesData) ? tablesData : [];
@@ -143,6 +152,12 @@ export default function Server() {
         return Array.isArray(reservationsData.reservations) ? reservationsData.reservations : [];
     }, [reservationsData]);
 
+    const readyOrders = useMemo(() => {
+        if (!liveOrdersData) return [];
+        const raw = Array.isArray(liveOrdersData.orders) ? liveOrdersData.orders : Array.isArray(liveOrdersData) ? liveOrdersData : [];
+        return raw.filter((o) => String(o.status || "").toUpperCase() === "READY");
+    }, [liveOrdersData]);
+
     // Compute unique sections
     const sections = useMemo(() => {
         const set = new Set(["ALL"]);
@@ -153,26 +168,69 @@ export default function Server() {
         return Array.from(set);
     }, [tables]);
 
-    // Socket real-time updates
+    // Socket real-time updates & Ready Order alerts
     useEffect(() => {
         if (!socket) return;
-        const handleRealtimeUpdate = () => {
+        const handleRealtimeUpdate = (data) => {
             refreshTables();
             refreshReservations();
+            refreshLiveOrders();
+
+            const status = String(data?.status || data?.kot?.status || "").toUpperCase();
+            if (status === "READY") {
+                playNotificationSound();
+                const tableNum = data?.tableNo || data?.kot?.tableNo || data?.order?.tableNo;
+                const orderNum = data?.orderNo || data?.kot?.kotNo || data?.order?.orderNo;
+                showToast({
+                    title: "🔔 Order Ready to Serve!",
+                    message: `${tableNum ? `Table ${tableNum} ` : ""}${orderNum ? `Order #${orderNum}` : "Food"} is READY!`,
+                    variant: "success",
+                });
+            }
         };
 
         socket.on("table:updated", handleRealtimeUpdate);
         socket.on("table:session_updated", handleRealtimeUpdate);
         socket.on("reservation:updated", handleRealtimeUpdate);
         socket.on("waitlist:updated", handleRealtimeUpdate);
+        socket.on("kot:status_updated", handleRealtimeUpdate);
+        socket.on("order:updated", handleRealtimeUpdate);
+        socket.on("order_created", handleRealtimeUpdate);
+        socket.on("new_order", handleRealtimeUpdate);
 
         return () => {
             socket.off("table:updated", handleRealtimeUpdate);
             socket.off("table:session_updated", handleRealtimeUpdate);
             socket.off("reservation:updated", handleRealtimeUpdate);
             socket.off("waitlist:updated", handleRealtimeUpdate);
+            socket.off("kot:status_updated", handleRealtimeUpdate);
+            socket.off("order:updated", handleRealtimeUpdate);
+            socket.off("order_created", handleRealtimeUpdate);
+            socket.off("new_order", handleRealtimeUpdate);
         };
-    }, [socket, refreshTables, refreshReservations]);
+    }, [socket, refreshTables, refreshReservations, refreshLiveOrders]);
+
+    const handleMarkServed = async (orderId, tableNo) => {
+        try {
+            await axios.put(`${API}/owner/${restaurantId}/orders/${orderId}/status`, {
+                status: "DELIVERED",
+                changedByName: user?.name || "Server",
+            });
+            showToast({
+                title: "Order Served 🍽️",
+                message: `Order for Table ${tableNo || ""} marked as served.`,
+                variant: "success",
+            });
+            refreshLiveOrders();
+            refreshTables();
+        } catch (err) {
+            showToast({
+                title: "Error",
+                message: err.response?.data?.message || err.message || "Failed to mark order served",
+                variant: "error",
+            });
+        }
+    };
 
     // Filter tables based on Section, Search query, and Shift time
     const filteredTables = useMemo(() => {
@@ -437,6 +495,52 @@ export default function Server() {
             {/* Main Content Body */}
             {viewMode === "FLOOR_PLAN" ? (
                 <div className="flex-1 p-4 space-y-4 max-w-7xl mx-auto w-full">
+                    {/* Ready to Serve Notification Banner */}
+                    {readyOrders.length > 0 && (
+                        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs shadow-xs animate-in fade-in duration-300">
+                            <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20">
+                                <h3 className="font-extrabold text-emerald-700 dark:text-emerald-400 flex items-center gap-2 text-sm">
+                                    <Bell className="h-4 w-4 text-emerald-500 animate-bounce" />
+                                    <span>Ready to Serve ({readyOrders.length})</span>
+                                </h3>
+                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                    Kitchen marked orders ready!
+                                </span>
+                            </div>
+                            <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                {readyOrders.map((order) => (
+                                    <div
+                                        key={order.id}
+                                        className="rounded-xl border border-emerald-500/20 bg-white dark:bg-slate-900 p-2.5 flex items-center justify-between gap-2 shadow-xs"
+                                    >
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-black text-slate-900 dark:text-white text-xs">
+                                                    Table {order.tableNo || "N/A"}
+                                                </span>
+                                                <span className="text-[10px] font-mono text-emerald-600 font-bold bg-emerald-100 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">
+                                                    #{order.orderNo}
+                                                </span>
+                                            </div>
+                                            <p className="text-[11px] theme-muted truncate max-w-[180px] mt-0.5">
+                                                {Array.isArray(order.items)
+                                                    ? order.items.map((i) => `${i.qty}x ${i.itemName}`).join(", ")
+                                                    : "Items ready"}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleMarkServed(order.id, order.tableNo)}
+                                            className="px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-[11px] shadow-xs active:scale-95 transition whitespace-nowrap flex items-center gap-1"
+                                        >
+                                            <Check className="h-3 w-3" /> Served
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Status Summary & Section Filters Bar */}
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 p-3 shadow-xs text-xs">
                         {/* Section Filter Tabs */}
