@@ -84,6 +84,7 @@ export default function OwnerTables() {
     const [error, setError] = useState("");
     const [query, setQuery] = useState("");
     const [openMenuId, setOpenMenuId] = useState(null);
+    const [menuPlacement, setMenuPlacement] = useState({});
     const [tableGroups, setTableGroups] = useState({});
     const [groupCatalog, setGroupCatalog] = useState([]);
     const [newGroupName, setNewGroupName] = useState("");
@@ -848,8 +849,35 @@ export default function OwnerTables() {
         }
     };
 
-    const toggleActionsMenu = (tableId) => {
-        setOpenMenuId((prev) => (prev === tableId ? null : tableId));
+    const toggleActionsMenu = (tableId, event) => {
+        if (event) {
+            event.stopPropagation();
+        }
+        setOpenMenuId((prev) => {
+            const nextId = prev === tableId ? null : tableId;
+            if (nextId && event?.currentTarget) {
+                const rect = event.currentTarget.getBoundingClientRect();
+                const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1024;
+                const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 768;
+
+                const spaceToLeft = rect.left;
+                const spaceToRight = viewportWidth - rect.right;
+                const spaceBelow = viewportHeight - rect.bottom;
+                const spaceAbove = rect.top;
+
+                const popupWidth = 220;
+                const popupHeight = 300;
+
+                const posX = (spaceToLeft < popupWidth || (spaceToRight > spaceToLeft && spaceToLeft < 240)) ? "left" : "right";
+                const posY = (spaceBelow < popupHeight && spaceAbove > spaceBelow) ? "top" : "bottom";
+
+                setMenuPlacement((prevPlacement) => ({
+                    ...prevPlacement,
+                    [tableId]: { x: posX, y: posY },
+                }));
+            }
+            return nextId;
+        });
     };
 
     const createGroup = () => {
@@ -1609,13 +1637,20 @@ export default function OwnerTables() {
                                                         <div className="relative" data-table-actions-menu>
                                                             <button
                                                                 type="button"
-                                                                onClick={() => toggleActionsMenu(table.id)}
+                                                                onClick={(event) => toggleActionsMenu(table.id, event)}
                                                                 className="rounded-lg border border-[color:var(--app-border)]/40 px-2 py-0.5 text-lg leading-none theme-muted hover:text-[color:var(--app-text)] hover:bg-black/5 dark:hover:bg-white/5"
                                                             >
                                                                 &#8942;
                                                             </button>
-                                                            {openMenuId === table.id && (
-                                                                <div className="absolute right-0 z-50 mt-2 w-52 max-h-[300px] overflow-y-auto rounded-xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)] p-1.5 shadow-2xl text-[color:var(--app-text)]">
+                                                            {openMenuId === table.id && (() => {
+                                                                const placement = menuPlacement[table.id] || { x: "left", y: "bottom" };
+                                                                const posXClass = placement.x === "left" ? "left-0" : "right-0";
+                                                                const posYClass = placement.y === "top" ? "bottom-full mb-2" : "top-full mt-2";
+                                                                return (
+                                                                <div
+                                                                    style={{ maxWidth: "calc(100vw - 32px)" }}
+                                                                    className={`absolute ${posXClass} ${posYClass} z-50 w-52 max-h-[300px] overflow-y-auto rounded-xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)] p-1.5 shadow-2xl text-[color:var(--app-text)]`}
+                                                                >
                                                                     {session && (
                                                                         <>
                                                                             <button
@@ -1682,7 +1717,8 @@ export default function OwnerTables() {
                                                                         Delete Table
                                                                     </button>
                                                                 </div>
-                                                            )}
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 </div>

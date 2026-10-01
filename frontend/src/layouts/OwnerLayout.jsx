@@ -30,6 +30,11 @@ import {
     Calendar,
     Clock,
     CheckSquare,
+    Edit2,
+    Link2,
+    Move,
+    Unlock,
+    Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
@@ -524,6 +529,13 @@ export default function OwnerLayout() {
             return next;
         });
     };
+
+    // Table Action Modals State
+    const [editingTableModal, setEditingTableModal] = useState(null);
+    const [submittingEditTable, setSubmittingEditTable] = useState(false);
+    const [moveTableModal, setMoveTableModal] = useState(null);
+    const [targetMoveTableId, setTargetMoveTableId] = useState("");
+    const [submittingMoveTable, setSubmittingMoveTable] = useState(false);
 
     const { user, logout } = useAuth();
     const restaurantId = Number(user?.restaurantId || 0);
@@ -1168,6 +1180,48 @@ export default function OwnerLayout() {
         }
     };
 
+    const copyQrLink = (table) => {
+        try {
+            const url = table.qrTargetUrl
+                ? `${window.location.origin}${table.qrTargetUrl}`
+                : `${window.location.origin}/order/table/${table.qrToken || table.id}`;
+            navigator.clipboard.writeText(url);
+            showToast({
+                title: "QR Link Copied 🎉",
+                message: `Ordering link for Table ${table.tableNo} copied to clipboard!`,
+                variant: "success",
+            });
+        } catch {
+            showToast({
+                title: "Copy Failed",
+                message: "Unable to copy link to clipboard.",
+                variant: "error",
+            });
+        }
+    };
+
+    const handleDeleteTable = async (table) => {
+        if (!table?.id) return;
+        if (!window.confirm(`Are you sure you want to delete Table ${table.tableNo}? This action cannot be undone.`)) {
+            return;
+        }
+        try {
+            await axios.delete(`${API}/owner/${restaurantId}/tables/${table.id}`);
+            showToast({
+                title: "Table Deleted",
+                message: `Table ${table.tableNo} has been deleted.`,
+                variant: "success",
+            });
+            await refreshTableOverview();
+        } catch (err) {
+            showToast({
+                title: "Delete Failed",
+                message: err.response?.data?.message || err.message || "Failed to delete table.",
+                variant: "error",
+            });
+        }
+    };
+
     useEffect(() => {
         const validTableKeys = new Set(
             tableOverview.tables.map((table) => String(table.assignmentKey || table.key))
@@ -1222,18 +1276,29 @@ export default function OwnerLayout() {
         return () => window.removeEventListener("storage", handleStorageChange);
     }, [restaurantId]);
 
+    const toTitleCase = (str) =>
+        String(str || "")
+            .trim()
+            .replace(/\s+/g, " ")
+            .split(" ")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(" ");
+
     const getTableGroup = useCallback(
         (table) => {
             if (table?.groupName && String(table.groupName).trim()) {
-                return String(table.groupName).trim();
+                return toTitleCase(table.groupName);
+            }
+            if (table?.section && String(table.section).trim()) {
+                return toTitleCase(table.section);
             }
             const idKey = String(table?.id || "");
             if (idKey && tableGroups[idKey] && String(tableGroups[idKey]).trim()) {
-                return String(tableGroups[idKey]).trim();
+                return toTitleCase(tableGroups[idKey]);
             }
             const noKey = String(table?.tableNo || "").trim();
             if (noKey && tableGroups[noKey] && String(tableGroups[noKey]).trim()) {
-                return String(tableGroups[noKey]).trim();
+                return toTitleCase(tableGroups[noKey]);
             }
 
             if (noKey) {
@@ -1247,7 +1312,7 @@ export default function OwnerLayout() {
                 }
             }
 
-            return "Main Area";
+            return "Main Hall";
         },
         [tableGroups]
     );
@@ -1318,28 +1383,47 @@ export default function OwnerLayout() {
 
     const resolvePopoverPlacement = (event, kind) => {
         const trigger = event?.currentTarget;
-        if (!trigger || typeof trigger.closest !== "function") return "bottom";
-        const tableCard = trigger.closest("[data-table-card='true']");
-        if (!tableCard || typeof tableCard.getBoundingClientRect !== "function") {
-            return "bottom";
-        }
+        if (!trigger || typeof trigger.getBoundingClientRect !== "function") return { y: "bottom", x: "left" };
+        const tableCard = trigger.closest("[data-table-card='true']") || trigger;
 
-        const rect = tableCard.getBoundingClientRect();
-        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        const rect = trigger.getBoundingClientRect();
+        const cardRect = tableCard ? tableCard.getBoundingClientRect() : rect;
+        const container = tableCard.closest(".theme-nav") || document.body;
+        const containerRect = container.getBoundingClientRect();
+
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1024;
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 768;
         const edgePadding = 16;
-        const spaceBelow = viewportHeight - rect.bottom - edgePadding;
-        const spaceAbove = rect.top - edgePadding;
+
+        const spaceBelow = viewportHeight - cardRect.bottom - edgePadding;
+        const spaceAbove = cardRect.top - edgePadding;
 
         const expectedHeightByKind = {
             orders: 360,
             staff: 280,
-            more: 240,
+            more: 260,
         };
         const requiredHeight = expectedHeightByKind[kind] || 260;
+        const popupWidth = kind === "orders" ? 320 : kind === "staff" ? 280 : 210;
 
-        if (spaceBelow >= requiredHeight) return "bottom";
-        if (spaceAbove >= requiredHeight) return "top";
-        return spaceAbove >= spaceBelow ? "top" : "bottom";
+        const posY = (spaceBelow < requiredHeight && spaceAbove > spaceBelow) ? "top" : "bottom";
+
+        // Boundary safety calculation:
+        // Table card has position: relative.
+        // A right-0 popup has its left edge at cardRect.right - popupWidth in viewport coords.
+        // A left-0 popup has its right edge at cardRect.left + popupWidth in viewport coords.
+        const rightAlignedLeft = cardRect.right - popupWidth;
+        const leftAlignedRight = cardRect.left + popupWidth;
+
+        let posX = "left";
+        // Only use right-0 if right-alignment leaves at least 8px on the left AND left-alignment would overflow the right boundary
+        if (rightAlignedLeft >= containerRect.left + 8 && leftAlignedRight > containerRect.right - 8) {
+            posX = "right";
+        } else {
+            posX = "left";
+        }
+
+        return { y: posY, x: posX };
     };
 
     const setPopoverPlacementFor = (kind, assignmentKey, event) => {
@@ -1350,8 +1434,15 @@ export default function OwnerLayout() {
         }));
     };
 
-    const toPopoverYClass = (placement) =>
-        placement === "top" ? "bottom-full mb-2" : "top-full mt-2";
+    const toPopoverYClass = (placement) => {
+        const posY = typeof placement === "object" ? placement?.y : placement;
+        return posY === "top" ? "bottom-full mb-2" : "top-full mt-2";
+    };
+
+    const toPopoverXClass = (placement) => {
+        const posX = typeof placement === "object" ? placement?.x : "left";
+        return posX === "right" ? "right-0" : "left-0";
+    };
 
     return (
         <div className="theme-page flex min-h-screen overflow-x-hidden">
@@ -1570,13 +1661,13 @@ export default function OwnerLayout() {
                 {showTableAssignmentStrip && (
                     <div
                         className={`theme-nav border-b px-1 py-1.5 sm:px-2 w-full ${
-                            isDashboardRoute ? "flex-1 min-h-[80vh] flex flex-col justify-start gap-4" : ""
+                            isDashboardRoute ? "flex-1 flex flex-col justify-start gap-3" : ""
                         }`}
                     >
                         <div
                             className={
                                 isDashboardRoute
-                                    ? `grid min-h-[80vh] h-full gap-4 ${
+                                    ? `grid gap-4 ${
                                           showOnlineOrdersPanel ? "xl:grid-cols-4" : "xl:grid-cols-1"
                                       }`
                                     : "flex flex-col gap-2.5"
@@ -1832,18 +1923,18 @@ export default function OwnerLayout() {
                                                 const tableStateKey = resolveTableState(table);
                                                 const tableStateClassToken =
                                                     toTableStateClassToken(tableStateKey);
-                                                const ordersPopoverYClass = toPopoverYClass(
-                                                    tablePopoverPlacement[`orders:${assignmentKey}`] ||
-                                                        "bottom"
-                                                );
-                                                const staffPopoverYClass = toPopoverYClass(
-                                                    tablePopoverPlacement[`staff:${assignmentKey}`] ||
-                                                        "bottom"
-                                                );
-                                                const morePopoverYClass = toPopoverYClass(
-                                                    tablePopoverPlacement[`more:${assignmentKey}`] ||
-                                                        "bottom"
-                                                );
+                                                const ordersPlacement = tablePopoverPlacement[`orders:${assignmentKey}`];
+                                                const staffPlacement = tablePopoverPlacement[`staff:${assignmentKey}`];
+                                                const morePlacement = tablePopoverPlacement[`more:${assignmentKey}`];
+
+                                                const ordersPopoverYClass = toPopoverYClass(ordersPlacement || "bottom");
+                                                const ordersPopoverXClass = toPopoverXClass(ordersPlacement);
+
+                                                const staffPopoverYClass = toPopoverYClass(staffPlacement || "bottom");
+                                                const staffPopoverXClass = toPopoverXClass(staffPlacement);
+
+                                                const morePopoverYClass = toPopoverYClass(morePlacement || "bottom");
+                                                const morePopoverXClass = toPopoverXClass(morePlacement);
                                                 const openStaffSelector = (event) => {
                                                     event.stopPropagation();
                                                     setPopoverPlacementFor("staff", assignmentKey, event);
@@ -1882,7 +1973,7 @@ export default function OwnerLayout() {
                                                                 ? ` - Managed by ${assignedStaffLabel}`
                                                                 : ""
                                                         }`}
-                                                        className={`theme-table-box relative w-full aspect-square flex flex-col justify-between rounded-xl p-2.5 pb-7 text-xs transition-all duration-200 state-${tableStateClassToken} ${
+                                                        className={`theme-table-box relative w-full aspect-square flex flex-col justify-between rounded-xl p-2 sm:p-2.5 text-xs transition-all duration-200 state-${tableStateClassToken} ${
                                                             table.isOccupied ? "is-occupied" : ""
                                                         } ${isDropTarget ? "is-drop-target" : ""} ${
                                                             hasAnyPopoverOpen
@@ -1890,27 +1981,26 @@ export default function OwnerLayout() {
                                                                 : "hover:-translate-y-0.5 z-1"
                                                         }`}
                                                         style={{
-                                                            minHeight: `${Math.max(45, Math.round(110 * (tableZoom / 100)))}px`,
-                                                            maxWidth: `${Math.max(55, Math.round(140 * (tableZoom / 100)))}px`,
+                                                            minHeight: `${Math.max(65, Math.round(110 * (tableZoom / 100)))}px`,
+                                                            maxWidth: `${Math.max(80, Math.round(140 * (tableZoom / 100)))}px`,
                                                             fontSize: `${Math.max(9, Math.round(12 * (tableZoom / 100)))}px`,
                                                         }}
                                                     >
                                                         <div className="flex h-full flex-col justify-between">
-                                                            <div className="flex items-start justify-between gap-2">
+                                                            {/* Card Header: Table Number / Name + Actions */}
+                                                            <div className="flex items-start justify-between gap-1">
                                                                 <div className="min-w-0">
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <p
-                                                                            className="truncate font-bold leading-none"
-                                                                            style={{
-                                                                                fontSize: `${Math.max(
-                                                                                    11,
-                                                                                    Math.round(20 * (tableZoom / 100))
-                                                                                )}px`,
-                                                                            }}
-                                                                        >
-                                                                            {tableLabel}
-                                                                        </p>
-                                                                    </div>
+                                                                    <p
+                                                                        className="truncate font-extrabold leading-none text-[color:var(--app-text)]"
+                                                                        style={{
+                                                                            fontSize: `${Math.max(
+                                                                                13,
+                                                                                Math.round(20 * (tableZoom / 100))
+                                                                            )}px`,
+                                                                        }}
+                                                                    >
+                                                                        {tableLabel}
+                                                                    </p>
                                                                 </div>
 
                                                                 <div className="flex items-center gap-1">
@@ -1933,14 +2023,10 @@ export default function OwnerLayout() {
                                                                                 setOpenMoreTableKey("");
                                                                                 setReceiptActionError("");
                                                                             }}
-                                                                            className="theme-table-meta-pill rounded-full px-2 py-0.5 text-[10px] leading-none transition hover:opacity-90"
+                                                                            className="theme-table-meta-pill rounded-full px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold leading-none transition hover:opacity-90"
                                                                             title={`Show orders for table ${tableLabel}`}
                                                                         >
-                                                                            {table.activeOrderCount || 0} order
-                                                                            {Number(table.activeOrderCount || 0) ===
-                                                                            1
-                                                                                ? ""
-                                                                                : "s"}
+                                                                            {table.activeOrderCount || 0} ord
                                                                         </button>
                                                                     )}
                                                                     <button
@@ -1960,61 +2046,91 @@ export default function OwnerLayout() {
                                                                             setOpenOrdersTableKey("");
                                                                             setOpenStaffTableKey("");
                                                                         }}
-                                                                        className="theme-table-icon-btn rounded-md p-1.5 transition"
-                                                                        title={`More options for table ${tableLabel}`}
+                                                                        className="theme-table-icon-btn rounded-md p-1 transition hover:bg-black/10 dark:hover:bg-white/10"
+                                                                        title={`Actions for Table ${tableLabel}`}
+                                                                        aria-label={`Table ${tableLabel} actions`}
                                                                     >
                                                                         <MoreHorizontal size={14} />
                                                                     </button>
                                                                 </div>
                                                             </div>
 
-                                                            {table.isOccupied && (
-                                                                <div className="mt-auto flex items-end justify-start gap-1 pr-16 text-[10px]">
-                                                                    {assignedStaff ? (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={(event) =>
-                                                                                openStaffSelector(event)
-                                                                            }
-                                                                            className="theme-table-staff-pill inline-flex items-center gap-1 rounded-full px-2 py-0.5 transition hover:opacity-90"
-                                                                            title={`Change server for table ${tableLabel}`}
-                                                                        >
-                                                                            <span className="theme-table-staff-symbol inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold leading-none">
-                                                                                {getStaffSymbol(
-                                                                                    assignedStaff,
-                                                                                    assignedStaffLabel
-                                                                                )}
-                                                                            </span>
-                                                                            <span className="max-w-[120px] truncate">
-                                                                                {getStaffName(assignedStaff)}
-                                                                            </span>
-                                                                        </button>
-                                                                    ) : (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={(event) =>
-                                                                                openStaffSelector(event)
-                                                                            }
-                                                                            className="theme-table-meta-pill rounded-full px-2 py-0.5 transition hover:opacity-90"
-                                                                            title={`Assign server for table ${tableLabel}`}
-                                                                        >
-                                                                            No server
-                                                                        </button>
-                                                                    )}
+                                                            {/* Card Center: Table Status Badge & Seats Indicator (ALWAYS VISIBLE!) */}
+                                                            <div className="my-auto flex flex-col gap-1 py-0.5">
+                                                                <div className="flex items-center gap-1 flex-wrap">
+                                                                    <span
+                                                                        className={`inline-flex items-center gap-1 rounded-full px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold ${
+                                                                            table.isOccupied
+                                                                                ? "bg-blue-500/20 text-blue-600 dark:text-blue-300 border border-blue-500/40"
+                                                                                : tableStateKey === TABLE_STATE_KEYS.RESERVED || table.isReserved
+                                                                                ? "bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-500/40"
+                                                                                : tableStateKey === TABLE_STATE_KEYS.RUNNING_KOT
+                                                                                ? "bg-orange-500/20 text-orange-600 dark:text-orange-300 border border-orange-500/40"
+                                                                                : tableStateKey === TABLE_STATE_KEYS.PRINTED
+                                                                                ? "bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/40"
+                                                                                : tableStateKey === TABLE_STATE_KEYS.PAID
+                                                                                ? "bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/40"
+                                                                                : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/40"
+                                                                        }`}
+                                                                    >
+                                                                        <span className="h-1.5 w-1.5 rounded-full bg-current shrink-0" />
+                                                                        <span>
+                                                                            {table.isOccupied
+                                                                                ? "Running"
+                                                                                : tableStateKey === TABLE_STATE_KEYS.RESERVED || table.isReserved
+                                                                                ? "Reserved"
+                                                                                : "Available"}
+                                                                        </span>
+                                                                    </span>
+
+                                                                    <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] font-semibold theme-muted">
+                                                                        <Users size={10} className="shrink-0" />
+                                                                        <span>{table.seats || 4}s</span>
+                                                                    </span>
                                                                 </div>
-                                                            )}
+
+                                                                {(table.activeReservation || table.upcomingReservation) && (
+                                                                    <p className="text-[9px] font-bold text-purple-600 dark:text-purple-300 truncate">
+                                                                        {(table.activeReservation || table.upcomingReservation).customerName}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Card Footer: Assigned Server or Free State Indicator */}
+                                                            <div className="flex items-center justify-between gap-1 text-[9px] sm:text-[10px] pt-0.5">
+                                                                {assignedStaff ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(event) => openStaffSelector(event)}
+                                                                        className="theme-table-staff-pill inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 transition hover:opacity-90 max-w-[100px]"
+                                                                        title={`Assigned: ${assignedStaffLabel}`}
+                                                                    >
+                                                                        <span className="theme-table-staff-symbol inline-flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-semibold leading-none shrink-0">
+                                                                            {getStaffSymbol(assignedStaff, assignedStaffLabel)}
+                                                                        </span>
+                                                                        <span className="truncate">{getStaffName(assignedStaff)}</span>
+                                                                    </button>
+                                                                ) : (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(event) => openStaffSelector(event)}
+                                                                        className="theme-table-meta-pill rounded-full px-1.5 py-0.5 transition hover:opacity-90 text-[9px] theme-muted"
+                                                                        title={`Assign server for Table ${tableLabel}`}
+                                                                    >
+                                                                        + Server
+                                                                    </button>
+                                                                )}
+
+                                                                {table.isOccupied ? (
+                                                                    <span className="theme-table-time-pill inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold shrink-0">
+                                                                        {occupiedFor || "now"}
+                                                                    </span>
+                                                                ) : null}
+                                                            </div>
                                                         </div>
 
                                                         {table.isOccupied && (
-                                                            <div className="pointer-events-none absolute bottom-2 right-2 z-10">
-                                                                <span className="theme-table-time-pill inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold">
-                                                                    {occupiedFor || "just now"}
-                                                                </span>
-                                                            </div>
-                                                        )}
-
-                                                        {table.isOccupied && (
-                                                            <div className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2">
+                                                            <div className="absolute -bottom-2 left-1/2 z-10 -translate-x-1/2">
                                                                 <button
                                                                     type="button"
                                                                     onClick={(event) => {
@@ -2033,10 +2149,10 @@ export default function OwnerLayout() {
                                                                         setOpenMoreTableKey("");
                                                                         setReceiptActionError("");
                                                                     }}
-                                                                    className="theme-table-icon-btn rounded-md p-1.5 transition"
-                                                                    title={`Show receipt for table ${tableLabel}`}
+                                                                    className="theme-table-icon-btn rounded-full p-1 shadow-md transition bg-[color:var(--app-surface)] border border-[color:var(--app-border)]/50"
+                                                                    title={`Show receipt for Table ${tableLabel}`}
                                                                 >
-                                                                    <Printer size={14} />
+                                                                    <Printer size={12} />
                                                                 </button>
                                                             </div>
                                                         )}
@@ -2045,7 +2161,7 @@ export default function OwnerLayout() {
                                                             <div
                                                                 onClick={(event) => event.stopPropagation()}
                                                                 onMouseDown={(event) => event.stopPropagation()}
-                                                                className={`theme-table-popover absolute left-0 z-[100] w-72 sm:w-80 max-h-[min(380px,75vh)] overflow-y-auto rounded-xl p-2.5 text-[11px] shadow-2xl transition-all duration-150 ${ordersPopoverYClass}`}
+                                                                className={`theme-table-popover absolute ${ordersPopoverXClass} ${ordersPopoverYClass} z-[100] w-72 sm:w-80 max-h-[min(380px,75vh)] overflow-y-auto rounded-xl p-2.5 text-[11px] shadow-2xl transition-all duration-150`}
                                                             >
                                                                 <div className="mb-1 flex items-center justify-between gap-2">
                                                                     <p className="font-semibold">
@@ -2188,7 +2304,7 @@ export default function OwnerLayout() {
                                                             <div
                                                                 onClick={(event) => event.stopPropagation()}
                                                                 onMouseDown={(event) => event.stopPropagation()}
-                                                                className={`theme-table-popover absolute left-0 z-[100] w-64 sm:w-72 max-h-[min(320px,75vh)] overflow-y-auto rounded-xl p-2.5 text-[11px] shadow-2xl transition-all duration-150 ${staffPopoverYClass}`}
+                                                                className={`theme-table-popover absolute ${staffPopoverXClass} ${staffPopoverYClass} z-[100] w-64 sm:w-72 max-h-[min(320px,75vh)] overflow-y-auto rounded-xl p-2.5 text-[11px] shadow-2xl transition-all duration-150`}
                                                             >
                                                                 <p className="font-semibold">
                                                                     Assign server for table {tableLabel}
@@ -2259,21 +2375,67 @@ export default function OwnerLayout() {
                                                             <div
                                                                 onClick={(event) => event.stopPropagation()}
                                                                 onMouseDown={(event) => event.stopPropagation()}
-                                                                className={`theme-table-popover absolute right-0 z-[100] w-52 max-h-[min(320px,75vh)] overflow-y-auto rounded-xl p-2.5 text-[11px] shadow-2xl transition-all duration-150 ${morePopoverYClass}`}
+                                                                className={`theme-table-popover absolute ${morePopoverXClass} ${morePopoverYClass} z-[100] w-52 max-h-[min(340px,75vh)] overflow-y-auto rounded-xl p-1.5 text-[11px] shadow-2xl transition-all duration-150`}
+                                                                style={{ maxWidth: "calc(100vw - 32px)" }}
                                                             >
-                                                                <div className="theme-table-order-row rounded-md px-2 py-1.5">
-                                                                    <p className="theme-muted text-[10px] uppercase tracking-[0.08em]">
-                                                                        Seats
-                                                                    </p>
-                                                                    <p className="font-semibold">
-                                                                        {table.seats} seat
-                                                                        {Number(table.seats || 0) === 1
-                                                                            ? ""
-                                                                            : "s"}
-                                                                    </p>
+                                                                {/* Header Info */}
+                                                                <div className="flex items-center justify-between px-2 py-1 mb-1 border-b border-[color:var(--app-border)]/40 text-[10px] theme-muted font-bold uppercase">
+                                                                    <span>Table {tableLabel}</span>
+                                                                    <span>{table.seats || 4} Seats</span>
                                                                 </div>
+
+                                                                {/* 1. Edit Table */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        setOpenMoreTableKey("");
+                                                                        setEditingTableModal({
+                                                                            id: table.id,
+                                                                            tableNo: table.tableNo,
+                                                                            seats: table.seats || 4,
+                                                                            groupName: getTableGroup(table) || "",
+                                                                            isActive: table.isActive !== false,
+                                                                        });
+                                                                    }}
+                                                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hover:bg-black/5 dark:hover:bg-white/10 text-left cursor-pointer"
+                                                                >
+                                                                    <Edit2 size={13} className="text-amber-500 shrink-0" />
+                                                                    <span>Edit Table</span>
+                                                                </button>
+
+                                                                {/* 2. Copy QR Link */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        setOpenMoreTableKey("");
+                                                                        copyQrLink(table);
+                                                                    }}
+                                                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hover:bg-black/5 dark:hover:bg-white/10 text-left cursor-pointer"
+                                                                >
+                                                                    <Link2 size={13} className="text-blue-500 shrink-0" />
+                                                                    <span>Copy QR Link</span>
+                                                                </button>
+
+                                                                {/* 3. Move Table */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        setOpenMoreTableKey("");
+                                                                        setMoveTableModal(table);
+                                                                        setTargetMoveTableId("");
+                                                                    }}
+                                                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hover:bg-black/5 dark:hover:bg-white/10 text-left cursor-pointer"
+                                                                >
+                                                                    <Move size={13} className="text-purple-500 shrink-0" />
+                                                                    <span>Move Table</span>
+                                                                </button>
+
+                                                                {/* Reservation Info if present */}
                                                                 {(table.activeReservation || table.upcomingReservation) && (
-                                                                    <div className="mt-2 rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-1.5 text-purple-700 dark:text-purple-300">
+                                                                    <div className="my-1 rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-1.5 text-purple-700 dark:text-purple-300">
                                                                         <p className="text-[10px] font-bold uppercase tracking-[0.08em] opacity-75">
                                                                             Reservation Info
                                                                         </p>
@@ -2285,35 +2447,38 @@ export default function OwnerLayout() {
                                                                                 {(table.activeReservation || table.upcomingReservation).startTime} – {(table.activeReservation || table.upcomingReservation).endTime}
                                                                             </p>
                                                                         )}
-                                                                        <p className="text-[10px]">
-                                                                            {(table.activeReservation || table.upcomingReservation).guestCount || 1} Guests
-                                                                        </p>
                                                                     </div>
                                                                 )}
-                                                                {tableStateKey === TABLE_STATE_KEYS.RESERVED && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={(event) => {
-                                                                            event.stopPropagation();
-                                                                            navigate("/owner/reservations");
-                                                                        }}
-                                                                        className="theme-button mt-2 w-full rounded-md px-2 py-1 text-[10px] font-semibold text-center transition"
-                                                                    >
-                                                                        View Reservations
-                                                                    </button>
-                                                                )}
+
+                                                                <div className="my-1 border-t border-[color:var(--app-border)]/40" />
+
+                                                                {/* 4. Free Table */}
                                                                 <button
                                                                     type="button"
                                                                     onClick={(event) => {
                                                                         event.stopPropagation();
+                                                                        setOpenMoreTableKey("");
                                                                         handleFreeTable(table, assignmentKey);
                                                                     }}
                                                                     disabled={isCompletingThisTable}
-                                                                    className="theme-table-remove-btn mt-2 w-full rounded-md px-2 py-1 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                                                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 text-left cursor-pointer disabled:opacity-60"
                                                                 >
-                                                                    {isCompletingThisTable
-                                                                        ? "Freeing..."
-                                                                        : "Free table"}
+                                                                    <Unlock size={13} className="shrink-0" />
+                                                                    <span>{isCompletingThisTable ? "Freeing..." : "Free Table"}</span>
+                                                                </button>
+
+                                                                {/* 5. Delete Table */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        setOpenMoreTableKey("");
+                                                                        handleDeleteTable(table);
+                                                                    }}
+                                                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 text-left cursor-pointer mt-1"
+                                                                >
+                                                                    <Trash2 size={13} className="shrink-0" />
+                                                                    <span>Delete Table</span>
                                                                 </button>
                                                             </div>
                                                         )}
@@ -2549,6 +2714,235 @@ export default function OwnerLayout() {
                     navigate("/owner/orders");
                 }}
             />
+
+            {/* EDIT TABLE MODAL */}
+            {editingTableModal && (
+                <div
+                    className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+                    onClick={() => setEditingTableModal(null)}
+                >
+                    <div
+                        className="theme-panel w-full max-w-md rounded-2xl p-5 shadow-2xl border border-[color:var(--app-border)]/50"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between pb-3 border-b border-[color:var(--app-border)]/40">
+                            <div className="flex items-center gap-2">
+                                <Edit2 size={16} className="text-amber-500" />
+                                <h3 className="text-base font-bold text-[color:var(--app-text)]">
+                                    Edit Table {editingTableModal.tableNo}
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setEditingTableModal(null)}
+                                className="p-1 rounded-lg theme-muted hover:text-[color:var(--app-text)] cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form
+                            onSubmit={async (e) => {
+                                e.preventDefault();
+                                if (!restaurantId || !editingTableModal.id) return;
+                                setSubmittingEditTable(true);
+                                try {
+                                    await axios.put(`${API}/owner/${restaurantId}/tables/${editingTableModal.id}`, {
+                                        tableNo: editingTableModal.tableNo,
+                                        seats: Number(editingTableModal.seats || 4),
+                                        section: editingTableModal.groupName,
+                                        isActive: editingTableModal.isActive,
+                                    });
+                                    showToast({
+                                        title: "Table Updated 🎉",
+                                        message: `Table ${editingTableModal.tableNo} configuration saved successfully.`,
+                                        variant: "success",
+                                    });
+                                    setEditingTableModal(null);
+                                    await refreshTableOverview();
+                                } catch (err) {
+                                    showToast({
+                                        title: "Update Failed",
+                                        message: err.response?.data?.message || err.message || "Failed to update table.",
+                                        variant: "error",
+                                    });
+                                } finally {
+                                    setSubmittingEditTable(false);
+                                }
+                            }}
+                            className="mt-4 space-y-3.5"
+                        >
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider theme-muted mb-1">
+                                    Table Number / Label
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={editingTableModal.tableNo}
+                                    onChange={(e) => setEditingTableModal({ ...editingTableModal, tableNo: e.target.value })}
+                                    className="w-full rounded-xl border border-[color:var(--app-border)]/50 bg-[color:var(--app-surface)] px-3 py-2 text-sm text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider theme-muted mb-1">
+                                    Seats (Capacity)
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="50"
+                                    required
+                                    value={editingTableModal.seats}
+                                    onChange={(e) => setEditingTableModal({ ...editingTableModal, seats: e.target.value })}
+                                    className="w-full rounded-xl border border-[color:var(--app-border)]/50 bg-[color:var(--app-surface)] px-3 py-2 text-sm text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider theme-muted mb-1">
+                                    Group / Section
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Main Hall, Roof Top, Section T"
+                                    value={editingTableModal.groupName}
+                                    onChange={(e) => setEditingTableModal({ ...editingTableModal, groupName: e.target.value })}
+                                    className="w-full rounded-xl border border-[color:var(--app-border)]/50 bg-[color:var(--app-surface)] px-3 py-2 text-sm text-[color:var(--app-text)] outline-none focus:border-amber-500"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-1">
+                                <input
+                                    type="checkbox"
+                                    id="edit-table-active"
+                                    checked={editingTableModal.isActive}
+                                    onChange={(e) => setEditingTableModal({ ...editingTableModal, isActive: e.target.checked })}
+                                    className="h-4 w-4 rounded accent-amber-500 cursor-pointer"
+                                />
+                                <label htmlFor="edit-table-active" className="text-xs font-semibold theme-muted cursor-pointer select-none">
+                                    Table is Active & Available for Dining
+                                </label>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[color:var(--app-border)]/40">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingTableModal(null)}
+                                    className="rounded-xl px-4 py-2 text-xs font-bold theme-muted hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submittingEditTable}
+                                    className="rounded-xl bg-[color:var(--app-primary)] px-5 py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                                >
+                                    {submittingEditTable ? "Saving..." : "Save Changes"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MOVE TABLE MODAL */}
+            {moveTableModal && (
+                <div
+                    className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+                    onClick={() => setMoveTableModal(null)}
+                >
+                    <div
+                        className="theme-panel w-full max-w-md rounded-2xl p-5 shadow-2xl border border-[color:var(--app-border)]/50"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between pb-3 border-b border-[color:var(--app-border)]/40">
+                            <div className="flex items-center gap-2">
+                                <Move size={16} className="text-purple-500" />
+                                <h3 className="text-base font-bold text-[color:var(--app-text)]">
+                                    Move Table {moveTableModal.tableNo}
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setMoveTableModal(null)}
+                                className="p-1 rounded-lg theme-muted hover:text-[color:var(--app-text)] cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="mt-4 space-y-4">
+                            <p className="text-xs theme-muted">
+                                Transfer orders and dining session from Table{" "}
+                                <strong className="text-[color:var(--app-text)]">{moveTableModal.tableNo}</strong> to a free table.
+                            </p>
+
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider theme-muted mb-1.5">
+                                    Destination Table
+                                </label>
+                                <select
+                                    value={targetMoveTableId}
+                                    onChange={(e) => setTargetMoveTableId(e.target.value)}
+                                    className="w-full rounded-xl border border-[color:var(--app-border)]/50 bg-[color:var(--app-surface)] px-3 py-2.5 text-sm text-[color:var(--app-text)] outline-none focus:border-amber-500 cursor-pointer"
+                                >
+                                    <option value="">-- Choose destination table --</option>
+                                    {tableOverview.tables
+                                        .filter((t) => t.id !== moveTableModal.id)
+                                        .map((t) => (
+                                            <option key={t.id} value={t.id} disabled={t.isOccupied}>
+                                                Table {t.tableNo} ({t.seats || 4} seats) - {t.isOccupied ? "Occupied" : "Free"}
+                                            </option>
+                                        ))}
+                                </select>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[color:var(--app-border)]/40">
+                                <button
+                                    type="button"
+                                    onClick={() => setMoveTableModal(null)}
+                                    className="rounded-xl px-4 py-2 text-xs font-bold theme-muted hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={!targetMoveTableId || submittingMoveTable}
+                                    onClick={async () => {
+                                        if (!restaurantId || !moveTableModal?.id || !targetMoveTableId) return;
+                                        setSubmittingMoveTable(true);
+                                        try {
+                                            await axios.post(`${API}/owner/${restaurantId}/tables/${moveTableModal.id}/move`, {
+                                                targetTableId: Number(targetMoveTableId),
+                                            });
+                                            showToast({
+                                                title: "Table Moved 🎉",
+                                                message: `Session moved to destination table.`,
+                                                variant: "success",
+                                            });
+                                            setMoveTableModal(null);
+                                            await refreshTableOverview();
+                                        } catch (err) {
+                                            showToast({
+                                                title: "Move Failed",
+                                                message: err.response?.data?.message || err.message || "Failed to move table.",
+                                                variant: "error",
+                                            });
+                                        } finally {
+                                            setSubmittingMoveTable(false);
+                                        }
+                                    }}
+                                    className="rounded-xl bg-purple-600 px-5 py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                                >
+                                    {submittingMoveTable ? "Moving..." : "Confirm Move"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
