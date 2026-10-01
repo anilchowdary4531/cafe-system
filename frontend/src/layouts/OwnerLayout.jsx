@@ -36,7 +36,7 @@ import {
     Unlock,
     Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { resolveRestaurantName } from "../utils/restaurantContext";
 import BrandLogo from "../components/BrandLogo";
@@ -729,6 +729,39 @@ export default function OwnerLayout() {
     })();
     const isDashboardRoute = location.pathname === "/owner" || location.pathname === "/owner/";
     const showTableAssignmentStrip = isDashboardRoute;
+
+    const dashboardHeaderRef = useRef(null);
+    const [dashboardHeaderHeight, setDashboardHeaderHeight] = useState(65);
+
+    useEffect(() => {
+        if (!isDashboardRoute) return;
+
+        const updateHeaderHeight = () => {
+            if (dashboardHeaderRef.current) {
+                const rect = dashboardHeaderRef.current.getBoundingClientRect();
+                const h = Math.round(rect.height || dashboardHeaderRef.current.offsetHeight || 65);
+                if (h > 0) {
+                    setDashboardHeaderHeight(h);
+                }
+            }
+        };
+
+        updateHeaderHeight();
+
+        let resizeObserver = null;
+        if (typeof ResizeObserver !== "undefined" && dashboardHeaderRef.current) {
+            resizeObserver = new ResizeObserver(() => {
+                updateHeaderHeight();
+            });
+            resizeObserver.observe(dashboardHeaderRef.current);
+        }
+
+        window.addEventListener("resize", updateHeaderHeight);
+        return () => {
+            if (resizeObserver) resizeObserver.disconnect();
+            window.removeEventListener("resize", updateHeaderHeight);
+        };
+    }, [isDashboardRoute]);
 
     useEffect(() => {
         if (!visibleNavItems.length) return;
@@ -1536,7 +1569,10 @@ export default function OwnerLayout() {
             <div className="flex min-h-screen min-w-0 flex-1 flex-col">
                 {/* Header - Full navbar ONLY on Dashboard page (/owner) */}
                 {isDashboardRoute && (
-                    <header className="theme-nav border-b px-2 py-2 sm:px-3">
+                    <header
+                        ref={dashboardHeaderRef}
+                        className="theme-nav border-b px-2 py-2 sm:px-3"
+                    >
                         <div className="flex items-center justify-between gap-3">
                             {/* Left */}
                             <div className="flex items-start gap-3 min-w-0">
@@ -1626,13 +1662,23 @@ export default function OwnerLayout() {
                 {showTableAssignmentStrip && (
                     <div
                         className={`theme-nav border-b px-1 py-1.5 sm:px-2 w-full ${
-                            isDashboardRoute ? "flex-1 flex flex-col justify-start gap-3" : ""
+                            isDashboardRoute
+                                ? "flex-1 flex flex-col justify-start gap-3 min-h-[calc(100vh-65px)] min-h-[calc(100dvh-var(--dashboard-header-height,65px))]"
+                                : ""
                         }`}
+                        style={
+                            isDashboardRoute
+                                ? {
+                                      minHeight: `calc(100dvh - ${dashboardHeaderHeight}px)`,
+                                      "--dashboard-header-height": `${dashboardHeaderHeight}px`,
+                                  }
+                                : undefined
+                        }
                     >
                         <div
                             className={
                                 isDashboardRoute
-                                    ? `grid gap-4 ${
+                                    ? `flex-1 grid gap-4 ${
                                           showOnlineOrdersPanel ? "xl:grid-cols-4" : "xl:grid-cols-1"
                                       }`
                                     : "flex flex-col gap-2.5"
@@ -1641,7 +1687,7 @@ export default function OwnerLayout() {
                             <div
                                 className={
                                     isDashboardRoute
-                                        ? `flex min-h-0 flex-col gap-1.5 ${
+                                        ? `flex min-h-0 flex-1 flex-col gap-1.5 ${
                                               showOnlineOrdersPanel ? "xl:col-span-3" : "xl:col-span-1 w-full"
                                           }`
                                         : ""
@@ -2550,7 +2596,7 @@ export default function OwnerLayout() {
                 )}
 
                 {/* Page */}
-                <main className={`w-full px-2 sm:px-3 pt-1 pb-4 md:pb-6 ${isDashboardRoute ? "hidden" : ""}`}>
+                <main className={`w-full flex-1 px-2 sm:px-3 pt-1 pb-4 md:pb-6 ${isDashboardRoute ? "hidden" : ""}`}>
                     {visibleNavItems.length === 0 ? (
                         <div className="theme-panel rounded-2xl p-6 text-sm">
                             No modules are enabled for this account.
@@ -2559,7 +2605,7 @@ export default function OwnerLayout() {
                         <Outlet context={{ setSidebarOpen, openSidebar: () => setSidebarOpen(true) }} />
                     ) : null}
                 </main>
-                <Footer />
+                <Footer className={isDashboardRoute ? "mt-0 border-t-0" : "mt-20"} />
             </div>
             {selectedLiveOrder && (
                 <div

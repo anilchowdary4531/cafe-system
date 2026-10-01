@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import BrandLogo from "./BrandLogo";
 
-export default function Footer() {
+export default function Footer({ className = "" }) {
     return (
-        <footer className="theme-footer mt-20 border-t border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_95%,#000_5%)] text-[color:var(--app-text)]">
+        <footer className={`theme-footer border-t border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-alpha,var(--app-bg))_95%,#000_5%)] text-[color:var(--app-text)] ${className || "mt-20"}`}>
             <div className="mx-auto max-w-7xl px-8 py-16">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12">
                     {/* Brand Column */}

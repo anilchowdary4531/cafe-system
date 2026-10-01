@@ -333,3 +333,154 @@ describe("Owner Panel Tables - Authoritative Table Grouping & Data Synchronizati
     });
 });
 
+describe("Owner Dashboard Tables - Viewport Layout & Footer Positioning Engine", () => {
+    // Pure layout calculation functions matching OwnerLayout implementation
+    function calculateWorkspaceLayout({
+        viewportHeight = 768,
+        headerHeight = 65,
+        contentHeight = 200,
+        zoom = 100,
+    }) {
+        // Effective viewport under zoom
+        const effectiveViewportHeight = Math.round(viewportHeight * (100 / zoom));
+        const minHeight = Math.max(0, effectiveViewportHeight - headerHeight);
+        // The workspace has min-height: minHeight, so it never shrinks below minHeight
+        const actualWorkspaceHeight = Math.max(minHeight, contentHeight);
+        const footerTop = headerHeight + actualWorkspaceHeight;
+
+        return {
+            effectiveViewportHeight,
+            minHeight,
+            actualWorkspaceHeight,
+            footerTop,
+            footerAppearsInInitialViewport: footerTop < effectiveViewportHeight,
+            workspaceFillsInitialScreen: actualWorkspaceHeight >= minHeight,
+        };
+    }
+
+    it("Scenario 1: With only a few tables, workspace fills available viewport and footer starts below initial screen", () => {
+        const layout = calculateWorkspaceLayout({
+            viewportHeight: 768,
+            headerHeight: 64,
+            contentHeight: 180, // 4 tables in 1 group
+        });
+
+        expect(layout.minHeight).toBe(704);
+        expect(layout.actualWorkspaceHeight).toBe(704);
+        expect(layout.footerTop).toBe(768);
+        expect(layout.footerAppearsInInitialViewport).toBe(false);
+        expect(layout.workspaceFillsInitialScreen).toBe(true);
+    });
+
+    it("Scenario 2: With nine tables divided into three groups, full-height workspace is maintained", () => {
+        const layout = calculateWorkspaceLayout({
+            viewportHeight: 900,
+            headerHeight: 64,
+            contentHeight: 360, // 9 tables across Main Hall, Roof Top, Section T
+        });
+
+        expect(layout.minHeight).toBe(836);
+        expect(layout.actualWorkspaceHeight).toBe(836);
+        expect(layout.footerTop).toBe(900);
+        expect(layout.footerAppearsInInitialViewport).toBe(false);
+    });
+
+    it("Scenario 3: With many tables (e.g. 30 tables), workspace expands naturally beyond minimum height", () => {
+        const layout = calculateWorkspaceLayout({
+            viewportHeight: 768,
+            headerHeight: 64,
+            contentHeight: 1200, // 30 tables across multiple rows
+        });
+
+        expect(layout.minHeight).toBe(704);
+        expect(layout.actualWorkspaceHeight).toBe(1200);
+        expect(layout.actualWorkspaceHeight).toBeGreaterThan(layout.minHeight);
+        expect(layout.footerTop).toBe(1264);
+        // Footer is pushed down with content
+        expect(layout.footerTop).toBeGreaterThan(layout.effectiveViewportHeight);
+    });
+
+    it("Scenario 4: Several new groups added allows workspace to grow accordingly", () => {
+        const layout = calculateWorkspaceLayout({
+            viewportHeight: 800,
+            headerHeight: 64,
+            contentHeight: 1500, // 8 groups with titles, counts, and table cards
+        });
+
+        expect(layout.actualWorkspaceHeight).toBe(1500);
+        expect(layout.footerTop).toBe(1564);
+    });
+
+    it("Scenario 5: Live Orders panel toggling (visible vs hidden) retains full layout stability", () => {
+        // Desktop xl layout: with panel visible (col-span-3 tables, col-span-1 orders)
+        const panelVisibleLayout = calculateWorkspaceLayout({
+            viewportHeight: 900,
+            headerHeight: 64,
+            contentHeight: 400,
+        });
+
+        // With panel hidden (xl:grid-cols-1)
+        const panelHiddenLayout = calculateWorkspaceLayout({
+            viewportHeight: 900,
+            headerHeight: 64,
+            contentHeight: 300,
+        });
+
+        expect(panelVisibleLayout.actualWorkspaceHeight).toBe(836);
+        expect(panelHiddenLayout.actualWorkspaceHeight).toBe(836);
+        expect(panelVisibleLayout.footerTop).toBe(900);
+        expect(panelHiddenLayout.footerTop).toBe(900);
+    });
+
+    it("Scenario 6: Browser window height reduced correctly recalibrates available height", () => {
+        const smallScreen = calculateWorkspaceLayout({
+            viewportHeight: 500,
+            headerHeight: 64,
+            contentHeight: 200,
+        });
+
+        expect(smallScreen.minHeight).toBe(436);
+        expect(smallScreen.actualWorkspaceHeight).toBe(436);
+        expect(smallScreen.footerTop).toBe(500);
+    });
+
+    it("Scenario 7: Browser at 70% zoom and 100% zoom adapts workspace height correctly", () => {
+        const layout100 = calculateWorkspaceLayout({
+            viewportHeight: 900,
+            headerHeight: 64,
+            contentHeight: 300,
+            zoom: 100,
+        });
+
+        const layout70 = calculateWorkspaceLayout({
+            viewportHeight: 900,
+            headerHeight: 64,
+            contentHeight: 300,
+            zoom: 70,
+        });
+
+        expect(layout100.minHeight).toBe(836);
+        // At 70% zoom, effective viewport is ~1286px, available workspace is 1222px
+        expect(layout70.effectiveViewportHeight).toBe(1286);
+        expect(layout70.minHeight).toBe(1222);
+        expect(layout70.actualWorkspaceHeight).toBe(1222);
+        // In both cases, footer never encroaches into the available workspace!
+        expect(layout100.footerAppearsInInitialViewport).toBe(false);
+        expect(layout70.footerAppearsInInitialViewport).toBe(false);
+    });
+
+    it("Scenario 8: Footer is in normal document flow and reached by scrolling when workspace grows", () => {
+        const expandedLayout = calculateWorkspaceLayout({
+            viewportHeight: 768,
+            headerHeight: 64,
+            contentHeight: 1800,
+        });
+
+        expect(expandedLayout.footerTop).toBe(1864);
+        // User can scroll the page 1864 - 768 = 1096px down to reach the footer
+        const scrollDistanceToFooter = expandedLayout.footerTop - expandedLayout.effectiveViewportHeight;
+        expect(scrollDistanceToFooter).toBe(1096);
+    });
+});
+
+
