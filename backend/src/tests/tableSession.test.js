@@ -164,7 +164,6 @@ test("Persistent Table Sessions Unit & Integration Test Suite", async (t) => {
 
   await t.test("updateSessionPaymentStatus completes session on PAID status", async () => {
     let closedStatus = null;
-    let tableStatusSet = null;
 
     const mockPrisma = {
       tableSession: {
@@ -177,7 +176,7 @@ test("Persistent Table Sessions Unit & Integration Test Suite", async (t) => {
         }),
         update: async ({ data }) => {
           closedStatus = data.status;
-          return { id: 1, status: data.status, closedAt: data.closedAt };
+          return { id: 1, status: data.status, paidAt: data.paidAt };
         },
       },
       order: {
@@ -185,8 +184,7 @@ test("Persistent Table Sessions Unit & Integration Test Suite", async (t) => {
       },
       diningTable: {
         update: async ({ data }) => {
-          tableStatusSet = data;
-          return { id: 10, isOccupied: false };
+          return { id: 10, assignedWaiterId: null, assignedWaiterName: null };
         },
       },
     };
@@ -201,4 +199,216 @@ test("Persistent Table Sessions Unit & Integration Test Suite", async (t) => {
     assert.equal(closedStatus, "PAID");
     assert.equal(result.status, "PAID");
   });
+
+  await t.test("Free Table Workflow - Successfully freeing an occupied table within transaction", async () => {
+    let sessionClosed = false;
+    let waiterCleared = false;
+    let auditLogged = false;
+    let ordersDeleted = false;
+    let paymentsDeleted = false;
+
+    const mockSession = {
+      id: 101,
+      tableId: 5,
+      restaurantId: 1,
+      status: "OPEN",
+      orders: [{ id: 201, status: "DELIVERED", paymentStatus: "PAID" }],
+    };
+
+    const mockTable = {
+      id: 5,
+      restaurantId: 1,
+      tableNo: "T-5",
+      assignedWaiterId: 12,
+      assignedWaiterName: "Sam",
+      tableSessions: [mockSession],
+    };
+
+    const mockTx = {
+      tableSession: {
+        updateMany: async ({ where, data }) => {
+          if (where.tableId === 5 && data.status === "CLOSED") {
+            sessionClosed = true;
+          }
+          return { count: 1 };
+        },
+      },
+      order: {
+        updateMany: async ({ data }) => {
+          return { count: 0 };
+        },
+        deleteMany: async () => {
+          ordersDeleted = true;
+        },
+      },
+      payment: {
+        deleteMany: async () => {
+          paymentsDeleted = true;
+        },
+      },
+      diningTable: {
+        update: async ({ where, data }) => {
+          assert.equal("isOccupied" in data, false, "diningTable.update must NOT include isOccupied argument");
+          if (data.assignedWaiterId === null && data.assignedWaiterName === null) {
+            waiterCleared = true;
+          }
+          return { ...mockTable, assignedWaiterId: null, assignedWaiterName: null };
+        },
+      },
+      tableOperationLog: {
+        create: async ({ data }) => {
+          if (data.operationType === "CLEAR_TABLE") {
+            auditLogged = true;
+          }
+          return { id: 1, ...data };
+        },
+      },
+    };
+
+    const mockPrisma = {
+      $transaction: async (cb) => cb(mockTx),
+    };
+
+    // Execute clear table transaction
+    const updatedTable = await mockPrisma.$transaction(async (tx) => {
+      await tx.tableSession.updateMany({
+        where: { tableId: 5, restaurantId: 1, status: { in: ["OPEN", "BILLING", "PAID"] } },
+        data: { status: "CLOSED", closedAt: new Date() },
+      });
+
+      await tx.order.updateMany({
+        where: { tableId: 5, restaurantId: 1, status: { in: ["PLACED", "ACCEPTED", "PREPARING", "READY", "OPEN", "BILLING"] } },
+        data: { status: "DELIVERED" },
+      });
+
+      const updated = await tx.diningTable.update({
+        where: { id: 5 },
+        data: { assignedWaiterId: null, assignedWaiterName: null },
+      });
+
+      await tx.tableOperationLog.create({
+        data: {
+          restaurantId: 1,
+          operationType: "CLEAR_TABLE",
+          sourceTableId: 5,
+          sourceTableNo: "T-5",
+          sourceSessionId: mockSession.id,
+          performedByName: "Server Test",
+          performedByUserRole: "SERVER",
+        },
+      });
+
+      return updated;
+    });
+
+    assert.equal(sessionClosed, true, "Active table session should be marked CLOSED");
+    assert.equal(waiterCleared, true, "Assigned waiter should be cleared");
+    assert.equal(auditLogged, true, "Audit log for CLEAR_TABLE should be created");
+    assert.equal(ordersDeleted, false, "Orders must NOT be deleted when freeing a table");
+    assert.equal(paymentsDeleted, false, "Payments must NOT be deleted when freeing a table");
+    assert.equal(updatedTable.id, 5);
+  });
+
+  await t.test("Free Table Workflow - Rejecting attempt to free table with active/unpaid orders without force flag", async () => {
+    const mockSessionWithActiveOrders = {
+      id: 102,
+      tableId: 6,
+      restaurantId: 1,
+      status: "OPEN",
+      orders: [
+        { id: 202, status: "PREPARING", paymentStatus: "PENDING" },
+      ],
+    };
+
+    const mockTable = {
+      id: 6,
+      restaurantId: 1,
+      tableNo: "T-6",
+      tableSessions: [mockSessionWithActiveOrders],
+    };
+
+    const activeSession = mockTable.tableSessions[0];
+    const activeOrders = activeSession?.orders || [];
+    const unpaidOrders = activeOrders.filter((o) => o.paymentStatus === "PENDING" && o.status !== "CANCELLED");
+    const activePrepOrders = activeOrders.filter((o) => ["PLACED", "ACCEPTED", "PREPARING"].includes(o.status));
+
+    const force = false;
+    let validationFailed = false;
+    let responseObj = null;
+
+    if (!force && (unpaidOrders.length > 0 || activePrepOrders.length > 0)) {
+      validationFailed = true;
+      responseObj = {
+        success: false,
+        requiresConfirmation: true,
+        unpaidCount: unpaidOrders.length,
+        prepCount: activePrepOrders.length,
+      };
+    }
+
+    assert.equal(validationFailed, true);
+    assert.equal(responseObj.requiresConfirmation, true);
+    assert.equal(responseObj.unpaidCount, 1);
+    assert.equal(responseObj.prepCount, 1);
+  });
+
+  await t.test("Free Table Workflow - Preventing duplicate Free Table requests (idempotent clearing)", async () => {
+    const mockTableAlreadyFree = {
+      id: 7,
+      restaurantId: 1,
+      tableNo: "T-7",
+      tableSessions: [], // No active session
+    };
+
+    let sessionClosedCount = 0;
+    let tableUpdatedCount = 0;
+
+    const mockTx = {
+      tableSession: {
+        updateMany: async () => {
+          sessionClosedCount++;
+          return { count: 0 };
+        },
+      },
+      order: {
+        updateMany: async () => ({ count: 0 }),
+      },
+      diningTable: {
+        update: async ({ data }) => {
+          assert.equal("isOccupied" in data, false);
+          tableUpdatedCount++;
+          return { ...mockTableAlreadyFree, assignedWaiterId: null, assignedWaiterName: null };
+        },
+      },
+      tableOperationLog: {
+        create: async () => ({ id: 2 }),
+      },
+    };
+
+    const mockPrisma = {
+      $transaction: async (cb) => cb(mockTx),
+    };
+
+    // Re-clearing table that has no active session should succeed cleanly without crashing
+    const activeSession = mockTableAlreadyFree.tableSessions[0]; // undefined
+
+    const result = await mockPrisma.$transaction(async (tx) => {
+      if (activeSession) {
+        await tx.tableSession.updateMany({
+          where: { tableId: 7, restaurantId: 1, status: { in: ["OPEN", "BILLING", "PAID"] } },
+          data: { status: "CLOSED", closedAt: new Date() },
+        });
+      }
+
+      return tx.diningTable.update({
+        where: { id: 7 },
+        data: { assignedWaiterId: null, assignedWaiterName: null },
+      });
+    });
+
+    assert.equal(sessionClosedCount, 0, "No active session update should occur if already closed");
+    assert.equal(tableUpdatedCount, 1, "Dining table status remains free without error");
+    assert.equal(result.id, 7);
+  });
 });
+

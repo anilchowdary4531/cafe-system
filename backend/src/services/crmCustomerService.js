@@ -1,4 +1,13 @@
 import { normalizePhone, isValidPhone } from "./phoneService.js";
+import {
+  resolveDateRange,
+  isQualifyingOrder,
+  getDistinctVisitDates,
+  calculateAvgVisitInterval,
+  classifyCustomerSegment,
+  matchesSegmentFilter,
+  calculateCrmSummary,
+} from "./customerAnalyticsService.js";
 
 const normalizeEmail = (email) => {
   if (!email) return null;
@@ -19,39 +28,60 @@ export const getCustomerStats = async ({ prisma, restaurantId, customerId }) => 
       lastOrderAt: null,
       cancelledOrders: 0,
       totalRefunded: 0,
+      distinctVisits: 0,
+      avgVisitIntervalDays: null,
+      segment: "NO_ORDERS",
+      isRepeat: false,
     };
   }
 
-  const orders = await prisma.order.findMany({
-    where: { restaurantId: rId, customerId: cId },
-    select: {
-      id: true,
-      total: true,
-      status: true,
-      paymentStatus: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  const [restaurant, orders, payments] = await Promise.all([
+    prisma.restaurant.findUnique({
+      where: { id: rId },
+      select: { timezone: true },
+    }),
+    prisma.order.findMany({
+      where: { restaurantId: rId, customerId: cId },
+      select: {
+        id: true,
+        total: true,
+        status: true,
+        paymentStatus: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.payment.findMany({
+      where: {
+        order: { restaurantId: rId, customerId: cId },
+        status: { in: ["REFUNDED", "PARTIALLY_REFUNDED"] },
+      },
+      select: { amount: true },
+    }),
+  ]);
 
-  const validOrders = orders.filter((o) => o.status !== "CANCELLED");
+  const timezone = restaurant?.timezone || "Asia/Kolkata";
+  const validOrders = orders.filter((o) => isQualifyingOrder(o));
   const cancelledOrders = orders.filter((o) => o.status === "CANCELLED").length;
-
-  const totalOrders = validOrders.length;
-  const totalSpent = validOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-  const averageOrderValue = totalOrders > 0 ? Number((totalSpent / totalOrders).toFixed(2)) : 0;
-  const firstOrderAt = orders.length > 0 ? orders[0].createdAt : null;
-  const lastOrderAt = orders.length > 0 ? orders[orders.length - 1].createdAt : null;
-
-  // Calculate refunds from Payment model if available
-  const payments = await prisma.payment.findMany({
-    where: {
-      order: { restaurantId: rId, customerId: cId },
-      status: { in: ["REFUNDED", "PARTIALLY_REFUNDED", "FAILED"] },
-    },
-    select: { amount: true },
-  });
   const totalRefunded = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+  const grossSpent = validOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+  const totalSpent = Math.max(0, Number((grossSpent - totalRefunded).toFixed(2)));
+  const totalOrders = validOrders.length;
+  const averageOrderValue = totalOrders > 0 ? Number((totalSpent / totalOrders).toFixed(2)) : 0;
+  const firstOrderAt = validOrders.length > 0 ? validOrders[0].createdAt : null;
+  const lastOrderAt = validOrders.length > 0 ? validOrders[validOrders.length - 1].createdAt : null;
+
+  const distinctVisitDates = getDistinctVisitDates(validOrders, timezone);
+  const distinctVisits = distinctVisitDates.length;
+  const avgVisitIntervalDays = calculateAvgVisitInterval(distinctVisitDates);
+
+  const segment = classifyCustomerSegment({
+    lifetimeOrders: totalOrders,
+    lifetimeSpend: totalSpent,
+    lastOrderAt,
+    firstOrderAt,
+  });
 
   return {
     totalOrders,
@@ -61,6 +91,10 @@ export const getCustomerStats = async ({ prisma, restaurantId, customerId }) => 
     lastOrderAt,
     cancelledOrders,
     totalRefunded,
+    distinctVisits,
+    avgVisitIntervalDays,
+    segment,
+    isRepeat: totalOrders >= 2,
   };
 };
 
@@ -73,6 +107,16 @@ export const searchCustomers = async ({
   status = "ACTIVE",
   sortBy = "createdAt",
   sortOrder = "desc",
+  range = "all",
+  startDate,
+  endDate,
+  segment = "ALL",
+  minOrders,
+  maxOrders,
+  minSpend,
+  maxSpend,
+  frequentThreshold = 5,
+  highSpendThreshold = 5000,
 }) => {
   const rId = Number(restaurantId);
   if (!rId) throw new Error("Invalid restaurant ID");
@@ -81,6 +125,18 @@ export const searchCustomers = async ({
   const l = Math.min(100, Math.max(1, Number(limit || 20)));
   const skip = (p - 1) * l;
 
+  // 1. Fetch restaurant info for timezone
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: rId },
+    select: { timezone: true },
+  });
+  const timezone = restaurant?.timezone || "Asia/Kolkata";
+
+  // 2. Resolve date range
+  const dateRange = resolveDateRange({ range, startDate, endDate, timezone });
+  const hasDateFilter = Boolean(dateRange.start && dateRange.end);
+
+  // 3. Build customer base WHERE clause
   const whereClause = {
     restaurantId: rId,
   };
@@ -102,86 +158,366 @@ export const searchCustomers = async ({
     ];
   }
 
-  // Handle sorting
-  let orderBy = {};
-  if (sortBy === "name") {
-    orderBy = { name: sortOrder.toLowerCase() === "asc" ? "asc" : "desc" };
-  } else if (sortBy === "updatedAt") {
-    orderBy = { updatedAt: sortOrder.toLowerCase() === "asc" ? "asc" : "desc" };
-  } else {
-    orderBy = { createdAt: sortOrder.toLowerCase() === "asc" ? "asc" : "desc" };
-  }
-
-  const [totalCount, customers] = await Promise.all([
-    prisma.customer.count({ where: whereClause }),
-    prisma.customer.findMany({
-      where: whereClause,
-      skip,
-      take: l,
-      orderBy,
-      include: {
-        orders: {
-          select: {
-            id: true,
-            total: true,
-            status: true,
-            createdAt: true,
+  // 4. Fetch all matching customers for this restaurant with their orders & refunds
+  // Single round-trip without N+1 queries, selecting only essential aggregate fields
+  const customers = await prisma.customer.findMany({
+    where: whereClause,
+    select: {
+      id: true,
+      restaurantId: true,
+      name: true,
+      phone: true,
+      email: true,
+      status: true,
+      notes: true,
+      tags: true,
+      rewardPoints: true,
+      createdAt: true,
+      updatedAt: true,
+      orders: {
+        where: { status: { not: "CANCELLED" } },
+        select: {
+          id: true,
+          total: true,
+          status: true,
+          paymentStatus: true,
+          createdAt: true,
+          payments: {
+            where: { status: { in: ["REFUNDED", "PARTIALLY_REFUNDED"] } },
+            select: { amount: true },
           },
         },
-        _count: {
-          select: {
-            orders: true,
-            reservations: true,
-            addresses: true,
-          },
+        orderBy: { createdAt: "asc" },
+      },
+      _count: {
+        select: {
+          orders: true,
+          reservations: true,
+          addresses: true,
         },
       },
-    }),
-  ]);
+    },
+  });
 
-  const items = customers.map((c) => {
-    const validOrders = (c.orders || []).filter((o) => o.status !== "CANCELLED");
-    const totalOrders = c._count?.orders || 0;
-    const totalSpent = validOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const sortedOrders = [...(c.orders || [])].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-    const lastOrderAt = sortedOrders.length > 0 ? sortedOrders[0].createdAt : null;
+  // Thresholds configuration
+  const thresholds = {
+    frequentThreshold: Number(frequentThreshold || 5),
+    highSpendThreshold: Number(highSpendThreshold || 5000),
+    recentlyInactiveDays: 30,
+    longTermInactiveDays: 90,
+    reactivationGapDays: 60,
+  };
+
+  // 5. Enrich each customer with metrics
+  const enrichedCustomers = customers.map((c) => {
+    const allValidOrders = (c.orders || []).filter((o) => isQualifyingOrder(o));
+    const lifetimeOrders = allValidOrders.length;
+
+    // Refund calculations
+    let totalRefunds = 0;
+    for (const o of allValidOrders) {
+      if (Array.isArray(o.payments)) {
+        for (const pmt of o.payments) {
+          totalRefunds += Number(pmt.amount || 0);
+        }
+      }
+    }
+
+    const grossLifetimeSpend = allValidOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    const lifetimeSpent = Math.max(0, Number((grossLifetimeSpend - totalRefunds).toFixed(2)));
+
+    const firstOrderAt = allValidOrders.length > 0 ? allValidOrders[0].createdAt : null;
+    const lastOrderAt = allValidOrders.length > 0 ? allValidOrders[allValidOrders.length - 1].createdAt : null;
+
+    // Distinct visit calculations
+    const lifetimeDistinctVisitDates = getDistinctVisitDates(allValidOrders, timezone);
+    const distinctVisits = lifetimeDistinctVisitDates.length;
+    const avgVisitIntervalDays = calculateAvgVisitInterval(lifetimeDistinctVisitDates);
+
+    const averageOrderValue = lifetimeOrders > 0
+      ? Number((lifetimeSpent / lifetimeOrders).toFixed(2))
+      : 0;
+
+    // Period-specific metrics
+    let periodOrders = lifetimeOrders;
+    let periodSpent = lifetimeSpent;
+    let periodVisits = distinctVisits;
+    let prevOrderBeforePeriodAt = null;
+
+    if (hasDateFilter) {
+      const pOrders = allValidOrders.filter((o) => {
+        const orderTime = new Date(o.createdAt).getTime();
+        return orderTime >= dateRange.start.getTime() && orderTime <= dateRange.end.getTime();
+      });
+
+      const priorOrders = allValidOrders.filter((o) => {
+        return new Date(o.createdAt).getTime() < dateRange.start.getTime();
+      });
+
+      if (priorOrders.length > 0) {
+        prevOrderBeforePeriodAt = priorOrders[priorOrders.length - 1].createdAt;
+      }
+
+      periodOrders = pOrders.length;
+      const grossPeriodSpend = pOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+      periodSpent = Math.max(0, Number(grossPeriodSpend.toFixed(2)));
+      periodVisits = getDistinctVisitDates(pOrders, timezone).length;
+    }
+
+    const customerSegment = classifyCustomerSegment({
+      lifetimeOrders,
+      lifetimeSpend: lifetimeSpent,
+      lastOrderAt,
+      periodOrders,
+      firstOrderAt,
+      prevOrderBeforePeriodAt,
+      thresholds,
+    });
 
     const { orders, ...rest } = c;
     return {
       ...rest,
-      totalOrders,
-      totalSpent,
+      totalOrders: lifetimeOrders,
+      totalSpent: lifetimeSpent,
+      periodOrders,
+      periodSpent,
+      distinctVisits,
+      periodVisits,
+      firstOrderAt,
       lastOrderAt,
+      avgVisitIntervalDays,
+      averageOrderValue,
+      segment: customerSegment,
+      isRepeat: lifetimeOrders >= 2,
     };
   });
 
-  // Client-side sorting for aggregated fields if requested
-  if (sortBy === "orderCount") {
-    items.sort((a, b) =>
-      sortOrder.toLowerCase() === "asc" ? a.totalOrders - b.totalOrders : b.totalOrders - a.totalOrders
+  // 6. Apply Segment & Numerical Threshold Filters
+  let filtered = enrichedCustomers;
+
+  if (segment && segment !== "ALL") {
+    filtered = filtered.filter((c) =>
+      matchesSegmentFilter(
+        c.segment,
+        segment,
+        { lifetimeOrders: c.totalOrders, lifetimeSpend: c.totalSpent, lastOrderAt: c.lastOrderAt },
+        thresholds
+      )
     );
-  } else if (sortBy === "totalSpend") {
-    items.sort((a, b) =>
-      sortOrder.toLowerCase() === "asc" ? a.totalSpent - b.totalSpent : b.totalSpent - a.totalSpent
-    );
-  } else if (sortBy === "lastOrderDate") {
-    items.sort((a, b) => {
-      const at = a.lastOrderAt ? new Date(a.lastOrderAt).getTime() : 0;
-      const bt = b.lastOrderAt ? new Date(b.lastOrderAt).getTime() : 0;
-      return sortOrder.toLowerCase() === "asc" ? at - bt : bt - at;
-    });
   }
 
+  if (minOrders !== undefined && minOrders !== "") {
+    const minO = Number(minOrders);
+    if (!isNaN(minO)) {
+      filtered = filtered.filter((c) => (hasDateFilter ? c.periodOrders : c.totalOrders) >= minO);
+    }
+  }
+
+  if (maxOrders !== undefined && maxOrders !== "") {
+    const maxO = Number(maxOrders);
+    if (!isNaN(maxO)) {
+      filtered = filtered.filter((c) => (hasDateFilter ? c.periodOrders : c.totalOrders) <= maxO);
+    }
+  }
+
+  if (minSpend !== undefined && minSpend !== "") {
+    const minS = Number(minSpend);
+    if (!isNaN(minS)) {
+      filtered = filtered.filter((c) => (hasDateFilter ? c.periodSpent : c.totalSpent) >= minS);
+    }
+  }
+
+  if (maxSpend !== undefined && maxSpend !== "") {
+    const maxS = Number(maxSpend);
+    if (!isNaN(maxS)) {
+      filtered = filtered.filter((c) => (hasDateFilter ? c.periodSpent : c.totalSpent) <= maxS);
+    }
+  }
+
+  // 7. Calculate Global Summary KPIs across all filtered customers
+  const summary = calculateCrmSummary({
+    customers: filtered,
+    dateRange,
+  });
+
+  // 8. Global Database-Consistent Sorting across the entire dataset
+  const sortDir = String(sortOrder).toLowerCase() === "asc" ? 1 : -1;
+  filtered.sort((a, b) => {
+    switch (sortBy) {
+      case "name":
+        return sortDir * (a.name || "").localeCompare(b.name || "");
+      case "orderCount":
+      case "totalOrders":
+        return sortDir * (a.totalOrders - b.totalOrders);
+      case "periodOrders":
+        return sortDir * (a.periodOrders - b.periodOrders);
+      case "totalSpend":
+      case "totalSpent":
+        return sortDir * (a.totalSpent - b.totalSpent);
+      case "periodSpent":
+        return sortDir * (a.periodSpent - b.periodSpent);
+      case "lastOrderDate":
+      case "lastOrderAt": {
+        const tA = a.lastOrderAt ? new Date(a.lastOrderAt).getTime() : 0;
+        const tB = b.lastOrderAt ? new Date(b.lastOrderAt).getTime() : 0;
+        return sortDir * (tA - tB);
+      }
+      case "firstOrderDate":
+      case "firstOrderAt": {
+        const tA = a.firstOrderAt ? new Date(a.firstOrderAt).getTime() : 0;
+        const tB = b.firstOrderAt ? new Date(b.firstOrderAt).getTime() : 0;
+        return sortDir * (tA - tB);
+      }
+      case "averageOrderValue":
+      case "avgOrderValue":
+        return sortDir * (a.averageOrderValue - b.averageOrderValue);
+      case "visitInterval":
+      case "avgVisitIntervalDays": {
+        const vA = a.avgVisitIntervalDays !== null && a.avgVisitIntervalDays !== undefined ? a.avgVisitIntervalDays : Infinity;
+        const vB = b.avgVisitIntervalDays !== null && b.avgVisitIntervalDays !== undefined ? b.avgVisitIntervalDays : Infinity;
+        return sortDir * (vA - vB);
+      }
+      case "updatedAt": {
+        const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const tB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return sortDir * (tA - tB);
+      }
+      default: // createdAt
+        return sortDir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    }
+  });
+
+  // 9. Paginate the globally sorted records
+  const totalCount = filtered.length;
+  const paginatedItems = filtered.slice(skip, skip + l);
+
   return {
-    items,
+    items: paginatedItems,
+    summary,
     pagination: {
       total: totalCount,
       page: p,
       limit: l,
       totalPages: Math.ceil(totalCount / l) || 1,
     },
+    filterMeta: {
+      range,
+      rangeLabel: dateRange.label,
+      startDate: dateRange.start ? dateRange.start.toISOString() : null,
+      endDate: dateRange.end ? dateRange.end.toISOString() : null,
+      segment,
+      timezone,
+    },
+  };
+};
+
+export const getCustomerDirectorySummary = async ({
+  prisma,
+  restaurantId,
+  range = "all",
+  startDate,
+  endDate,
+  frequentThreshold = 5,
+  highSpendThreshold = 5000,
+}) => {
+  const result = await searchCustomers({
+    prisma,
+    restaurantId,
+    range,
+    startDate,
+    endDate,
+    page: 1,
+    limit: 1, // Summary is computed over all matching records
+    status: "ALL",
+    frequentThreshold,
+    highSpendThreshold,
+  });
+  return result.summary;
+};
+
+export const exportCustomerDirectory = async ({
+  prisma,
+  restaurantId,
+  query = "",
+  status = "ACTIVE",
+  sortBy = "createdAt",
+  sortOrder = "desc",
+  range = "all",
+  startDate,
+  endDate,
+  segment = "ALL",
+  minOrders,
+  maxOrders,
+  minSpend,
+  maxSpend,
+  frequentThreshold = 5,
+  highSpendThreshold = 5000,
+}) => {
+  const result = await searchCustomers({
+    prisma,
+    restaurantId,
+    query,
+    page: 1,
+    limit: 10000, // Export up to 10k records
+    status,
+    sortBy,
+    sortOrder,
+    range,
+    startDate,
+    endDate,
+    segment,
+    minOrders,
+    maxOrders,
+    minSpend,
+    maxSpend,
+    frequentThreshold,
+    highSpendThreshold,
+  });
+
+  const headers = [
+    "Customer ID",
+    "Name",
+    "Phone",
+    "Email",
+    "Status",
+    "Segment",
+    "Lifetime Orders",
+    "Lifetime Spend (INR)",
+    "Period Orders",
+    "Period Spend (INR)",
+    "First Order Date",
+    "Last Visit Date",
+    "Avg Visit Interval (Days)",
+    "Avg Order Value (INR)",
+    "Repeat Customer",
+    "Joined Date",
+  ];
+
+  const rows = result.items.map((c) => [
+    c.id,
+    c.name || "Guest Customer",
+    c.phone,
+    c.email || "",
+    c.status,
+    c.segment,
+    c.totalOrders,
+    c.totalSpent,
+    c.periodOrders,
+    c.periodSpent,
+    c.firstOrderAt ? new Date(c.firstOrderAt).toISOString().split("T")[0] : "",
+    c.lastOrderAt ? new Date(c.lastOrderAt).toISOString().split("T")[0] : "",
+    c.avgVisitIntervalDays !== null && c.avgVisitIntervalDays !== undefined ? c.avgVisitIntervalDays : "N/A",
+    c.averageOrderValue,
+    c.isRepeat ? "Yes" : "No",
+    c.createdAt ? new Date(c.createdAt).toISOString().split("T")[0] : "",
+  ]);
+
+  return {
+    headers,
+    rows,
+    summary: result.summary,
+    totalRecords: result.items.length,
+    rangeLabel: result.filterMeta?.rangeLabel || "All Time",
   };
 };
 

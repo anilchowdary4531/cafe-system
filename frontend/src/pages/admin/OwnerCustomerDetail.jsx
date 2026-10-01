@@ -211,6 +211,14 @@ export default function OwnerCustomerDetail() {
                   {customer.status === "ACTIVE" ? <UserCheck size={10} /> : <UserX size={10} />}
                   {customer.status}
                 </span>
+
+                {stats.segment && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20"
+                  >
+                    {stats.segment.replace(/_/g, " ")}
+                  </span>
+                )}
               </div>
 
               <div className="mt-1 flex flex-wrap items-center gap-4 text-xs text-[color:var(--app-muted)]">
@@ -259,26 +267,46 @@ export default function OwnerCustomerDetail() {
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
         <div className="space-y-6">
-          {/* Factual Stat Cards */}
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {/* Factual Stat Cards - 6 Cards Grid */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
-              <span className="text-xs font-medium text-[color:var(--app-muted)]">Total Orders</span>
+              <span className="text-xs font-medium text-[color:var(--app-muted)]">Qualifying Orders</span>
               <p className="mt-1 text-2xl font-bold text-[color:var(--app-text)]">{stats.totalOrders || 0}</p>
+              <span className="text-[10px] text-[color:var(--app-muted)] mt-1 block">Completed purchases</span>
             </div>
 
             <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
-              <span className="text-xs font-medium text-[color:var(--app-muted)]">Total Spent</span>
+              <span className="text-xs font-medium text-[color:var(--app-muted)]">Net Total Spent</span>
               <p className="mt-1 text-2xl font-bold text-emerald-500">₹{Number(stats.totalSpent || 0).toLocaleString()}</p>
+              <span className="text-[10px] text-[color:var(--app-muted)] mt-1 block">After refunds</span>
             </div>
 
             <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
               <span className="text-xs font-medium text-[color:var(--app-muted)]">Avg Order Value</span>
               <p className="mt-1 text-2xl font-bold text-blue-500">₹{Number(stats.averageOrderValue || 0).toLocaleString()}</p>
+              <span className="text-[10px] text-[color:var(--app-muted)] mt-1 block">Per qualifying order</span>
+            </div>
+
+            <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
+              <span className="text-xs font-medium text-[color:var(--app-muted)]">Distinct Visits</span>
+              <p className="mt-1 text-2xl font-bold text-amber-500">{stats.distinctVisits || 0}</p>
+              <span className="text-[10px] text-[color:var(--app-muted)] mt-1 block">Unique visit dates</span>
+            </div>
+
+            <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
+              <span className="text-xs font-medium text-[color:var(--app-muted)]">Visit Interval</span>
+              <p className="mt-1 text-2xl font-bold text-purple-500">
+                {stats.avgVisitIntervalDays !== null && stats.avgVisitIntervalDays !== undefined
+                  ? `${stats.avgVisitIntervalDays}d`
+                  : "Single Visit"}
+              </p>
+              <span className="text-[10px] text-[color:var(--app-muted)] mt-1 block">Avg days between visits</span>
             </div>
 
             <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-1)] p-4 shadow-sm">
               <span className="text-xs font-medium text-[color:var(--app-muted)]">Cancelled Orders</span>
               <p className="mt-1 text-2xl font-bold text-red-400">{stats.cancelledOrders || 0}</p>
+              <span className="text-[10px] text-[color:var(--app-muted)] mt-1 block">Voided tickets</span>
             </div>
           </div>
 
@@ -333,6 +361,22 @@ export default function OwnerCustomerDetail() {
                   <span className="text-[color:var(--app-muted)]">Last Order Date:</span>
                   <span className="font-semibold text-[color:var(--app-text)]">
                     {stats.lastOrderAt ? new Date(stats.lastOrderAt).toLocaleString() : "Never"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-[color:var(--app-border)] p-3 bg-[color:var(--app-surface-2)]">
+                  <span className="text-[color:var(--app-muted)]">Distinct Visit Days:</span>
+                  <span className="font-semibold text-amber-600">
+                    {stats.distinctVisits || 0} unique dates
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-[color:var(--app-border)] p-3 bg-[color:var(--app-surface-2)]">
+                  <span className="text-[color:var(--app-muted)]">Avg Interval Between Visits:</span>
+                  <span className="font-semibold text-purple-600">
+                    {stats.avgVisitIntervalDays !== null && stats.avgVisitIntervalDays !== undefined
+                      ? `${stats.avgVisitIntervalDays} days`
+                      : "Insufficient visit history"}
                   </span>
                 </div>
 

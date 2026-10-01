@@ -12,6 +12,8 @@ import { resolveMenuPricing } from "../services/menuPricingService.js";
 import { buildPayLaterController } from "../controllers/payLaterController.js";
 import {
   searchCustomers,
+  getCustomerDirectorySummary,
+  exportCustomerDirectory,
   getCustomerById,
   createCustomer,
   updateCustomer,
@@ -1125,67 +1127,71 @@ export default async function ownerRoutes(app, deps) {
         });
       }
 
-      // Close all active table sessions for this table
-      if (activeSession) {
-        await prisma.tableSession.updateMany({
+      // Execute session closure, order updates, waiter unassignment, and audit log atomically in a transaction
+      const updatedTable = await prisma.$transaction(async (tx) => {
+        // Close all active table sessions for this table
+        if (activeSession) {
+          await tx.tableSession.updateMany({
+            where: {
+              tableId,
+              restaurantId,
+              status: { in: ["OPEN", "BILLING", "PAID"] },
+            },
+            data: {
+              status: "CLOSED",
+              closedAt: new Date(),
+            },
+          });
+        }
+
+        // Mark open prep/active orders for this table as DELIVERED if forced/permitted
+        await tx.order.updateMany({
           where: {
             tableId,
             restaurantId,
-            status: { in: ["OPEN", "BILLING", "PAID"] },
+            status: { in: ["PLACED", "ACCEPTED", "PREPARING", "READY", "OPEN", "BILLING"] },
           },
           data: {
-            status: "CLOSED",
-            closedAt: new Date(),
+            status: "DELIVERED",
+          },
+        }).catch(() => {});
+
+        // Clear waiter assignment on table (isOccupied is derived from active sessions, not a table column)
+        const updated = await tx.diningTable.update({
+          where: { id: tableId },
+          data: {
+            assignedWaiterId: null,
+            assignedWaiterName: null,
           },
         });
-      }
 
-      // Mark any open orders for this table as delivered / closed
-      await prisma.order.updateMany({
-        where: {
-          tableId,
-          restaurantId,
-          status: { in: ["PLACED", "ACCEPTED", "PREPARING", "READY", "OPEN", "BILLING"] },
-        },
-        data: {
-          status: "DELIVERED",
-        },
-      }).catch(() => {});
-
-      // Clear waiter assignment and mark isOccupied = false on table
-      const updatedTable = await prisma.diningTable.update({
-        where: { id: tableId },
-        data: {
-          isOccupied: false,
-          assignedWaiterId: null,
-          assignedWaiterName: null,
-        },
-      });
-
-      // Record Audit Log in TableOperationLog
-      try {
-        await prisma.tableOperationLog.create({
-          data: {
-            restaurantId,
-            operationType: "CLEAR_TABLE",
-            sourceTableId: tableId,
-            sourceTableNo: table.tableNo,
-            sourceSessionId: activeSession?.id || null,
-            performedByUserId: performedByUserId ? Number(performedByUserId) : (req.user?.id || null),
-            performedByName: performedByName || req.user?.name || req.user?.email || (performedByUserRole === "OWNER" ? "Owner" : "Server"),
-            performedByUserRole: performedByUserRole || (req.user?.role || "STAFF"),
-            details: {
-              reason,
-              forced: Boolean(force),
-              previousState: activeSession ? activeSession.status : "OCCUPIED",
-              activeOrdersCount: activeOrders.length,
-              unpaidOrdersCount: unpaidOrders.length,
+        // Record Audit Log in TableOperationLog
+        try {
+          await tx.tableOperationLog.create({
+            data: {
+              restaurantId,
+              operationType: "CLEAR_TABLE",
+              sourceTableId: tableId,
+              sourceTableNo: table.tableNo,
+              sourceSessionId: activeSession?.id || null,
+              performedByUserId: performedByUserId ? Number(performedByUserId) : (req.user?.id || null),
+              performedByName: performedByName || req.user?.name || req.user?.email || (performedByUserRole === "OWNER" ? "Owner" : "Server"),
+              performedByUserRole: performedByUserRole || (req.user?.role || "STAFF"),
+              details: {
+                reason,
+                forced: Boolean(force),
+                previousState: activeSession ? activeSession.status : "OCCUPIED",
+                activeOrdersCount: activeOrders.length,
+                unpaidOrdersCount: unpaidOrders.length,
+              },
             },
-          },
-        });
-      } catch (auditErr) {
-        console.warn("Failed to record TableOperationLog:", auditErr?.message);
-      }
+          });
+        } catch (auditErr) {
+          console.warn("Failed to record TableOperationLog:", auditErr?.message);
+        }
+
+        return updated;
+      });
 
       if (realtime?.io) {
         realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId, tableNo: table.tableNo });
@@ -1478,8 +1484,27 @@ export default async function ownerRoutes(app, deps) {
         }).catch(() => []),
         prisma.diningTable.findMany({
           where: { restaurantId },
-          select: { id: true, tableNo: true, isActive: true, seats: true, groupName: true, isOccupied: true },
-        }).catch(() => []),
+          select: {
+            id: true,
+            tableNo: true,
+            isActive: true,
+            seats: true,
+            section: true,
+            tableSessions: {
+              where: { status: { in: ["OPEN", "BILLING", "PAID"] } },
+              select: { id: true },
+            },
+          },
+        }).then((rows) =>
+          rows.map((t) => ({
+            ...t,
+            groupName: t.section || "Main Floor",
+            isOccupied: Boolean(t.tableSessions && t.tableSessions.length > 0),
+          }))
+        ).catch((err) => {
+          console.error("[Analytics] DiningTable fetch error:", err.message);
+          return [];
+        }),
         prisma.inventoryStock.findMany({
           where: { restaurantId },
         }).catch(() => []),
@@ -2892,7 +2917,33 @@ export default async function ownerRoutes(app, deps) {
   const handleGetCustomers = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
-      const { query, q, page, limit, status, sortBy, sortOrder } = req.query || {};
+      if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant ID" });
+
+      // Restaurant context authorization check
+      if (req.user && req.user.role !== "SUPER_ADMIN" && req.user.restaurantId && Number(req.user.restaurantId) !== restaurantId) {
+        return reply.code(403).send({ message: "Access forbidden: cannot access another restaurant's customers" });
+      }
+
+      const {
+        query,
+        q,
+        page,
+        limit,
+        status,
+        sortBy,
+        sortOrder,
+        range,
+        startDate,
+        endDate,
+        segment,
+        minOrders,
+        maxOrders,
+        minSpend,
+        maxSpend,
+        frequentThreshold,
+        highSpendThreshold,
+      } = req.query || {};
+
       const result = await searchCustomers({
         prisma,
         restaurantId,
@@ -2902,6 +2953,16 @@ export default async function ownerRoutes(app, deps) {
         status: status || "ACTIVE",
         sortBy: sortBy || "createdAt",
         sortOrder: sortOrder || "desc",
+        range: range || "all",
+        startDate,
+        endDate,
+        segment: segment || "ALL",
+        minOrders,
+        maxOrders,
+        minSpend,
+        maxSpend,
+        frequentThreshold,
+        highSpendThreshold,
       });
       return reply.send(result);
     } catch (err) {
@@ -2910,10 +2971,105 @@ export default async function ownerRoutes(app, deps) {
     }
   };
 
+  const handleGetCustomerSummary = async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant ID" });
+
+      if (req.user && req.user.role !== "SUPER_ADMIN" && req.user.restaurantId && Number(req.user.restaurantId) !== restaurantId) {
+        return reply.code(403).send({ message: "Access forbidden: cannot access another restaurant's customers" });
+      }
+
+      const { range, startDate, endDate, frequentThreshold, highSpendThreshold } = req.query || {};
+      const summary = await getCustomerDirectorySummary({
+        prisma,
+        restaurantId,
+        range: range || "all",
+        startDate,
+        endDate,
+        frequentThreshold,
+        highSpendThreshold,
+      });
+      return reply.send(summary);
+    } catch (err) {
+      console.error("[CRM Route Error] Customer summary failed:", err.message);
+      return reply.code(500).send({ message: err.message || "Failed to fetch customer summary" });
+    }
+  };
+
+  const handleExportCustomers = async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant ID" });
+
+      if (req.user && req.user.role !== "SUPER_ADMIN" && req.user.restaurantId && Number(req.user.restaurantId) !== restaurantId) {
+        return reply.code(403).send({ message: "Access forbidden: cannot access another restaurant's customers" });
+      }
+
+      const {
+        query,
+        status,
+        sortBy,
+        sortOrder,
+        range,
+        startDate,
+        endDate,
+        segment,
+        minOrders,
+        maxOrders,
+        minSpend,
+        maxSpend,
+        format = "json",
+      } = req.query || {};
+
+      const exportData = await exportCustomerDirectory({
+        prisma,
+        restaurantId,
+        query,
+        status: status || "ALL",
+        sortBy: sortBy || "createdAt",
+        sortOrder: sortOrder || "desc",
+        range: range || "all",
+        startDate,
+        endDate,
+        segment: segment || "ALL",
+        minOrders,
+        maxOrders,
+        minSpend,
+        maxSpend,
+      });
+
+      if (format.toLowerCase() === "csv") {
+        let csv = exportData.headers.join(",") + "\n";
+        for (const row of exportData.rows) {
+          csv += row.map((cell) => `"${String(cell || "").replace(/"/g, '""')}"`).join(",") + "\n";
+        }
+        reply.header("Content-Type", "text/csv; charset=utf-8");
+        reply.header("Content-Disposition", `attachment; filename="customers_${restaurantId}_${exportData.rangeLabel.replace(/[^a-zA-Z0-9]/g, "_")}.csv"`);
+        return reply.send(csv);
+      }
+
+      return reply.send(exportData);
+    } catch (err) {
+      console.error("[CRM Route Error] Customer export failed:", err.message);
+      return reply.code(500).send({ message: err.message || "Failed to export customers" });
+    }
+  };
+
   app.get("/owner/:restaurantId/customers", handleGetCustomers);
   app.get("/api/owner/:restaurantId/customers", handleGetCustomers);
   app.get("/owner/:restaurantId/crm/customers", handleGetCustomers);
   app.get("/api/owner/:restaurantId/crm/customers", handleGetCustomers);
+
+  app.get("/owner/:restaurantId/customers/summary", handleGetCustomerSummary);
+  app.get("/api/owner/:restaurantId/customers/summary", handleGetCustomerSummary);
+  app.get("/owner/:restaurantId/crm/customers/summary", handleGetCustomerSummary);
+  app.get("/api/owner/:restaurantId/crm/customers/summary", handleGetCustomerSummary);
+
+  app.get("/owner/:restaurantId/customers/export", handleExportCustomers);
+  app.get("/api/owner/:restaurantId/customers/export", handleExportCustomers);
+  app.get("/owner/:restaurantId/crm/customers/export", handleExportCustomers);
+  app.get("/api/owner/:restaurantId/crm/customers/export", handleExportCustomers);
 
   const handleSearchCustomersAutocomplete = async (req, reply) => {
     try {

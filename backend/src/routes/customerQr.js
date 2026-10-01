@@ -42,11 +42,6 @@ export default async function (fastify) {
                     guestCount: 1,
                 },
             });
-
-            await prisma.diningTable.update({
-                where: { id: table.id },
-                data: { status: "OPEN" },
-            });
         }
 
         return session;

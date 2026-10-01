@@ -86,11 +86,6 @@ export const getOrCreateActiveSession = async ({
       });
     }
 
-    await tx.diningTable.update({
-      where: { id: tid },
-      data: { isOccupied: true },
-    }).catch(() => {});
-
     return session;
   });
 };
