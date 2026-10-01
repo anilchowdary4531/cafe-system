@@ -1096,7 +1096,7 @@ export default function OwnerLayout() {
         }, 250);
     };
 
-    const handleFreeTable = async (table, assignmentKey) => {
+    const handleFreeTable = async (table, assignmentKey, options = {}) => {
         const activeOrders = Array.isArray(table?.activeOrders) ? table.activeOrders : [];
         const hasAssignment = Boolean(tableAssignments[assignmentKey]);
         const targetTableId = table?.id || (table?.tableNo ? Number(table.tableNo) : null);
@@ -1107,11 +1107,22 @@ export default function OwnerLayout() {
             return;
         }
 
+        const tableNoLabel = table?.tableNo || table?.label || "this table";
+        if (!options.force && !window.confirm(`Are you sure you want to free Table ${tableNoLabel}? Confirm that the customer has left and there are no outstanding orders.`)) {
+            return;
+        }
+
         setCompletingTableKey(assignmentKey);
         setReceiptActionError("");
         try {
-            // Call backend API to force clear table session & waiter assignment
-            await axios.post(`${API}/owner/${restaurantId}/tables/${targetTableId}/clear`).catch(() => {});
+            // Call backend API to clear table session, reset isOccupied, and record audit trail
+            await axios.post(`${API}/owner/${restaurantId}/tables/${targetTableId}/clear`, {
+                force: options.force || true,
+                reason: options.reason || "Table cleared by Owner",
+                performedByUserId: user?.id || null,
+                performedByName: user?.name || user?.email || "Owner",
+                performedByUserRole: "OWNER",
+            });
 
             if (activeOrders.length > 0) {
                 await Promise.all(
@@ -1143,14 +1154,15 @@ export default function OwnerLayout() {
             setOpenMoreTableKey("");
             showToast({
                 title: "Table Freed 🎉",
-                message: `Table ${table?.tableNo || "--"} is now free and available.`,
+                message: `Table ${tableNoLabel} is now free and available.`,
                 variant: "success",
             });
         } catch (err) {
-            console.error("Error freeing table:", err);
-            setReceiptActionError(
-                err?.response?.data?.message || err?.message || "Failed to free the table."
-            );
+            showToast({
+                title: "Error Clearing Table",
+                message: err.response?.data?.message || err.message || "Failed to free table.",
+                variant: "error",
+            });
         } finally {
             setCompletingTableKey("");
         }

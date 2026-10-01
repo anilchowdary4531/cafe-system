@@ -1040,27 +1040,55 @@ export default async function ownerRoutes(app, deps) {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const tableId = Number(req.params.tableId);
+      const body = req.body || {};
+      const { force = false, reason = "Customer left table", performedByUserId = null, performedByName = null, performedByUserRole = "SERVER" } = body;
 
       const table = await prisma.diningTable.findFirst({
         where: { id: tableId, restaurantId },
+        include: {
+          tableSessions: {
+            where: { status: { in: ["OPEN", "BILLING", "PAID"] } },
+            include: { orders: { include: { items: true } } },
+          },
+        },
       });
 
       if (!table) {
         return reply.code(404).send({ success: false, message: "Table not found" });
       }
 
+      const activeSession = table.tableSessions[0];
+      const activeOrders = activeSession?.orders || [];
+      const unpaidOrders = activeOrders.filter((o) => o.paymentStatus === "PENDING" && o.status !== "CANCELLED");
+      const activePrepOrders = activeOrders.filter((o) => ["PLACED", "ACCEPTED", "PREPARING"].includes(o.status));
+
+      // Validation check if not forced
+      if (!force && (unpaidOrders.length > 0 || activePrepOrders.length > 0)) {
+        return reply.code(400).send({
+          success: false,
+          requiresConfirmation: true,
+          hasUnpaidOrders: unpaidOrders.length > 0,
+          hasActivePrepOrders: activePrepOrders.length > 0,
+          unpaidCount: unpaidOrders.length,
+          prepCount: activePrepOrders.length,
+          message: `Table ${table.tableNo} has ${unpaidOrders.length > 0 ? `${unpaidOrders.length} unpaid order(s)` : ""}${unpaidOrders.length > 0 && activePrepOrders.length > 0 ? " and " : ""}${activePrepOrders.length > 0 ? `${activePrepOrders.length} order(s) undergoing preparation` : ""}. Please confirm to force-free this table.`,
+        });
+      }
+
       // Close all active table sessions for this table
-      await prisma.tableSession.updateMany({
-        where: {
-          tableId,
-          restaurantId,
-          status: { in: ["OPEN", "BILLING", "PAID"] },
-        },
-        data: {
-          status: "CLOSED",
-          closedAt: new Date(),
-        },
-      });
+      if (activeSession) {
+        await prisma.tableSession.updateMany({
+          where: {
+            tableId,
+            restaurantId,
+            status: { in: ["OPEN", "BILLING", "PAID"] },
+          },
+          data: {
+            status: "CLOSED",
+            closedAt: new Date(),
+          },
+        });
+      }
 
       // Mark any open orders for this table as delivered / closed
       await prisma.order.updateMany({
@@ -1074,18 +1102,45 @@ export default async function ownerRoutes(app, deps) {
         },
       }).catch(() => {});
 
-      // Clear waiter assignment on table
+      // Clear waiter assignment and mark isOccupied = false on table
       const updatedTable = await prisma.diningTable.update({
         where: { id: tableId },
         data: {
+          isOccupied: false,
           assignedWaiterId: null,
           assignedWaiterName: null,
         },
       });
 
+      // Record Audit Log in TableOperationLog
+      try {
+        await prisma.tableOperationLog.create({
+          data: {
+            restaurantId,
+            operationType: "CLEAR_TABLE",
+            sourceTableId: tableId,
+            sourceTableNo: table.tableNo,
+            sourceSessionId: activeSession?.id || null,
+            performedByUserId: performedByUserId ? Number(performedByUserId) : (req.user?.id || null),
+            performedByName: performedByName || req.user?.name || req.user?.email || (performedByUserRole === "OWNER" ? "Owner" : "Server"),
+            performedByUserRole: performedByUserRole || (req.user?.role || "STAFF"),
+            details: {
+              reason,
+              forced: Boolean(force),
+              previousState: activeSession ? activeSession.status : "OCCUPIED",
+              activeOrdersCount: activeOrders.length,
+              unpaidOrdersCount: unpaidOrders.length,
+            },
+          },
+        });
+      } catch (auditErr) {
+        console.warn("Failed to record TableOperationLog:", auditErr?.message);
+      }
+
       if (realtime?.io) {
-        realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId });
-        realtime.io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableId });
+        realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId, tableNo: table.tableNo });
+        realtime.io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableId, tableNo: table.tableNo });
+        realtime.io.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableId, tableNo: table.tableNo });
         realtime.io.to(`restaurant_${restaurantId}`).emit("table:layout_updated", { restaurantId });
       }
 
@@ -1097,6 +1152,22 @@ export default async function ownerRoutes(app, deps) {
     } catch (err) {
       console.error("Error clearing table:", err);
       return reply.code(500).send({ success: false, message: err.message || "Failed to clear table" });
+    }
+  });
+
+  // Table Operation Audit Logs Endpoint
+  app.get("/owner/:restaurantId/table-operation-logs", async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const logs = await prisma.tableOperationLog.findMany({
+        where: { restaurantId },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      });
+      return { success: true, logs };
+    } catch (err) {
+      console.error("Error fetching table operation logs:", err);
+      return reply.code(500).send({ success: false, message: "Failed to fetch table audit logs" });
     }
   });
 

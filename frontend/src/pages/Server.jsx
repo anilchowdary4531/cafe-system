@@ -292,16 +292,23 @@ export default function Server() {
         }
     };
 
-    const handleClearTable = async (tableToClear) => {
+    const handleClearTable = async (tableToClear, options = {}) => {
         const target = tableToClear || selectedTable;
         if (!target || !restaurantId) return;
 
         try {
-            const res = await axios.post(`${API}/owner/${restaurantId}/tables/${target.id}/clear`);
+            const res = await axios.post(`${API}/owner/${restaurantId}/tables/${target.id}/clear`, {
+                force: options.force || false,
+                reason: options.reason || "Customer left table - freed by server",
+                performedByUserId: user?.id || null,
+                performedByName: user?.name || user?.email || "Server",
+                performedByUserRole: "SERVER",
+            });
+
             if (res.data?.success) {
                 showToast({
                     title: "Table Freed 🎉",
-                    message: `Table ${target.tableNo} is now free.`,
+                    message: `Table ${target.tableNo} is now free and available.`,
                     variant: "success",
                 });
                 if (selectedTable?.id === target.id) {
@@ -312,9 +319,16 @@ export default function Server() {
                 refreshTables();
             }
         } catch (err) {
+            const data = err.response?.data;
+            if (data?.requiresConfirmation && !options.force) {
+                if (window.confirm(`${data.message}\n\nDo you want to FORCE-FREE Table ${target.tableNo}?`)) {
+                    handleClearTable(target, { ...options, force: true });
+                    return;
+                }
+            }
             showToast({
                 title: "Error",
-                message: err.response?.data?.message || err.message || "Failed to free table.",
+                message: data?.message || err.message || "Failed to free table.",
                 variant: "error",
             });
         }
