@@ -395,33 +395,33 @@ export default function Server() {
     return (
         <div className="min-h-screen bg-[color:var(--app-bg,#f8fafc)] text-[color:var(--app-text,#0f172a)] font-sans flex flex-col">
             {/* Top Navigation & Status Bar */}
-            <header className="sticky top-0 z-30 border-b border-[color:var(--app-border)]/50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 py-3 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            <header className="sticky top-0 z-30 border-b border-[color:var(--app-border)]/50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-3 sm:px-4 py-2.5 sm:py-3 shadow-xs flex flex-wrap lg:flex-nowrap items-center justify-between gap-2.5 sm:gap-3">
                 {/* Brand & Branch Info */}
-                <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1 shadow-[0_4px_14px_rgba(104,70,37,0.12)]">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1 shadow-[0_4px_14px_rgba(104,70,37,0.12)]">
                         <BrandLogo className="h-full w-full" title="Tiffzy logo" />
                     </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-base font-black tracking-tight text-orange-500">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                            <span className="text-sm sm:text-base font-black tracking-tight text-orange-500">
                                 Tiffzy
                             </span>
-                            <span className="text-sm font-extrabold text-[color:var(--app-muted)]">•</span>
-                            <h1 className="text-base font-extrabold tracking-tight text-[color:var(--app-text)]">{restaurantName}</h1>
-                            <span className="rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 px-2 py-0.5 text-[10px] font-bold border border-orange-500/30">
+                            <span className="text-xs font-extrabold text-[color:var(--app-muted)] hidden min-[360px]:inline">•</span>
+                            <h1 className="text-xs sm:text-base font-extrabold tracking-tight text-[color:var(--app-text)] truncate max-w-[120px] min-[400px]:max-w-[180px] sm:max-w-[240px]">{restaurantName}</h1>
+                            <span className="rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold border border-orange-500/30 whitespace-nowrap">
                                 Server Station
                             </span>
                         </div>
-                        <p className="text-[11px] theme-muted flex items-center gap-2">
-                            <span>🕒 {currentTime.toLocaleTimeString()}</span>
-                            <span>•</span>
+                        <p className="text-[10px] sm:text-[11px] theme-muted flex items-center gap-1.5 flex-wrap">
+                            <span>🕒 {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="hidden min-[360px]:inline">•</span>
                             <span>📅 {currentTime.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                         </p>
                     </div>
                 </div>
 
                 {/* Meal Shift Selector */}
-                <div className="flex items-center gap-1.5 bg-black/5 dark:bg-white/5 p-1 rounded-xl border border-[color:var(--app-border)]/40">
+                <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 p-1 rounded-xl border border-[color:var(--app-border)]/40 overflow-x-auto scrollbar-none max-w-full shrink-0 my-0.5 sm:my-0">
                     {[
                         { id: "BREAKFAST", label: "🍳 Breakfast", time: `${shiftConfig.breakfast.start}-${shiftConfig.breakfast.end}` },
                         { id: "LUNCH", label: "🍱 Lunch", time: `${shiftConfig.lunch.start}-${shiftConfig.lunch.end}` },
@@ -430,36 +430,36 @@ export default function Server() {
                         <button
                             key={shift.id}
                             onClick={() => setActiveShift(shift.id)}
-                            className={`flex flex-col items-center rounded-lg px-3 py-1 text-xs font-bold transition ${
+                            className={`flex flex-col items-center rounded-lg px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold transition whitespace-nowrap ${
                                 activeShift === shift.id
-                                    ? "bg-orange-500 text-white shadow-sm"
+                                    ? "bg-orange-500 text-white shadow-xs"
                                     : "theme-muted hover:text-[color:var(--app-text)]"
                             }`}
                         >
                             <span>{shift.label}</span>
-                            <span className="text-[9px] opacity-80 font-normal">{shift.time}</span>
+                            <span className="text-[8px] sm:text-[9px] opacity-80 font-normal">{shift.time}</span>
                         </button>
                     ))}
                     <button
                         onClick={() => setIsShiftConfigOpen(true)}
-                        className="p-1.5 text-slate-400 hover:text-orange-500 rounded-lg transition"
+                        className="p-1.5 text-slate-400 hover:text-orange-500 rounded-lg transition shrink-0"
                         title="Configure Shift Timings"
                     >
-                        <Settings2 className="h-4 w-4" />
+                        <Settings2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </button>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     {/* Waitlist Drawer Trigger */}
                     <button
                         onClick={() => setIsWaitlistOpen(true)}
-                        className="relative flex items-center gap-1.5 rounded-xl border border-orange-500/30 bg-orange-500/10 px-3.5 py-2 text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 transition cursor-pointer"
+                        className="relative flex items-center gap-1 sm:gap-1.5 rounded-xl border border-orange-500/30 bg-orange-500/10 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 transition cursor-pointer whitespace-nowrap"
                     >
-                        <Users className="h-4 w-4" />
-                        <span>Waitlist</span>
+                        <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="hidden min-[450px]:inline">Waitlist</span>
                         {waitlistSummary.waitingCount > 0 && (
-                            <span className="rounded-full bg-orange-500 text-white px-1.5 py-0.2 text-[10px]">
+                            <span className="rounded-full bg-orange-500 text-white px-1.5 py-0.2 text-[9px] sm:text-[10px]">
                                 {waitlistSummary.waitingCount}
                             </span>
                         )}
@@ -471,10 +471,10 @@ export default function Server() {
                             setEditingReservation(null);
                             setIsReservationModalOpen(true);
                         }}
-                        className="flex items-center gap-1.5 rounded-xl bg-orange-500 px-3.5 py-2 text-xs font-bold text-white hover:bg-orange-600 transition shadow-xs cursor-pointer"
+                        className="flex items-center gap-1 sm:gap-1.5 rounded-xl bg-orange-500 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold text-white hover:bg-orange-600 transition shadow-xs cursor-pointer whitespace-nowrap"
                     >
-                        <Plus className="h-4 w-4" />
-                        <span>New Reservation</span>
+                        <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span><span className="hidden min-[400px]:inline">New </span>Reservation</span>
                     </button>
 
                     {/* View Mode Toggle */}
@@ -486,7 +486,7 @@ export default function Server() {
                             }`}
                             title="Floor Plan Grid View"
                         >
-                            <LayoutGrid className="h-4 w-4" />
+                            <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </button>
                     </div>
                 </div>
@@ -494,12 +494,12 @@ export default function Server() {
 
             {/* Main Content Body */}
             {viewMode === "FLOOR_PLAN" ? (
-                <div className="flex-1 p-4 space-y-4 max-w-7xl mx-auto w-full">
+                <div className="flex-1 p-3 sm:p-4 space-y-3 sm:space-y-4 max-w-7xl mx-auto w-full">
                     {/* Ready to Serve Notification Banner */}
                     {readyOrders.length > 0 && (
-                        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs shadow-xs animate-in fade-in duration-300">
+                        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 sm:p-4 text-xs shadow-xs animate-in fade-in duration-300">
                             <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20">
-                                <h3 className="font-extrabold text-emerald-700 dark:text-emerald-400 flex items-center gap-2 text-sm">
+                                <h3 className="font-extrabold text-emerald-700 dark:text-emerald-400 flex items-center gap-2 text-xs sm:text-sm">
                                     <Bell className="h-4 w-4 text-emerald-500 animate-bounce" />
                                     <span>Ready to Serve ({readyOrders.length})</span>
                                 </h3>
@@ -507,14 +507,14 @@ export default function Server() {
                                     Kitchen marked orders ready!
                                 </span>
                             </div>
-                            <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
                                 {readyOrders.map((order) => (
                                     <div
                                         key={order.id}
-                                        className="rounded-xl border border-emerald-500/20 bg-white dark:bg-slate-900 p-2.5 flex items-center justify-between gap-2 shadow-xs"
+                                        className="rounded-xl border border-emerald-500/20 bg-white dark:bg-slate-900 p-2.5 flex items-center justify-between gap-2 shadow-xs min-w-0"
                                     >
-                                        <div>
-                                            <div className="flex items-center gap-2">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
                                                 <span className="font-black text-slate-900 dark:text-white text-xs">
                                                     Table {order.tableNo || "N/A"}
                                                 </span>
@@ -522,7 +522,7 @@ export default function Server() {
                                                     #{order.orderNo}
                                                 </span>
                                             </div>
-                                            <p className="text-[11px] theme-muted truncate max-w-[180px] mt-0.5">
+                                            <p className="text-[11px] theme-muted truncate mt-0.5">
                                                 {Array.isArray(order.items)
                                                     ? order.items.map((i) => `${i.qty}x ${i.itemName}`).join(", ")
                                                     : "Items ready"}
@@ -531,7 +531,7 @@ export default function Server() {
                                         <button
                                             type="button"
                                             onClick={() => handleMarkServed(order.id, order.tableNo)}
-                                            className="px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-[11px] shadow-xs active:scale-95 transition whitespace-nowrap flex items-center gap-1"
+                                            className="px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-[11px] shadow-xs active:scale-95 transition whitespace-nowrap flex items-center gap-1 shrink-0"
                                         >
                                             <Check className="h-3 w-3" /> Served
                                         </button>
@@ -542,14 +542,14 @@ export default function Server() {
                     )}
 
                     {/* Status Summary & Section Filters Bar */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 p-3 shadow-xs text-xs">
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 rounded-2xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 p-3 shadow-xs text-xs">
                         {/* Section Filter Tabs */}
-                        <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 p-1 rounded-xl overflow-x-auto">
+                        <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 p-1 rounded-xl overflow-x-auto scrollbar-none max-w-full shrink-0">
                             {sections.map((sec) => (
                                 <button
                                     key={sec}
                                     onClick={() => setActiveSectionFilter(sec)}
-                                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
+                                    className={`rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
                                         activeSectionFilter === sec
                                             ? "bg-orange-500 text-white shadow-xs"
                                             : "theme-muted hover:text-[color:var(--app-text)]"
@@ -561,7 +561,7 @@ export default function Server() {
                         </div>
 
                         {/* Search Input */}
-                        <div className="relative w-full sm:w-60">
+                        <div className="relative w-full md:w-60 lg:w-72">
                             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 theme-muted" />
                             <input
                                 type="text"
@@ -573,17 +573,17 @@ export default function Server() {
                         </div>
 
                         {/* Table Status Legend Badges */}
-                        <div className="flex items-center gap-2 text-[11px] overflow-x-auto py-0.5">
-                            <span className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] overflow-x-auto scrollbar-none py-0.5 border-t md:border-t-0 border-gray-100 dark:border-slate-800 pt-2 md:pt-0">
+                            <span className="flex items-center gap-1 text-slate-600 dark:text-slate-400 whitespace-nowrap">
                                 <span className="h-2.5 w-2.5 rounded-full border border-slate-400 bg-white dark:bg-slate-800"></span> Available ({statusCounts.available})
                             </span>
-                            <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-medium">
+                            <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-medium whitespace-nowrap">
                                 <span className="h-2.5 w-2.5 rounded-full bg-purple-500"></span> Reserved ({statusCounts.reserved})
                             </span>
-                            <span className="flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium">
+                            <span className="flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium whitespace-nowrap">
                                 <span className="h-2.5 w-2.5 rounded-full bg-sky-500"></span> Occupied ({statusCounts.occupied})
                             </span>
-                            <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-medium">
+                            <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
                                 <span className="h-2.5 w-2.5 rounded-full bg-slate-500"></span> Blocked 🔒 ({statusCounts.blocked})
                             </span>
                         </div>
@@ -600,7 +600,7 @@ export default function Server() {
                             <p className="font-bold text-xs">No dining tables match selected section or search filter.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                             {filteredTables.map((table) => {
                                 const isBlocked = Boolean(table.isBlocked);
                                 const isOccupied = Boolean(table.isOccupied);
@@ -610,7 +610,7 @@ export default function Server() {
                                     <div
                                         key={table.id}
                                         onClick={() => handleSelectTableForOrder(table)}
-                                        className={`group relative flex flex-col justify-between rounded-2xl border p-3 cursor-pointer transition-all duration-200 shadow-xs hover:-translate-y-0.5 aspect-square text-xs bg-white dark:bg-slate-900 ${
+                                        className={`group relative flex flex-col justify-between rounded-2xl border p-3 cursor-pointer transition-all duration-200 shadow-xs hover:-translate-y-0.5 min-h-[155px] sm:min-h-[165px] h-full text-xs bg-white dark:bg-slate-900 ${
                                             isBlocked
                                                 ? "border-slate-500/40 bg-slate-500/10 dark:bg-slate-950/40 opacity-75"
                                                 : isOccupied
@@ -621,9 +621,9 @@ export default function Server() {
                                         }`}
                                     >
                                         {/* Table Header: Table # & Seats */}
-                                        <div className="flex justify-between items-start">
+                                        <div className="flex justify-between items-start gap-1">
                                             <div>
-                                                <h3 className="text-lg font-black tracking-tight text-[color:var(--app-text)]">
+                                                <h3 className="text-base sm:text-lg font-black tracking-tight text-[color:var(--app-text)]">
                                                     {table.tableNo}
                                                 </h3>
                                                 <p className="text-[10px] theme-muted">{table.seats} Seats • {table.section || "Main"}</p>
@@ -631,26 +631,26 @@ export default function Server() {
 
                                             {/* Status Badge */}
                                             {isBlocked ? (
-                                                <span className="flex items-center gap-1 rounded-full bg-slate-700 text-white px-2 py-0.5 text-[9px] font-bold">
+                                                <span className="flex items-center gap-1 rounded-full bg-slate-700 text-white px-2 py-0.5 text-[9px] font-bold shrink-0">
                                                     <Lock className="h-2.5 w-2.5" /> BLOCKED
                                                 </span>
                                             ) : isOccupied ? (
-                                                <span className="rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-400 px-2 py-0.5 text-[9px] font-bold border border-sky-500/30">
+                                                <span className="rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-400 px-2 py-0.5 text-[9px] font-bold border border-sky-500/30 shrink-0">
                                                     OCCUPIED
                                                 </span>
                                             ) : isReserved ? (
-                                                <span className="rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-400 px-2 py-0.5 text-[9px] font-bold border border-purple-500/30">
+                                                <span className="rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-400 px-2 py-0.5 text-[9px] font-bold border border-purple-500/30 shrink-0">
                                                     RESERVED
                                                 </span>
                                             ) : (
-                                                <span className="rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[9px] font-bold border border-emerald-500/30">
+                                                <span className="rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[9px] font-bold border border-emerald-500/30 shrink-0">
                                                     AVAILABLE
                                                 </span>
                                             )}
                                         </div>
 
                                         {/* Table Content Details */}
-                                        <div className="my-1 text-[11px] space-y-1">
+                                        <div className="my-1.5 text-[11px] space-y-1">
                                             {isBlocked ? (
                                                 <p className="text-slate-600 dark:text-slate-400 italic text-[10px] truncate">
                                                     Reason: {table.blockReason || "Maintenance"}
@@ -686,13 +686,13 @@ export default function Server() {
                                                     e.stopPropagation();
                                                     setBlockModalTable(table);
                                                 }}
-                                                className="theme-muted hover:text-slate-900 dark:hover:text-white font-semibold flex items-center gap-1"
+                                                className="theme-muted hover:text-slate-900 dark:hover:text-white font-semibold flex items-center gap-1 py-0.5"
                                             >
                                                 {isBlocked ? <Unlock className="h-3 w-3 text-emerald-500" /> : <Lock className="h-3 w-3 text-slate-400" />}
                                                 {isBlocked ? "Unblock" : "Block"}
                                             </button>
 
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1.5">
                                                 {isOccupied && (
                                                     <button
                                                         type="button"
@@ -710,7 +710,7 @@ export default function Server() {
                                                 )}
 
                                                 {!isBlocked && (
-                                                    <span className="font-bold text-orange-500 group-hover:translate-x-0.5 transition">
+                                                    <span className="font-bold text-orange-500 group-hover:translate-x-0.5 transition flex items-center gap-0.5">
                                                         Select →
                                                     </span>
                                                 )}
@@ -724,17 +724,17 @@ export default function Server() {
                 </div>
             ) : (
                 /* Ordering View Mode (Active Table Order / Cart) */
-                <div className="flex-1 p-4 grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-7xl mx-auto w-full">
+                <div className="flex-1 p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-7xl mx-auto w-full pb-20 lg:pb-4">
                     {/* Menu Studio Items Column */}
                     <div className="lg:col-span-2 space-y-3">
-                        <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--app-border)]/40 pb-2">
                             <div>
-                                <h2 className="text-base font-bold flex items-center gap-2">
+                                <h2 className="text-sm sm:text-base font-bold flex items-center gap-2">
                                     <span>Ordering for Table {selectedTable?.tableNo}</span>
                                     <span className="text-xs theme-muted">({selectedTable?.seats} Seats)</span>
                                 </h2>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -742,21 +742,21 @@ export default function Server() {
                                             handleClearTable(selectedTable);
                                         }
                                     }}
-                                    className="rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-3 py-1 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition flex items-center gap-1"
+                                    className="rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-2.5 sm:px-3 py-1 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition flex items-center gap-1"
                                 >
                                     <Trash2 className="h-3 w-3" /> Free Table
                                 </button>
                                 <button
                                     onClick={() => setViewMode("FLOOR_PLAN")}
-                                    className="rounded-xl border border-[color:var(--app-border)]/40 px-3 py-1 text-xs font-bold theme-muted hover:bg-black/5"
+                                    className="rounded-xl border border-[color:var(--app-border)]/40 px-2.5 sm:px-3 py-1 text-xs font-bold theme-muted hover:bg-black/5"
                                 >
-                                    ← Back to Floor Plan
+                                    ← Floor Plan
                                 </button>
                             </div>
                         </div>
 
                         {/* Menu Categories */}
-                        <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+                        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1">
                             {["ALL", "Coffee", "Breakfast", "Burgers", "Pizza", "Salads", "Desserts"].map((cat) => (
                                 <button
                                     key={cat}
@@ -771,22 +771,22 @@ export default function Server() {
                         </div>
 
                         {/* Menu Items Grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-2">
+                        <div className="grid grid-cols-2 min-[480px]:grid-cols-3 sm:grid-cols-4 gap-2.5 sm:gap-3 pt-1">
                             {menuItems
                                 .filter((i) => activeCategory === "ALL" || i.category === activeCategory)
                                 .map((item) => (
                                     <button
                                         key={item.id}
                                         onClick={() => handleAddToCart(item)}
-                                        className="flex flex-col justify-between rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 text-left hover:border-orange-500 transition shadow-xs"
+                                        className="flex flex-col justify-between rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 text-left hover:border-orange-500 transition shadow-xs cursor-pointer active:scale-98"
                                     >
                                         <div>
-                                            <p className="font-bold text-xs text-[color:var(--app-text)]">{item.name}</p>
+                                            <p className="font-bold text-xs text-[color:var(--app-text)] line-clamp-2">{item.name}</p>
                                             <p className="text-[10px] theme-muted mt-0.5">{item.category}</p>
                                         </div>
                                         <div className="flex justify-between items-center mt-3 pt-1 border-t border-gray-100 dark:border-slate-800">
                                             <span className="font-extrabold text-xs text-orange-500">{formatMoney(item.price)}</span>
-                                            <span className="rounded-lg bg-orange-500 text-white p-1 text-[10px] font-bold">
+                                            <span className="rounded-lg bg-orange-500 text-white px-2 py-0.5 text-[10px] font-bold">
                                                 + Add
                                             </span>
                                         </div>
@@ -796,27 +796,27 @@ export default function Server() {
                     </div>
 
                     {/* Cart & KOT Summary Column */}
-                    <div className="rounded-2xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 p-4 space-y-4 shadow-xs flex flex-col justify-between">
+                    <div id="kot-cart-section" className="rounded-2xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 p-3.5 sm:p-4 space-y-4 shadow-xs flex flex-col justify-between">
                         <div className="space-y-3">
                             <h3 className="font-bold text-sm border-b border-[color:var(--app-border)]/40 pb-2 flex justify-between items-center">
                                 <span>Table {selectedTable?.tableNo} Cart</span>
                                 <span className="text-xs font-mono font-bold text-orange-500">{Object.keys(cart).length} Items</span>
                             </h3>
 
-                            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                            <div className="space-y-2 max-h-[40vh] sm:max-h-[50vh] overflow-y-auto">
                                 {Object.values(cart).length === 0 ? (
                                     <p className="text-xs theme-muted text-center py-8">Select menu items on the left to build order.</p>
                                 ) : (
                                     Object.values(cart).map((item) => (
                                         <div key={item.id} className="flex justify-between items-center rounded-xl bg-slate-50 dark:bg-slate-800/50 p-2 text-xs">
-                                            <div>
-                                                <p className="font-bold text-slate-900 dark:text-white">{item.name}</p>
+                                            <div className="min-w-0 flex-1 pr-2">
+                                                <p className="font-bold text-slate-900 dark:text-white truncate">{item.name}</p>
                                                 <p className="text-[10px] theme-muted">{formatMoney(item.price)} each</p>
                                             </div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 shrink-0">
                                                 <span className="font-mono font-bold">x{item.qty}</span>
                                                 <span className="font-bold text-orange-500">{formatMoney(item.price * item.qty)}</span>
-                                                <button onClick={() => handleRemoveFromCart(item.id)} className="text-red-400 hover:text-red-500">
+                                                <button onClick={() => handleRemoveFromCart(item.id)} className="text-red-400 hover:text-red-500 p-1">
                                                     <Trash2 className="h-3.5 w-3.5" />
                                                 </button>
                                             </div>
@@ -843,6 +843,38 @@ export default function Server() {
                             </button>
                         </div>
                     </div>
+
+                    {/* Mobile Floating Cart Action Bar (< lg) */}
+                    {Object.keys(cart).length > 0 && (
+                        <div className="lg:hidden fixed bottom-3 left-3 right-3 z-40 bg-slate-900/95 dark:bg-slate-800/95 text-white backdrop-blur-md p-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center justify-between gap-3 animate-in slide-in-from-bottom duration-200">
+                            <div>
+                                <p className="text-xs font-bold flex items-center gap-1.5">
+                                    <ShoppingBag className="h-4 w-4 text-orange-400" />
+                                    <span>{Object.values(cart).reduce((a, b) => a + b.qty, 0)} Items Selected</span>
+                                </p>
+                                <p className="text-[11px] font-mono font-bold text-orange-400">{formatMoney(cartTotal)}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        document.getElementById("kot-cart-section")?.scrollIntoView({ behavior: "smooth" });
+                                    }}
+                                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-600 text-xs font-bold hover:bg-slate-700"
+                                >
+                                    View Cart
+                                </button>
+                                <button
+                                    onClick={handleSendKOT}
+                                    disabled={placingOrder}
+                                    className="px-4 py-2 rounded-xl bg-orange-500 text-white text-xs font-bold hover:bg-orange-600 shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                                >
+                                    {placingOrder ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ChefHat className="h-3.5 w-3.5" />}
+                                    Send KOT
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
