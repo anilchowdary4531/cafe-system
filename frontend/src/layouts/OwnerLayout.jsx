@@ -54,6 +54,14 @@ import { API } from "../config";
 import { api } from "../utils/apiClient";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import { playNotificationSound } from "../utils/soundPlayer";
+import {
+    getStoredTableGroups,
+    getStoredGroupCatalog,
+    writeStoredTableGroups,
+    resolveTableGroup,
+    TABLE_GROUPS_SYNC_EVENT,
+    toTitleCase,
+} from "../utils/tableGrouping";
 
 const MODULES = [
     "dashboard",
@@ -490,6 +498,7 @@ export default function OwnerLayout() {
     const [selectedLiveOrder, setSelectedLiveOrder] = useState(null);
     const [printedTableKeys, setPrintedTableKeys] = useState(() => new Set());
     const [tableGroups, setTableGroups] = useState({});
+    const [groupCatalog, setGroupCatalog] = useState([]);
     const [activeGroupFilter, setActiveGroupFilter] = useState("All");
     const [tableZoom, setTableZoom] = useState(() => {
         try {
@@ -1252,69 +1261,23 @@ export default function OwnerLayout() {
 
     useEffect(() => {
         if (!restaurantId) return;
-        const key = `owner_table_groups_v1_${restaurantId}`;
-        const loadGroups = () => {
-            try {
-                const raw = localStorage.getItem(key);
-                if (raw) {
-                    const parsed = JSON.parse(raw);
-                    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-                        setTableGroups(parsed);
-                    }
-                } else {
-                    setTableGroups({});
-                }
-            } catch {
-                setTableGroups({});
-            }
+        const load = () => {
+            setTableGroups(getStoredTableGroups(restaurantId));
+            setGroupCatalog(getStoredGroupCatalog(restaurantId));
         };
-        loadGroups();
-        const handleStorageChange = (e) => {
-            if (!e.key || e.key === key) loadGroups();
+        load();
+        const handleSync = () => load();
+        window.addEventListener(TABLE_GROUPS_SYNC_EVENT, handleSync);
+        window.addEventListener("storage", handleSync);
+        return () => {
+            window.removeEventListener(TABLE_GROUPS_SYNC_EVENT, handleSync);
+            window.removeEventListener("storage", handleSync);
         };
-        window.addEventListener("storage", handleStorageChange);
-        return () => window.removeEventListener("storage", handleStorageChange);
     }, [restaurantId]);
 
-    const toTitleCase = (str) =>
-        String(str || "")
-            .trim()
-            .replace(/\s+/g, " ")
-            .split(" ")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-            .join(" ");
-
     const getTableGroup = useCallback(
-        (table) => {
-            if (table?.groupName && String(table.groupName).trim()) {
-                return toTitleCase(table.groupName);
-            }
-            if (table?.section && String(table.section).trim()) {
-                return toTitleCase(table.section);
-            }
-            const idKey = String(table?.id || "");
-            if (idKey && tableGroups[idKey] && String(tableGroups[idKey]).trim()) {
-                return toTitleCase(tableGroups[idKey]);
-            }
-            const noKey = String(table?.tableNo || "").trim();
-            if (noKey && tableGroups[noKey] && String(tableGroups[noKey]).trim()) {
-                return toTitleCase(tableGroups[noKey]);
-            }
-
-            if (noKey) {
-                if (/^\d+$/.test(noKey)) {
-                    return "Main Hall";
-                }
-                const letterMatch = noKey.match(/^([A-Za-z]+)\s*\d+$/);
-                if (letterMatch) {
-                    const prefix = letterMatch[1].toUpperCase();
-                    return prefix === "T" ? "Section T" : `Section ${prefix}`;
-                }
-            }
-
-            return "Main Hall";
-        },
-        [tableGroups]
+        (table) => resolveTableGroup(table, tableGroups, groupCatalog),
+        [tableGroups, groupCatalog]
     );
 
     const groupedTablesMap = useMemo(() => {
@@ -1328,9 +1291,11 @@ export default function OwnerLayout() {
     }, [tableOverview.tables, getTableGroup]);
 
     const availableGroupNames = useMemo(() => {
-        return Object.keys(groupedTablesMap).sort((a, b) =>
-            a.localeCompare(b, undefined, { sensitivity: "base" })
-        );
+        return Object.keys(groupedTablesMap).sort((a, b) => {
+            if (a.toLowerCase() === "ungrouped") return 1;
+            if (b.toLowerCase() === "ungrouped") return -1;
+            return a.localeCompare(b, undefined, { sensitivity: "base" });
+        });
     }, [groupedTablesMap]);
 
     const filteredGroupEntries = useMemo(() => {
@@ -2747,12 +2712,21 @@ export default function OwnerLayout() {
                                 if (!restaurantId || !editingTableModal.id) return;
                                 setSubmittingEditTable(true);
                                 try {
+                                    const nextGroup = String(editingTableModal.groupName || "").trim();
                                     await axios.put(`${API}/owner/${restaurantId}/tables/${editingTableModal.id}`, {
                                         tableNo: editingTableModal.tableNo,
                                         seats: Number(editingTableModal.seats || 4),
-                                        section: editingTableModal.groupName,
+                                        section: nextGroup || null,
                                         isActive: editingTableModal.isActive,
                                     });
+                                    const nextTableGroups = { ...tableGroups };
+                                    if (nextGroup) {
+                                        nextTableGroups[String(editingTableModal.id)] = nextGroup;
+                                    } else {
+                                        delete nextTableGroups[String(editingTableModal.id)];
+                                    }
+                                    writeStoredTableGroups(restaurantId, nextTableGroups);
+                                    setTableGroups(nextTableGroups);
                                     showToast({
                                         title: "Table Updated 🎉",
                                         message: `Table ${editingTableModal.tableNo} configuration saved successfully.`,
@@ -2806,11 +2780,17 @@ export default function OwnerLayout() {
                                 </label>
                                 <input
                                     type="text"
+                                    list="existing-group-options"
                                     placeholder="e.g. Main Hall, Roof Top, Section T"
                                     value={editingTableModal.groupName}
                                     onChange={(e) => setEditingTableModal({ ...editingTableModal, groupName: e.target.value })}
                                     className="w-full rounded-xl border border-[color:var(--app-border)]/50 bg-[color:var(--app-surface)] px-3 py-2 text-sm text-[color:var(--app-text)] outline-none focus:border-amber-500"
                                 />
+                                <datalist id="existing-group-options">
+                                    {availableGroupNames.map((g) => (
+                                        <option key={g} value={g} />
+                                    ))}
+                                </datalist>
                             </div>
 
                             <div className="flex items-center gap-2 pt-1">

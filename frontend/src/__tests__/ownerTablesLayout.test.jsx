@@ -144,3 +144,192 @@ describe("Owner Panel Tables - Popover Positioning & Layout Engine", () => {
         expect(ordersText).toBe("3 orders");
     });
 });
+
+describe("Owner Panel Tables - Authoritative Table Grouping & Data Synchronization", () => {
+    // Import shared table grouping functions
+    const {
+        resolveTableGroup,
+        mergeUniqueGroupNames,
+        normalizeGroupName,
+        isSameGroupName,
+        toTitleCase,
+    } = require("../utils/tableGrouping");
+
+    const sampleNineTables = [
+        { id: 1, tableNo: "1", seats: 4, section: "Main Floor", isOccupied: false },
+        { id: 2, tableNo: "2", seats: 4, section: "Main Floor", isOccupied: true, activeOrderCount: 1 },
+        { id: 3, tableNo: "3", seats: 4, section: "Main Floor", isOccupied: false },
+        { id: 4, tableNo: "4", seats: 6, section: "Main Floor", isOccupied: false },
+        { id: 5, tableNo: "5", seats: 4, section: "Roof Top", isOccupied: false },
+        { id: 8, tableNo: "T1", seats: 4, section: "Main Floor", isOccupied: false },
+        { id: 9, tableNo: "T2", seats: 4, section: "Main Floor", isOccupied: true, activeOrderCount: 2 },
+        { id: 10, tableNo: "T3", seats: 4, section: "Main Floor", isOccupied: false },
+        { id: 11, tableNo: "T4", seats: 4, section: "Main Floor", isOccupied: false },
+    ];
+
+    it("Requirement 1 & 2: Nine tables across three groups appear in their correct groups (4 Main Hall, 1 Roof Top, 4 Section T)", () => {
+        const tableGroups = {
+            "5": "Roof Top",
+        };
+        const groupCatalog = ["Main Hall", "Roof Top", "Section T"];
+
+        const grouped = {};
+        sampleNineTables.forEach((t) => {
+            const g = resolveTableGroup(t, tableGroups, groupCatalog);
+            if (!grouped[g]) grouped[g] = [];
+            grouped[g].push(t);
+        });
+
+        expect(Object.keys(grouped).sort()).toEqual(["Main Hall", "Roof Top", "Section T"].sort());
+        expect(grouped["Main Hall"].length).toBe(4);
+        expect(grouped["Roof Top"].length).toBe(1);
+        expect(grouped["Section T"].length).toBe(4);
+        expect(grouped["Roof Top"][0].id).toBe(5);
+    });
+
+    it("Requirement 3: Moving a table from Main Hall to Roof Top moves it cleanly without duplication", () => {
+        let tableGroups = {
+            "5": "Roof Top",
+        };
+        const groupCatalog = ["Main Hall", "Roof Top", "Section T"];
+
+        // Before move: Table 1 is in Main Hall
+        expect(resolveTableGroup(sampleNineTables[0], tableGroups, groupCatalog)).toBe("Main Hall");
+
+        // Move Table 1 to Roof Top
+        tableGroups = {
+            ...tableGroups,
+            "1": "Roof Top",
+        };
+
+        const grouped = {};
+        sampleNineTables.forEach((t) => {
+            const g = resolveTableGroup(t, tableGroups, groupCatalog);
+            if (!grouped[g]) grouped[g] = [];
+            grouped[g].push(t);
+        });
+
+        expect(grouped["Main Hall"].length).toBe(3);
+        expect(grouped["Roof Top"].length).toBe(2);
+        expect(grouped["Section T"].length).toBe(4);
+
+        // Verify Table 1 appears ONLY once, inside Roof Top
+        const inMainHall = grouped["Main Hall"].some((t) => t.id === 1);
+        const inRoofTop = grouped["Roof Top"].some((t) => t.id === 1);
+        expect(inMainHall).toBe(false);
+        expect(inRoofTop).toBe(true);
+    });
+
+    it("Requirement 4: A newly created group and its assigned tables appear correctly", () => {
+        const tableGroups = {
+            "5": "Roof Top",
+            "4": "Garden Patio", // Newly created group
+        };
+        const groupCatalog = ["Main Hall", "Roof Top", "Section T", "Garden Patio"];
+
+        const grouped = {};
+        sampleNineTables.forEach((t) => {
+            const g = resolveTableGroup(t, tableGroups, groupCatalog);
+            if (!grouped[g]) grouped[g] = [];
+            grouped[g].push(t);
+        });
+
+        expect(grouped["Garden Patio"]).toBeDefined();
+        expect(grouped["Garden Patio"].length).toBe(1);
+        expect(grouped["Garden Patio"][0].id).toBe(4);
+        expect(grouped["Main Hall"].length).toBe(3);
+    });
+
+    it("Requirement 5: Renaming a group updates all assigned tables to the new heading", () => {
+        let tableGroups = {
+            "5": "Roof Top",
+        };
+        let groupCatalog = ["Main Hall", "Roof Top", "Section T"];
+
+        // Rename "Roof Top" to "Sky Deck"
+        const oldName = "Roof Top";
+        const newName = "Sky Deck";
+
+        groupCatalog = groupCatalog.map((g) => (isSameGroupName(g, oldName) ? newName : g));
+        tableGroups = Object.entries(tableGroups).reduce((acc, [k, v]) => {
+            acc[k] = isSameGroupName(v, oldName) ? newName : v;
+            return acc;
+        }, {});
+
+        const table5Group = resolveTableGroup(sampleNineTables[4], tableGroups, groupCatalog);
+        expect(table5Group).toBe("Sky Deck");
+    });
+
+    it("Requirement 6: Deleting a group unassigns tables cleanly", () => {
+        let tableGroups = {
+            "1": "VIP Lounge",
+            "2": "VIP Lounge",
+            "5": "Roof Top",
+        };
+        let groupCatalog = ["Main Hall", "Roof Top", "Section T", "VIP Lounge"];
+
+        // Delete "VIP Lounge"
+        const groupToDelete = "VIP Lounge";
+        groupCatalog = groupCatalog.filter((g) => !isSameGroupName(g, groupToDelete));
+        tableGroups = Object.entries(tableGroups).reduce((acc, [k, v]) => {
+            if (!isSameGroupName(v, groupToDelete)) acc[k] = v;
+            return acc;
+        }, {});
+
+        // Table 1 and 2 now fallback according to their naming pattern
+        expect(resolveTableGroup(sampleNineTables[0], tableGroups, groupCatalog)).toBe("Main Hall");
+        expect(resolveTableGroup(sampleNineTables[1], tableGroups, groupCatalog)).toBe("Main Hall");
+    });
+
+    it("Requirement 7: Tables without any assigned group are categorized as Ungrouped (never Main Floor)", () => {
+        const tableWithoutPattern = {
+            id: 99,
+            tableNo: "XYZ-Bar",
+            seats: 2,
+            section: "Main Floor", // Default schema section
+            isOccupied: false,
+        };
+
+        const tableGroups = {};
+        const groupCatalog = ["Main Hall", "Roof Top"];
+
+        const resolved = resolveTableGroup(tableWithoutPattern, tableGroups, groupCatalog);
+        expect(resolved).toBe("Ungrouped");
+        expect(resolved).not.toBe("Main Floor");
+    });
+
+    it("Requirement 8: Occupied tables and active orders retain full state across grouping", () => {
+        const tableGroups = {
+            "5": "Roof Top",
+        };
+        const groupCatalog = ["Main Hall", "Roof Top", "Section T"];
+
+        const table2 = sampleNineTables.find((t) => t.id === 2);
+        expect(table2.isOccupied).toBe(true);
+        expect(table2.activeOrderCount).toBe(1);
+
+        const group = resolveTableGroup(table2, tableGroups, groupCatalog);
+        expect(group).toBe("Main Hall");
+        // State remains intact
+        expect(table2.isOccupied).toBe(true);
+        expect(table2.activeOrderCount).toBe(1);
+    });
+
+    it("Requirement 9: Works dynamically with any group names and arbitrary number of tables", () => {
+        const customTables = [
+            { id: 101, tableNo: "B1", seats: 2, section: "Terrace" },
+            { id: 102, tableNo: "B2", seats: 4, section: "Poolside" },
+            { id: 103, tableNo: "B3", seats: 6, section: "Executive Lounge" },
+        ];
+        const tableGroups = {
+            "101": "Terrace",
+            "102": "Poolside",
+            "103": "Executive Lounge",
+        };
+        const groupCatalog = ["Terrace", "Poolside", "Executive Lounge"];
+
+        const groups = customTables.map((t) => resolveTableGroup(t, tableGroups, groupCatalog));
+        expect(groups).toEqual(["Terrace", "Poolside", "Executive Lounge"]);
+    });
+});
+

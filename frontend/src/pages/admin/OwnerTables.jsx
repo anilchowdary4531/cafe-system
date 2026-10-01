@@ -21,31 +21,22 @@ const emptyForm = {
 const qrImageUrl = (targetUrl) =>
     `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(targetUrl)}`;
 
-const TABLE_GROUPS_STORAGE_PREFIX = "owner_table_groups_v1";
-const TABLE_GROUP_CATALOG_STORAGE_PREFIX = "owner_table_group_catalog_v1";
+import {
+    TABLE_GROUPS_STORAGE_PREFIX,
+    TABLE_GROUP_CATALOG_STORAGE_PREFIX,
+    TABLE_GROUPS_SYNC_EVENT,
+    normalizeGroupName,
+    isSameGroupName,
+    mergeUniqueGroupNames,
+    getStoredTableGroups,
+    getStoredGroupCatalog,
+    writeStoredTableGroups,
+    writeStoredGroupCatalog,
+    resolveTableGroup,
+    toTitleCase,
+} from "../../utils/tableGrouping";
+
 const ALL_GROUPS_FILTER = "All";
-
-const normalizeGroupName = (value) =>
-    String(value || "")
-        .trim()
-        .replace(/\s+/g, " ");
-
-const isSameGroupName = (left, right) =>
-    normalizeGroupName(left).toLowerCase() ===
-    normalizeGroupName(right).toLowerCase();
-
-const mergeUniqueGroupNames = (names) => {
-    const unique = new Map();
-    for (const name of names || []) {
-        const normalized = normalizeGroupName(name);
-        if (!normalized) continue;
-        const key = normalized.toLowerCase();
-        if (!unique.has(key)) unique.set(key, normalized);
-    }
-    return [...unique.values()].sort((a, b) =>
-        a.localeCompare(b, undefined, { sensitivity: "base" })
-    );
-};
 
 const escapeHtml = (value) =>
     String(value)
@@ -474,62 +465,36 @@ export default function OwnerTables() {
     }, [socket]);
 
     useEffect(() => {
-        if (!tableGroupStorageKey) {
+        if (!restaurantId) {
             setTableGroups({});
-            return;
-        }
-
-        try {
-            const raw = localStorage.getItem(tableGroupStorageKey);
-            if (!raw) {
-                setTableGroups({});
-                return;
-            }
-            const parsed = JSON.parse(raw);
-            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-                setTableGroups({});
-                return;
-            }
-            setTableGroups(parsed);
-        } catch {
-            setTableGroups({});
-        }
-    }, [tableGroupStorageKey]);
-
-    useEffect(() => {
-        if (!tableGroupCatalogStorageKey) {
             setGroupCatalog([]);
             return;
         }
-        try {
-            const raw = localStorage.getItem(tableGroupCatalogStorageKey);
-            if (!raw) {
-                setGroupCatalog([]);
-                return;
-            }
-            const parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed)) {
-                setGroupCatalog([]);
-                return;
-            }
-            setGroupCatalog(mergeUniqueGroupNames(parsed));
-        } catch {
-            setGroupCatalog([]);
-        }
-    }, [tableGroupCatalogStorageKey]);
+
+        const load = () => {
+            setTableGroups(getStoredTableGroups(restaurantId));
+            setGroupCatalog(getStoredGroupCatalog(restaurantId));
+        };
+        load();
+
+        const handleSync = () => load();
+        window.addEventListener(TABLE_GROUPS_SYNC_EVENT, handleSync);
+        window.addEventListener("storage", handleSync);
+        return () => {
+            window.removeEventListener(TABLE_GROUPS_SYNC_EVENT, handleSync);
+            window.removeEventListener("storage", handleSync);
+        };
+    }, [restaurantId]);
 
     useEffect(() => {
-        if (!tableGroupStorageKey) return;
-        localStorage.setItem(tableGroupStorageKey, JSON.stringify(tableGroups));
-    }, [tableGroupStorageKey, tableGroups]);
+        if (!restaurantId || !tableGroupStorageKey) return;
+        writeStoredTableGroups(restaurantId, tableGroups);
+    }, [restaurantId, tableGroupStorageKey, tableGroups]);
 
     useEffect(() => {
-        if (!tableGroupCatalogStorageKey) return;
-        localStorage.setItem(
-            tableGroupCatalogStorageKey,
-            JSON.stringify(groupCatalog)
-        );
-    }, [groupCatalog, tableGroupCatalogStorageKey]);
+        if (!restaurantId || !tableGroupCatalogStorageKey) return;
+        writeStoredGroupCatalog(restaurantId, groupCatalog);
+    }, [groupCatalog, restaurantId, tableGroupCatalogStorageKey]);
 
     useEffect(() => {
         if (loading) return;
@@ -612,6 +577,7 @@ export default function OwnerTables() {
                     tableNo: existingTable.tableNo,
                     seats: Number(form.seats || existingTable.seats || 4),
                     isActive: form.isActive,
+                    section: normalizedGroup || null,
                 };
                 await axios.put(
                     `${API}/owner/${restaurantId}/tables/${existingTable.id}`,
@@ -622,6 +588,7 @@ export default function OwnerTables() {
                     tableNo: inputTableNo,
                     seats: Number(form.seats || 4),
                     isActive: form.isActive,
+                    section: normalizedGroup || null,
                 };
                 const updated = await axios.put(
                     `${API}/owner/${restaurantId}/tables/${editingId}`,
@@ -633,6 +600,7 @@ export default function OwnerTables() {
                     tableNo: inputTableNo,
                     seats: Number(form.seats || 4),
                     isActive: form.isActive,
+                    section: normalizedGroup || null,
                 };
                 const created = await axios.post(
                     `${API}/owner/${restaurantId}/tables`,
@@ -643,19 +611,19 @@ export default function OwnerTables() {
 
             if (savedTableId) {
                 const groupKey = String(savedTableId);
-                setTableGroups((prev) => {
-                    const next = { ...prev };
-                    if (normalizedGroup) {
-                        next[groupKey] = normalizedGroup;
-                    } else {
-                        delete next[groupKey];
-                    }
-                    return next;
-                });
+                const nextTableGroups = { ...tableGroups };
                 if (normalizedGroup) {
-                    setGroupCatalog((prev) =>
-                        mergeUniqueGroupNames([...prev, normalizedGroup])
-                    );
+                    nextTableGroups[groupKey] = normalizedGroup;
+                } else {
+                    delete nextTableGroups[groupKey];
+                }
+                setTableGroups(nextTableGroups);
+                writeStoredTableGroups(restaurantId, nextTableGroups);
+
+                if (normalizedGroup) {
+                    const nextCatalog = mergeUniqueGroupNames([...groupCatalog, normalizedGroup]);
+                    setGroupCatalog(nextCatalog);
+                    writeStoredGroupCatalog(restaurantId, nextCatalog);
                 }
             }
 
@@ -887,11 +855,37 @@ export default function OwnerTables() {
             return;
         }
         setError("");
-        setGroupCatalog((prev) =>
-            mergeUniqueGroupNames([...prev, normalized])
-        );
+        const nextCatalog = mergeUniqueGroupNames([...groupCatalog, normalized]);
+        setGroupCatalog(nextCatalog);
+        writeStoredGroupCatalog(restaurantId, nextCatalog);
         setForm((prev) => ({ ...prev, groupName: normalized }));
         setNewGroupName("");
+    };
+
+    const renameGroup = (oldName, newName) => {
+        const oldNorm = normalizeGroupName(oldName);
+        const newNorm = normalizeGroupName(newName);
+        if (!newNorm || isSameGroupName(oldNorm, newNorm)) return;
+
+        const nextCatalog = mergeUniqueGroupNames(
+            groupCatalog.map((g) => (isSameGroupName(g, oldNorm) ? newNorm : g))
+        );
+        setGroupCatalog(nextCatalog);
+        writeStoredGroupCatalog(restaurantId, nextCatalog);
+
+        const nextGroups = {};
+        for (const [key, val] of Object.entries(tableGroups)) {
+            nextGroups[key] = isSameGroupName(val, oldNorm) ? newNorm : val;
+        }
+        setTableGroups(nextGroups);
+        writeStoredTableGroups(restaurantId, nextGroups);
+
+        if (isSameGroupName(activeGroupFilter, oldNorm)) {
+            setActiveGroupFilter(newNorm);
+        }
+        if (isSameGroupName(form.groupName, oldNorm)) {
+            setForm((prev) => ({ ...prev, groupName: newNorm }));
+        }
     };
 
     const deleteGroup = (groupName) => {
@@ -910,21 +904,19 @@ export default function OwnerTables() {
         if (!approved) return;
 
         setError("");
-        setGroupCatalog((prev) =>
-            prev.filter((name) => !isSameGroupName(name, normalized))
-        );
-        setTableGroups((prev) => {
-            const next = {};
-            let changed = false;
-            for (const [tableId, value] of Object.entries(prev)) {
-                if (isSameGroupName(value, normalized)) {
-                    changed = true;
-                    continue;
-                }
-                next[tableId] = value;
+        const nextCatalog = groupCatalog.filter((name) => !isSameGroupName(name, normalized));
+        setGroupCatalog(nextCatalog);
+        writeStoredGroupCatalog(restaurantId, nextCatalog);
+
+        const nextGroups = {};
+        for (const [tableId, value] of Object.entries(tableGroups)) {
+            if (isSameGroupName(value, normalized)) {
+                continue;
             }
-            return changed ? next : prev;
-        });
+            nextGroups[tableId] = value;
+        }
+        setTableGroups(nextGroups);
+        writeStoredTableGroups(restaurantId, nextGroups);
 
         if (isSameGroupName(form.groupName, normalized)) {
             setForm((prev) => ({ ...prev, groupName: "" }));
@@ -934,26 +926,9 @@ export default function OwnerTables() {
         }
     };
 
-    const getTableGroup = (table) => {
-        const idKey = String(table?.id || "");
-        if (idKey && tableGroups[idKey] && String(tableGroups[idKey]).trim()) {
-            return String(tableGroups[idKey]).trim();
-        }
-        const noKey = String(table?.tableNo || "").trim();
-        if (noKey && tableGroups[noKey] && String(tableGroups[noKey]).trim()) {
-            return String(tableGroups[noKey]).trim();
-        }
-
-        if (noKey) {
-            if (/^\d+$/.test(noKey)) return "Main Hall";
-            const letterMatch = noKey.match(/^([A-Za-z]+)\s*\d+$/);
-            if (letterMatch) {
-                const prefix = letterMatch[1].toUpperCase();
-                return prefix === "T" ? "Section T" : `Section ${prefix}`;
-            }
-        }
-        return "Main Area";
-    };
+    const getTableGroup = useCallback((table) => {
+        return resolveTableGroup(table, tableGroups, groupCatalog);
+    }, [tableGroups, groupCatalog]);
 
     const groupOptions = useMemo(() => {
         const fromTables = tables.map((table) => getTableGroup(table)).filter(Boolean);
@@ -1259,12 +1234,26 @@ export default function OwnerTables() {
                         </button>
                         <button
                             type="button"
+                            onClick={() => {
+                                const newName = window.prompt(`Rename group "${group}" to:`, group);
+                                if (newName && newName.trim() && newName.trim() !== group) {
+                                    renameGroup(group, newName.trim());
+                                }
+                            }}
+                            className="border-l border-[color:var(--app-border)]/40 px-1.5 py-1 text-xs theme-muted transition hover:text-orange-500 hover:bg-black/5 dark:hover:bg-white/5"
+                            aria-label={`Rename group ${group}`}
+                            title={`Rename group ${group}`}
+                        >
+                            ✎
+                        </button>
+                        <button
+                            type="button"
                             onClick={() => deleteGroup(group)}
                             className="border-l border-[color:var(--app-border)]/40 px-2 py-1 text-xs text-red-500 transition hover:bg-red-500/20"
                             aria-label={`Delete group ${group}`}
                             title={`Delete group ${group}`}
                         >
-                            x
+                            ✕
                         </button>
                     </div>
                 ))}
