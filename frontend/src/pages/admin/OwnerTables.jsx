@@ -525,6 +525,37 @@ export default function OwnerTables() {
         }
     };
 
+    const handleFreeTable = async (table) => {
+        if (!table || !restaurantId) return;
+        const confirmed = window.confirm(`Are you sure you want to free Table ${table.tableNo}? Confirm that the customer has left and there are no outstanding orders.`);
+        if (!confirmed) return;
+
+        try {
+            await axios.post(`${API}/owner/${restaurantId}/tables/${table.id}/clear`, {
+                force: true,
+                reason: "Table cleared by Owner via OwnerTables",
+                performedByUserId: user?.id || null,
+                performedByName: user?.name || user?.email || "Owner",
+                performedByUserRole: "OWNER",
+            });
+
+            showToast({
+                title: "Table Freed 🎉",
+                message: `Table ${table.tableNo} is now free and available.`,
+                variant: "success",
+            });
+            await loadTables();
+            await loadActiveSessions();
+        } catch (err) {
+            console.error("Failed to free table:", err);
+            showToast({
+                title: "Error Freeing Table",
+                message: err?.response?.data?.message || err.message || "Failed to free table.",
+                variant: "error",
+            });
+        }
+    };
+
     useEffect(() => {
         loadTables();
         loadActiveSessions();
@@ -1797,6 +1828,21 @@ export default function OwnerTables() {
                                                                     style={{ maxWidth: "calc(100vw - 32px)" }}
                                                                     className={`absolute ${posXClass} ${posYClass} z-50 w-52 max-h-[300px] overflow-y-auto rounded-xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)] p-1.5 shadow-2xl text-[color:var(--app-text)]`}
                                                                 >
+                                                                    {(isOccupied || session) && (
+                                                                        <>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    handleFreeTable(table);
+                                                                                    setOpenMenuId(null);
+                                                                                }}
+                                                                                className={actionMenuItemClass}
+                                                                            >
+                                                                                Free Table
+                                                                            </button>
+                                                                            <div className="my-1 border-t border-white/10" />
+                                                                        </>
+                                                                    )}
                                                                     {session && (
                                                                         <>
                                                                             <button

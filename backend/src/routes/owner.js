@@ -1094,12 +1094,20 @@ export default async function ownerRoutes(app, deps) {
   app.post("/owner/:restaurantId/tables/:tableId/clear", async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
-      const tableId = Number(req.params.tableId);
+      const rawParam = String(req.params.tableId || "").trim();
+      const parsedId = Number(rawParam);
+      const isNumeric = Number.isInteger(parsedId) && parsedId > 0;
       const body = req.body || {};
       const { force = false, reason = "Customer left table", performedByUserId = null, performedByName = null, performedByUserRole = "SERVER" } = body;
 
       const table = await prisma.diningTable.findFirst({
-        where: { id: tableId, restaurantId },
+        where: {
+          restaurantId,
+          OR: [
+            ...(isNumeric ? [{ id: parsedId }] : []),
+            { tableNo: rawParam },
+          ],
+        },
         include: {
           tableSessions: {
             where: { status: { in: ["OPEN", "BILLING", "PAID"] } },
@@ -1132,12 +1140,27 @@ export default async function ownerRoutes(app, deps) {
 
       // Execute session closure, order updates, waiter unassignment, and audit log atomically in a transaction
       const updatedTable = await prisma.$transaction(async (tx) => {
+        // Find all active sessions for this table to get their session IDs
+        const sessionsToClose = await tx.tableSession.findMany({
+          where: {
+            restaurantId,
+            OR: [
+              { tableId: table.id },
+              { tableNo: table.tableNo },
+            ],
+            status: { in: ["OPEN", "BILLING", "PAID"] },
+          },
+          select: { id: true },
+        });
+
+        const activeSessionIds = sessionsToClose.map((s) => s.id);
+
         // Always close all active table sessions matching tableId OR tableNo
         await tx.tableSession.updateMany({
           where: {
             restaurantId,
             OR: [
-              { tableId },
+              { tableId: table.id },
               { tableNo: table.tableNo },
             ],
             status: { in: ["OPEN", "BILLING", "PAID"] },
@@ -1148,27 +1171,30 @@ export default async function ownerRoutes(app, deps) {
           },
         });
 
-        // Mark open prep/active orders for this table as DELIVERED if forced/permitted
+        // Mark open prep/active orders for this table as DELIVERED
+        // Note: Order model uses tableNo and tableSessionId (not tableId)
+        const orderWhereOr = [{ tableNo: table.tableNo }];
+        if (activeSessionIds.length > 0) {
+          orderWhereOr.push({ tableSessionId: { in: activeSessionIds } });
+        }
+
         await tx.order.updateMany({
           where: {
             restaurantId,
-            OR: [
-              { tableId },
-              { tableNo: table.tableNo },
-            ],
+            OR: orderWhereOr,
             status: { in: ["PLACED", "ACCEPTED", "PREPARING", "READY", "OPEN", "BILLING"] },
           },
           data: {
             status: "DELIVERED",
           },
-        }).catch(() => {});
+        });
 
         // Maintain separation between table occupancy and server assignment:
         // Freeing a table / clearing occupancy does NOT remove a server assignment unless explicitly requested via clearWaiter: true
         const shouldClearWaiter = Boolean(req.body?.clearWaiter);
         const updated = shouldClearWaiter
           ? await tx.diningTable.update({
-              where: { id: tableId },
+              where: { id: table.id },
               data: {
                 assignedWaiterId: null,
                 assignedWaiterName: null,
@@ -1182,7 +1208,7 @@ export default async function ownerRoutes(app, deps) {
             data: {
               restaurantId,
               operationType: "CLEAR_TABLE",
-              sourceTableId: tableId,
+              sourceTableId: table.id,
               sourceTableNo: table.tableNo,
               sourceSessionId: activeSession?.id || null,
               performedByUserId: performedByUserId ? Number(performedByUserId) : (req.user?.id || null),
@@ -1205,10 +1231,10 @@ export default async function ownerRoutes(app, deps) {
       });
 
       if (realtime?.io) {
-        realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId, tableNo: table.tableNo });
-        realtime.io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableId, tableNo: table.tableNo });
-        realtime.io.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableId, tableNo: table.tableNo });
-        realtime.io.to(`restaurant:${restaurantId}`).emit("table:session_updated", { restaurantId, tableId, tableNo: table.tableNo });
+        realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId: table.id, tableNo: table.tableNo });
+        realtime.io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableId: table.id, tableNo: table.tableNo });
+        realtime.io.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableId: table.id, tableNo: table.tableNo });
+        realtime.io.to(`restaurant:${restaurantId}`).emit("table:session_updated", { restaurantId, tableId: table.id, tableNo: table.tableNo });
         realtime.io.to(`restaurant_${restaurantId}`).emit("table:layout_updated", { restaurantId });
         realtime.io.to(`restaurant:${restaurantId}`).emit("table:layout_updated", { restaurantId });
       }

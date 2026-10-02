@@ -1300,9 +1300,7 @@ export default function OwnerLayout() {
     };
 
     const handleFreeTable = async (table, assignmentKey, options = {}) => {
-        const activeOrders = Array.isArray(table?.activeOrders) ? table.activeOrders : [];
-        const hasAssignment = Boolean(tableAssignments[assignmentKey]);
-        const targetTableId = table?.id || (table?.tableNo ? Number(table.tableNo) : null);
+        const targetTableId = table?.id || table?.tableNo || table?.label || null;
 
         if (!restaurantId || !targetTableId) {
             setOpenOrdersTableKey("");
@@ -1315,7 +1313,7 @@ export default function OwnerLayout() {
             return;
         }
 
-        setCompletingTableKey(assignmentKey);
+        setCompletingTableKey(assignmentKey || String(targetTableId));
         setReceiptActionError("");
         const prevOverview = { ...tableOverview };
 
@@ -1345,27 +1343,13 @@ export default function OwnerLayout() {
 
         try {
             // Call backend API to clear table session, reset isOccupied, and record audit trail
-            await axios.post(`${API}/owner/${restaurantId}/tables/${targetTableId}/clear`, {
+            await axios.post(`${API}/owner/${restaurantId}/tables/${encodeURIComponent(targetTableId)}/clear`, {
                 force: true,
                 reason: options.reason || "Table cleared by Owner",
                 performedByUserId: user?.id || null,
                 performedByName: user?.name || user?.email || "Owner",
                 performedByUserRole: "OWNER",
             });
-
-            if (activeOrders.length > 0) {
-                await Promise.all(
-                    activeOrders.map((order) =>
-                        axios.put(
-                            `${API}/owner/${restaurantId}/orders/${order.id}/status`,
-                            {
-                                status: "DELIVERED",
-                                changedByName: user?.name || "Owner",
-                            }
-                        ).catch(() => {})
-                    )
-                );
-            }
 
             // Note: Server assignment remains attached to the table across order completion / table freeing.
             if (assignmentKey) {
@@ -2648,11 +2632,17 @@ export default function OwnerLayout() {
                                                                         setOpenMoreTableKey("");
                                                                         handleFreeTable(table, assignmentKey);
                                                                     }}
-                                                                    disabled={isCompletingThisTable}
+                                                                    disabled={isCompletingThisTable || (!table.isOccupied && (!table.activeOrders || table.activeOrders.length === 0) && !table.activeSession)}
                                                                     className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 text-left cursor-pointer disabled:opacity-60"
                                                                 >
                                                                     <Unlock size={13} className="shrink-0" />
-                                                                    <span>{isCompletingThisTable ? "Freeing..." : "Free Table"}</span>
+                                                                    <span>
+                                                                        {isCompletingThisTable
+                                                                            ? "Freeing..."
+                                                                            : table.isOccupied || (table.activeOrders && table.activeOrders.length > 0) || table.activeSession
+                                                                            ? "Free Table"
+                                                                            : "Table Available"}
+                                                                    </span>
                                                                 </button>
 
                                                                 {/* 5. Delete Table */}
