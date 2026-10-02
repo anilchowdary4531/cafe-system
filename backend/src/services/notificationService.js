@@ -258,6 +258,7 @@ export const getUserNotifications = async ({
   prisma,
   recipientType = RECIPIENT_TYPES.CUSTOMER,
   recipientId,
+  restaurantId = null,
   isRead = null,
   page = 1,
   limit = 20,
@@ -265,11 +266,33 @@ export const getUserNotifications = async ({
   const p = Math.max(1, Number(page || 1));
   const l = Math.min(100, Math.max(1, Number(limit || 20)));
 
-  const where = {
-    recipientType,
-    recipientId: Number(recipientId),
-    ...(isRead !== null ? { isRead: Boolean(isRead) } : {}),
-  };
+  let where;
+  let unreadWhere;
+
+  if (recipientType === RECIPIENT_TYPES.USER || recipientType === RECIPIENT_TYPES.RESTAURANT) {
+    const userOrRestaurantConditions = [
+      { recipientType: RECIPIENT_TYPES.USER, recipientId: Number(recipientId) },
+    ];
+    if (restaurantId) {
+      userOrRestaurantConditions.push({ recipientType: RECIPIENT_TYPES.RESTAURANT, recipientId: Number(restaurantId) });
+      userOrRestaurantConditions.push({ restaurantId: Number(restaurantId) });
+    }
+    where = {
+      OR: userOrRestaurantConditions,
+      ...(isRead !== null ? { isRead: Boolean(isRead) } : {}),
+    };
+    unreadWhere = {
+      OR: userOrRestaurantConditions,
+      isRead: false,
+    };
+  } else {
+    where = {
+      recipientType,
+      recipientId: Number(recipientId),
+      ...(isRead !== null ? { isRead: Boolean(isRead) } : {}),
+    };
+    unreadWhere = { recipientType, recipientId: Number(recipientId), isRead: false };
+  }
 
   const [notifications, total, unreadCount] = await Promise.all([
     prisma.notification.findMany({
@@ -279,9 +302,7 @@ export const getUserNotifications = async ({
       take: l,
     }),
     prisma.notification.count({ where }),
-    prisma.notification.count({
-      where: { recipientType, recipientId: Number(recipientId), isRead: false },
-    }),
+    prisma.notification.count({ where: unreadWhere }),
   ]);
 
   return {
@@ -290,19 +311,34 @@ export const getUserNotifications = async ({
     unreadCount,
     page: p,
     limit: l,
+    hasMore: (p * l) < total,
   };
 };
 
 /**
  * Mark a single notification read
  */
-export const markNotificationRead = async ({ prisma, notificationId, recipientType, recipientId }) => {
-  return await prisma.notification.updateMany({
-    where: {
+export const markNotificationRead = async ({ prisma, notificationId, recipientType, recipientId, restaurantId = null }) => {
+  let where;
+  if ((recipientType === RECIPIENT_TYPES.USER || recipientType === RECIPIENT_TYPES.RESTAURANT) && restaurantId) {
+    where = {
+      id: Number(notificationId),
+      OR: [
+        { recipientType: RECIPIENT_TYPES.USER, recipientId: Number(recipientId) },
+        { recipientType: RECIPIENT_TYPES.RESTAURANT, recipientId: Number(restaurantId) },
+        { restaurantId: Number(restaurantId) },
+      ],
+    };
+  } else {
+    where = {
       id: Number(notificationId),
       recipientType,
       recipientId: Number(recipientId),
-    },
+    };
+  }
+
+  return await prisma.notification.updateMany({
+    where,
     data: {
       isRead: true,
       readAt: new Date(),
@@ -313,13 +349,27 @@ export const markNotificationRead = async ({ prisma, notificationId, recipientTy
 /**
  * Mark all notifications read for recipient
  */
-export const markAllNotificationsRead = async ({ prisma, recipientType, recipientId }) => {
-  return await prisma.notification.updateMany({
-    where: {
+export const markAllNotificationsRead = async ({ prisma, recipientType, recipientId, restaurantId = null }) => {
+  let where;
+  if ((recipientType === RECIPIENT_TYPES.USER || recipientType === RECIPIENT_TYPES.RESTAURANT) && restaurantId) {
+    where = {
+      OR: [
+        { recipientType: RECIPIENT_TYPES.USER, recipientId: Number(recipientId) },
+        { recipientType: RECIPIENT_TYPES.RESTAURANT, recipientId: Number(restaurantId) },
+        { restaurantId: Number(restaurantId) },
+      ],
+      isRead: false,
+    };
+  } else {
+    where = {
       recipientType,
       recipientId: Number(recipientId),
       isRead: false,
-    },
+    };
+  }
+
+  return await prisma.notification.updateMany({
+    where,
     data: {
       isRead: true,
       readAt: new Date(),

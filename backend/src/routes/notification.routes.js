@@ -36,7 +36,13 @@ export default async function notificationRoutes(app, deps) {
         const token = authHeader.split(" ")[1];
         const decoded = app.jwt.verify(token);
         if (decoded?.id && String(decoded?.type || "") !== "customer") {
-          return { recipientType: RECIPIENT_TYPES.USER, recipientId: Number(decoded.id), user: decoded };
+          const restaurantId = decoded.restaurantId || decoded.restaurant_id ? Number(decoded.restaurantId || decoded.restaurant_id) : null;
+          return {
+            recipientType: RECIPIENT_TYPES.USER,
+            recipientId: Number(decoded.id),
+            restaurantId,
+            user: decoded,
+          };
         }
       }
     } catch {
@@ -58,6 +64,7 @@ export default async function notificationRoutes(app, deps) {
       prisma,
       recipientType: actor.recipientType,
       recipientId: actor.recipientId,
+      restaurantId: actor.restaurantId,
       isRead: parsedRead,
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
@@ -71,15 +78,29 @@ export default async function notificationRoutes(app, deps) {
     const actor = await resolveActor(req);
     if (!actor) return reply.code(401).send({ message: "Authentication required" });
 
-    const count = await prisma.notification.count({
-      where: {
-        recipientType: actor.recipientType,
-        recipientId: actor.recipientId,
-        isRead: false,
-      },
-    });
+    let count;
+    if (actor.recipientType === RECIPIENT_TYPES.USER && actor.restaurantId) {
+      count = await prisma.notification.count({
+        where: {
+          OR: [
+            { recipientType: RECIPIENT_TYPES.USER, recipientId: actor.recipientId },
+            { recipientType: RECIPIENT_TYPES.RESTAURANT, recipientId: actor.restaurantId },
+            { restaurantId: actor.restaurantId },
+          ],
+          isRead: false,
+        },
+      });
+    } else {
+      count = await prisma.notification.count({
+        where: {
+          recipientType: actor.recipientType,
+          recipientId: actor.recipientId,
+          isRead: false,
+        },
+      });
+    }
 
-    return { unreadCount: count };
+    return { success: true, count, unreadCount: count };
   });
 
   // PATCH & POST /api/notifications/:id/read — Mark single notification read
@@ -93,6 +114,7 @@ export default async function notificationRoutes(app, deps) {
       notificationId,
       recipientType: actor.recipientType,
       recipientId: actor.recipientId,
+      restaurantId: actor.restaurantId,
     });
 
     return { message: "Notification marked as read" };
@@ -109,6 +131,7 @@ export default async function notificationRoutes(app, deps) {
       prisma,
       recipientType: actor.recipientType,
       recipientId: actor.recipientId,
+      restaurantId: actor.restaurantId,
     });
 
     return { message: "All notifications marked as read" };

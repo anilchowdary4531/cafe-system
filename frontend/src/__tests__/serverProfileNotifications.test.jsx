@@ -151,7 +151,7 @@ describe("ServerNotificationsView Unit Tests", () => {
             type: "KITCHEN",
             isRead: false,
             createdAt: new Date().toISOString(),
-            metadata: { tableNo: "4" },
+            data: { tableNo: "4" },
         },
         {
             id: 2,
@@ -160,7 +160,7 @@ describe("ServerNotificationsView Unit Tests", () => {
             type: "ORDER",
             isRead: true,
             createdAt: new Date().toISOString(),
-            metadata: { tableNo: "2" },
+            data: { tableNo: "2" },
         },
     ];
 
@@ -174,6 +174,7 @@ describe("ServerNotificationsView Unit Tests", () => {
                         notifications: mockNotifications,
                         total: 2,
                         unreadCount: 1,
+                        hasMore: false,
                     },
                 });
             }
@@ -181,12 +182,70 @@ describe("ServerNotificationsView Unit Tests", () => {
         });
     });
 
-    it("fetches and renders notifications list", async () => {
+    it("fetches and renders notifications list with header and badges", async () => {
         renderWithProviders(<ServerNotificationsView onBackToFloorPlan={vi.fn()} />);
 
         await waitFor(() => {
             expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
             expect(screen.getByText("New Order Placed")).toBeInTheDocument();
+            expect(screen.getByText("Table 4")).toBeInTheDocument();
+            expect(screen.getByText("Table 2")).toBeInTheDocument();
+        });
+    });
+
+    it("filters notifications by category tabs and search query", async () => {
+        renderWithProviders(<ServerNotificationsView onBackToFloorPlan={vi.fn()} />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        });
+
+        // Click UNREAD tab
+        const unreadTab = screen.getByRole("button", { name: "UNREAD" });
+        fireEvent.click(unreadTab);
+
+        expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        expect(screen.queryByText("New Order Placed")).not.toBeInTheDocument();
+
+        // Click ALL tab
+        const allTab = screen.getByRole("button", { name: "ALL" });
+        fireEvent.click(allTab);
+        expect(screen.getByText("New Order Placed")).toBeInTheDocument();
+
+        // Search Query
+        const searchInput = screen.getByPlaceholderText(/search notifications/i);
+        fireEvent.change(searchInput, { target: { value: "Pepperoni" } });
+
+        expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        expect(screen.queryByText("New Order Placed")).not.toBeInTheDocument();
+    });
+
+    it("triggers table navigation when View Table button is clicked", async () => {
+        const onNavigateMock = vi.fn();
+        renderWithProviders(<ServerNotificationsView onNavigateToTable={onNavigateMock} />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        });
+
+        const viewTableBtn = screen.getByTitle("View Table 4");
+        fireEvent.click(viewTableBtn);
+
+        expect(onNavigateMock).toHaveBeenCalledWith("4");
+    });
+
+    it("toggles Sound Settings panel when clicked", async () => {
+        renderWithProviders(<ServerNotificationsView onBackToFloorPlan={vi.fn()} />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Notifications")).toBeInTheDocument();
+        });
+
+        const soundSettingsBtn = screen.getByTitle("Adjust Notification Sound");
+        fireEvent.click(soundSettingsBtn);
+
+        await waitFor(() => {
+            expect(screen.getByText("Notification Sound")).toBeInTheDocument();
         });
     });
 
@@ -220,7 +279,7 @@ describe("ServerNotificationsView Unit Tests", () => {
             expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
         });
 
-        const markAllBtn = screen.getByRole("button", { name: /mark all read/i });
+        const markAllBtn = screen.getByRole("button", { name: /mark all as read/i });
         fireEvent.click(markAllBtn);
 
         await waitFor(() => {
