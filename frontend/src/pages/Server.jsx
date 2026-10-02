@@ -369,6 +369,50 @@ export default function Server() {
         };
     }, [socket, refreshTables, refreshReservations, refreshLiveOrders, refreshReadyKots]);
 
+    // Ordering Actions & Auto Server Assignment
+    const handleSelectTableForOrder = useCallback(async (table) => {
+        if (!table) return;
+        if (table.isBlocked) {
+            showToast({
+                title: "Table Blocked 🔒",
+                message: `Table ${table.tableNo} is BLOCKED (${table.blockReason || "Maintenance"}). Unblock table before placing orders.`,
+                variant: "warning",
+            });
+            return;
+        }
+
+        const serverId = user?.id || user?.userId;
+        const serverName = user?.name || user?.username || "Server";
+
+        let activeTable = table;
+
+        // Auto-assign authenticated server to selected table if unassigned or assigned to another staff
+        if (serverId && table?.id && Number(table.assignedWaiterId) !== Number(serverId)) {
+            try {
+                activeTable = {
+                    ...table,
+                    assignedWaiterId: Number(serverId),
+                    assignedWaiterName: serverName,
+                };
+                setSelectedTable(activeTable);
+
+                await axios.post(`${API}/owner/${restaurantId}/tables/${table.id}/assign-waiter`, {
+                    waiterId: Number(serverId),
+                    reason: "Assigned on table selection in Server Station",
+                });
+
+                refreshTables({ force: true });
+            } catch (err) {
+                console.error("Failed to assign server on table selection:", err);
+            }
+        } else {
+            setSelectedTable(table);
+        }
+
+        setViewMode("ORDERING");
+        setSearchParams({ table: activeTable.tableNo }, { replace: true });
+    }, [user, restaurantId, refreshTables, setSearchParams]);
+
     // Auto-select table if query param ?table=X is provided
     const urlTableParam = searchParams.get("table");
     useEffect(() => {
@@ -384,10 +428,9 @@ export default function Server() {
             );
         });
         if (matched) {
-            setSelectedTable(matched);
-            setViewMode("ORDERING");
+            handleSelectTableForOrder(matched);
         }
-    }, [urlTableParam, tables]);
+    }, [urlTableParam, tables, handleSelectTableForOrder]);
 
     // Keep selectedTable in sync with refreshed tables data
     useEffect(() => {
@@ -493,21 +536,6 @@ export default function Server() {
 
         return { total: tables.length, available, occupied, reserved, blocked };
     }, [tables]);
-
-    // Ordering Actions
-    const handleSelectTableForOrder = (table) => {
-        if (table.isBlocked) {
-            showToast({
-                title: "Table Blocked 🔒",
-                message: `Table ${table.tableNo} is BLOCKED (${table.blockReason || "Maintenance"}). Unblock table before placing orders.`,
-                variant: "warning",
-            });
-            return;
-        }
-        setSelectedTable(table);
-        setViewMode("ORDERING");
-        setSearchParams({ table: table.tableNo }, { replace: true });
-    };
 
     const handleAddToCart = (item) => {
         const key = item.id;
