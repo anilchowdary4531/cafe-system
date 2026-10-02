@@ -1,5 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import axios from "axios";
+import { API } from "../../config";
+import { api } from "../../utils/apiClient";
 import {
     ArrowLeft,
     Banknote,
@@ -177,6 +180,9 @@ const buildBillPrintMarkup = ({ restaurantName, order } = {}) => {
         ["Type", orderType],
         ...(paymentMethod ? [["Payment Mode", paymentMethod]] : []),
         ...(String(order?.tableNo || "").trim() ? [["Table", order.tableNo]] : []),
+        ...(String(order?.waiterName || order?.assignedWaiterName || "").trim()
+            ? [["Server", order.waiterName || order.assignedWaiterName]]
+            : []),
         ...(String(order?.customerName || "").trim() ? [["Customer", order.customerName]] : []),
         ...(String(order?.phone || "").trim() ? [["Phone", order.phone]] : []),
         ...(String(order?.notes || "").trim() ? [["Notes", order.notes]] : []),
@@ -554,12 +560,89 @@ const CartRow = memo(function CartRow({ item, onAdd, onSub, onRemove, onSetQty, 
 
 export default function NewOrder() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams] = useSearchParams();
     const { user } = useAuth();
     const { socket, connected, error: socketError } = useStaffSocket();
 
+    const restaurantId = user?.restaurantId || user?.restaurant?.id;
     const slug = String(user?.restaurant?.slug || "").trim();
     const restaurantName = String(user?.restaurant?.name || "Restaurant").trim() || "Restaurant";
+
+    const [tables, setTables] = useState([]);
+    const [selectedTableNo, setSelectedTableNo] = useState(
+        () => String(searchParams.get("table") || "").trim() || null
+    );
+    const [showTablePickerModal, setShowTablePickerModal] = useState(false);
+
+    useEffect(() => {
+        const qTable = String(searchParams.get("table") || "").trim() || null;
+        if (qTable !== selectedTableNo) {
+            setSelectedTableNo(qTable);
+        }
+    }, [searchParams]);
+
+    const loadTables = useCallback(async () => {
+        if (!restaurantId) return;
+        try {
+            const res = await axios.get(`${API}/owner/${restaurantId}/tables`);
+            if (Array.isArray(res.data)) {
+                setTables(res.data);
+            }
+        } catch (err) {
+            console.error("Failed to load tables in NewOrder POS:", err);
+        }
+    }, [restaurantId]);
+
+    useEffect(() => {
+        loadTables();
+    }, [loadTables]);
+
+    useEffect(() => {
+        if (!socket || typeof socket.on !== "function") return undefined;
+        socket.on("table:updated", loadTables);
+        socket.on("table:waiter_assigned", loadTables);
+        socket.on("table:layout_updated", loadTables);
+        return () => {
+            if (typeof socket.off === "function") {
+                socket.off("table:updated", loadTables);
+                socket.off("table:waiter_assigned", loadTables);
+                socket.off("table:layout_updated", loadTables);
+            }
+        };
+    }, [socket, loadTables]);
+
+    const currentTableObj = useMemo(() => {
+        if (!selectedTableNo) return null;
+        return (
+            tables.find(
+                (t) =>
+                    String(t.tableNo || "").trim().toLowerCase() ===
+                    String(selectedTableNo || "").trim().toLowerCase()
+            ) || null
+        );
+    }, [tables, selectedTableNo]);
+
+    const assignedServerName =
+        currentTableObj?.assignedWaiterName ||
+        currentTableObj?.assignedWaiter?.name ||
+        null;
+    const assignedServerId =
+        currentTableObj?.assignedWaiterId ||
+        currentTableObj?.assignedWaiter?.id ||
+        null;
+
+    const handleSelectTable = (newTableNo) => {
+        const currentPath = location.pathname || "/owner/pos";
+        if (newTableNo) {
+            setSelectedTableNo(newTableNo);
+            navigate(`${currentPath}?table=${encodeURIComponent(newTableNo)}`, { replace: true });
+        } else {
+            setSelectedTableNo(null);
+            navigate(currentPath, { replace: true });
+        }
+        setShowTablePickerModal(false);
+    };
 
     const [billState, setBillState] = useState(() => loadStoredBills(slug));
     const [search, setSearch] = useState("");
@@ -571,7 +654,7 @@ export default function NewOrder() {
     const [cashGiven, setCashGiven] = useState("");
     const searchRef = useRef(null);
 
-    const tableNo = String(searchParams.get("table") || "").trim() || null;
+    const tableNo = selectedTableNo;
     const orderType = tableNo ? "DINE_IN" : "TAKEAWAY";
 
     // Reload bills when slug changes
@@ -1106,6 +1189,8 @@ export default function NewOrder() {
 
                 const offlineOrderPayload = {
                     tableNo: String(orderType || "").toUpperCase() === "DINE_IN" ? tableNo : null,
+                    waiterId: String(orderType || "").toUpperCase() === "DINE_IN" ? (assignedServerId || null) : null,
+                    waiterName: String(orderType || "").toUpperCase() === "DINE_IN" ? (assignedServerName || null) : null,
                     notes: finalNotes,
                     customerName: customerName ? String(customerName).trim() : null,
                     phone: phone ? String(phone).trim() : null,
@@ -1165,6 +1250,8 @@ export default function NewOrder() {
             {
                 orderType: String(orderType || "TAKEAWAY").toUpperCase(),
                 tableNo: String(orderType || "").toUpperCase() === "DINE_IN" ? tableNo : null,
+                waiterId: String(orderType || "").toUpperCase() === "DINE_IN" ? (assignedServerId || null) : null,
+                waiterName: String(orderType || "").toUpperCase() === "DINE_IN" ? (assignedServerName || null) : null,
                 notes: finalNotes,
                 customerName: customerName ? String(customerName).trim() : null,
                 phone: phone ? String(phone).trim() : null,
@@ -1201,6 +1288,8 @@ export default function NewOrder() {
 
                         const createdOrder = {
                             ...ack.order,
+                            waiterId: ack?.order?.waiterId || assignedServerId || null,
+                            waiterName: ack?.order?.waiterName || assignedServerName || null,
                             paymentMethod,
                             cashGiven: cashGivenNum,
                             changeReturned: changeReturnedNum,
@@ -1232,7 +1321,7 @@ export default function NewOrder() {
                 }
             }
         );
-    }, [socket, connected, placing, cartItems, paymentMethod, cashGiven, subtotal, notes, orderType, tableNo, customerName, phone, activeBill.id, triggerPrintReceipt, removeCompletedBill]);
+    }, [socket, connected, placing, cartItems, paymentMethod, cashGiven, subtotal, notes, orderType, tableNo, customerName, phone, activeBill.id, assignedServerId, assignedServerName, triggerPrintReceipt, removeCompletedBill]);
 
     return (
         <div className="theme-page min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_430px]">
@@ -1447,6 +1536,33 @@ export default function NewOrder() {
                             </p>
                         </div>
                         <p className="theme-muted text-sm font-semibold tabular-nums">Rs {toInr(subtotal)}</p>
+                    </div>
+
+                    {/* Table & Server Assignment Bar */}
+                    <div className="mt-2.5 flex items-center justify-between gap-1.5 rounded-xl border border-[color:var(--app-border)]/40 bg-black/5 dark:bg-white/5 p-2 text-xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-bold text-[color:var(--app-text)] flex items-center gap-1 shrink-0">
+                                🍽️ {tableNo ? `Table ${tableNo}` : "Takeaway / Counter"}
+                            </span>
+                            {tableNo && (
+                                assignedServerName ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 text-[11px] font-medium text-orange-400 truncate" title={`Assigned Server: ${assignedServerName}`}>
+                                        👤 {assignedServerName}
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-500/40 px-1.5 py-0.5 text-[10px] text-gray-400" title="No server assigned to this table">
+                                        No Server
+                                    </span>
+                                )
+                            )}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowTablePickerModal(true)}
+                            className="shrink-0 text-[11px] font-semibold text-orange-500 hover:text-orange-400 underline underline-offset-2"
+                        >
+                            {tableNo ? "Switch Table" : "Select Table"}
+                        </button>
                     </div>
 
                     {/* Optional Customer Information with Autocomplete */}
@@ -1736,6 +1852,97 @@ export default function NewOrder() {
                 </div>
             )}
 
+            {/* TABLE PICKER MODAL */}
+            {showTablePickerModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-lg rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)] text-[color:var(--app-text)] p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+                        <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-3">
+                            <h4 className="text-xl font-bold flex items-center gap-2">
+                                <span>🍽️</span>
+                                <span>Select Table for Billing</span>
+                            </h4>
+                            <button
+                                type="button"
+                                onClick={() => setShowTablePickerModal(false)}
+                                className="theme-muted hover:text-[color:var(--app-text)] text-lg"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <p className="text-xs theme-muted">
+                            Choose a table to link to this order. The assigned server will be automatically associated with the order.
+                        </p>
+
+                        <div className="overflow-y-auto pr-1 space-y-3 flex-1">
+                            {/* Takeaway / Counter Option */}
+                            <button
+                                type="button"
+                                onClick={() => handleSelectTable(null)}
+                                className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition ${
+                                    !tableNo
+                                        ? "border-orange-500 bg-orange-500/10 text-orange-400 font-bold"
+                                        : "border-[color:var(--app-border)]/40 hover:border-orange-500/40"
+                                }`}
+                            >
+                                <div>
+                                    <p className="font-bold text-sm">Takeaway / Quick Counter</p>
+                                    <p className="text-xs theme-muted">No table or server association</p>
+                                </div>
+                                {!tableNo && <span className="text-xs font-bold text-orange-500">Selected</span>}
+                            </button>
+
+                            {/* Dine-In Tables Grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                                {tables.map((t) => {
+                                    const isSelected = String(t.tableNo).trim().toLowerCase() === String(tableNo || "").trim().toLowerCase();
+                                    const sName = t.assignedWaiterName || t.assignedWaiter?.name;
+                                    return (
+                                        <button
+                                            key={t.id}
+                                            type="button"
+                                            onClick={() => handleSelectTable(t.tableNo)}
+                                            className={`flex flex-col justify-between p-3 rounded-xl border text-left transition ${
+                                                isSelected
+                                                    ? "border-orange-500 bg-orange-500/10 shadow-md shadow-orange-500/10"
+                                                    : "border-[color:var(--app-border)]/40 hover:border-orange-500/50"
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-lg font-black">{t.tableNo}</span>
+                                                <span className="text-[10px] theme-muted">{t.seats || 4} seats</span>
+                                            </div>
+                                            <div className="mt-2 text-[10px]">
+                                                {sName ? (
+                                                    <span className="inline-flex items-center gap-1 text-orange-400 font-semibold truncate max-w-full">
+                                                        👤 {sName}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-gray-400">No Server</span>
+                                                )}
+                                            </div>
+                                            {isSelected && (
+                                                <span className="mt-1 text-[10px] font-bold text-orange-500 self-end">Current</span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end pt-2 border-t border-[color:var(--app-border)]/40">
+                            <button
+                                type="button"
+                                onClick={() => setShowTablePickerModal(false)}
+                                className="rounded-xl border border-[color:var(--app-border)]/40 px-4 py-2 text-sm theme-muted hover:bg-black/5 dark:hover:bg-white/5"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* PETPOOJA STYLE PAYMENT & CUSTOMER CHANGE CALCULATOR MODAL */}
             {showCheckoutModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
@@ -1749,6 +1956,7 @@ export default function NewOrder() {
                                 </h3>
                                 <p className="text-xs text-stone-500 mt-0.5 font-semibold">
                                     {activeBill.billNumber} • {orderType === "DINE_IN" ? `Table ${tableNo}` : "Takeaway"}
+                                    {orderType === "DINE_IN" && assignedServerName ? ` • Server: ${assignedServerName}` : ""}
                                 </p>
                             </div>
                             <button

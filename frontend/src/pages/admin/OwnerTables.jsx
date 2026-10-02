@@ -103,6 +103,12 @@ export default function OwnerTables() {
     const [submittingTransfer, setSubmittingTransfer] = useState(false);
     const [splitBillingSession, setSplitBillingSession] = useState(null);
 
+    // Server Assignment State
+    const [staffList, setStaffList] = useState([]);
+    const [assignServerModalTable, setAssignServerModalTable] = useState(null);
+    const [selectedWaiterIdToAssign, setSelectedWaiterIdToAssign] = useState("");
+    const [submittingAssignServer, setSubmittingAssignServer] = useState(false);
+
     // Reservation State
     const [reservations, setReservations] = useState([]);
     const [seatingReservationId, setSeatingReservationId] = useState(null);
@@ -387,6 +393,113 @@ export default function OwnerTables() {
         }
     };
 
+    const loadStaff = async () => {
+        if (!restaurantId) return;
+        try {
+            const res = await axios.get(`${API}/owner/${restaurantId}/staff`);
+            const list = Array.isArray(res.data) ? res.data : [];
+            setStaffList(list.filter((s) => s && s.isActive !== false));
+        } catch (err) {
+            console.error("Failed to load staff in OwnerTables:", err);
+        }
+    };
+
+    const handleAssignWaiter = async (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        if (!restaurantId || !assignServerModalTable || !selectedWaiterIdToAssign) return;
+
+        const waiterUser = staffList.find((s) => String(s.id) === String(selectedWaiterIdToAssign));
+        const waiterName = waiterUser ? (waiterUser.name || waiterUser.userName || "Server") : "Server";
+        const prevTables = [...tables];
+
+        try {
+            setSubmittingAssignServer(true);
+
+            // Optimistic update in tables list
+            setTables((prev) =>
+                prev.map((t) => {
+                    if (t.id === assignServerModalTable.id) {
+                        return {
+                            ...t,
+                            assignedWaiterId: Number(selectedWaiterIdToAssign),
+                            assignedWaiterName: waiterName,
+                        };
+                    }
+                    return t;
+                })
+            );
+
+            await axios.post(`${API}/owner/${restaurantId}/tables/${assignServerModalTable.id}/assign-waiter`, {
+                waiterId: Number(selectedWaiterIdToAssign),
+                reason: "Assigned via Owner Tables page",
+            });
+
+            showToast({
+                title: "Server Assigned",
+                message: `${waiterName} assigned to Table ${assignServerModalTable.tableNo}.`,
+                variant: "success",
+            });
+            setAssignServerModalTable(null);
+            setSelectedWaiterIdToAssign("");
+            await loadTables();
+        } catch (err) {
+            console.error("Failed to assign server:", err);
+            setTables(prevTables);
+            showToast({
+                title: "Assignment Failed",
+                message: err?.response?.data?.message || err.message || "Failed to assign server",
+                variant: "error",
+            });
+            await loadTables();
+        } finally {
+            setSubmittingAssignServer(false);
+        }
+    };
+
+    const handleUnassignWaiter = async (tableToUnassign) => {
+        if (!restaurantId || !tableToUnassign) return;
+        const prevTables = [...tables];
+
+        try {
+            // Optimistic update
+            setTables((prev) =>
+                prev.map((t) => {
+                    if (t.id === tableToUnassign.id) {
+                        return {
+                            ...t,
+                            assignedWaiterId: null,
+                            assignedWaiterName: null,
+                        };
+                    }
+                    return t;
+                })
+            );
+
+            await axios.post(`${API}/owner/${restaurantId}/tables/${tableToUnassign.id}/unassign-waiter`, {
+                reason: "Unassigned via Owner Tables page",
+            });
+
+            showToast({
+                title: "Server Removed",
+                message: `Server unassigned from Table ${tableToUnassign.tableNo}.`,
+                variant: "success",
+            });
+            if (assignServerModalTable?.id === tableToUnassign.id) {
+                setAssignServerModalTable(null);
+            }
+            await loadTables();
+        } catch (err) {
+            console.error("Failed to unassign server:", err);
+            setTables(prevTables);
+            showToast({
+                title: "Unassignment Failed",
+                message: err?.response?.data?.message || err.message || "Failed to remove server",
+                variant: "error",
+            });
+            await loadTables();
+        }
+    };
+
     const handleSeatReservation = async (reservationId) => {
         if (!reservationId || !restaurantId) return;
         try {
@@ -416,6 +529,7 @@ export default function OwnerTables() {
         loadTables();
         loadActiveSessions();
         loadReservations();
+        loadStaff();
     }, [restaurantId]);
 
     // Live 30-sec timer tick for table occupancy duration
@@ -426,7 +540,7 @@ export default function OwnerTables() {
 
     // Socket.IO Real-time Sync
     useEffect(() => {
-        if (!socket) return undefined;
+        if (!socket || typeof socket.on !== "function") return undefined;
 
         const onSessionUpdated = (session) => {
             if (!session || !session.tableId) return;
@@ -449,18 +563,22 @@ export default function OwnerTables() {
 
         socket.on("table:session_updated", onSessionUpdated);
         socket.on("table:updated", handleReservationChange);
+        socket.on("table:waiter_assigned", handleReservationChange);
         socket.on("table:layout_updated", loadTables);
         socket.on("order:created", loadActiveSessions);
         socket.on("order:updated", loadActiveSessions);
         socket.on("reservation:updated", handleReservationChange);
 
         return () => {
-            socket.off("table:session_updated", onSessionUpdated);
-            socket.off("table:updated", handleReservationChange);
-            socket.off("table:layout_updated", loadTables);
-            socket.off("order:created", loadActiveSessions);
-            socket.off("order:updated", loadActiveSessions);
-            socket.off("reservation:updated", handleReservationChange);
+            if (typeof socket.off === "function") {
+                socket.off("table:session_updated", onSessionUpdated);
+                socket.off("table:updated", handleReservationChange);
+                socket.off("table:waiter_assigned", handleReservationChange);
+                socket.off("table:layout_updated", loadTables);
+                socket.off("order:created", loadActiveSessions);
+                socket.off("order:updated", loadActiveSessions);
+                socket.off("reservation:updated", handleReservationChange);
+            }
         };
     }, [socket]);
 
@@ -1458,6 +1576,13 @@ export default function OwnerTables() {
                                             </span>
                                         </div>
 
+                                        {(table.assignedWaiterName || session?.waiterName) && (
+                                            <div className="text-[9px] text-orange-400 font-semibold truncate flex items-center gap-0.5 my-0.5" title={`Assigned: ${table.assignedWaiterName || session?.waiterName}`}>
+                                                <span>👤</span>
+                                                <span className="truncate">{table.assignedWaiterName || session?.waiterName}</span>
+                                            </div>
+                                        )}
+
                                         {session ? (
                                             <div className="text-center my-0.5">
                                                 <p className="text-sm font-black text-emerald-400 tabular-nums">{formatMoney(session.total)}</p>
@@ -1604,6 +1729,38 @@ export default function OwnerTables() {
                                                                 </option>
                                                             ))}
                                                         </select>
+
+                                                        {/* Server Assignment Badge / + Server Button */}
+                                                        <div className="mt-1.5 flex items-center gap-1">
+                                                            {(table.assignedWaiterName || session?.waiterName) ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setAssignServerModalTable(table);
+                                                                        setSelectedWaiterIdToAssign(String(table.assignedWaiterId || session?.waiterId || ""));
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 text-[10px] font-medium text-orange-400 hover:bg-orange-500/20 transition max-w-[140px] truncate"
+                                                                    title={`Assigned Server: ${table.assignedWaiterName || session?.waiterName}. Click to change or remove.`}
+                                                                >
+                                                                    <span className="shrink-0">👤</span>
+                                                                    <span className="truncate">{table.assignedWaiterName || session?.waiterName}</span>
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setAssignServerModalTable(table);
+                                                                        setSelectedWaiterIdToAssign("");
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 rounded-full border border-dashed border-[color:var(--app-border)]/60 bg-black/5 dark:bg-white/5 px-2 py-0.5 text-[10px] font-medium theme-muted hover:text-orange-400 hover:border-orange-500/50 transition"
+                                                                    title={`Assign server to Table ${table.tableNo}`}
+                                                                >
+                                                                    <span>+ Server</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
 
                                                     <div className="flex items-center gap-1.5">
@@ -1666,6 +1823,17 @@ export default function OwnerTables() {
                                                                             <div className="my-1 border-t border-white/10" />
                                                                         </>
                                                                     )}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setAssignServerModalTable(table);
+                                                                            setSelectedWaiterIdToAssign(String(table.assignedWaiterId || session?.waiterId || ""));
+                                                                            setOpenMenuId(null);
+                                                                        }}
+                                                                        className={actionMenuItemClass}
+                                                                    >
+                                                                        {table.assignedWaiterId || session?.waiterId ? "Change / Remove Server" : "Assign Server"}
+                                                                    </button>
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => { startEdit(table); setOpenMenuId(null); }}
@@ -2091,6 +2259,80 @@ export default function OwnerTables() {
                     </div>
                 );
             })()}
+
+            {/* ASSIGN SERVER MODAL */}
+            {assignServerModalTable && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                    <form onSubmit={handleAssignWaiter} className="w-full max-w-md rounded-2xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)] text-[color:var(--app-text)] p-6 shadow-2xl space-y-4">
+                        <div className="flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-3">
+                            <h4 className="text-xl font-bold flex items-center gap-2">
+                                <span>👤</span>
+                                <span>Assign Server to Table {assignServerModalTable.tableNo}</span>
+                            </h4>
+                            <button
+                                type="button"
+                                onClick={() => setAssignServerModalTable(null)}
+                                className="theme-muted hover:text-[color:var(--app-text)]"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <p className="text-xs theme-muted">
+                            Select an active waiter or staff member to assign to Table <strong className="text-orange-500">{assignServerModalTable.tableNo}</strong>.
+                        </p>
+
+                        <div>
+                            <label className="block text-xs font-semibold theme-muted mb-1">Select Server / Waiter</label>
+                            <select
+                                value={selectedWaiterIdToAssign}
+                                onChange={(e) => setSelectedWaiterIdToAssign(e.target.value)}
+                                className="w-full rounded-xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)] px-4 py-2.5 text-sm text-[color:var(--app-text)] outline-none focus:border-orange-500"
+                            >
+                                <option value="">-- Choose a Server --</option>
+                                {staffList.map((staff) => (
+                                    <option key={staff.id} value={staff.id}>
+                                        {staff.name || staff.userName || `Staff #${staff.id}`} ({staff.role || "Staff"}{staff.designation ? ` - ${staff.designation}` : ""})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {(assignServerModalTable.assignedWaiterId || assignServerModalTable.assignedWaiterName) && (
+                            <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-3 text-xs flex items-center justify-between">
+                                <div>
+                                    <span className="text-gray-400">Currently Assigned: </span>
+                                    <strong className="text-orange-400 font-bold">{assignServerModalTable.assignedWaiterName || `Staff #${assignServerModalTable.assignedWaiterId}`}</strong>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => handleUnassignWaiter(assignServerModalTable)}
+                                    className="rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-xs font-bold text-red-400 hover:bg-red-500/20"
+                                >
+                                    Unassign
+                                </button>
+                            </div>
+                        )}
+
+                        <div className="flex gap-2 justify-end pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setAssignServerModalTable(null)}
+                                className="rounded-xl border border-[color:var(--app-border)]/40 px-4 py-2.5 text-sm theme-muted hover:bg-black/5 dark:hover:bg-white/5"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={!selectedWaiterIdToAssign || submittingAssignServer}
+                                className="rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-bold text-black hover:bg-orange-400 disabled:opacity-50"
+                            >
+                                {submittingAssignServer ? "Saving..." : "Save Assignment"}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
 
             {/* SPLIT BILLING & MULTI-PAYMENT MODAL */}
             {splitBillingSession && (

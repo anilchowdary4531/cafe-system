@@ -406,9 +406,41 @@ export default function App() {
                             </ProtectedRoute>
                         }
                     />
+                    <Route
+                        path="/waiter/profile"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CASHIER"]}>
+                                <Server />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/waiter/notifications"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CASHIER"]}>
+                                <Server />
+                            </ProtectedRoute>
+                        }
+                    />
 
                     <Route
                         path="/server"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CASHIER"]}>
+                                <Server />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/server/profile"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CASHIER"]}>
+                                <Server />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/server/notifications"
                         element={
                             <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CASHIER"]}>
                                 <Server />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
     AlertTriangle,
     Bell,
@@ -43,6 +43,8 @@ import MealShiftConfigModal from "../components/MealShiftConfigModal";
 import ReservationModal from "../components/ReservationModal";
 import OwnerMenuButton from "../components/OwnerMenuButton";
 import BrandLogo from "../components/BrandLogo";
+import ServerProfileView from "../components/ServerProfileView";
+import ServerNotificationsView from "../components/ServerNotificationsView";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
 
@@ -52,13 +54,30 @@ const formatMoney = (value) => {
     return `₹${amount.toFixed(2)}`;
 };
 
+export const normalizeTableKey = (val) => {
+    if (!val) return "";
+    return String(val)
+        .trim()
+        .toLowerCase()
+        .replace(/^table\s*[-_]?/i, "")
+        .replace(/^t\s*[-_]?/i, "");
+};
+
 export default function Server() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const { user, logout } = useAuth();
     const { socket } = useStaffSocket();
 
-    const restaurantId = Number(user?.restaurantId || localStorage.getItem("restaurantId") || 1);
+    const restaurantId = Number(
+        user?.restaurantId ||
+        user?.restaurant?.id ||
+        user?.restaurant_id ||
+        localStorage.getItem("restaurantId") ||
+        localStorage.getItem("selectedRestaurantId") ||
+        1
+    );
     const restaurantName = String(user?.restaurant?.name || "Tiffzy Restaurant").trim();
 
     // Time ticker for local clock
@@ -68,8 +87,52 @@ export default function Server() {
         return () => clearInterval(timer);
     }, []);
 
-    // Active View Mode: "FLOOR_PLAN" | "ORDERING"
-    const [viewMode, setViewMode] = useState("FLOOR_PLAN");
+    // Active View Mode: "FLOOR_PLAN" | "ORDERING" | "PROFILE" | "NOTIFICATIONS"
+    const getInitialViewMode = () => {
+        if (location.pathname.endsWith("/profile")) return "PROFILE";
+        if (location.pathname.endsWith("/notifications")) return "NOTIFICATIONS";
+        return "FLOOR_PLAN";
+    };
+    const [viewMode, setViewMode] = useState(getInitialViewMode);
+
+    useEffect(() => {
+        if (location.pathname.endsWith("/profile")) {
+            setViewMode("PROFILE");
+        } else if (location.pathname.endsWith("/notifications")) {
+            setViewMode("NOTIFICATIONS");
+        } else if (viewMode !== "ORDERING") {
+            setViewMode("FLOOR_PLAN");
+        }
+    }, [location.pathname]);
+
+    // Unread Notifications Badge
+    const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+    const fetchUnreadCount = useCallback(async () => {
+        try {
+            const res = await api.get("/notifications/unread-count");
+            if (res.data?.success) {
+                setUnreadNotificationCount(res.data.count || 0);
+            }
+        } catch {
+            // fallback silently
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchUnreadCount();
+    }, [fetchUnreadCount]);
+
+    useEffect(() => {
+        if (!socket) return;
+        const handleNewNotif = () => {
+            fetchUnreadCount();
+        };
+        socket.on("notification:new", handleNewNotif);
+        return () => {
+            socket.off("notification:new", handleNewNotif);
+        };
+    }, [socket, fetchUnreadCount]);
 
     // Meal Shift Selection: "BREAKFAST" | "LUNCH" | "DINNER"
     const [activeShift, setActiveShift] = useState("LUNCH");
@@ -137,6 +200,15 @@ export default function Server() {
         }
     );
 
+    const { data: readyKotsData, refresh: refreshReadyKots } = useCachedGet(
+        restaurantId ? `/owner/${restaurantId}/kots?scope=live` : null,
+        {
+            enabled: Boolean(restaurantId),
+            ttlMs: 4_000,
+            scope: `server-ready-kots:${restaurantId}`,
+        }
+    );
+
     const tables = useMemo(() => {
         if (!tablesData) return [];
         return Array.isArray(tablesData.tables) ? tablesData.tables : Array.isArray(tablesData) ? tablesData : [];
@@ -151,6 +223,88 @@ export default function Server() {
         if (!reservationsData) return [];
         return Array.isArray(reservationsData.reservations) ? reservationsData.reservations : [];
     }, [reservationsData]);
+
+    // Unified List of Ready Items to Distribute (from KOTs and Orders)
+    const readyItemsToDistribute = useMemo(() => {
+        const list = [];
+        const seenOrderIds = new Set();
+
+        // 1. Collect from Ready KOTs or KOTs with ready items
+        const rawKots = Array.isArray(readyKotsData?.kots) ? readyKotsData.kots : Array.isArray(readyKotsData) ? readyKotsData : [];
+        rawKots.forEach((kot) => {
+            const kotStatus = String(kot.status || "").toUpperCase();
+            const rawItems = Array.isArray(kot.items) ? kot.items : [];
+            const isKotReady = kotStatus === "READY";
+            const readyItemsInKot = rawItems.filter((it) => String(it.status || "").toUpperCase() === "READY");
+
+            if (isKotReady || readyItemsInKot.length > 0) {
+                if (kot.orderId) seenOrderIds.add(Number(kot.orderId));
+                const itemsToShow = isKotReady ? rawItems : readyItemsInKot;
+                list.push({
+                    key: `kot-${kot.id}`,
+                    id: kot.id,
+                    type: "KOT",
+                    kotNo: kot.kotNo,
+                    orderId: kot.orderId,
+                    tableNo: String(kot.tableNo || kot.order?.tableNo || "N/A").trim(),
+                    waiterName: kot.waiterName || kot.order?.customerName || null,
+                    stationName: kot.stationName || "Kitchen",
+                    readyAt: kot.updatedAt || kot.createdAt,
+                    isPartial: !isKotReady && readyItemsInKot.length > 0,
+                    itemsList: itemsToShow.map((it) => ({
+                        name: it.itemName,
+                        qty: it.qty,
+                        notes: it.notes,
+                        status: it.status,
+                    })),
+                });
+            }
+        });
+
+        // 2. Collect from Ready Orders (if not already captured as a ready KOT)
+        const rawOrders = Array.isArray(liveOrdersData?.orders) ? liveOrdersData.orders : Array.isArray(liveOrdersData) ? liveOrdersData : [];
+        rawOrders.forEach((order) => {
+            if (String(order.status || "").toUpperCase() === "READY" && !seenOrderIds.has(Number(order.id))) {
+                list.push({
+                    key: `order-${order.id}`,
+                    id: order.id,
+                    type: "ORDER",
+                    orderNo: order.orderNo,
+                    orderId: order.id,
+                    tableNo: String(order.tableNo || "N/A").trim(),
+                    waiterName: order.assignedWaiterName || order.waiterName || order.customerName || null,
+                    stationName: "Kitchen",
+                    readyAt: order.updatedAt || order.createdAt,
+                    isPartial: false,
+                    itemsList: Array.isArray(order.items)
+                        ? order.items.map((it) => ({
+                              name: it.itemName,
+                              qty: it.qty,
+                              notes: it.notes,
+                          }))
+                        : [],
+                });
+            }
+        });
+
+        return list;
+    }, [readyKotsData, liveOrdersData]);
+
+    // Map table number (and normalized key) to count of ready items waiting for pickup
+    const readyItemsByTable = useMemo(() => {
+        const map = new Map();
+        readyItemsToDistribute.forEach((item) => {
+            const raw = String(item.tableNo || "").trim();
+            if (!raw || raw === "N/A") return;
+            const norm = normalizeTableKey(raw);
+            map.set(raw, (map.get(raw) || 0) + 1);
+            map.set(raw.toLowerCase(), (map.get(raw.toLowerCase()) || 0) + 1);
+            if (norm) {
+                map.set(norm, (map.get(norm) || 0) + 1);
+            }
+        });
+        return map;
+    }, [readyItemsToDistribute]);
 
     const readyOrders = useMemo(() => {
         if (!liveOrdersData) return [];
@@ -172,9 +326,10 @@ export default function Server() {
     useEffect(() => {
         if (!socket) return;
         const handleRealtimeUpdate = (data) => {
-            refreshTables();
-            refreshReservations();
-            refreshLiveOrders();
+            refreshTables({ force: true });
+            refreshReservations({ force: true });
+            refreshLiveOrders({ force: true });
+            refreshReadyKots({ force: true });
 
             const status = String(data?.status || data?.kot?.status || "").toUpperCase();
             if (status === "READY") {
@@ -182,37 +337,107 @@ export default function Server() {
                 const tableNum = data?.tableNo || data?.kot?.tableNo || data?.order?.tableNo;
                 const orderNum = data?.orderNo || data?.kot?.kotNo || data?.order?.orderNo;
                 showToast({
-                    title: "🔔 Order Ready to Serve!",
-                    message: `${tableNum ? `Table ${tableNum} ` : ""}${orderNum ? `Order #${orderNum}` : "Food"} is READY!`,
+                    title: "🔔 Food Ready to Distribute!",
+                    message: `${tableNum ? `Table ${tableNum}: ` : ""}${orderNum ? `Ticket #${orderNum}` : "Items"} ready at kitchen pass!`,
                     variant: "success",
                 });
             }
         };
 
         socket.on("table:updated", handleRealtimeUpdate);
+        socket.on("table:waiter_assigned", handleRealtimeUpdate);
         socket.on("table:session_updated", handleRealtimeUpdate);
         socket.on("reservation:updated", handleRealtimeUpdate);
         socket.on("waitlist:updated", handleRealtimeUpdate);
         socket.on("kot:status_updated", handleRealtimeUpdate);
+        socket.on("kot:item_updated", handleRealtimeUpdate);
         socket.on("order:updated", handleRealtimeUpdate);
         socket.on("order_created", handleRealtimeUpdate);
         socket.on("new_order", handleRealtimeUpdate);
 
         return () => {
             socket.off("table:updated", handleRealtimeUpdate);
+            socket.off("table:waiter_assigned", handleRealtimeUpdate);
             socket.off("table:session_updated", handleRealtimeUpdate);
             socket.off("reservation:updated", handleRealtimeUpdate);
             socket.off("waitlist:updated", handleRealtimeUpdate);
             socket.off("kot:status_updated", handleRealtimeUpdate);
+            socket.off("kot:item_updated", handleRealtimeUpdate);
             socket.off("order:updated", handleRealtimeUpdate);
             socket.off("order_created", handleRealtimeUpdate);
             socket.off("new_order", handleRealtimeUpdate);
         };
-    }, [socket, refreshTables, refreshReservations, refreshLiveOrders]);
+    }, [socket, refreshTables, refreshReservations, refreshLiveOrders, refreshReadyKots]);
+
+    // Auto-select table if query param ?table=X is provided
+    const urlTableParam = searchParams.get("table");
+    useEffect(() => {
+        if (!urlTableParam || tables.length === 0) return;
+        const normParam = normalizeTableKey(urlTableParam);
+        const matched = tables.find((t) => {
+            const tNo = String(t.tableNo || "").trim();
+            const normTNo = normalizeTableKey(tNo);
+            return (
+                tNo === String(urlTableParam).trim() ||
+                String(t.id).trim() === String(urlTableParam).trim() ||
+                (normParam && normTNo === normParam)
+            );
+        });
+        if (matched) {
+            setSelectedTable(matched);
+            setViewMode("ORDERING");
+        }
+    }, [urlTableParam, tables]);
+
+    // Keep selectedTable in sync with refreshed tables data
+    useEffect(() => {
+        if (!selectedTable) return;
+        const fresh = tables.find(
+            (t) => t.id === selectedTable.id || String(t.tableNo).trim() === String(selectedTable.tableNo).trim()
+        );
+        if (
+            fresh &&
+            (fresh.assignedWaiterId !== selectedTable.assignedWaiterId ||
+                fresh.assignedWaiterName !== selectedTable.assignedWaiterName ||
+                fresh.isOccupied !== selectedTable.isOccupied ||
+                fresh.activeSession?.waiterName !== selectedTable.activeSession?.waiterName)
+        ) {
+            setSelectedTable(fresh);
+        }
+    }, [tables, selectedTable]);
+
+    const handleMarkItemServed = async (item) => {
+        try {
+            if (item.type === "KOT") {
+                await api.put(`/owner/${restaurantId}/kots/${item.id}/status`, {
+                    status: "SERVED",
+                });
+            } else {
+                await api.put(`/owner/${restaurantId}/orders/${item.id}/status`, {
+                    status: "DELIVERED",
+                    changedByName: user?.name || "Server",
+                });
+            }
+            showToast({
+                title: "Delivered 🍽️",
+                message: `${item.tableNo ? `Table ${item.tableNo}: ` : ""}${item.kotNo ? `Ticket #${item.kotNo}` : `Order #${item.orderNo || ""}`} marked served!`,
+                variant: "success",
+            });
+            refreshReadyKots();
+            refreshLiveOrders();
+            refreshTables();
+        } catch (err) {
+            showToast({
+                title: "Error",
+                message: err?.response?.data?.message || err?.message || "Failed to mark item served",
+                variant: "error",
+            });
+        }
+    };
 
     const handleMarkServed = async (orderId, tableNo) => {
         try {
-            await axios.put(`${API}/owner/${restaurantId}/orders/${orderId}/status`, {
+            await api.put(`/owner/${restaurantId}/orders/${orderId}/status`, {
                 status: "DELIVERED",
                 changedByName: user?.name || "Server",
             });
@@ -222,6 +447,7 @@ export default function Server() {
                 variant: "success",
             });
             refreshLiveOrders();
+            refreshReadyKots();
             refreshTables();
         } catch (err) {
             showToast({
@@ -280,6 +506,7 @@ export default function Server() {
         }
         setSelectedTable(table);
         setViewMode("ORDERING");
+        setSearchParams({ table: table.tableNo }, { replace: true });
     };
 
     const handleAddToCart = (item) => {
@@ -319,9 +546,14 @@ export default function Server() {
 
         try {
             setPlacingOrder(true);
+            const assignedId = selectedTable.assignedWaiterId || selectedTable.activeSession?.waiterId || (user?.role === "WAITER" || user?.role === "SERVER" ? user?.id : null);
+            const assignedName = selectedTable.assignedWaiterName || selectedTable.activeSession?.waiterName || (user?.role === "WAITER" || user?.role === "SERVER" ? user?.name : null);
+
             const payload = {
                 tableNo: selectedTable.tableNo,
                 tableId: selectedTable.id,
+                waiterId: assignedId || null,
+                waiterName: assignedName || null,
                 items: itemsList.map((i) => ({
                     menuItemId: i.id,
                     qty: i.qty,
@@ -341,6 +573,7 @@ export default function Server() {
                 setCart({});
                 setViewMode("FLOOR_PLAN");
                 setSelectedTable(null);
+                setSearchParams({}, { replace: true });
                 refreshTables();
             }
         } catch (err) {
@@ -451,6 +684,36 @@ export default function Server() {
 
                 {/* Action Buttons */}
                 <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                    {/* Ready to Distribute Trigger Button */}
+                    <button
+                        onClick={() => {
+                            const el = document.getElementById("ready-distribution-section");
+                            if (el) {
+                                el.scrollIntoView({ behavior: "smooth" });
+                            } else {
+                                showToast({
+                                    title: "Kitchen Pass",
+                                    message: readyItemsToDistribute.length > 0 ? `${readyItemsToDistribute.length} item(s) ready to distribute` : "No items waiting at the pass right now.",
+                                    variant: "info",
+                                });
+                            }
+                        }}
+                        className={`relative flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-extrabold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                            readyItemsToDistribute.length > 0
+                                ? "border-emerald-500 bg-emerald-500 text-white shadow-emerald-500/25 animate-pulse"
+                                : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
+                        }`}
+                        title="Kitchen Pass / Ready to Distribute"
+                    >
+                        <Bell className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${readyItemsToDistribute.length > 0 ? "animate-bounce" : ""}`} />
+                        <span>Ready to Distribute</span>
+                        <span className={`rounded-full px-1.5 py-0.2 text-[9px] sm:text-[10px] font-black ${
+                            readyItemsToDistribute.length > 0 ? "bg-white text-emerald-700" : "bg-black/10 dark:bg-white/10"
+                        }`}>
+                            {readyItemsToDistribute.length}
+                        </span>
+                    </button>
+
                     {/* Waitlist Drawer Trigger */}
                     <button
                         onClick={() => setIsWaitlistOpen(true)}
@@ -477,10 +740,66 @@ export default function Server() {
                         <span><span className="hidden min-[400px]:inline">New </span>Reservation</span>
                     </button>
 
+                    {/* Notifications Button */}
+                    <button
+                        onClick={() => {
+                            if (viewMode === "NOTIFICATIONS") {
+                                setViewMode("FLOOR_PLAN");
+                                navigate("/server");
+                            } else {
+                                setViewMode("NOTIFICATIONS");
+                                navigate("/server/notifications");
+                            }
+                        }}
+                        className={`relative flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                            viewMode === "NOTIFICATIONS"
+                                ? "border-orange-500 bg-orange-500 text-white"
+                                : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
+                        }`}
+                        title="Server Notifications"
+                    >
+                        <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="hidden min-[500px]:inline">Notifications</span>
+                        {unreadNotificationCount > 0 && (
+                            <span className="rounded-full bg-rose-500 text-white px-1.5 py-0.2 text-[9px] sm:text-[10px] font-black animate-pulse">
+                                {unreadNotificationCount}
+                            </span>
+                        )}
+                    </button>
+
+                    {/* Profile Button */}
+                    <button
+                        onClick={() => {
+                            if (viewMode === "PROFILE") {
+                                setViewMode("FLOOR_PLAN");
+                                navigate("/server");
+                            } else {
+                                setViewMode("PROFILE");
+                                navigate("/server/profile");
+                            }
+                        }}
+                        className={`flex items-center gap-1.5 rounded-xl border px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                            viewMode === "PROFILE"
+                                ? "border-orange-500 bg-orange-500 text-white"
+                                : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
+                        }`}
+                        title="My Profile"
+                    >
+                        <div className={`h-5 w-5 rounded-full flex items-center justify-center font-black text-[10px] ${
+                            viewMode === "PROFILE" ? "bg-white text-orange-600" : "bg-orange-500 text-white"
+                        }`}>
+                            {(user?.name || user?.username || "S").charAt(0).toUpperCase()}
+                        </div>
+                        <span className="hidden sm:inline font-bold">{user?.name?.split(" ")[0] || "Profile"}</span>
+                    </button>
+
                     {/* View Mode Toggle */}
                     <div className="flex items-center bg-black/5 dark:bg-white/5 p-1 rounded-xl border border-[color:var(--app-border)]/40">
                         <button
-                            onClick={() => setViewMode("FLOOR_PLAN")}
+                            onClick={() => {
+                                setViewMode("FLOOR_PLAN");
+                                navigate("/server");
+                            }}
                             className={`p-1.5 rounded-lg text-xs font-bold transition ${
                                 viewMode === "FLOOR_PLAN" ? "bg-orange-500 text-white" : "theme-muted"
                             }`}
@@ -493,48 +812,112 @@ export default function Server() {
             </header>
 
             {/* Main Content Body */}
-            {viewMode === "FLOOR_PLAN" ? (
+            {viewMode === "PROFILE" ? (
+                <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full">
+                    <ServerProfileView
+                        onBackToFloorPlan={() => {
+                            setViewMode("FLOOR_PLAN");
+                            navigate("/server");
+                        }}
+                    />
+                </div>
+            ) : viewMode === "NOTIFICATIONS" ? (
+                <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full">
+                    <ServerNotificationsView
+                        onUnreadCountChange={(count) => setUnreadNotificationCount(count)}
+                        onNavigateToTable={(tableNo) => {
+                            setViewMode("FLOOR_PLAN");
+                            navigate(`/server?table=${encodeURIComponent(tableNo)}`);
+                        }}
+                        onBackToFloorPlan={() => {
+                            setViewMode("FLOOR_PLAN");
+                            navigate("/server");
+                        }}
+                    />
+                </div>
+            ) : viewMode === "FLOOR_PLAN" ? (
                 <div className="flex-1 p-3 sm:p-4 space-y-3 sm:space-y-4 max-w-7xl mx-auto w-full">
-                    {/* Ready to Serve Notification Banner */}
-                    {readyOrders.length > 0 && (
-                        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 sm:p-4 text-xs shadow-xs animate-in fade-in duration-300">
-                            <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20">
-                                <h3 className="font-extrabold text-emerald-700 dark:text-emerald-400 flex items-center gap-2 text-xs sm:text-sm">
-                                    <Bell className="h-4 w-4 text-emerald-500 animate-bounce" />
-                                    <span>Ready to Serve ({readyOrders.length})</span>
-                                </h3>
-                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                                    Kitchen marked orders ready!
-                                </span>
+                    {/* Ready to Distribute Notification Banner & Grid */}
+                    {readyItemsToDistribute.length > 0 && (
+                        <div
+                            id="ready-distribution-section"
+                            className="rounded-2xl border-2 border-emerald-500/40 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-teal-500/10 p-3.5 sm:p-4 text-xs shadow-md animate-in fade-in duration-300"
+                        >
+                            <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-emerald-500/20">
+                                <div className="flex items-center gap-2">
+                                    <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm">
+                                        <Bell className="h-4 w-4 animate-bounce" />
+                                    </span>
+                                    <div>
+                                        <h3 className="font-black text-emerald-800 dark:text-emerald-300 text-sm sm:text-base flex items-center gap-2">
+                                            <span>Ready for Distribution at Kitchen Pass</span>
+                                            <span className="rounded-full bg-emerald-500 text-white px-2 py-0.5 text-[10px] font-extrabold">
+                                                {readyItemsToDistribute.length} Ticket(s)
+                                            </span>
+                                        </h3>
+                                        <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400 font-medium">
+                                            Food & drinks ready to pick up and serve to guest tables
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-1 rounded-lg">
+                                        🔴 Live Pass
+                                    </span>
+                                </div>
                             </div>
-                            <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
-                                {readyOrders.map((order) => (
+
+                            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                                {readyItemsToDistribute.map((item) => (
                                     <div
-                                        key={order.id}
-                                        className="rounded-xl border border-emerald-500/20 bg-white dark:bg-slate-900 p-2.5 flex items-center justify-between gap-2 shadow-xs min-w-0"
+                                        key={item.key}
+                                        className="group relative flex flex-col justify-between rounded-xl border border-emerald-500/30 bg-white dark:bg-slate-900 p-3 shadow-xs hover:shadow-md hover:border-emerald-500 transition-all duration-200"
                                     >
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                <span className="font-black text-slate-900 dark:text-white text-xs">
-                                                    Table {order.tableNo || "N/A"}
-                                                </span>
-                                                <span className="text-[10px] font-mono text-emerald-600 font-bold bg-emerald-100 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">
-                                                    #{order.orderNo}
+                                        <div>
+                                            <div className="flex items-start justify-between gap-2 pb-1.5 border-b border-gray-100 dark:border-slate-800">
+                                                <div>
+                                                    <span className="inline-block text-xs font-black px-2 py-0.5 rounded-lg bg-orange-500 text-white shadow-xs">
+                                                        Table {item.tableNo}
+                                                    </span>
+                                                    <span className="text-[10px] font-mono text-emerald-600 font-bold ml-1.5">
+                                                        #{item.kotNo || item.orderNo}
+                                                    </span>
+                                                </div>
+                                                <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                                    {item.stationName}
                                                 </span>
                                             </div>
-                                            <p className="text-[11px] theme-muted truncate mt-0.5">
-                                                {Array.isArray(order.items)
-                                                    ? order.items.map((i) => `${i.qty}x ${i.itemName}`).join(", ")
-                                                    : "Items ready"}
-                                            </p>
+
+                                            <div className="py-2 space-y-1">
+                                                {item.itemsList.map((food, fIdx) => (
+                                                    <div key={fIdx} className="flex items-center justify-between text-xs">
+                                                        <span className="font-extrabold text-[color:var(--app-text)] flex items-center gap-1.5">
+                                                            <span className="text-emerald-600 font-mono font-black">{food.qty}x</span>
+                                                            <span>{food.name}</span>
+                                                        </span>
+                                                        {food.notes && (
+                                                            <span className="text-[9px] text-amber-600 italic">({food.notes})</span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {item.waiterName && (
+                                                <p className="text-[10px] theme-muted pt-1 border-t border-gray-100 dark:border-slate-800 flex items-center gap-1">
+                                                    <span>👤 Assigned:</span> <strong className="text-[color:var(--app-text)]">{item.waiterName}</strong>
+                                                </p>
+                                            )}
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleMarkServed(order.id, order.tableNo)}
-                                            className="px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-[11px] shadow-xs active:scale-95 transition whitespace-nowrap flex items-center gap-1 shrink-0"
-                                        >
-                                            <Check className="h-3 w-3" /> Served
-                                        </button>
+
+                                        <div className="pt-2 mt-2 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleMarkItemServed(item)}
+                                                className="flex-1 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs shadow-xs active:scale-95 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                                            >
+                                                <Check className="h-3.5 w-3.5 stroke-[3]" /> Served / Distributed
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -651,6 +1034,24 @@ export default function Server() {
 
                                         {/* Table Content Details */}
                                         <div className="my-1.5 text-[11px] space-y-1">
+                                            {/* Ready Items Alert for this Table */}
+                                            {(() => {
+                                                const rawNo = String(table.tableNo || "").trim();
+                                                const count = readyItemsByTable.get(rawNo) || readyItemsByTable.get(rawNo.toLowerCase()) || readyItemsByTable.get(normalizeTableKey(rawNo)) || 0;
+                                                if (count <= 0) return null;
+                                                return (
+                                                    <div className="flex items-center justify-between rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-2 py-1 text-[10px] text-emerald-700 dark:text-emerald-300 font-extrabold animate-pulse">
+                                                        <span className="flex items-center gap-1">
+                                                            <Bell className="h-3 w-3 animate-bounce text-emerald-500" />
+                                                            <span>Ready to Distribute!</span>
+                                                        </span>
+                                                        <span className="bg-emerald-500 text-white px-1.5 py-0.2 rounded-full font-black text-[9px]">
+                                                            {count}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })()}
+
                                             {isBlocked ? (
                                                 <p className="text-slate-600 dark:text-slate-400 italic text-[10px] truncate">
                                                     Reason: {table.blockReason || "Maintenance"}
@@ -660,8 +1061,12 @@ export default function Server() {
                                                     <p className="font-bold text-sky-600 dark:text-sky-400">
                                                         {table.activeOrderCount || 1} Active Order(s)
                                                     </p>
-                                                    {table.assignedWaiterName && (
-                                                        <p className="text-[10px] theme-muted truncate">Waiter: {table.assignedWaiterName}</p>
+                                                    {(table.assignedWaiterName || table.activeSession?.waiterName) ? (
+                                                        <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 truncate flex items-center gap-1">
+                                                            <span>👤</span> Server: <span className="font-bold">{table.assignedWaiterName || table.activeSession?.waiterName}</span>
+                                                        </p>
+                                                    ) : (
+                                                        <p className="text-[10px] theme-muted italic">No server assigned</p>
                                                     )}
                                                 </div>
                                             ) : isReserved ? (
@@ -672,9 +1077,23 @@ export default function Server() {
                                                     <p className="text-[10px] theme-muted font-mono">
                                                         ⏰ {table.activeReservation?.startTime} – {table.activeReservation?.endTime}
                                                     </p>
+                                                    {(table.assignedWaiterName || table.activeSession?.waiterName) && (
+                                                        <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 truncate flex items-center gap-1">
+                                                            <span>👤</span> Server: <span className="font-bold">{table.assignedWaiterName || table.activeSession?.waiterName}</span>
+                                                        </p>
+                                                    )}
                                                 </div>
                                             ) : (
-                                                <p className="text-[10px] theme-muted opacity-75">Click to open table & take order</p>
+                                                <div className="space-y-0.5">
+                                                    <p className="text-[10px] theme-muted opacity-75">Click to open table & take order</p>
+                                                    {(table.assignedWaiterName || table.activeSession?.waiterName) ? (
+                                                        <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 truncate flex items-center gap-1">
+                                                            <span>👤</span> Server: <span className="font-bold">{table.assignedWaiterName || table.activeSession?.waiterName}</span>
+                                                        </p>
+                                                    ) : (
+                                                        <p className="text-[10px] theme-muted italic">Unassigned</p>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
 
@@ -733,6 +1152,19 @@ export default function Server() {
                                     <span>Ordering for Table {selectedTable?.tableNo}</span>
                                     <span className="text-xs theme-muted">({selectedTable?.seats} Seats)</span>
                                 </h2>
+                                <div className="flex items-center gap-2 mt-1">
+                                    {(selectedTable?.assignedWaiterName || selectedTable?.activeSession?.waiterName) ? (
+                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2.5 py-0.5 rounded-full shadow-xs">
+                                            <span>👤 Assigned Server:</span>
+                                            <strong className="font-extrabold">{selectedTable.assignedWaiterName || selectedTable.activeSession?.waiterName}</strong>
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
+                                            <span>No server assigned</span>
+                                        </span>
+                                    )}
+                                    <span className="text-[11px] theme-muted">• Section: {selectedTable?.section || "Main"}</span>
+                                </div>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
                                 <button
@@ -747,13 +1179,60 @@ export default function Server() {
                                     <Trash2 className="h-3 w-3" /> Free Table
                                 </button>
                                 <button
-                                    onClick={() => setViewMode("FLOOR_PLAN")}
+                                    onClick={() => {
+                                        setViewMode("FLOOR_PLAN");
+                                        setSearchParams({}, { replace: true });
+                                    }}
                                     className="rounded-xl border border-[color:var(--app-border)]/40 px-2.5 sm:px-3 py-1 text-xs font-bold theme-muted hover:bg-black/5"
                                 >
                                     ← Floor Plan
                                 </button>
                             </div>
                         </div>
+
+                        {/* Ready Food Alert Banner for Selected Table */}
+                        {(() => {
+                            if (!selectedTable) return null;
+                            const tRaw = String(selectedTable.tableNo || "").trim();
+                            const tNorm = normalizeTableKey(tRaw);
+                            const tableReadyItems = readyItemsToDistribute.filter((it) => {
+                                const itRaw = String(it.tableNo || "").trim();
+                                const itNorm = normalizeTableKey(itRaw);
+                                return itRaw === tRaw || (tNorm && itNorm === tNorm);
+                            });
+                            if (tableReadyItems.length === 0) return null;
+                            return (
+                                <div className="rounded-2xl border-2 border-emerald-500/50 bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-teal-500/15 p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs animate-in fade-in">
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-xs">
+                                            <Bell className="h-4 w-4 animate-bounce" />
+                                        </span>
+                                        <div>
+                                            <h4 className="font-black text-xs sm:text-sm text-emerald-900 dark:text-emerald-100 flex items-center gap-2">
+                                                <span>Food / Drinks Ready at Kitchen Pass for Table {selectedTable.tableNo}!</span>
+                                                <span className="rounded-full bg-emerald-500 text-white px-2 py-0.2 text-[10px] font-black">
+                                                    {tableReadyItems.length} Ticket(s)
+                                                </span>
+                                            </h4>
+                                            <p className="text-[11px] text-emerald-800 dark:text-emerald-300 font-semibold mt-0.5">
+                                                {tableReadyItems
+                                                    .map((it) =>
+                                                        it.itemsList.map((f) => `${f.qty}x ${f.name}`).join(", ")
+                                                    )
+                                                    .join(" • ")}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleMarkItemServed(tableReadyItems[0])}
+                                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 transition"
+                                    >
+                                        <Check className="h-3.5 w-3.5 stroke-[3]" /> Served / Distributed
+                                    </button>
+                                </div>
+                            );
+                        })()}
 
                         {/* Menu Categories */}
                         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1">
@@ -798,10 +1277,17 @@ export default function Server() {
                     {/* Cart & KOT Summary Column */}
                     <div id="kot-cart-section" className="rounded-2xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 p-3.5 sm:p-4 space-y-4 shadow-xs flex flex-col justify-between">
                         <div className="space-y-3">
-                            <h3 className="font-bold text-sm border-b border-[color:var(--app-border)]/40 pb-2 flex justify-between items-center">
-                                <span>Table {selectedTable?.tableNo} Cart</span>
-                                <span className="text-xs font-mono font-bold text-orange-500">{Object.keys(cart).length} Items</span>
-                            </h3>
+                            <div className="border-b border-[color:var(--app-border)]/40 pb-2">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="font-bold text-sm">Table {selectedTable?.tableNo} Cart</h3>
+                                    <span className="text-xs font-mono font-bold text-orange-500">{Object.keys(cart).length} Items</span>
+                                </div>
+                                {(selectedTable?.assignedWaiterName || selectedTable?.activeSession?.waiterName) && (
+                                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 flex items-center gap-1">
+                                        <span>👤</span> Assigned Server: <strong>{selectedTable.assignedWaiterName || selectedTable.activeSession?.waiterName}</strong>
+                                    </p>
+                                )}
+                            </div>
 
                             <div className="space-y-2 max-h-[40vh] sm:max-h-[50vh] overflow-y-auto">
                                 {Object.values(cart).length === 0 ? (

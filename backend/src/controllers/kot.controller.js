@@ -91,13 +91,11 @@ export const getKots = async (req, res) => {
       }
       where.createdAt = { gte: start, lte: end };
     } else if (scope === "today" || scope === "live") {
-      // Live KOTs (Today + active)
+      // Live KOTs (Today + active unserved KOTs)
       const startToday = getStartOfBusinessDay(new Date(), timezone);
-      const activeCutoff = new Date(Date.now() - 24 * 3600 * 1000);
       where.OR = [
         { createdAt: { gte: startToday } },
         {
-          createdAt: { gte: activeCutoff },
           status: { in: ["PENDING", "PRINTED", "PRINT_FAILED", "PREPARING", "READY"] },
         },
       ];
@@ -221,15 +219,24 @@ export const updateStatus = async (req, res) => {
       nextStatus: status,
       actor,
     });
+    const updatedOrder = updatedKot?.order || null;
 
     // Realtime notification & broadcast
-    if (req.app.get("io")) {
-      const io = req.app.get("io");
+    const io = req.server?.io || req.app?.get?.("io");
+    if (io) {
       io.to(`restaurant_${restaurantId}`).emit("kot:status_updated", updatedKot);
       io.to(`restaurant:${restaurantId}`).emit("kot:status_updated", updatedKot);
+      if (updatedOrder) {
+        io.to(`restaurant_${restaurantId}`).emit("order:updated", updatedOrder);
+        io.to(`restaurant:${restaurantId}`).emit("order:updated", updatedOrder);
+        if (updatedOrder.tableNo) {
+          io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: updatedOrder.tableNo });
+          io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: updatedOrder.tableNo });
+        }
+      }
     }
 
-    return res.send({ ok: true, kot: updatedKot });
+    return res.send({ ok: true, kot: updatedKot, order: updatedOrder });
   } catch (err) {
     console.error("updateKotStatus error:", err);
     return res.status(500).send({ message: err?.message || "Failed to update KOT status" });
@@ -253,7 +260,7 @@ export const updateItemStatus = async (req, res) => {
     const actor = req.user ? { userId: req.user.id, userName: req.user.name || req.user.email } : null;
 
     const { kot, order } = await updateKotItemStatus({
-      prisma: req.prisma,
+      prisma: req.prisma || prisma,
       kotId,
       itemId,
       restaurantId,
@@ -261,8 +268,8 @@ export const updateItemStatus = async (req, res) => {
       actor,
     });
 
-    if (req.app.get("io")) {
-      const io = req.app.get("io");
+    const io = req.server?.io || req.app?.get?.("io");
+    if (io) {
       io.to(`restaurant_${restaurantId}`).emit("kot:item_updated", { kotId, itemId, status, kot });
       io.to(`restaurant:${restaurantId}`).emit("kot:item_updated", { kotId, itemId, status, kot });
       io.to(`restaurant_${restaurantId}`).emit("kot:status_updated", kot);
@@ -270,6 +277,10 @@ export const updateItemStatus = async (req, res) => {
       if (order) {
         io.to(`restaurant_${restaurantId}`).emit("order:updated", order);
         io.to(`restaurant:${restaurantId}`).emit("order:updated", order);
+        if (order.tableNo) {
+          io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
+          io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
+        }
       }
     }
 
@@ -294,17 +305,18 @@ export const updatePriority = async (req, res) => {
     }
 
     const updated = await updateKotPriority({
-      prisma: req.prisma,
+      prisma: req.prisma || prisma,
       kotId,
       restaurantId,
       priority,
     });
 
-    if (req.app.get("io")) {
-      const io = req.app.get("io");
+    const io = req.server?.io || req.app?.get?.("io");
+    if (io) {
       io.to(`restaurant_${restaurantId}`).emit("kot:priority_updated", updated);
       io.to(`restaurant:${restaurantId}`).emit("kot:priority_updated", updated);
       io.to(`restaurant_${restaurantId}`).emit("kot:status_updated", updated);
+      io.to(`restaurant:${restaurantId}`).emit("kot:status_updated", updated);
     }
 
     return res.send({ ok: true, kot: updated });

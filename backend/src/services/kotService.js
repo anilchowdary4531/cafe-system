@@ -76,6 +76,29 @@ export const createKotsForOrder = async ({ prisma, tx = prisma, order, actor, id
     const createdKots = [];
     const priority = order.priority ? String(order.priority).toUpperCase() : "NORMAL";
 
+    let effectiveWaiterId = actor?.userId || null;
+    let effectiveWaiterName = actor?.userName || null;
+
+    if (order.tableSessionId) {
+        const session = await tx.tableSession.findUnique({
+            where: { id: order.tableSessionId },
+            select: { waiterId: true, waiterName: true },
+        });
+        if (session?.waiterId) {
+            effectiveWaiterId = session.waiterId;
+            effectiveWaiterName = session.waiterName || effectiveWaiterName;
+        }
+    } else if (order.tableNo) {
+        const dTable = await tx.diningTable.findFirst({
+            where: { restaurantId, tableNo: String(order.tableNo).trim() },
+            select: { assignedWaiterId: true, assignedWaiterName: true },
+        });
+        if (dTable?.assignedWaiterId) {
+            effectiveWaiterId = dTable.assignedWaiterId;
+            effectiveWaiterName = dTable.assignedWaiterName || effectiveWaiterName;
+        }
+    }
+
     // 4. Create separate KOT for each station group inside transaction
     for (const [stKey, items] of itemsByStation.entries()) {
         const stationObj = typeof stKey === "number" ? stations.find((s) => s.id === stKey) : null;
@@ -106,8 +129,8 @@ export const createKotsForOrder = async ({ prisma, tx = prisma, order, actor, id
                 stationId: stationObj?.id || null,
                 stationName,
                 tableNo: order.tableNo || null,
-                waiterId: actor?.userId || null,
-                waiterName: actor?.userName || order.customerName || "Staff",
+                waiterId: effectiveWaiterId,
+                waiterName: effectiveWaiterName || actor?.userName || order.customerName || "Staff",
                 type: "NEW",
                 status: initialStatus,
                 priority: ["NORMAL", "HIGH", "URGENT"].includes(priority) ? priority : "NORMAL",
@@ -292,7 +315,8 @@ export const updateKotStatus = async ({ prisma, kotId, restaurantId, nextStatus,
     });
 
     // Automatically check parent order status
-    await syncParentOrderStatusFromKots({ prisma, orderId: existing.orderId });
+    const updatedOrder = await syncParentOrderStatusFromKots({ prisma, orderId: existing.orderId });
+    updated.order = updatedOrder;
 
     return updated;
 };

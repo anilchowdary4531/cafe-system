@@ -358,6 +358,8 @@ const normalizeTableRows = (rows) =>
         .map((table, index) => ({
             ...table,
             tableNo: String(table?.tableNo || "").trim(),
+            assignedWaiterId: table?.assignedWaiterId || table?.activeSession?.waiterId || null,
+            assignedWaiterName: table?.assignedWaiterName || table?.activeSession?.waiterName || null,
             isOccupied: Boolean(table?.isOccupied),
             isReserved: Boolean(table?.isReserved || table?.is_reserved || table?.activeReservation || table?.upcomingReservation),
             activeReservation: table?.activeReservation || null,
@@ -826,6 +828,22 @@ export default function OwnerLayout() {
                 if (o?.id) knownOrderIdsRef.add(o.id);
             });
 
+            setTableAssignments((prev) => {
+                const next = { ...(prev || {}) };
+                tables.forEach((t) => {
+                    const wid = t.assignedWaiterId ? String(t.assignedWaiterId) : "";
+                    if (wid) {
+                        next[t.assignmentKey] = wid;
+                        next[t.key] = wid;
+                        if (t.id) next[String(t.id)] = wid;
+                        if (t.id) next[`table-${t.id}`] = wid;
+                        if (t.tableNo) next[String(t.tableNo)] = wid;
+                        if (t.tableNo) next[`table-${String(t.tableNo).trim().toLowerCase()}`] = wid;
+                    }
+                });
+                return next;
+            });
+
             setTableOverview({
                 loading: false,
                 total: tables.length,
@@ -866,6 +884,8 @@ export default function OwnerLayout() {
         socket.on("notification:new", loadTableOverview);
         socket.on("reservation:updated", loadTableOverview);
         socket.on("table:updated", loadTableOverview);
+        socket.on("table:waiter_assigned", loadTableOverview);
+        socket.on("table:layout_updated", loadTableOverview);
 
         return () => {
             socket.off("order:created", handleNewOrder);
@@ -873,6 +893,8 @@ export default function OwnerLayout() {
             socket.off("notification:new", loadTableOverview);
             socket.off("reservation:updated", loadTableOverview);
             socket.off("table:updated", loadTableOverview);
+            socket.off("table:waiter_assigned", loadTableOverview);
+            socket.off("table:layout_updated", loadTableOverview);
         };
     }, [loadTableOverview, socket]);
 
@@ -1037,13 +1059,25 @@ export default function OwnerLayout() {
 
     const assignedTableCountByStaff = useMemo(() => {
         const counts = {};
-        Object.values(tableAssignments).forEach((staffId) => {
-            const key = String(staffId || "");
-            if (!key) return;
-            counts[key] = (counts[key] || 0) + 1;
+        tableOverview.tables.forEach((table) => {
+            const assignmentKey = String(table.assignmentKey || table.key);
+            const staffId = String(
+                table.assignedWaiterId ||
+                table.activeSession?.waiterId ||
+                tableAssignments[assignmentKey] ||
+                tableAssignments[table.key] ||
+                tableAssignments[String(table.id || "")] ||
+                tableAssignments[`table-${table.id}`] ||
+                tableAssignments[String(table.tableNo || "")] ||
+                tableAssignments[`table-${String(table.tableNo || "").trim().toLowerCase()}`] ||
+                ""
+            ).trim();
+            if (staffId) {
+                counts[staffId] = (counts[staffId] || 0) + 1;
+            }
         });
         return counts;
-    }, [tableAssignments]);
+    }, [tableOverview.tables, tableAssignments]);
 
     const handleStaffDragStart = (event, staffId) => {
         const normalizedStaffId = String(staffId || "").trim();
@@ -1083,7 +1117,10 @@ export default function OwnerLayout() {
         setDraggedStaffId("");
     };
 
-    const clearTableAssignment = (tableKey, tableObj) => {
+    const clearTableAssignment = async (tableKey, tableObj) => {
+        const prevAssignments = { ...(tableAssignments || {}) };
+        const prevOverview = { ...tableOverview };
+
         setTableAssignments((prev) => {
             const next = { ...(prev || {}) };
             delete next[tableKey];
@@ -1097,11 +1134,68 @@ export default function OwnerLayout() {
             }
             return next;
         });
+
+        // Optimistically clear on tableOverview
+        setTableOverview((prev) => ({
+            ...prev,
+            tables: (prev.tables || []).map((t) => {
+                const matches = (tableObj?.id && String(t.id) === String(tableObj.id)) ||
+                                (tableObj?.tableNo && String(t.tableNo) === String(tableObj.tableNo)) ||
+                                t.assignmentKey === tableKey ||
+                                t.key === tableKey;
+                if (!matches) return t;
+                return {
+                    ...t,
+                    assignedWaiterId: null,
+                    assignedWaiterName: null,
+                    activeSession: t.activeSession ? {
+                        ...t.activeSession,
+                        waiterId: null,
+                        waiterName: null,
+                    } : null,
+                };
+            }),
+        }));
+
+        const targetTableId = tableObj?.id || (function () {
+            const found = tableOverview.tables.find(
+                (t) =>
+                    t.assignmentKey === tableKey ||
+                    String(t.tableNo) === String(tableKey) ||
+                    t.key === tableKey ||
+                    String(t.id) === String(tableKey)
+            );
+            return found?.id;
+        })();
+
+        if (restaurantId && targetTableId) {
+            try {
+                await axios.post(`${API}/owner/${restaurantId}/tables/${targetTableId}/unassign-waiter`, {
+                    reason: "Unassigned via Owner Panel",
+                });
+            } catch (err) {
+                console.error("Failed to unassign waiter on backend:", err);
+                setTableAssignments(prevAssignments);
+                setTableOverview(prevOverview);
+                showToast({
+                    title: "Unassignment Failed",
+                    message: err?.response?.data?.message || err.message || "Failed to unassign waiter on backend",
+                    variant: "error",
+                });
+                await refreshTableOverview();
+            }
+        }
     };
 
-    const assignStaffToTable = (tableKey, staffId, tableObj) => {
+    const assignStaffToTable = async (tableKey, staffId, tableObj) => {
         const normalizedStaffId = String(staffId || "").trim();
         if (!normalizedStaffId) return;
+
+        const staffMember = staffById.get(normalizedStaffId);
+        const staffName = staffMember ? (staffMember.name || staffMember.userName || "Server") : "Server";
+
+        const prevAssignments = { ...(tableAssignments || {}) };
+        const prevOverview = { ...tableOverview };
 
         setTableAssignments((prev) => {
             const next = { ...(prev || {}) };
@@ -1116,6 +1210,58 @@ export default function OwnerLayout() {
             }
             return next;
         });
+
+        // Optimistically update on tableOverview
+        setTableOverview((prev) => ({
+            ...prev,
+            tables: (prev.tables || []).map((t) => {
+                const matches = (tableObj?.id && String(t.id) === String(tableObj.id)) ||
+                                (tableObj?.tableNo && String(t.tableNo) === String(tableObj.tableNo)) ||
+                                t.assignmentKey === tableKey ||
+                                t.key === tableKey;
+                if (!matches) return t;
+                return {
+                    ...t,
+                    assignedWaiterId: Number(normalizedStaffId) || t.assignedWaiterId,
+                    assignedWaiterName: staffName || t.assignedWaiterName,
+                    activeSession: t.activeSession ? {
+                        ...t.activeSession,
+                        waiterId: Number(normalizedStaffId) || t.activeSession.waiterId,
+                        waiterName: staffName || t.activeSession.waiterName,
+                    } : null,
+                };
+            }),
+        }));
+
+        const targetTableId = tableObj?.id || (function () {
+            const found = tableOverview.tables.find(
+                (t) =>
+                    t.assignmentKey === tableKey ||
+                    String(t.tableNo) === String(tableKey) ||
+                    t.key === tableKey ||
+                    String(t.id) === String(tableKey)
+            );
+            return found?.id;
+        })();
+
+        if (restaurantId && targetTableId) {
+            try {
+                await axios.post(`${API}/owner/${restaurantId}/tables/${targetTableId}/assign-waiter`, {
+                    waiterId: Number(normalizedStaffId),
+                    reason: "Assigned via Owner Panel",
+                });
+            } catch (err) {
+                console.error("Failed to assign waiter on backend:", err);
+                setTableAssignments(prevAssignments);
+                setTableOverview(prevOverview);
+                showToast({
+                    title: "Assignment Failed",
+                    message: err?.response?.data?.message || err.message || "Failed to assign waiter on backend",
+                    variant: "error",
+                });
+                await refreshTableOverview();
+            }
+        }
     };
 
     const refreshTableOverview = async () => {
@@ -1171,10 +1317,36 @@ export default function OwnerLayout() {
 
         setCompletingTableKey(assignmentKey);
         setReceiptActionError("");
+        const prevOverview = { ...tableOverview };
+
+        // Optimistically update table state to Available in local state
+        setTableOverview((prev) => {
+            const updatedTables = (prev.tables || []).map((t) => {
+                if (String(t.id) === String(targetTableId) || String(t.tableNo) === String(table?.tableNo)) {
+                    return {
+                        ...t,
+                        isOccupied: false,
+                        activeOrderCount: 0,
+                        activeItemCount: 0,
+                        activeOrders: [],
+                        activeSession: null,
+                        occupiedSince: null,
+                    };
+                }
+                return t;
+            });
+            const occupiedCount = updatedTables.filter((t) => t.isOccupied).length;
+            return {
+                ...prev,
+                occupied: occupiedCount,
+                tables: updatedTables,
+            };
+        });
+
         try {
             // Call backend API to clear table session, reset isOccupied, and record audit trail
             await axios.post(`${API}/owner/${restaurantId}/tables/${targetTableId}/clear`, {
-                force: options.force || true,
+                force: true,
                 reason: options.reason || "Table cleared by Owner",
                 performedByUserId: user?.id || null,
                 performedByName: user?.name || user?.email || "Owner",
@@ -1195,9 +1367,7 @@ export default function OwnerLayout() {
                 );
             }
 
-            if (hasAssignment && assignmentKey) {
-                clearTableAssignment(assignmentKey);
-            }
+            // Note: Server assignment remains attached to the table across order completion / table freeing.
             if (assignmentKey) {
                 setPrintedTableKeys((prev) => {
                     const next = new Set(prev);
@@ -1215,6 +1385,7 @@ export default function OwnerLayout() {
                 variant: "success",
             });
         } catch (err) {
+            setTableOverview(prevOverview);
             showToast({
                 title: "Error Clearing Table",
                 message: err.response?.data?.message || err.message || "Failed to free table.",
@@ -1899,6 +2070,8 @@ export default function OwnerLayout() {
                                                      table.assignmentKey || table.key
                                                  );
                                                  const assignedStaffId = String(
+                                                     table.assignedWaiterId ||
+                                                     table.activeSession?.waiterId ||
                                                      tableAssignments[assignmentKey] ||
                                                      tableAssignments[table.key] ||
                                                      tableAssignments[String(table.id || "")] ||
@@ -1907,9 +2080,10 @@ export default function OwnerLayout() {
                                                      tableAssignments[`table-${String(table.tableNo || "").trim().toLowerCase()}`] ||
                                                      ""
                                                  );
+                                                 const fallbackStaffName = table.assignedWaiterName || table.activeSession?.waiterName || (assignedStaffId ? "Server" : "");
                                                  const assignedStaff = assignedStaffId
-                                                     ? staffById.get(assignedStaffId) || { id: assignedStaffId, name: `Server`, role: "STAFF" }
-                                                     : null;
+                                                     ? staffById.get(assignedStaffId) || { id: assignedStaffId, name: fallbackStaffName || `Server`, role: "STAFF" }
+                                                     : (fallbackStaffName ? { id: "", name: fallbackStaffName, role: "STAFF" } : null);
                                                 const assignedStaffLabel = assignedStaff
                                                     ? getStaffDisplayLabel(assignedStaff)
                                                     : "";
@@ -2314,7 +2488,7 @@ export default function OwnerLayout() {
                                                             </div>
                                                         )}
 
-                                                        {table.isOccupied && isStaffOpen && (
+                                                        {isStaffOpen && (
                                                             <div
                                                                 onClick={(event) => event.stopPropagation()}
                                                                 onMouseDown={(event) => event.stopPropagation()}

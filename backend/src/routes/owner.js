@@ -62,7 +62,7 @@ import {
   mergeTables,
   splitTableOrTransferItems,
 } from "../controllers/tableOperationController.js";
-import { assignWaiterToTable, getWaiterAssignmentHistory, getWaiterWorkspaceData, getStaffPerformanceMetrics } from "../services/staffManagementService.js";
+import { assignWaiterToTable, unassignWaiterFromTable, getWaiterAssignmentHistory, getWaiterWorkspaceData, getStaffPerformanceMetrics } from "../services/staffManagementService.js";
 import { getAuditLogs } from "../services/auditLogService.js";
 import { approveCancellation, approveDiscount, approveReprint } from "../controllers/managerApprovalController.js";
 
@@ -871,6 +871,8 @@ export default async function ownerRoutes(app, deps) {
               guestCount: upcomingRes.guestCount,
               status: upcomingRes.status,
             } : null,
+            assignedWaiterId: table.assignedWaiterId || activeSession?.waiterId || null,
+            assignedWaiterName: table.assignedWaiterName || activeSession?.waiterName || null,
             occupiedSince: activeSession?.openedAt || tableActiveOrders[0]?.createdAt || null,
             activeOrderCount: tableActiveOrders.length,
             activeItemCount,
@@ -879,6 +881,7 @@ export default async function ownerRoutes(app, deps) {
               id: activeSession.id,
               status: activeSession.status,
               guestCount: activeSession.guestCount,
+              waiterId: activeSession.waiterId,
               waiterName: activeSession.waiterName,
               subtotal: activeSession.subtotal,
               total: activeSession.total,
@@ -1129,26 +1132,30 @@ export default async function ownerRoutes(app, deps) {
 
       // Execute session closure, order updates, waiter unassignment, and audit log atomically in a transaction
       const updatedTable = await prisma.$transaction(async (tx) => {
-        // Close all active table sessions for this table
-        if (activeSession) {
-          await tx.tableSession.updateMany({
-            where: {
-              tableId,
-              restaurantId,
-              status: { in: ["OPEN", "BILLING", "PAID"] },
-            },
-            data: {
-              status: "CLOSED",
-              closedAt: new Date(),
-            },
-          });
-        }
+        // Always close all active table sessions matching tableId OR tableNo
+        await tx.tableSession.updateMany({
+          where: {
+            restaurantId,
+            OR: [
+              { tableId },
+              { tableNo: table.tableNo },
+            ],
+            status: { in: ["OPEN", "BILLING", "PAID"] },
+          },
+          data: {
+            status: "CLOSED",
+            closedAt: new Date(),
+          },
+        });
 
         // Mark open prep/active orders for this table as DELIVERED if forced/permitted
         await tx.order.updateMany({
           where: {
-            tableId,
             restaurantId,
+            OR: [
+              { tableId },
+              { tableNo: table.tableNo },
+            ],
             status: { in: ["PLACED", "ACCEPTED", "PREPARING", "READY", "OPEN", "BILLING"] },
           },
           data: {
@@ -1156,14 +1163,18 @@ export default async function ownerRoutes(app, deps) {
           },
         }).catch(() => {});
 
-        // Clear waiter assignment on table (isOccupied is derived from active sessions, not a table column)
-        const updated = await tx.diningTable.update({
-          where: { id: tableId },
-          data: {
-            assignedWaiterId: null,
-            assignedWaiterName: null,
-          },
-        });
+        // Maintain separation between table occupancy and server assignment:
+        // Freeing a table / clearing occupancy does NOT remove a server assignment unless explicitly requested via clearWaiter: true
+        const shouldClearWaiter = Boolean(req.body?.clearWaiter);
+        const updated = shouldClearWaiter
+          ? await tx.diningTable.update({
+              where: { id: tableId },
+              data: {
+                assignedWaiterId: null,
+                assignedWaiterName: null,
+              },
+            })
+          : table;
 
         // Record Audit Log in TableOperationLog
         try {
@@ -1197,7 +1208,9 @@ export default async function ownerRoutes(app, deps) {
         realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId, tableNo: table.tableNo });
         realtime.io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableId, tableNo: table.tableNo });
         realtime.io.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableId, tableNo: table.tableNo });
+        realtime.io.to(`restaurant:${restaurantId}`).emit("table:session_updated", { restaurantId, tableId, tableNo: table.tableNo });
         realtime.io.to(`restaurant_${restaurantId}`).emit("table:layout_updated", { restaurantId });
+        realtime.io.to(`restaurant:${restaurantId}`).emit("table:layout_updated", { restaurantId });
       }
 
       return reply.send({
@@ -1378,7 +1391,7 @@ export default async function ownerRoutes(app, deps) {
   });
 
   // Keep analytics/finance/settings/staff endpoints in this module.
-  app.get("/owner/:restaurantId/analytics", async (req, reply) => {
+  const getOwnerAnalyticsHandler = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
@@ -1396,73 +1409,149 @@ export default async function ownerRoutes(app, deps) {
       const timezone = restaurant.timezone || "Asia/Kolkata";
       const now = new Date();
 
-      // Helper to compute start of day and end of day in local time
-      const getStartOfDay = (d) => {
-        const temp = new Date(d);
-        temp.setHours(0, 0, 0, 0);
-        return temp;
-      };
-      const getEndOfDay = (d) => {
-        const temp = new Date(d);
-        temp.setHours(23, 59, 59, 999);
-        return temp;
+      // Timezone boundary helpers
+      const getLocalDateStr = (date, tz = timezone) => {
+        try {
+          return new Intl.DateTimeFormat("en-CA", {
+            timeZone: tz,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(new Date(date));
+        } catch {
+          return new Date(date).toISOString().split("T")[0];
+        }
       };
 
+      const getLocalHour = (date, tz = timezone) => {
+        try {
+          const parts = new Intl.DateTimeFormat("en-US", {
+            timeZone: tz,
+            hour: "numeric",
+            hourCycle: "h23",
+          }).formatToParts(new Date(date));
+          return Number(parts.find((p) => p.type === "hour")?.value || 0);
+        } catch {
+          return new Date(date).getHours();
+        }
+      };
+
+      const getZonedBoundary = (dateStr, isEnd = false, tz = timezone) => {
+        try {
+          const [y, m, d] = dateStr.split("-").map(Number);
+          const utcGuess = new Date(Date.UTC(y, m - 1, d, isEnd ? 23 : 0, isEnd ? 59 : 0, isEnd ? 59 : 0, isEnd ? 999 : 0));
+          const parts = new Intl.DateTimeFormat("en-US", {
+            timeZone: tz,
+            year: "numeric",
+            month: "numeric",
+            day: "numeric",
+            hour: "numeric",
+            minute: "numeric",
+            second: "numeric",
+            hourCycle: "h23",
+          }).formatToParts(utcGuess);
+          const zYear = Number(parts.find((p) => p.type === "year")?.value || y);
+          const zMonth = Number(parts.find((p) => p.type === "month")?.value || m);
+          const zDay = Number(parts.find((p) => p.type === "day")?.value || d);
+          const zHour = Number(parts.find((p) => p.type === "hour")?.value || 0);
+          const zMinute = Number(parts.find((p) => p.type === "minute")?.value || 0);
+          const zSec = Number(parts.find((p) => p.type === "second")?.value || 0);
+
+          const asUtc = Date.UTC(zYear, zMonth - 1, zDay, zHour, zMinute, zSec, isEnd ? 999 : 0);
+          const offsetMs = asUtc - utcGuess.getTime();
+          return new Date(utcGuess.getTime() - offsetMs);
+        } catch {
+          const temp = new Date(dateStr);
+          if (isEnd) temp.setHours(23, 59, 59, 999);
+          else temp.setHours(0, 0, 0, 0);
+          return temp;
+        }
+      };
+
+      const formatDateLabel = (d, tz = timezone, opts = { day: "numeric", month: "short" }) => {
+        try {
+          return new Intl.DateTimeFormat("en-GB", { timeZone: tz, ...opts }).format(new Date(d));
+        } catch {
+          return new Date(d).toLocaleDateString("en-GB", opts);
+        }
+      };
+
+      const todayStr = getLocalDateStr(now, timezone);
+
       let seriesStart;
-      let seriesEnd = new Date(now);
+      let seriesEnd;
       let prevSeriesStart;
       let prevSeriesEnd;
       let rangeLabel = "7 Days";
       let dateDisplayLabel = "";
 
       if (rangeRaw === "today" || rangeRaw === "24h") {
-        seriesStart = getStartOfDay(now);
-        seriesEnd = new Date(now);
-        const y = new Date(now);
-        y.setDate(y.getDate() - 1);
-        prevSeriesStart = getStartOfDay(y);
-        prevSeriesEnd = getEndOfDay(y);
+        seriesStart = getZonedBoundary(todayStr, false, timezone);
+        seriesEnd = getZonedBoundary(todayStr, true, timezone);
+        const yesterday = new Date(seriesStart.getTime() - 24 * 3600 * 1000);
+        const yesterdayStr = getLocalDateStr(yesterday, timezone);
+        prevSeriesStart = getZonedBoundary(yesterdayStr, false, timezone);
+        prevSeriesEnd = getZonedBoundary(yesterdayStr, true, timezone);
         rangeLabel = "Today";
-        dateDisplayLabel = `Today · ${now.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`;
+        dateDisplayLabel = `Today · ${formatDateLabel(seriesStart, timezone, { day: "numeric", month: "long", year: "numeric" })}`;
       } else if (rangeRaw === "yesterday") {
-        const y = new Date(now);
-        y.setDate(y.getDate() - 1);
-        seriesStart = getStartOfDay(y);
-        seriesEnd = getEndOfDay(y);
+        const yesterday = new Date(now.getTime() - 24 * 3600 * 1000);
+        const yesterdayStr = getLocalDateStr(yesterday, timezone);
+        seriesStart = getZonedBoundary(yesterdayStr, false, timezone);
+        seriesEnd = getZonedBoundary(yesterdayStr, true, timezone);
 
-        const dbY = new Date(now);
-        dbY.setDate(dbY.getDate() - 2);
-        prevSeriesStart = getStartOfDay(dbY);
-        prevSeriesEnd = getEndOfDay(dbY);
+        const dayBefore = new Date(seriesStart.getTime() - 24 * 3600 * 1000);
+        const dayBeforeStr = getLocalDateStr(dayBefore, timezone);
+        prevSeriesStart = getZonedBoundary(dayBeforeStr, false, timezone);
+        prevSeriesEnd = getZonedBoundary(dayBeforeStr, true, timezone);
         rangeLabel = "Yesterday";
-        dateDisplayLabel = `Yesterday · ${y.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`;
+        dateDisplayLabel = `Yesterday · ${formatDateLabel(seriesStart, timezone, { day: "numeric", month: "long", year: "numeric" })}`;
       } else if (rangeRaw === "30d" || rangeRaw === "this_month") {
-        seriesStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        seriesEnd = new Date(now);
-        prevSeriesStart = new Date(seriesStart.getTime() - 30 * 24 * 60 * 60 * 1000);
+        seriesEnd = getZonedBoundary(todayStr, true, timezone);
+        const startDay = new Date(seriesEnd.getTime() - 30 * 24 * 3600 * 1000 + 1000);
+        const startDayStr = getLocalDateStr(startDay, timezone);
+        seriesStart = getZonedBoundary(startDayStr, false, timezone);
+
+        const durationMs = seriesEnd.getTime() - seriesStart.getTime();
         prevSeriesEnd = new Date(seriesStart.getTime() - 1);
+        prevSeriesStart = new Date(seriesStart.getTime() - durationMs);
         rangeLabel = "30 Days";
-        dateDisplayLabel = `${seriesStart.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – ${now.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
+        dateDisplayLabel = `${formatDateLabel(seriesStart, timezone)} – ${formatDateLabel(seriesEnd, timezone, { day: "numeric", month: "short", year: "numeric" })}`;
       } else if (rangeRaw === "custom" && startDateQuery && endDateQuery) {
-        seriesStart = getStartOfDay(new Date(startDateQuery));
-        seriesEnd = getEndOfDay(new Date(endDateQuery));
-        const diffMs = seriesEnd.getTime() - seriesStart.getTime();
-        prevSeriesStart = new Date(seriesStart.getTime() - diffMs);
+        seriesStart = getZonedBoundary(String(startDateQuery), false, timezone);
+        seriesEnd = getZonedBoundary(String(endDateQuery), true, timezone);
+        const durationMs = seriesEnd.getTime() - seriesStart.getTime();
         prevSeriesEnd = new Date(seriesStart.getTime() - 1);
+        prevSeriesStart = new Date(seriesStart.getTime() - durationMs);
         rangeLabel = "Custom";
-        dateDisplayLabel = `${seriesStart.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – ${seriesEnd.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
+        dateDisplayLabel = `${formatDateLabel(seriesStart, timezone)} – ${formatDateLabel(seriesEnd, timezone, { day: "numeric", month: "short", year: "numeric" })}`;
       } else {
         // Default 7d
-        seriesStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        seriesEnd = new Date(now);
-        prevSeriesStart = new Date(seriesStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+        seriesEnd = getZonedBoundary(todayStr, true, timezone);
+        const startDay = new Date(seriesEnd.getTime() - 7 * 24 * 3600 * 1000 + 1000);
+        const startDayStr = getLocalDateStr(startDay, timezone);
+        seriesStart = getZonedBoundary(startDayStr, false, timezone);
+
+        const durationMs = seriesEnd.getTime() - seriesStart.getTime();
         prevSeriesEnd = new Date(seriesStart.getTime() - 1);
+        prevSeriesStart = new Date(seriesStart.getTime() - durationMs);
         rangeLabel = "7 Days";
-        dateDisplayLabel = `${seriesStart.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – ${now.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
+        dateDisplayLabel = `${formatDateLabel(seriesStart, timezone)} – ${formatDateLabel(seriesEnd, timezone, { day: "numeric", month: "short", year: "numeric" })}`;
       }
 
       // Fetch Current and Previous Period data in parallel
-      const [orders, prevOrders, menuItems, tables, inventoryStocks, customers, payments, staffUsers] = await Promise.all([
+      const [
+        orders,
+        prevOrders,
+        menuItems,
+        tables,
+        rawMaterials,
+        inventoryStocks,
+        customers,
+        payments,
+        staffUsers,
+        kots,
+      ] = await Promise.all([
         prisma.order.findMany({
           where: { restaurantId, createdAt: { gte: seriesStart, lte: seriesEnd } },
           include: { items: true, customer: true, payments: true },
@@ -1505,8 +1594,13 @@ export default async function ownerRoutes(app, deps) {
           console.error("[Analytics] DiningTable fetch error:", err.message);
           return [];
         }),
+        prisma.rawMaterial.findMany({
+          where: { restaurantId, isActive: true },
+          select: { id: true, name: true, currentStock: true, minimumStock: true, category: true },
+        }).catch(() => []),
         prisma.inventoryStock.findMany({
           where: { restaurantId },
+          include: { menuItem: { select: { name: true } } },
         }).catch(() => []),
         prisma.customer.findMany({
           where: { restaurantId },
@@ -1519,13 +1613,18 @@ export default async function ownerRoutes(app, deps) {
           where: { restaurantId },
           select: { id: true, name: true, role: true, designation: true },
         }).catch(() => []),
+        prisma.kitchenOrderTicket.findMany({
+          where: { restaurantId, createdAt: { gte: seriesStart, lte: seriesEnd } },
+          select: { id: true, status: true, reprintsCount: true },
+        }).catch(() => []),
       ]);
 
       // Previous Period Aggregations for Comparisons
-      const prevTotalRevenue = prevOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-      const prevTotalOrders = prevOrders.length;
-      const prevUniqueCustomers = new Set(prevOrders.map((o) => o.customerId).filter(Boolean)).size;
-      const prevAvgOrderValue = prevTotalOrders > 0 ? prevTotalRevenue / prevTotalOrders : 0;
+      const prevValidOrders = prevOrders.filter((o) => !["CANCELLED", "REFUNDED"].includes(String(o.status || "").toUpperCase()));
+      const prevTotalRevenue = prevValidOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+      const prevTotalOrders = prevValidOrders.length;
+      const prevUniqueCustomers = new Set(prevValidOrders.map((o) => o.customerId).filter(Boolean)).size;
+      const prevAvgOrderValue = prevTotalOrders > 0 ? +(prevTotalRevenue / prevTotalOrders).toFixed(2) : 0;
 
       // Current Period Aggregations
       const statusKeys = ["PLACED", "ACCEPTED", "PREPARING", "READY", "DELIVERED", "CANCELLED"];
@@ -1560,6 +1659,7 @@ export default async function ownerRoutes(app, deps) {
       const tableMap = new Map();
       const customerSpendMap = new Map();
       const staffMap = new Map();
+      const staffUserMap = new Map(staffUsers.map((u) => [u.id, u]));
       const menuById = new Map(menuItems.map((m) => [m.id, m]));
 
       for (const order of orders) {
@@ -1585,7 +1685,7 @@ export default async function ownerRoutes(app, deps) {
           }
         }
 
-        // Order Source & Type
+        // Order Source
         const src = String(order.orderSource || "POS").toUpperCase();
         if (src.includes("QR")) {
           sourceCounts.QR += 1;
@@ -1599,13 +1699,14 @@ export default async function ownerRoutes(app, deps) {
           sourceCounts.POS += 1;
         }
 
-        const type = String(order.orderType || "DINE_IN").toUpperCase();
+        // Order Type / Fulfillment
+        const type = String(order.fulfillment || order.orderType || (order.tableNo ? "DINE_IN" : "TAKEAWAY")).toUpperCase();
         if (type.includes("TAKE")) typeCounts.TAKEAWAY += 1;
         else if (type.includes("DELIV")) typeCounts.DELIVERY += 1;
         else typeCounts.DINE_IN += 1;
 
-        // Payment Method
-        const pm = String(order.paymentMethod || "CASH").toUpperCase();
+        // Payment Method from order.paymentMode or payments relation
+        const pm = String(order.paymentMode || order.paymentMethod || order.payments?.[0]?.paymentMethod || "CASH").toUpperCase();
         if (pm.includes("UPI")) { paymentMethodCounts.UPI += 1; paymentMethodAmount.UPI += orderTotal; }
         else if (pm.includes("CARD")) { paymentMethodCounts.CARD += 1; paymentMethodAmount.CARD += orderTotal; }
         else if (pm.includes("ONLINE")) { paymentMethodCounts.ONLINE += 1; paymentMethodAmount.ONLINE += orderTotal; }
@@ -1622,8 +1723,8 @@ export default async function ownerRoutes(app, deps) {
           deliveredWithCycle += 1;
         }
 
-        // Hourly waveform
-        const hour = createdAt.getHours();
+        // Hourly waveform in local restaurant timezone
+        const hour = getLocalHour(createdAt, timezone);
         if (hour >= 0 && hour < 24) {
           hourlyWaveform[hour].orders += 1;
           hourlyWaveform[hour].revenue += orderTotal;
@@ -1641,8 +1742,8 @@ export default async function ownerRoutes(app, deps) {
         if (order.customerId) {
           const custAgg = customerSpendMap.get(order.customerId) || {
             id: order.customerId,
-            name: order.customer?.name || "Customer",
-            phone: order.customer?.phone || "",
+            name: order.customer?.name || order.customerName || "Customer",
+            phone: order.customer?.phone || order.phone || "",
             orders: 0,
             spend: 0,
           };
@@ -1652,11 +1753,13 @@ export default async function ownerRoutes(app, deps) {
         }
 
         // Staff map
-        if (order.waiterId || order.serverUserId) {
-          const staffId = order.waiterId || order.serverUserId;
+        const staffId = order.createdByUserId || order.waiterId || order.serverUserId;
+        if (staffId) {
+          const staffUser = staffUserMap.get(staffId);
+          const staffName = staffUser?.name || order.waiter?.name || `Staff #${staffId}`;
           const staffAgg = staffMap.get(staffId) || {
             staffId,
-            name: order.waiter?.name || `Staff #${staffId}`,
+            name: staffName,
             orders: 0,
             revenue: 0,
           };
@@ -1684,21 +1787,23 @@ export default async function ownerRoutes(app, deps) {
         }
       }
 
-      const totalOrders = orders.length;
-      const uniqueCustomerIds = new Set(orders.map((o) => o.customerId).filter(Boolean));
-      const totalCustomers = uniqueCustomerIds.size || Math.max(1, Math.round(totalOrders * 0.75));
+      const validOrders = orders.filter((o) => !["CANCELLED", "REFUNDED"].includes(String(o.status || "").toUpperCase()));
+      const totalOrders = validOrders.length;
+      const totalAllOrders = orders.length;
+      const uniqueCustomerIds = new Set(validOrders.map((o) => o.customerId).filter(Boolean));
+      const totalCustomers = uniqueCustomerIds.size || (totalOrders > 0 ? Math.max(1, Math.round(totalOrders * 0.75)) : 0);
       const deliveredOrders = Number(statusCounts.DELIVERED || 0);
       const cancelledOrders = Number(statusCounts.CANCELLED || 0);
       const closedOrders = deliveredOrders + cancelledOrders;
-      const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-      const completionRate = closedOrders > 0 ? (deliveredOrders / closedOrders) * 100 : 0;
-      const cancellationRate = totalOrders > 0 ? (cancelledOrders / totalOrders) * 100 : 0;
-      const avgPrepMinutes = deliveredWithCycle > 0 ? totalCycleMinutes / deliveredWithCycle : 0;
+      const avgOrderValue = totalOrders > 0 ? +(totalRevenue / totalOrders).toFixed(2) : 0;
+      const completionRate = closedOrders > 0 ? +((deliveredOrders / closedOrders) * 100).toFixed(1) : 0;
+      const cancellationRate = totalAllOrders > 0 ? +((cancelledOrders / totalAllOrders) * 100).toFixed(1) : 0;
+      const avgPrepMinutes = deliveredWithCycle > 0 ? +(totalCycleMinutes / deliveredWithCycle).toFixed(1) : 0;
 
       // Percentage Change Calculations
       const calcPctChange = (curr, prev) => {
         if (!prev || prev === 0) return curr > 0 ? 100 : 0;
-        return ((curr - prev) / prev) * 100;
+        return +(((curr - prev) / prev) * 100).toFixed(1);
       };
 
       const revenuePctChange = calcPctChange(totalRevenue, prevTotalRevenue);
@@ -1715,28 +1820,49 @@ export default async function ownerRoutes(app, deps) {
       }
 
       // Table Status Stats
-      const totalTables = tables.length || 24;
-      const occupiedTables = tables.filter((t) => t.isOccupied).length || 0;
-      const availableTables = totalTables - occupiedTables;
-      const occupancyRatePct = totalTables > 0 ? (occupiedTables / totalTables) * 100 : 0;
-      const avgQrOrderValue = qrOrdersCount > 0 ? qrRevenue / qrOrdersCount : 0;
-      const qrConversionRatePct = totalOrders > 0 ? (qrOrdersCount / totalOrders) * 100 : 0;
+      const totalTables = tables.length;
+      const occupiedTables = tables.filter((t) => t.isOccupied).length;
+      const availableTables = Math.max(0, totalTables - occupiedTables);
+      const occupancyRatePct = totalTables > 0 ? +((occupiedTables / totalTables) * 100).toFixed(1) : 0;
+      const avgQrOrderValue = qrOrdersCount > 0 ? +(qrRevenue / qrOrdersCount).toFixed(2) : 0;
+      const qrConversionRatePct = totalOrders > 0 ? +((qrOrdersCount / totalOrders) * 100).toFixed(1) : 0;
 
       // Inventory Stock Status
       let healthyCount = 0;
       let lowStockCount = 0;
       let outOfStockCount = 0;
-      for (const item of inventoryStocks) {
-        const qty = Number(item.quantity || 0);
-        const minTh = Number(item.minThreshold || 5);
-        if (qty <= 0) outOfStockCount += 1;
-        else if (qty <= minTh) lowStockCount += 1;
-        else healthyCount += 1;
-      }
-      if (inventoryStocks.length === 0) {
-        healthyCount = 42;
-        lowStockCount = 7;
-        outOfStockCount = 3;
+      const lowStockItems = [];
+      const outOfStockItems = [];
+
+      if (rawMaterials.length > 0) {
+        for (const rm of rawMaterials) {
+          const qty = Number(rm.currentStock || 0);
+          const minTh = Number(rm.minimumStock || 0);
+          if (qty <= 0) {
+            outOfStockCount += 1;
+            outOfStockItems.push(rm.name);
+          } else if (qty <= minTh) {
+            lowStockCount += 1;
+            lowStockItems.push(rm.name);
+          } else {
+            healthyCount += 1;
+          }
+        }
+      } else if (inventoryStocks.length > 0) {
+        for (const item of inventoryStocks) {
+          const qty = Number(item.stockQuantity || 0);
+          const minTh = Number(item.thresholdAlert || 5);
+          const name = item.menuItem?.name || `Item #${item.menuItemId}`;
+          if (qty <= 0) {
+            outOfStockCount += 1;
+            outOfStockItems.push(name);
+          } else if (qty <= minTh) {
+            lowStockCount += 1;
+            lowStockItems.push(name);
+          } else {
+            healthyCount += 1;
+          }
+        }
       }
 
       // Operational AI Radar Alerts
@@ -1793,27 +1919,40 @@ export default async function ownerRoutes(app, deps) {
       }
 
       // Payments Overview
-      const successfulPaymentsCount = payments.filter((p) => String(p.status).toUpperCase() === "SUCCESS" || String(p.status).toUpperCase() === "COMPLETED").length || totalOrders;
-      const failedPaymentsCount = payments.filter((p) => String(p.status).toUpperCase() === "FAILED").length || 0;
-      const pendingPaymentsCount = payments.filter((p) => String(p.status).toUpperCase() === "PENDING").length || 0;
-      const paymentSuccessRatePct = (successfulPaymentsCount + failedPaymentsCount) > 0 ? (successfulPaymentsCount / (successfulPaymentsCount + failedPaymentsCount)) * 100 : 98.4;
+      const successfulPaymentsCount = payments.filter((p) => String(p.status).toUpperCase() === "SUCCESS" || String(p.status).toUpperCase() === "COMPLETED").length || (totalPaidValue > 0 ? totalOrders : 0);
+      const failedPaymentsCount = payments.filter((p) => String(p.status).toUpperCase() === "FAILED").length;
+      const pendingPaymentsCount = payments.filter((p) => String(p.status).toUpperCase() === "PENDING").length;
+      const totalPaymentsEvaluated = successfulPaymentsCount + failedPaymentsCount;
+      const paymentSuccessRatePct = totalPaymentsEvaluated > 0 ? +((successfulPaymentsCount / totalPaymentsEvaluated) * 100).toFixed(1) : (totalOrders > 0 ? 100 : 0);
 
       const topProductsList = Array.from(itemMap.values()).sort((a, b) => b.qty - a.qty);
       const bottomProductsList = Array.from(itemMap.values()).sort((a, b) => a.qty - b.qty).slice(0, 5);
+
+      // Customer stats
+      const newCustomersCount = customers.filter((c) => {
+        const ct = new Date(c.createdAt).getTime();
+        return ct >= seriesStart.getTime() && ct <= seriesEnd.getTime();
+      }).length;
+      const returningPatronsCount = Array.from(customerSpendMap.values()).filter((c) => c.orders > 1).length;
+      const repeatRatePct = totalCustomers > 0 ? +((returningPatronsCount / totalCustomers) * 100).toFixed(1) : 0;
+
+      // KOTs metrics
+      const totalKotsCount = kots.length || totalOrders;
+      const reprintsCount = kots.reduce((sum, k) => sum + Number(k.reprintsCount || 0), 0);
 
       // Build timeseries array for trend charts
       const dailyMap = new Map();
       if (rangeRaw !== "today" && rangeRaw !== "24h" && rangeRaw !== "yesterday") {
         let currDate = new Date(seriesStart);
-        while (currDate <= seriesEnd) {
-          const dateStr = currDate.toISOString().split("T")[0];
-          const label = currDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+        while (currDate.getTime() <= seriesEnd.getTime()) {
+          const dateStr = getLocalDateStr(currDate, timezone);
+          const label = formatDateLabel(currDate, timezone, { day: "numeric", month: "short" });
           dailyMap.set(dateStr, { ts: dateStr, label, orders: 0, revenue: 0, customers: new Set() });
-          currDate.setDate(currDate.getDate() + 1);
+          currDate = new Date(currDate.getTime() + 24 * 3600 * 1000);
         }
 
         for (const order of orders) {
-          const dStr = new Date(order.createdAt).toISOString().split("T")[0];
+          const dStr = getLocalDateStr(order.createdAt, timezone);
           if (dailyMap.has(dStr)) {
             const entry = dailyMap.get(dStr);
             entry.orders += 1;
@@ -1826,8 +1965,20 @@ export default async function ownerRoutes(app, deps) {
       }
 
       const timeseries = (rangeRaw === "today" || rangeRaw === "24h" || rangeRaw === "yesterday")
-        ? hourlyWaveform.map((h) => ({ ts: h.hour, label: h.label, orders: h.orders, revenue: h.revenue, customers: Math.round(h.orders * 0.8) }))
-        : Array.from(dailyMap.values()).map((d) => ({ ts: d.ts, label: d.label, orders: d.orders, revenue: d.revenue, customers: d.customers.size || Math.round(d.orders * 0.8) }));
+        ? hourlyWaveform.map((h) => ({
+            ts: h.hour,
+            label: h.label,
+            orders: h.orders,
+            revenue: h.revenue,
+            customers: h.orders > 0 ? Math.max(1, Math.round(h.orders * 0.8)) : 0,
+          }))
+        : Array.from(dailyMap.values()).map((d) => ({
+            ts: d.ts,
+            label: d.label,
+            orders: d.orders,
+            revenue: d.revenue,
+            customers: d.customers.size || (d.orders > 0 ? Math.max(1, Math.round(d.orders * 0.8)) : 0),
+          }));
 
       return {
         generatedAt: now.toISOString(),
@@ -1842,21 +1993,21 @@ export default async function ownerRoutes(app, deps) {
         },
         overview: {
           totalRevenue,
-          previousTotalRevenue,
+          previousTotalRevenue: prevTotalRevenue,
           revenuePctChange,
           totalOrders,
-          previousTotalOrders,
+          previousTotalOrders: prevTotalOrders,
           ordersPctChange,
           totalCustomers,
-          previousTotalCustomers,
+          previousTotalCustomers: prevUniqueCustomers,
           customersPctChange,
           avgOrderValue,
-          previousAvgOrderValue,
+          previousAvgOrderValue: prevAvgOrderValue,
           aovPctChange,
-          grossSales: totalSubtotal || totalRevenue,
-          netSales: totalRevenue,
-          totalDiscounts,
-          totalTaxes,
+          grossSales: +(totalSubtotal || totalRevenue).toFixed(2),
+          netSales: +((totalSubtotal || totalRevenue) - totalDiscounts).toFixed(2),
+          totalDiscounts: +totalDiscounts.toFixed(2),
+          totalTaxes: +totalTaxes.toFixed(2),
           cancelledOrderValue: totalCancelledValue,
           paidOrderValue: totalPaidValue,
           unpaidOrderValue: totalUnpaidValue,
@@ -1902,29 +2053,29 @@ export default async function ownerRoutes(app, deps) {
           cancelled: statusCounts.CANCELLED || 0,
           avgPrepMinutes,
           delayedTickets,
-          totalKots: totalOrders,
-          reprintsCount: 0,
+          totalKots: totalKotsCount,
+          reprintsCount,
         },
         customerStats: {
           totalCustomers,
-          newCustomers: customers.filter((c) => new Date(c.createdAt) >= seriesStart).length || Math.round(totalCustomers * 0.3),
-          returningCustomers: Math.round(totalCustomers * 0.7),
-          repeatRatePct: 73.2,
-          avgCustomerSpend: totalCustomers > 0 ? totalRevenue / totalCustomers : 0,
+          newCustomers: newCustomersCount,
+          returningCustomers: Math.max(0, totalCustomers - newCustomersCount),
+          repeatRatePct,
+          avgCustomerSpend: totalCustomers > 0 ? +(totalRevenue / totalCustomers).toFixed(2) : 0,
           topCustomers: Array.from(customerSpendMap.values()).sort((a, b) => b.spend - a.spend).slice(0, 5),
         },
         inventoryStatus: {
           healthyCount,
           lowStockCount,
           outOfStockCount,
-          lowStockItems: inventoryStocks.filter((i) => Number(i.quantity || 0) <= Number(i.minThreshold || 5) && Number(i.quantity || 0) > 0).map((i) => i.itemName),
-          outOfStockItems: inventoryStocks.filter((i) => Number(i.quantity || 0) <= 0).map((i) => i.itemName),
+          lowStockItems: lowStockItems.slice(0, 10),
+          outOfStockItems: outOfStockItems.slice(0, 10),
         },
         staffPerformance: Array.from(staffMap.values()).sort((a, b) => b.orders - a.orders),
         peakDemand: {
-          peakHourLabel: peakHourObj.label,
-          peakOrders: peakHourObj.orders,
-          peakRevenue: peakHourObj.revenue,
+          peakHourLabel: peakHourObj?.label || "12 PM",
+          peakOrders: peakHourObj?.orders || 0,
+          peakRevenue: peakHourObj?.revenue || 0,
           waveform: hourlyWaveform,
         },
         alerts: aiAlerts,
@@ -1940,13 +2091,16 @@ export default async function ownerRoutes(app, deps) {
           preOrderQrFunnel: "Pre-order QR scan tracking is not configured in event database.",
           profitability: "Ingredient cost (BOM) data is unavailable for profitability calculations.",
           gatewayFees: "Payment gateway fee structure is not configured in payment database.",
-        }
+        },
       };
     } catch (err) {
       console.error("[Analytics] Unexpected handler error:", err);
       return reply.code(500).send({ message: "Failed to fetch analytics", error: err.message });
     }
-  });
+  };
+
+  app.get("/owner/:restaurantId/analytics", getOwnerAnalyticsHandler);
+  app.get("/api/owner/:restaurantId/analytics", getOwnerAnalyticsHandler);
 
   const getFinanceAnalyticsHandler = async (req, reply) => {
     try {
@@ -2814,7 +2968,22 @@ export default async function ownerRoutes(app, deps) {
   // ==========================================
   // FEATURE 20 — STAFF MANAGEMENT, WAITER WORKSPACE, RBAC & MANAGER APPROVALS
   // ==========================================
-  app.post("/owner/:restaurantId/tables/:tableId/assign-waiter", async (req, reply) => {
+  const emitTableAssignmentUpdate = (restaurantId, tableId, table) => {
+    if (!realtime?.io) return;
+    const payload = {
+      restaurantId: Number(restaurantId),
+      tableId: Number(tableId),
+      tableNo: table?.tableNo || null,
+      assignedWaiterId: table?.assignedWaiterId || null,
+      assignedWaiterName: table?.assignedWaiterName || null,
+    };
+    realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", payload);
+    realtime.io.to(`restaurant:${restaurantId}`).emit("table:updated", payload);
+    realtime.io.to(`restaurant_${restaurantId}`).emit("table:waiter_assigned", payload);
+    realtime.io.to(`restaurant:${restaurantId}`).emit("table:waiter_assigned", payload);
+  };
+
+  const handleAssignWaiter = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const tableId = Number(req.params.tableId);
@@ -2828,13 +2997,14 @@ export default async function ownerRoutes(app, deps) {
         actor: req.user ? { userId: req.user.id, userName: req.user.name || req.user.email, role: req.user.role } : null,
         reason,
       });
-      return { ok: true, message: "Waiter assigned", ...result };
+      emitTableAssignmentUpdate(restaurantId, tableId, result.table);
+      return { ok: true, message: waiterId ? "Waiter assigned" : "Waiter unassigned", ...result };
     } catch (err) {
       return reply.code(400).send({ message: err?.message || "Failed to assign waiter" });
     }
-  });
+  };
 
-  app.post("/owner/:restaurantId/tables/:tableId/reassign-waiter", async (req, reply) => {
+  const handleReassignWaiter = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const tableId = Number(req.params.tableId);
@@ -2848,11 +3018,39 @@ export default async function ownerRoutes(app, deps) {
         actor: req.user ? { userId: req.user.id, userName: req.user.name || req.user.email, role: req.user.role } : null,
         reason: reason || "Reassigned to new waiter",
       });
+      emitTableAssignmentUpdate(restaurantId, tableId, result.table);
       return { ok: true, message: "Waiter reassigned", ...result };
     } catch (err) {
       return reply.code(400).send({ message: err?.message || "Failed to reassign waiter" });
     }
-  });
+  };
+
+  const handleUnassignWaiter = async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const tableId = Number(req.params.tableId);
+      const { tableSessionId, reason } = req.body || {};
+      const result = await unassignWaiterFromTable({
+        prisma,
+        restaurantId,
+        tableId,
+        tableSessionId,
+        actor: req.user ? { userId: req.user.id, userName: req.user.name || req.user.email, role: req.user.role } : null,
+        reason: reason || "Unassigned via Owner Panel",
+      });
+      emitTableAssignmentUpdate(restaurantId, tableId, result.table);
+      return { ok: true, message: "Waiter unassigned", ...result };
+    } catch (err) {
+      return reply.code(400).send({ message: err?.message || "Failed to unassign waiter" });
+    }
+  };
+
+  app.post("/owner/:restaurantId/tables/:tableId/assign-waiter", handleAssignWaiter);
+  app.post("/api/owner/:restaurantId/tables/:tableId/assign-waiter", handleAssignWaiter);
+  app.post("/owner/:restaurantId/tables/:tableId/reassign-waiter", handleReassignWaiter);
+  app.post("/api/owner/:restaurantId/tables/:tableId/reassign-waiter", handleReassignWaiter);
+  app.post("/owner/:restaurantId/tables/:tableId/unassign-waiter", handleUnassignWaiter);
+  app.post("/api/owner/:restaurantId/tables/:tableId/unassign-waiter", handleUnassignWaiter);
 
   app.get("/owner/:restaurantId/tables/:tableId/assignments", async (req, reply) => {
     try {

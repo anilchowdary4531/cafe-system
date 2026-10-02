@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import axios from "axios";
+import { api } from "../../utils/apiClient";
+import { getActiveStaffSession } from "../../utils/staffSessionStorage";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
 import {
     Activity,
@@ -88,25 +90,26 @@ export default function OwnerAnalytics() {
     const [error, setError] = useState("");
     const [chartMetric, setChartMetric] = useState("revenue"); // revenue | orders | customers
 
-    const [customStartDate, setCustomStartDate] = useState(startDateParam);
-    const [customEndDate, setCustomEndDate] = useState(endDateParam);
+    const [customStartDate, setCustomStartDate] = useState(startDateParam || "");
+    const [customEndDate, setCustomEndDate] = useState(endDateParam || "");
 
-    const user = useMemo(() => {
+    const restaurantId = useMemo(() => {
+        let userObj = {};
         try {
-            return JSON.parse(localStorage.getItem("user")) || {};
+            userObj = JSON.parse(localStorage.getItem("user")) || {};
         } catch {
-            return {};
+            userObj = {};
         }
+        return Number(
+            userObj?.restaurantId ||
+            userObj?.restaurant?.id ||
+            localStorage.getItem("restaurantId") ||
+            localStorage.getItem("activeRestaurantId") ||
+            1
+        );
     }, []);
 
-    const restaurantId = Number(
-        user?.restaurantId ||
-        localStorage.getItem("restaurantId") ||
-        localStorage.getItem("activeRestaurantId") ||
-        1
-    );
-
-    const fetchAnalytics = async ({ silent = false } = {}) => {
+    const fetchAnalytics = useCallback(async ({ silent = false } = {}) => {
         if (!restaurantId) {
             setLoading(false);
             setError("Restaurant ID missing for current owner.");
@@ -118,26 +121,53 @@ export default function OwnerAnalytics() {
             else setLoading(true);
 
             const params = { range };
-            if (range === "custom" && customStartDate && customEndDate) {
-                params.startDate = customStartDate;
-                params.endDate = customEndDate;
+            const effectiveStart = customStartDate || startDateParam;
+            const effectiveEnd = customEndDate || endDateParam;
+            if (range === "custom" && effectiveStart && effectiveEnd) {
+                params.startDate = effectiveStart;
+                params.endDate = effectiveEnd;
             }
 
-            const res = await axios.get(`${API}/owner/${restaurantId}/analytics`, { params });
+            const activeStaffSession = getActiveStaffSession();
+            const token = activeStaffSession?.token || localStorage.getItem("token");
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+            let res;
+            try {
+                res = await api.get(`/owner/${restaurantId}/analytics`, {
+                    params,
+                    headers,
+                    bypassCache: true,
+                });
+            } catch {
+                // If api wrapper fails or baseURL differs, fallback to direct axios request
+                res = await axios.get(`${API}/owner/${restaurantId}/analytics`, {
+                    params,
+                    headers,
+                });
+            }
             setData(res.data || null);
             setError("");
         } catch (err) {
             console.error("Analytics fetch error:", err);
-            setError(err?.response?.data?.message || "Failed to load restaurant analytics.");
+            setError(err?.response?.data?.message || err?.message || "Failed to load restaurant analytics.");
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    };
+    }, [restaurantId, range, customStartDate, customEndDate, startDateParam, endDateParam]);
 
     useEffect(() => {
-        fetchAnalytics();
-    }, [restaurantId, range, startDateParam, endDateParam]);
+        let cancelled = false;
+        void Promise.resolve().then(() => {
+            if (!cancelled) {
+                fetchAnalytics();
+            }
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [fetchAnalytics]);
 
     useEffect(() => {
         if (!autoRefresh || !restaurantId) return undefined;
@@ -145,7 +175,7 @@ export default function OwnerAnalytics() {
             fetchAnalytics({ silent: true });
         }, REFRESH_MS);
         return () => clearInterval(timer);
-    }, [autoRefresh, restaurantId, range, startDateParam, endDateParam]);
+    }, [autoRefresh, restaurantId, fetchAnalytics]);
 
     const handleSectionChange = (secId) => {
         const nextParams = new URLSearchParams(searchParams);
@@ -342,8 +372,19 @@ export default function OwnerAnalytics() {
             </header>
 
             {error && (
-                <div className="rounded-md border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-600 dark:text-rose-400">
-                    {error}
+                <div className="flex items-center justify-between gap-3 rounded-md border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-600 dark:text-rose-400">
+                    <div className="flex items-center gap-2">
+                        <AlertCircle size={15} className="shrink-0" />
+                        <span>{error}</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => fetchAnalytics({ silent: false })}
+                        className="inline-flex items-center gap-1 rounded border border-rose-500/40 bg-rose-500/20 px-2.5 py-1 font-semibold text-rose-700 hover:bg-rose-500/30 dark:text-rose-300 transition-colors"
+                    >
+                        <RefreshCcw size={12} className={loading || refreshing ? "animate-spin" : ""} />
+                        Retry
+                    </button>
                 </div>
             )}
 

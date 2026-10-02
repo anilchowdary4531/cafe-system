@@ -104,4 +104,109 @@ export default async function staffRoutes(app, deps) {
 
   app.get("/ai/recommendations", { preHandler: requireStaff }, aiController.getRecommendationsRoute);
   app.get("/ai/customer-insights", { preHandler: requireStaff }, aiController.getCustomerInsightsRoute);
+
+  // ==========================================
+  // STAFF SELF-SERVICE PROFILE & SECURITY
+  // ==========================================
+  const getSelfProfileHandler = async (req, reply) => {
+    try {
+      const staffId = req.staffActor?.id || req.actor?.id || req.user?.id;
+      if (!staffId) return reply.code(401).send({ message: "Authentication required" });
+
+      const user = await prisma.user.findUnique({
+        where: { id: Number(staffId) },
+        include: {
+          restaurant: { select: { id: true, name: true, logoUrl: true, slug: true } },
+          branch: { select: { id: true, name: true } },
+          staffAccess: { select: { permissions: true } },
+        },
+      });
+
+      if (!user) return reply.code(404).send({ message: "User profile not found" });
+
+      const { password, ...safeUser } = user;
+      return { success: true, user: safeUser };
+    } catch (err) {
+      return reply.code(500).send({ message: err.message || "Failed to fetch profile" });
+    }
+  };
+
+  const updateSelfProfileHandler = async (req, reply) => {
+    try {
+      const staffId = req.staffActor?.id || req.actor?.id || req.user?.id;
+      if (!staffId) return reply.code(401).send({ message: "Authentication required" });
+
+      const { name, phone } = req.body || {};
+      const trimmedName = String(name || "").trim();
+      const trimmedPhone = phone !== undefined ? String(phone).trim() : undefined;
+
+      if (name !== undefined && !trimmedName) {
+        return reply.code(400).send({ message: "Full name cannot be empty" });
+      }
+
+      const updateData = {};
+      if (trimmedName) updateData.name = trimmedName;
+      if (trimmedPhone !== undefined) updateData.phone = trimmedPhone;
+
+      const updatedUser = await prisma.user.update({
+        where: { id: Number(staffId) },
+        data: updateData,
+        include: {
+          restaurant: { select: { id: true, name: true, logoUrl: true, slug: true } },
+          branch: { select: { id: true, name: true } },
+          staffAccess: { select: { permissions: true } },
+        },
+      });
+
+      const { password, ...safeUser } = updatedUser;
+      return { success: true, message: "Profile updated successfully", user: safeUser };
+    } catch (err) {
+      return reply.code(500).send({ message: err.message || "Failed to update profile" });
+    }
+  };
+
+  const changePasswordHandler = async (req, reply) => {
+    try {
+      const staffId = req.staffActor?.id || req.actor?.id || req.user?.id;
+      if (!staffId) return reply.code(401).send({ message: "Authentication required" });
+
+      const { currentPassword, newPassword } = req.body || {};
+      if (!currentPassword || !newPassword) {
+        return reply.code(400).send({ message: "Current password and new password are required" });
+      }
+
+      if (String(newPassword).length < 6) {
+        return reply.code(400).send({ message: "New password must be at least 6 characters long" });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: Number(staffId) },
+      });
+
+      if (!user) return reply.code(404).send({ message: "User not found" });
+
+      const { default: bcrypt } = await import("bcryptjs");
+      const isValid = bcrypt.compareSync(String(currentPassword), user.password);
+      if (!isValid) {
+        return reply.code(400).send({ message: "Incorrect current password" });
+      }
+
+      const hashedPassword = bcrypt.hashSync(String(newPassword), 10);
+      await prisma.user.update({
+        where: { id: Number(staffId) },
+        data: { password: hashedPassword },
+      });
+
+      return { success: true, message: "Password updated successfully" };
+    } catch (err) {
+      return reply.code(500).send({ message: err.message || "Failed to change password" });
+    }
+  };
+
+  app.get("/api/staff/profile/me", { preHandler: requireStaff }, getSelfProfileHandler);
+  app.get("/staff/profile/me", { preHandler: requireStaff }, getSelfProfileHandler);
+  app.put("/api/staff/profile/me", { preHandler: requireStaff }, updateSelfProfileHandler);
+  app.put("/staff/profile/me", { preHandler: requireStaff }, updateSelfProfileHandler);
+  app.post("/api/auth/change-password", { preHandler: requireStaff }, changePasswordHandler);
+  app.post("/auth/change-password", { preHandler: requireStaff }, changePasswordHandler);
 }

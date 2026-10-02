@@ -297,7 +297,7 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
     if (!inputTableSessionId && tableNo) {
       const dTable = await tx.diningTable.findFirst({
         where: { restaurantId, tableNo: String(tableNo).trim() },
-        select: { id: true, tableNo: true },
+        select: { id: true, tableNo: true, assignedWaiterId: true, assignedWaiterName: true },
       });
       if (dTable) {
         let activeSession = await tx.tableSession.findFirst({
@@ -307,17 +307,28 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
             status: { in: ["OPEN", "BILLING", "PAID"] },
           },
         });
+        const resolvedWaiterId = body.waiterId ? Number(body.waiterId) : (dTable.assignedWaiterId || actor?.userId || null);
+        const resolvedWaiterName = body.waiterName || dTable.assignedWaiterName || actor?.userName || null;
+
         if (!activeSession) {
           activeSession = await tx.tableSession.create({
             data: {
               restaurantId,
               tableId: dTable.id,
               tableNo: dTable.tableNo,
-              waiterId: actor?.userId || null,
-              waiterName: actor?.userName || null,
+              waiterId: resolvedWaiterId,
+              waiterName: resolvedWaiterName,
               guestCount: Math.max(1, Number(body.guestCount || 1)),
               status: "OPEN",
               openedAt: new Date(),
+            },
+          });
+        } else if (!activeSession.waiterId && resolvedWaiterId) {
+          activeSession = await tx.tableSession.update({
+            where: { id: activeSession.id },
+            data: {
+              waiterId: resolvedWaiterId,
+              waiterName: resolvedWaiterName,
             },
           });
         }

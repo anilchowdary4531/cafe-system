@@ -1,6 +1,100 @@
 import { logAuditEvent } from "./auditLogService.js";
 
 /**
+ * Unassign Waiter from Table & TableSession
+ */
+export const unassignWaiterFromTable = async ({
+    prisma,
+    restaurantId,
+    tableId,
+    tableSessionId = null,
+    actor = null,
+    reason = null,
+} = {}) => {
+    const rid = Number(restaurantId);
+    const tid = Number(tableId);
+
+    if (!rid || !tid) {
+        throw new Error("Missing required parameters for waiter unassignment");
+    }
+
+    // 1. Fetch Dining Table
+    const table = await prisma.diningTable.findFirst({
+        where: { id: tid, restaurantId: rid },
+    });
+    if (!table) throw new Error("table_not_found");
+
+    const previousWaiterId = table.assignedWaiterId;
+    const previousWaiterName = table.assignedWaiterName;
+
+    // 2. Update DiningTable
+    const updatedTable = await prisma.diningTable.update({
+        where: { id: tid },
+        data: {
+            assignedWaiterId: null,
+            assignedWaiterName: null,
+        },
+    });
+
+    // 3. If an active session exists on the table, unassign its waiter as well
+    let updatedSession = null;
+    let targetSessionId = tableSessionId ? Number(tableSessionId) : null;
+
+    if (!targetSessionId) {
+        const activeSession = await prisma.tableSession.findFirst({
+            where: { tableId: tid, restaurantId: rid, status: { in: ["OPEN", "BILLING"] } },
+        });
+        if (activeSession) targetSessionId = activeSession.id;
+    }
+
+    if (targetSessionId) {
+        updatedSession = await prisma.tableSession.update({
+            where: { id: targetSessionId },
+            data: {
+                waiterId: null,
+                waiterName: null,
+            },
+        });
+    }
+
+    // 4. Record Assignment History
+    let assignmentLog = null;
+    if (previousWaiterId) {
+        assignmentLog = await prisma.tableWaiterAssignment.create({
+            data: {
+                restaurantId: rid,
+                tableId: tid,
+                tableSessionId: targetSessionId || null,
+                waiterId: previousWaiterId,
+                waiterName: previousWaiterName,
+                assignedByUserId: actor?.userId || actor?.id ? Number(actor?.userId || actor?.id) : null,
+                assignedByName: actor?.userName || actor?.name || actor?.email || "Staff",
+                action: "UNASSIGNED",
+                reason: reason ? String(reason) : "Unassigned from table",
+            },
+        });
+    }
+
+    // 5. Audit Log
+    await logAuditEvent({
+        prisma,
+        restaurantId: rid,
+        actor,
+        action: "WAITER_UNASSIGNED",
+        entity: "DiningTable",
+        entityId: String(tid),
+        details: {
+            tableNo: table.tableNo,
+            previousWaiterId,
+            previousWaiterName,
+            reason,
+        },
+    });
+
+    return { table: updatedTable, session: updatedSession, assignmentLog };
+};
+
+/**
  * Assign or Reassign Waiter to Table & TableSession
  */
 export const assignWaiterToTable = async ({
@@ -14,15 +108,34 @@ export const assignWaiterToTable = async ({
 } = {}) => {
     const rid = Number(restaurantId);
     const tid = Number(tableId);
-    const wid = Number(waiterId);
 
-    if (!rid || !tid || !wid) {
+    if (!rid || !tid) {
         throw new Error("Missing required parameters for waiter assignment");
     }
 
+    if (waiterId === null || waiterId === undefined || waiterId === "" || Number(waiterId) === 0) {
+        return unassignWaiterFromTable({
+            prisma,
+            restaurantId: rid,
+            tableId: tid,
+            tableSessionId,
+            actor,
+            reason,
+        });
+    }
+
+    const wid = Number(waiterId);
+
     // 1. Verify Waiter User
     const waiter = await prisma.user.findFirst({
-        where: { id: wid, restaurantId: rid, isActive: true },
+        where: {
+            id: wid,
+            isActive: true,
+            OR: [
+                { restaurantId: rid },
+                { staffAccess: { restaurantId: rid } },
+            ],
+        },
         select: { id: true, name: true, role: true },
     });
 
