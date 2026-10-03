@@ -320,7 +320,7 @@ test("Server Assignment, Table Mapping & Connection Audit — Backend Test Suite
         assert.ok(unassignLog);
     });
 
-    await t.test("7. Lifecycle: Table clearing preserves server assignment by default", async () => {
+    await t.test("7. Lifecycle: Table clearing automatically clears server assignment by default", async () => {
         // First re-assign serverA1
         await app.inject({
             method: "POST",
@@ -354,7 +354,7 @@ test("Server Assignment, Table Mapping & Connection Audit — Backend Test Suite
             },
         });
 
-        // Now clear table (without clearWaiter flag)
+        // Now clear table (automatically clears assigned waiter)
         const clearRes = await app.inject({
             method: "POST",
             url: `/owner/${restaurantA.id}/tables/${tableA2.id}/clear`,
@@ -364,10 +364,10 @@ test("Server Assignment, Table Mapping & Connection Audit — Backend Test Suite
 
         assert.equal(clearRes.statusCode, 200);
 
-        // Verify session is closed, but assignedWaiterId remains intact on diningTable
+        // Verify session is closed and assignedWaiterId/Name are set to null
         const dbTable = await prisma.diningTable.findUnique({ where: { id: tableA2.id } });
-        assert.equal(dbTable.assignedWaiterId, serverA1.id, "Assigned waiter must be preserved across table clearing");
-        assert.equal(dbTable.assignedWaiterName, serverA1.name);
+        assert.equal(dbTable.assignedWaiterId, null, "Assigned waiter must be cleared when freeing table");
+        assert.equal(dbTable.assignedWaiterName, null);
 
         const closedSession = await prisma.tableSession.findUnique({ where: { id: session.id } });
         assert.equal(closedSession.status, "CLOSED");
@@ -375,6 +375,12 @@ test("Server Assignment, Table Mapping & Connection Audit — Backend Test Suite
 
     await t.test("8. Order placement preserves table server assignment and associates server with session & KOT", async () => {
         // Ensure Table 2 has serverA1 assigned
+        await app.inject({
+            method: "POST",
+            url: `/owner/${restaurantA.id}/tables/${tableA2.id}/assign-waiter`,
+            headers: { authorization: `Bearer ${tokenA}` },
+            payload: { waiterId: serverA1.id },
+        });
         const dbTableBefore = await prisma.diningTable.findUnique({ where: { id: tableA2.id } });
         assert.equal(dbTableBefore.assignedWaiterId, serverA1.id);
 

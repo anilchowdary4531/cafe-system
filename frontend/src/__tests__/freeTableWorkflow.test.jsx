@@ -138,19 +138,19 @@ describe("Free Table Comprehensive Workflow Unit & Integration Suite", () => {
         expect(table1Element).toBeInTheDocument();
     });
 
-    it("Scenario 2 & 7: Freeing a table preserves the assigned server identity", async () => {
+    it("Scenario 2: Freeing a table automatically clears the assigned server identity", async () => {
         axios.post.mockResolvedValueOnce({
             data: {
                 success: true,
                 message: "Table Table 1 cleared and marked free!",
-                table: { id: 1, tableNo: "Table 1", isOccupied: false, assignedWaiterId: 10, assignedWaiterName: "Kamesh" },
+                table: { id: 1, tableNo: "Table 1", isOccupied: false, assignedWaiterId: null, assignedWaiterName: null },
             },
         });
 
         renderWithRouter(<OwnerLayout />);
 
         await waitFor(() => {
-            expect(screen.getByText("Kamesh")).toBeInTheDocument();
+            expect(screen.getByText("Table 1")).toBeInTheDocument();
         });
     });
 

@@ -1315,9 +1315,9 @@ export default function OwnerLayout() {
 
         setCompletingTableKey(assignmentKey || String(targetTableId));
         setReceiptActionError("");
-        const prevOverview = { ...tableOverview };
+        const prevAssignments = { ...tableAssignments };
 
-        // Optimistically update table state to Available in local state
+        // Optimistically update table state to Available and clear server assignment in local state
         setTableOverview((prev) => {
             const updatedTables = (prev.tables || []).map((t) => {
                 if (String(t.id) === String(targetTableId) || String(t.tableNo) === String(table?.tableNo)) {
@@ -1329,6 +1329,8 @@ export default function OwnerLayout() {
                         activeOrders: [],
                         activeSession: null,
                         occupiedSince: null,
+                        assignedWaiterId: null,
+                        assignedWaiterName: null,
                     };
                 }
                 return t;
@@ -1341,17 +1343,42 @@ export default function OwnerLayout() {
             };
         });
 
+        // Clear local table staff assignments map
+        setTableAssignments((prev) => {
+            const next = { ...(prev || {}) };
+            const keysToRemove = [
+                assignmentKey,
+                String(targetTableId),
+                `table-${targetTableId}`,
+                table?.tableNo ? String(table.tableNo) : null,
+                table?.tableNo ? `table-${String(table.tableNo).trim().toLowerCase()}` : null,
+                table?.assignmentKey,
+                table?.key,
+            ].filter(Boolean);
+            keysToRemove.forEach((k) => {
+                delete next[k];
+            });
+            if (restaurantId) {
+                try {
+                    localStorage.setItem(getTableStaffStorageKey(restaurantId), JSON.stringify(next));
+                } catch (e) {
+                    // Ignore storage quota errors
+                }
+            }
+            return next;
+        });
+
         try {
-            // Call backend API to clear table session, reset isOccupied, and record audit trail
+            // Call backend API to clear table session, reset isOccupied, clear assigned waiter, and record audit trail
             await axios.post(`${API}/owner/${restaurantId}/tables/${encodeURIComponent(targetTableId)}/clear`, {
                 force: true,
+                clearWaiter: true,
                 reason: options.reason || "Table cleared by Owner",
                 performedByUserId: user?.id || null,
                 performedByName: user?.name || user?.email || "Owner",
                 performedByUserRole: "OWNER",
             });
 
-            // Note: Server assignment remains attached to the table across order completion / table freeing.
             if (assignmentKey) {
                 setPrintedTableKeys((prev) => {
                     const next = new Set(prev);
@@ -1370,6 +1397,14 @@ export default function OwnerLayout() {
             });
         } catch (err) {
             setTableOverview(prevOverview);
+            setTableAssignments(prevAssignments);
+            if (restaurantId) {
+                try {
+                    localStorage.setItem(getTableStaffStorageKey(restaurantId), JSON.stringify(prevAssignments));
+                } catch (e) {
+                    // Ignore storage quota errors
+                }
+            }
             showToast({
                 title: "Error Clearing Table",
                 message: err.response?.data?.message || err.message || "Failed to free table.",

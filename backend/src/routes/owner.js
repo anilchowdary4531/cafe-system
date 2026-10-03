@@ -1189,9 +1189,9 @@ export default async function ownerRoutes(app, deps) {
           },
         });
 
-        // Maintain separation between table occupancy and server assignment:
-        // Freeing a table / clearing occupancy does NOT remove a server assignment unless explicitly requested via clearWaiter: true
-        const shouldClearWaiter = Boolean(req.body?.clearWaiter);
+        // Freeing a table automatically clears the assigned server (setting assignedWaiterId and assignedWaiterName to null)
+        // unless explicitly requested to preserve it via clearWaiter: false
+        const shouldClearWaiter = req.body?.clearWaiter !== false;
         const updated = shouldClearWaiter
           ? await tx.diningTable.update({
               where: { id: table.id },

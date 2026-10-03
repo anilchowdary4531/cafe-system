@@ -533,6 +533,7 @@ export default function OwnerTables() {
         try {
             await axios.post(`${API}/owner/${restaurantId}/tables/${table.id}/clear`, {
                 force: true,
+                clearWaiter: true,
                 reason: "Table cleared by Owner via OwnerTables",
                 performedByUserId: user?.id || null,
                 performedByName: user?.name || user?.email || "Owner",
