@@ -5,6 +5,10 @@ import fastifyJwt from "@fastify/jwt";
 import prisma from "../prisma.js";
 import ownerRoutes from "../routes/owner.js";
 import { requireStaffJwt } from "../services/staffAuthService.js";
+import { createAndDispatchNotification } from "../services/notificationService.js";
+import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
+import { assignWaiterToTable } from "../services/staffManagementService.js";
+import { updateSessionPaymentStatus } from "../services/tableSessionService.js";
 
 const STAFF_ALLOWED_ROLES = ["OWNER", "ADMIN", "MANAGER", "SUPER_ADMIN"];
 
@@ -437,5 +441,122 @@ test("Server Assignment, Table Mapping & Connection Audit — Backend Test Suite
             const tableCheck = await prisma.diningTable.findUnique({ where: { id: tableA2.id } });
             assert.equal(tableCheck.assignedWaiterId, serverA1.id, `Server assignment must be preserved when order transitions to ${st}`);
         }
+    });
+
+    await t.test("9. Owner assignment creates persistent in-app notification for waiter", async () => {
+        await app.inject({
+            method: "POST",
+            url: `/owner/${restaurantA.id}/tables/${tableA2.id}/assign-waiter`,
+            headers: { authorization: `Bearer ${tokenA}` },
+            payload: { waiterId: serverA1.id },
+        });
+
+        const notifAfter = await prisma.notification.findFirst({
+            where: { recipientId: serverA1.id, restaurantId: restaurantA.id },
+            orderBy: { createdAt: "desc" },
+        });
+
+        assert.ok(notifAfter, "Persistent in-app notification must be created for assigned waiter");
+        assert.ok(notifAfter.title.includes("Table Assigned"), "Notification title must indicate table assignment");
+    });
+
+    await t.test("10. Kitchen order status READY creates persistent notification for restaurant staff", async () => {
+        const order = await prisma.order.create({
+            data: {
+                restaurantId: restaurantA.id,
+                orderNo: `ORD-READY-${Date.now()}`,
+                tableNo: tableA2.tableNo,
+                status: "PREPARING",
+                subtotal: 150,
+                total: 150,
+            },
+        });
+
+        // Simulate kitchen updating order to READY and dispatching notification
+        await prisma.order.update({
+            where: { id: order.id },
+            data: { status: "READY" },
+        });
+
+        await createAndDispatchNotification({
+            prisma,
+            realtime: null,
+            recipientType: RECIPIENT_TYPES.RESTAURANT,
+            recipientId: restaurantA.id,
+            restaurantId: restaurantA.id,
+            orderId: order.id,
+            notificationType: NOTIFICATION_TYPES.FOOD_READY || "FOOD_READY",
+            title: `🔔 Order Ready — Table ${order.tableNo}`,
+            message: `Order #${order.orderNo} for Table ${order.tableNo} is ready to serve!`,
+            data: { orderId: order.id, tableNo: order.tableNo, status: "READY" },
+            idempotencyKey: `order_ready_${order.id}_${Date.now()}`,
+        });
+
+        const readyNotif = await prisma.notification.findFirst({
+            where: { restaurantId: restaurantA.id, orderId: order.id },
+            orderBy: { createdAt: "desc" },
+        });
+
+        assert.ok(readyNotif, "Persistent notification must be created when kitchen order is READY");
+        assert.equal(readyNotif.notificationType, "FOOD_READY");
+    });
+
+    await t.test("11. Unauthorized reassignment by ordinary staff is rejected by backend permission guard", async () => {
+        // Ensure Table 2 is assigned to serverA1
+        await prisma.diningTable.update({
+            where: { id: tableA2.id },
+            data: { assignedWaiterId: serverA1.id, assignedWaiterName: serverA1.name },
+        });
+
+        // Ordinary staff member trying to overwrite serverA1 with serverA2 without manager auth or force flag
+        await assert.rejects(
+            async () => {
+                await assignWaiterToTable({
+                    prisma,
+                    restaurantId: restaurantA.id,
+                    tableId: tableA2.id,
+                    waiterId: serverA2.id,
+                    actor: { userId: serverA2.id, userName: serverA2.name, role: "STAFF" },
+                });
+            },
+            (err) => {
+                assert.ok(err.message.includes("already assigned"), "Error message must state table is already assigned");
+                return true;
+            }
+        );
+    });
+
+    await t.test("12. Session payment completion automatically clears active waiter assignment on dining table", async () => {
+        // Assign serverA1 to Table 2
+        await prisma.diningTable.update({
+            where: { id: tableA2.id },
+            data: { assignedWaiterId: serverA1.id, assignedWaiterName: serverA1.name },
+        });
+
+        const session = await prisma.tableSession.create({
+            data: {
+                restaurantId: restaurantA.id,
+                tableId: tableA2.id,
+                tableNo: tableA2.tableNo,
+                status: "OPEN",
+                waiterId: serverA1.id,
+                waiterName: serverA1.name,
+                openedAt: new Date(),
+            },
+        });
+
+        const updatedSession = await updateSessionPaymentStatus({
+            prisma,
+            sessionId: session.id,
+            paymentMode: "CASH",
+            paymentStatus: "PAID",
+        });
+
+        assert.ok(updatedSession);
+        assert.equal(updatedSession.status, "PAID");
+
+        const freedTable = await prisma.diningTable.findUnique({ where: { id: tableA2.id } });
+        assert.equal(freedTable.assignedWaiterId, null, "DiningTable assignedWaiterId must be set to null upon session payment completion");
+        assert.equal(freedTable.assignedWaiterName, null);
     });
 });

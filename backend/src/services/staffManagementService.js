@@ -1,4 +1,6 @@
 import { logAuditEvent } from "./auditLogService.js";
+import { createAndDispatchNotification } from "./notificationService.js";
+import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 
 /**
  * Unassign Waiter from Table & TableSession
@@ -151,6 +153,12 @@ export const assignWaiterToTable = async ({
 
     const isReassignment = Boolean(table.assignedWaiterId && table.assignedWaiterId !== wid);
 
+    // Concurrency / Permission Guard:
+    // Ordinary staff members cannot overwrite an existing server's table assignment without Owner/Manager authorization or force flag
+    if (isReassignment && actor && actor.role !== "OWNER" && actor.role !== "MANAGER" && !actor.force) {
+        throw new Error(`Table ${table.tableNo} is already assigned to ${table.assignedWaiterName || 'another server'}. Manager/Owner re-assignment required.`);
+    }
+
     // 3. Update DiningTable default assigned waiter
     const updatedTable = await prisma.diningTable.update({
         where: { id: tid },
@@ -211,6 +219,27 @@ export const assignWaiterToTable = async ({
             reason,
         },
     });
+
+    // 7. Dispatch persistent in-app notification to assigned waiter
+    try {
+        await createAndDispatchNotification({
+            prisma,
+            realtime: null,
+            recipientType: RECIPIENT_TYPES.USER,
+            recipientId: waiter.id,
+            restaurantId: rid,
+            notificationType: NOTIFICATION_TYPES.IMPORTANT_ORDER_ALERT || "IMPORTANT_ORDER_ALERT",
+            title: `📋 Table Assigned — Table ${table.tableNo}`,
+            message: `You have been assigned to Table ${table.tableNo} (${table.section || "Main Floor"}).`,
+            data: {
+                tableId: tid,
+                tableNo: table.tableNo,
+                restaurantId: rid,
+                action: isReassignment ? "REASSIGNED" : "ASSIGNED",
+            },
+            idempotencyKey: `waiter_assigned_${tid}_${waiter.id}_${Math.floor(Date.now() / 30000)}`,
+        }).catch((err) => console.warn("[StaffService] Assignment notification warning:", err?.message));
+    } catch (_) {}
 
     return { table: updatedTable, session: updatedSession, assignmentLog };
 };

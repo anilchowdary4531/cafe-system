@@ -386,8 +386,12 @@ export default function Server() {
 
         let activeTable = table;
 
-        // Auto-assign authenticated server to selected table if unassigned or assigned to another staff
-        if (serverId && table?.id && Number(table.assignedWaiterId) !== Number(serverId)) {
+        // Auto-assign authenticated server to selected table if unassigned
+        const isUnassigned = !table?.assignedWaiterId;
+        const isAssignedToOther = Boolean(table?.assignedWaiterId && Number(table.assignedWaiterId) !== Number(serverId));
+        const isManagerOrOwner = user?.role === "OWNER" || user?.role === "MANAGER";
+
+        if (serverId && table?.id && (isUnassigned || (isAssignedToOther && isManagerOrOwner))) {
             try {
                 activeTable = {
                     ...table,

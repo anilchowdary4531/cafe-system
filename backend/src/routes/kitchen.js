@@ -1,4 +1,6 @@
 import prisma from "../prisma.js";
+import { createAndDispatchNotification } from "../services/notificationService.js";
+import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 
 export default async function (fastify) {
 
@@ -69,6 +71,32 @@ export default async function (fastify) {
                     items: true,
                 },
             });
+
+            if (status === "READY" && order?.restaurantId) {
+                try {
+                    await createAndDispatchNotification({
+                        prisma,
+                        realtime: fastify.realtime || { io: fastify.io },
+                        recipientType: RECIPIENT_TYPES.RESTAURANT,
+                        recipientId: order.restaurantId,
+                        restaurantId: order.restaurantId,
+                        orderId: order.id,
+                        notificationType: NOTIFICATION_TYPES.FOOD_READY || "FOOD_READY",
+                        title: `🔔 Order Ready — Table ${order.tableNo || "Takeaway"}`,
+                        message: `Order #${order.orderNo || order.id} for Table ${order.tableNo || "Takeaway"} is ready to serve!`,
+                        data: {
+                            orderId: order.id,
+                            tableNo: order.tableNo,
+                            orderNo: order.orderNo,
+                            restaurantId: order.restaurantId,
+                            status: "READY",
+                        },
+                        idempotencyKey: `order_ready_${order.id}_${order.updatedAt?.getTime() || Date.now()}`,
+                    }).catch((err) => console.warn("[KitchenRoute] READY notification warning:", err?.message));
+                } catch (notifErr) {
+                    console.warn("[KitchenRoute] Failed to send READY notification:", notifErr?.message);
+                }
+            }
 
             return order;
         } catch (error) {

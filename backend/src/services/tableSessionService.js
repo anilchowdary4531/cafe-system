@@ -311,6 +311,17 @@ export const updateSessionPaymentStatus = async ({
         table: true,
       },
     });
+
+    if (session.tableId) {
+      await prisma.diningTable.update({
+        where: { id: session.tableId },
+        data: {
+          assignedWaiterId: null,
+          assignedWaiterName: null,
+        },
+      }).catch((err) => console.warn("[TableSession] Error clearing waiter on payment:", err?.message));
+    }
+
     return updated;
   }
 
@@ -338,6 +349,16 @@ export const closeTableSession = async ({ prisma, sessionId } = {}) => {
       table: true,
     },
   });
+
+  if (session.tableId) {
+    await prisma.diningTable.update({
+      where: { id: session.tableId },
+      data: {
+        assignedWaiterId: null,
+        assignedWaiterName: null,
+      },
+    }).catch((err) => console.warn("[TableSession] Error clearing waiter on close:", err?.message));
+  }
 
   return updated;
 };
