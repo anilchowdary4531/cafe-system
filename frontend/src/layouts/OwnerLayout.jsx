@@ -832,13 +832,23 @@ export default function OwnerLayout() {
                 const next = { ...(prev || {}) };
                 tables.forEach((t) => {
                     const wid = t.assignedWaiterId ? String(t.assignedWaiterId) : "";
+                    const keys = [
+                        t.assignmentKey,
+                        t.key,
+                        t.id ? String(t.id) : null,
+                        t.id ? `table-${t.id}` : null,
+                        t.tableNo ? String(t.tableNo) : null,
+                        t.tableNo ? `table-${String(t.tableNo).trim().toLowerCase()}` : null,
+                    ].filter(Boolean);
+
                     if (wid) {
-                        next[t.assignmentKey] = wid;
-                        next[t.key] = wid;
-                        if (t.id) next[String(t.id)] = wid;
-                        if (t.id) next[`table-${t.id}`] = wid;
-                        if (t.tableNo) next[String(t.tableNo)] = wid;
-                        if (t.tableNo) next[`table-${String(t.tableNo).trim().toLowerCase()}`] = wid;
+                        keys.forEach((k) => {
+                            next[k] = wid;
+                        });
+                    } else {
+                        keys.forEach((k) => {
+                            delete next[k];
+                        });
                     }
                 });
                 return next;
@@ -2102,7 +2112,7 @@ export default function OwnerLayout() {
                                                  const fallbackStaffName = table.assignedWaiterName || table.activeSession?.waiterName || (assignedStaffId ? "Server" : "");
                                                  const assignedStaff = assignedStaffId
                                                      ? staffById.get(assignedStaffId) || { id: assignedStaffId, name: fallbackStaffName || `Server`, role: "STAFF" }
-                                                     : (fallbackStaffName ? { id: "", name: fallbackStaffName, role: "STAFF" } : null);
+                                                     : null;
                                                 const assignedStaffLabel = assignedStaff
                                                     ? getStaffDisplayLabel(assignedStaff)
                                                     : "";
