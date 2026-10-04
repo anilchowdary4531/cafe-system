@@ -672,6 +672,12 @@ export default function OwnerLayout() {
             fallbackKey: "finance",
         },
         {
+            label: "Supply Chain Intel",
+            path: "/owner/supply-chain",
+            icon: <Boxes size={18} />,
+            accessKey: "supply",
+        },
+        {
             label: "Supply Marketplace",
             path: "/owner/supply",
             icon: <Truck size={18} />,

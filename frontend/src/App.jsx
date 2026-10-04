@@ -85,6 +85,7 @@ import SuperAdminWalletManagement from "./pages/super-admin/SuperAdminWalletMana
 import SupplierLogin from "./pages/supplier/SupplierLogin";
 import SupplierDashboard from "./pages/supplier/SupplierDashboard";
 import OwnerSupplyMarketplace from "./pages/admin/OwnerSupplyMarketplace";
+import OwnerSupplyChainIntelligence from "./pages/admin/OwnerSupplyChainIntelligence";
 import SuperAdminSupplyChain from "./pages/super-admin/SuperAdminSupplyChain";
 import NewOrder from "./pages/admin/NewOrder.jsx";
 import PaymentSuccess from "./pages/admin/PaymentSuccess.jsx";
@@ -595,6 +596,7 @@ export default function App() {
                         <Route path="settings" element={<OwnerSettings />} />
                         <Route path="notifications" element={<OwnerNotifications />} />
                         <Route path="supply" element={<OwnerSupplyMarketplace />} />
+                        <Route path="supply-chain" element={<OwnerSupplyChainIntelligence />} />
                         <Route path="delivery" element={<OwnerDeliveryManager />} />
                         <Route path="delivery-partners" element={<OwnerDeliveryPartners />} />
                         <Route path="driver-portal" element={<DriverDeliveryStudio />} />
