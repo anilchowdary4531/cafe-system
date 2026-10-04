@@ -1258,6 +1258,7 @@ export default function OwnerLayout() {
             try {
                 await axios.post(`${API}/owner/${restaurantId}/tables/${targetTableId}/assign-waiter`, {
                     waiterId: Number(normalizedStaffId),
+                    waiterName: staffName,
                     reason: "Assigned via Owner Panel",
                 });
             } catch (err) {
