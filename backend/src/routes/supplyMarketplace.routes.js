@@ -83,6 +83,25 @@ export default async function supplyMarketplaceRoutes(app) {
         }
     };
 
+    const listSuppliersForOwnerHandler = async (req, reply) => {
+        try {
+            const suppliers = await prisma.supplier.findMany({
+                include: {
+                    profile: true,
+                    addresses: true,
+                    products: { where: { isAvailable: true } },
+                    orders: { include: { items: true } },
+                    _count: { select: { products: true, orders: true } },
+                },
+                orderBy: { createdAt: "desc" },
+            });
+
+            return reply.code(200).send({ suppliers });
+        } catch (err) {
+            return reply.code(500).send({ error: "Failed to fetch suppliers" });
+        }
+    };
+
     const listSupplierOrdersHandler = async (req, reply) => {
         try {
             const supplierId = req.user?.supplierId || req.user?.id;
@@ -153,6 +172,10 @@ export default async function supplyMarketplaceRoutes(app) {
     app.get("/supplier/orders", { preHandler: [authSupplier] }, listSupplierOrdersHandler);
     app.get("/api/supplier/orders", { preHandler: [authSupplier] }, listSupplierOrdersHandler);
     app.get("/api/v1/supplier/orders", { preHandler: [authSupplier] }, listSupplierOrdersHandler);
+
+    app.get("/owner/suppliers", { preHandler: [authUser] }, listSuppliersForOwnerHandler);
+    app.get("/api/owner/suppliers", { preHandler: [authUser] }, listSuppliersForOwnerHandler);
+    app.get("/api/v1/owner/suppliers", { preHandler: [authUser] }, listSuppliersForOwnerHandler);
 
     app.post("/supplier/orders/:id/accept", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "ACCEPTED"));
     app.post("/supplier/orders/:id/dispatch", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "DISPATCHED"));

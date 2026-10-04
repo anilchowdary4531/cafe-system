@@ -717,6 +717,12 @@ export default function OwnerLayout() {
             accessKey: "supply",
         },
         {
+            label: "Supplier Vendors",
+            path: "/owner/supply-chain/suppliers",
+            icon: <Truck size={18} />,
+            accessKey: "supply",
+        },
+        {
             label: "Supply Marketplace",
             path: "/owner/supply",
             icon: <Truck size={18} />,
