@@ -711,6 +711,12 @@ export default function OwnerLayout() {
             accessKey: "supply",
         },
         {
+            label: "Inventory Valuation",
+            path: "/owner/supply-chain/inventory/valuation",
+            icon: <IndianRupee size={18} />,
+            accessKey: "supply",
+        },
+        {
             label: "Supply Marketplace",
             path: "/owner/supply",
             icon: <Truck size={18} />,
