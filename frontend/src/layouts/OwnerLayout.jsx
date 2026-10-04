@@ -1293,7 +1293,14 @@ export default function OwnerLayout() {
             setPrintedTableKeys((prev) => new Set([...prev, assignmentKey]));
         }
         const printWindow = window.open("", "_blank");
-        if (!printWindow) return;
+        if (!printWindow) {
+            showToast({
+                title: "Print Blocked",
+                message: "Please allow popups in your browser to print receipts.",
+                variant: "warning",
+            });
+            return;
+        }
 
         const markup = buildReceiptPrintMarkup({
             tableLabel,
@@ -1315,6 +1322,7 @@ export default function OwnerLayout() {
 
         if (!restaurantId || !targetTableId) {
             setOpenOrdersTableKey("");
+            setOpenStaffTableKey("");
             setOpenMoreTableKey("");
             return;
         }
@@ -1327,6 +1335,7 @@ export default function OwnerLayout() {
         setCompletingTableKey(assignmentKey || String(targetTableId));
         setReceiptActionError("");
         const prevAssignments = { ...tableAssignments };
+        const prevOverview = { ...tableOverview };
 
         // Optimistically update table state to Available and clear server assignment in local state
         setTableOverview((prev) => {
@@ -1426,18 +1435,43 @@ export default function OwnerLayout() {
         }
     };
 
-    const copyQrLink = (table) => {
-        try {
-            const url = table.qrTargetUrl
-                ? `${window.location.origin}${table.qrTargetUrl}`
-                : `${window.location.origin}/order/table/${table.qrToken || table.id}`;
-            navigator.clipboard.writeText(url);
+    const copyQrLink = async (table) => {
+        const url = table.qrTargetUrl
+            ? `${window.location.origin}${table.qrTargetUrl}`
+            : `${window.location.origin}/order/table/${table.qrToken || table.id}`;
+
+        let copied = false;
+        if (navigator?.clipboard?.writeText) {
+            try {
+                await navigator.clipboard.writeText(url);
+                copied = true;
+            } catch {
+                // fallback to execCommand below
+            }
+        }
+
+        if (!copied) {
+            try {
+                const textarea = document.createElement("textarea");
+                textarea.value = url;
+                textarea.style.position = "fixed";
+                textarea.style.opacity = "0";
+                document.body.appendChild(textarea);
+                textarea.select();
+                copied = document.execCommand("copy");
+                document.body.removeChild(textarea);
+            } catch {
+                copied = false;
+            }
+        }
+
+        if (copied) {
             showToast({
                 title: "QR Link Copied 🎉",
                 message: `Ordering link for Table ${table.tableNo} copied to clipboard!`,
                 variant: "success",
             });
-        } catch {
+        } else {
             showToast({
                 title: "Copy Failed",
                 message: "Unable to copy link to clipboard.",
@@ -2678,14 +2712,14 @@ export default function OwnerLayout() {
                                                                         setOpenMoreTableKey("");
                                                                         handleFreeTable(table, assignmentKey);
                                                                     }}
-                                                                    disabled={isCompletingThisTable || (!table.isOccupied && (!table.activeOrders || table.activeOrders.length === 0) && !table.activeSession)}
+                                                                    disabled={isCompletingThisTable || (!table.isOccupied && (!table.activeOrders || table.activeOrders.length === 0) && !table.activeSession && !assignedStaff)}
                                                                     className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 text-left cursor-pointer disabled:opacity-60"
                                                                 >
                                                                     <Unlock size={13} className="shrink-0" />
                                                                     <span>
                                                                         {isCompletingThisTable
                                                                             ? "Freeing..."
-                                                                            : table.isOccupied || (table.activeOrders && table.activeOrders.length > 0) || table.activeSession
+                                                                            : table.isOccupied || (table.activeOrders && table.activeOrders.length > 0) || table.activeSession || assignedStaff
                                                                             ? "Free Table"
                                                                             : "Table Available"}
                                                                     </span>

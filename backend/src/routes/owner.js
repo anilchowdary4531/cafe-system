@@ -245,7 +245,7 @@ export default async function ownerRoutes(app, deps) {
     }
   });
 
-  app.get("/owner/dashboard/:restaurantId", async (req, reply) => {
+  const handleGetOwnerDashboard = async (req, reply) => {
     try {
       const { restaurantId } = req.params;
       const id = Number(restaurantId);
@@ -287,7 +287,9 @@ export default async function ownerRoutes(app, deps) {
         message: "Dashboard failed",
       });
     }
-  });
+  };
+  app.get("/owner/dashboard/:restaurantId", handleGetOwnerDashboard);
+  app.get("/api/owner/dashboard/:restaurantId", handleGetOwnerDashboard);
 
   app.get("/owner/:restaurantId/orders", async (req, reply) => {
     try {
@@ -606,7 +608,7 @@ export default async function ownerRoutes(app, deps) {
     }
   });
 
-  app.get("/owner/:restaurantId/tables", async (req, reply) => {
+  const handleGetOwnerTables = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
@@ -899,13 +901,19 @@ export default async function ownerRoutes(app, deps) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to fetch tables" });
     }
-  });
+  };
+  app.get("/owner/:restaurantId/tables", handleGetOwnerTables);
+  app.get("/api/owner/:restaurantId/tables", handleGetOwnerTables);
 
   // Table Operations: Move, Merge, Split / Transfer Items
   app.post("/owner/:restaurantId/tables/:tableId/move", moveTable);
+  app.post("/api/owner/:restaurantId/tables/:tableId/move", moveTable);
   app.post("/owner/:restaurantId/tables/:tableId/merge", mergeTables);
+  app.post("/api/owner/:restaurantId/tables/:tableId/merge", mergeTables);
   app.post("/owner/:restaurantId/tables/:tableId/split", splitTableOrTransferItems);
+  app.post("/api/owner/:restaurantId/tables/:tableId/split", splitTableOrTransferItems);
   app.post("/owner/:restaurantId/tables/:tableId/transfer-items", splitTableOrTransferItems);
+  app.post("/api/owner/:restaurantId/tables/:tableId/transfer-items", splitTableOrTransferItems);
 
   // Bulk Floor Plan Layout Update
   app.put("/owner/:restaurantId/tables/layout", async (req, reply) => {
@@ -1091,7 +1099,7 @@ export default async function ownerRoutes(app, deps) {
   });
 
   // Force Clear & Free Table Endpoint
-  app.post("/owner/:restaurantId/tables/:tableId/clear", async (req, reply) => {
+  const handleClearTable = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const rawParam = String(req.params.tableId || "").trim();
@@ -1248,7 +1256,9 @@ export default async function ownerRoutes(app, deps) {
       console.error("Error clearing table:", err);
       return reply.code(500).send({ success: false, message: err.message || "Failed to clear table" });
     }
-  });
+  };
+  app.post("/owner/:restaurantId/tables/:tableId/clear", handleClearTable);
+  app.post("/api/owner/:restaurantId/tables/:tableId/clear", handleClearTable);
 
   // Table Operation Audit Logs Endpoint
   app.get("/owner/:restaurantId/table-operation-logs", async (req, reply) => {
@@ -1303,7 +1313,7 @@ export default async function ownerRoutes(app, deps) {
     }
   });
 
-  app.post("/owner/:restaurantId/tables", async (req, reply) => {
+  const handleCreateTable = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const { tableNo, seats, isActive, section, positionX, positionY, width, height, shape, rotation } = req.body || {};
@@ -1344,9 +1354,11 @@ export default async function ownerRoutes(app, deps) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to create table" });
     }
-  });
+  };
+  app.post("/owner/:restaurantId/tables", handleCreateTable);
+  app.post("/api/owner/:restaurantId/tables", handleCreateTable);
 
-  app.put("/owner/:restaurantId/tables/:tableId", async (req, reply) => {
+  const handleUpdateTable = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const tableId = Number(req.params.tableId);
@@ -1392,9 +1404,11 @@ export default async function ownerRoutes(app, deps) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to update table" });
     }
-  });
+  };
+  app.put("/owner/:restaurantId/tables/:tableId", handleUpdateTable);
+  app.put("/api/owner/:restaurantId/tables/:tableId", handleUpdateTable);
 
-  app.delete("/owner/:restaurantId/tables/:tableId", async (req, reply) => {
+  const handleDeleteTable = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const tableId = Number(req.params.tableId);
@@ -1414,7 +1428,9 @@ export default async function ownerRoutes(app, deps) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to delete table" });
     }
-  });
+  };
+  app.delete("/owner/:restaurantId/tables/:tableId", handleDeleteTable);
+  app.delete("/api/owner/:restaurantId/tables/:tableId", handleDeleteTable);
 
   // Keep analytics/finance/settings/staff endpoints in this module.
   const getOwnerAnalyticsHandler = async (req, reply) => {
@@ -2479,7 +2495,7 @@ export default async function ownerRoutes(app, deps) {
     }
   });
 
-  app.get("/owner/:restaurantId/staff", async (req, reply) => {
+  const handleGetStaffUsers = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       const q = String(req.query?.q || "").trim().toLowerCase();
@@ -2512,7 +2528,9 @@ export default async function ownerRoutes(app, deps) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to fetch staff users" });
     }
-  });
+  };
+  app.get("/owner/:restaurantId/staff", handleGetStaffUsers);
+  app.get("/api/owner/:restaurantId/staff", handleGetStaffUsers);
 
   app.post("/owner/:restaurantId/staff", async (req, reply) => {
     try {
