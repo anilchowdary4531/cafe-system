@@ -21,6 +21,7 @@ import {
     IndianRupee,
     Truck,
     Package,
+    AlertTriangle,
     Tag,
     Award,
     ZoomIn,
@@ -681,6 +682,12 @@ export default function OwnerLayout() {
             label: "Supply Inventory",
             path: "/owner/supply-chain/inventory",
             icon: <Package size={18} />,
+            accessKey: "supply",
+        },
+        {
+            label: "Low Stock Intel",
+            path: "/owner/supply-chain/inventory/low-stock",
+            icon: <AlertTriangle size={18} />,
             accessKey: "supply",
         },
         {

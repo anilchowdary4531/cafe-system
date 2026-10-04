@@ -88,6 +88,7 @@ import OwnerSupplyMarketplace from "./pages/admin/OwnerSupplyMarketplace";
 import OwnerSupplyChainIntelligence from "./pages/admin/OwnerSupplyChainIntelligence";
 import OwnerSupplyChainInventory from "./pages/admin/OwnerSupplyChainInventory";
 import OwnerSupplyChainInventoryDetail from "./pages/admin/OwnerSupplyChainInventoryDetail";
+import OwnerSupplyChainLowStock from "./pages/admin/OwnerSupplyChainLowStock";
 import SuperAdminSupplyChain from "./pages/super-admin/SuperAdminSupplyChain";
 import NewOrder from "./pages/admin/NewOrder.jsx";
 import PaymentSuccess from "./pages/admin/PaymentSuccess.jsx";
@@ -600,6 +601,7 @@ export default function App() {
                         <Route path="supply" element={<OwnerSupplyMarketplace />} />
                         <Route path="supply-chain" element={<OwnerSupplyChainIntelligence />} />
                         <Route path="supply-chain/inventory" element={<OwnerSupplyChainInventory />} />
+                        <Route path="supply-chain/inventory/low-stock" element={<OwnerSupplyChainLowStock />} />
                         <Route path="supply-chain/inventory/:itemId" element={<OwnerSupplyChainInventoryDetail />} />
                         <Route path="delivery" element={<OwnerDeliveryManager />} />
                         <Route path="delivery-partners" element={<OwnerDeliveryPartners />} />
