@@ -22,6 +22,7 @@ import {
     Truck,
     Package,
     Activity,
+    SlidersHorizontal,
     AlertTriangle,
     Tag,
     Award,
@@ -701,6 +702,12 @@ export default function OwnerLayout() {
             label: "Stock Movements",
             path: "/owner/supply-chain/inventory/movements",
             icon: <Activity size={18} />,
+            accessKey: "supply",
+        },
+        {
+            label: "Stock Adjustments",
+            path: "/owner/supply-chain/inventory/adjustments",
+            icon: <SlidersHorizontal size={18} />,
             accessKey: "supply",
         },
         {
