@@ -82,7 +82,7 @@ export default function OwnerShiftManager() {
   const fetchCurrentShift = async () => {
     setLoadingShift(true);
     try {
-      const res = await axios.get(`${API}/shifts/current?terminalId=${terminalId}`, authHeaders);
+      const res = await axios.get(`${API}/api/shifts/current?terminalId=${terminalId}`, authHeaders);
       if (res.data?.success) {
         setCurrentShift(res.data.shift);
       }
@@ -96,7 +96,7 @@ export default function OwnerShiftManager() {
   const fetchHistory = async () => {
     setHistoryLoading(true);
     try {
-      const url = `${API}/shifts/history?terminalId=${terminalId}${statusFilter ? `&status=${statusFilter}` : ""}`;
+      const url = `${API}/api/shifts/history?terminalId=${terminalId}${statusFilter ? `&status=${statusFilter}` : ""}`;
       const res = await axios.get(url, authHeaders);
       if (res.data?.success) {
         setHistoryItems(res.data.items || []);
@@ -111,7 +111,7 @@ export default function OwnerShiftManager() {
   const fetchDaySummary = async () => {
     setDayLoading(true);
     try {
-      const res = await axios.get(`${API}/day-closing/current`, authHeaders);
+      const res = await axios.get(`${API}/api/day-closing/current`, authHeaders);
       if (res.data?.success) {
         setDaySummary(res.data.summary);
       }
@@ -153,7 +153,7 @@ export default function OwnerShiftManager() {
   const handleOpenShift = async () => {
     try {
       const res = await axios.post(
-        `${API}/shifts/open`,
+        `${API}/api/shifts/open`,
         {
           openingCash: Number(openCashInput),
           notes: openNotes,
@@ -174,7 +174,7 @@ export default function OwnerShiftManager() {
     if (!currentShift) return;
     try {
       const res = await axios.post(
-        `${API}/shifts/${currentShift.id}/cash-in`,
+        `${API}/api/shifts/${currentShift.id}/cash-in`,
         {
           amount: Number(movementAmount),
           reason: movementReason,
@@ -196,7 +196,7 @@ export default function OwnerShiftManager() {
     if (!currentShift) return;
     try {
       const res = await axios.post(
-        `${API}/shifts/${currentShift.id}/cash-out`,
+        `${API}/api/shifts/${currentShift.id}/cash-out`,
         {
           amount: Number(movementAmount),
           reason: movementReason,
@@ -218,7 +218,7 @@ export default function OwnerShiftManager() {
     if (!currentShift) return;
     try {
       const res = await axios.post(
-        `${API}/shifts/${currentShift.id}/close`,
+        `${API}/api/shifts/${currentShift.id}/close`,
         {
           actualCash: countedCash,
           varianceReason,
@@ -239,7 +239,7 @@ export default function OwnerShiftManager() {
   const handleReopenShift = async (shiftId) => {
     try {
       const res = await axios.post(
-        `${API}/shifts/${shiftId}/reopen`,
+        `${API}/api/shifts/${shiftId}/reopen`,
         { reason: reopenReason },
         authHeaders
       );
@@ -257,7 +257,7 @@ export default function OwnerShiftManager() {
   const handleExecuteDayClose = async () => {
     try {
       const res = await axios.post(
-        `${API}/day-closing/close`,
+        `${API}/api/day-closing/close`,
         { notes: dayClosingNotes },
         authHeaders
       );

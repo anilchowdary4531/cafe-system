@@ -397,8 +397,8 @@ export default function OwnerTables() {
         if (!restaurantId) return;
         try {
             const res = await axios.get(`${API}/owner/${restaurantId}/staff`);
-            const list = Array.isArray(res.data) ? res.data : [];
-            setStaffList(list.filter((s) => s && s.isActive !== false));
+            const rawList = Array.isArray(res.data) ? res.data : (res.data?.users || res.data?.staff || []);
+            setStaffList(rawList.filter((s) => s && s.isActive !== false));
         } catch (err) {
             console.error("Failed to load staff in OwnerTables:", err);
         }
