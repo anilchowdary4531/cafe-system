@@ -21,10 +21,14 @@ export const unassignWaiterFromTable = async ({
     }
 
     // 1. Fetch Dining Table
-    const table = await prisma.diningTable.findFirst({
+    let table = await prisma.diningTable.findFirst({
         where: { id: tid, restaurantId: rid },
     });
+    if (!table) {
+        table = await prisma.diningTable.findUnique({ where: { id: tid } });
+    }
     if (!table) throw new Error("table_not_found");
+    const effectiveRid = table.restaurantId || rid;
 
     const previousWaiterId = table.assignedWaiterId;
     const previousWaiterName = table.assignedWaiterName;
@@ -44,7 +48,7 @@ export const unassignWaiterFromTable = async ({
 
     if (!targetSessionId) {
         const activeSession = await prisma.tableSession.findFirst({
-            where: { tableId: tid, restaurantId: rid, status: { in: ["OPEN", "BILLING"] } },
+            where: { tableId: tid, restaurantId: effectiveRid, status: { in: ["OPEN", "BILLING"] } },
         });
         if (activeSession) targetSessionId = activeSession.id;
     }
@@ -64,7 +68,7 @@ export const unassignWaiterFromTable = async ({
     if (previousWaiterId) {
         assignmentLog = await prisma.tableWaiterAssignment.create({
             data: {
-                restaurantId: rid,
+                restaurantId: effectiveRid,
                 tableId: tid,
                 tableSessionId: targetSessionId || null,
                 waiterId: previousWaiterId,
@@ -80,7 +84,7 @@ export const unassignWaiterFromTable = async ({
     // 5. Audit Log
     await logAuditEvent({
         prisma,
-        restaurantId: rid,
+        restaurantId: effectiveRid,
         actor,
         action: "WAITER_UNASSIGNED",
         entity: "DiningTable",
@@ -128,14 +132,26 @@ export const assignWaiterToTable = async ({
 
     const wid = Number(waiterId);
 
-    // 1. Verify Waiter User
+    // 1. Fetch Dining Table first to determine effective restaurant context
+    let table = await prisma.diningTable.findFirst({
+        where: { id: tid, restaurantId: rid },
+    });
+    if (!table) {
+        table = await prisma.diningTable.findUnique({ where: { id: tid } });
+    }
+    if (!table) throw new Error("table_not_found");
+    const effectiveRid = table.restaurantId || rid;
+
+    // 2. Verify Waiter User
     const waiter = await prisma.user.findFirst({
         where: {
             id: wid,
             isActive: true,
             OR: [
-                { restaurantId: rid },
-                { staffAccess: { restaurantId: rid } },
+                { restaurantId: effectiveRid },
+                { staffAccess: { restaurantId: effectiveRid } },
+                { role: "OWNER", OR: [{ restaurantId: effectiveRid }, { restaurantId: null }] },
+                { role: "SUPER_ADMIN" },
             ],
         },
         select: { id: true, name: true, role: true },
@@ -144,12 +160,6 @@ export const assignWaiterToTable = async ({
     if (!waiter) {
         throw new Error("Active waiter not found for this restaurant");
     }
-
-    // 2. Fetch Dining Table
-    const table = await prisma.diningTable.findFirst({
-        where: { id: tid, restaurantId: rid },
-    });
-    if (!table) throw new Error("table_not_found");
 
     const isReassignment = Boolean(table.assignedWaiterId && table.assignedWaiterId !== wid);
 

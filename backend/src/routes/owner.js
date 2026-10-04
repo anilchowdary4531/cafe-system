@@ -3032,13 +3032,18 @@ export default async function ownerRoutes(app, deps) {
       const restaurantId = Number(req.params.restaurantId);
       const tableId = Number(req.params.tableId);
       const { waiterId, tableSessionId, reason } = req.body || {};
+      const actorInfo = req.staffActor
+        ? { userId: req.staffActor.userId, userName: req.staffActor.name || req.staffActor.email, role: req.staffActor.role }
+        : req.user
+        ? { userId: req.user.id, userName: req.user.name || req.user.email, role: req.user.role }
+        : null;
       const result = await assignWaiterToTable({
         prisma,
         restaurantId,
         tableId,
         tableSessionId,
         waiterId,
-        actor: req.user ? { userId: req.user.id, userName: req.user.name || req.user.email, role: req.user.role } : null,
+        actor: actorInfo,
         reason,
       });
       emitTableAssignmentUpdate(restaurantId, tableId, result.table);
@@ -3053,13 +3058,18 @@ export default async function ownerRoutes(app, deps) {
       const restaurantId = Number(req.params.restaurantId);
       const tableId = Number(req.params.tableId);
       const { waiterId, tableSessionId, reason } = req.body || {};
+      const actorInfo = req.staffActor
+        ? { userId: req.staffActor.userId, userName: req.staffActor.name || req.staffActor.email, role: req.staffActor.role }
+        : req.user
+        ? { userId: req.user.id, userName: req.user.name || req.user.email, role: req.user.role }
+        : null;
       const result = await assignWaiterToTable({
         prisma,
         restaurantId,
         tableId,
         tableSessionId,
         waiterId,
-        actor: req.user ? { userId: req.user.id, userName: req.user.name || req.user.email, role: req.user.role } : null,
+        actor: actorInfo,
         reason: reason || "Reassigned to new waiter",
       });
       emitTableAssignmentUpdate(restaurantId, tableId, result.table);
@@ -3074,12 +3084,17 @@ export default async function ownerRoutes(app, deps) {
       const restaurantId = Number(req.params.restaurantId);
       const tableId = Number(req.params.tableId);
       const { tableSessionId, reason } = req.body || {};
+      const actorInfo = req.staffActor
+        ? { userId: req.staffActor.userId, userName: req.staffActor.name || req.staffActor.email, role: req.staffActor.role }
+        : req.user
+        ? { userId: req.user.id, userName: req.user.name || req.user.email, role: req.user.role }
+        : null;
       const result = await unassignWaiterFromTable({
         prisma,
         restaurantId,
         tableId,
         tableSessionId,
-        actor: req.user ? { userId: req.user.id, userName: req.user.name || req.user.email, role: req.user.role } : null,
+        actor: actorInfo,
         reason: reason || "Unassigned via Owner Panel",
       });
       emitTableAssignmentUpdate(restaurantId, tableId, result.table);
