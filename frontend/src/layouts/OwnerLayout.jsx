@@ -1692,6 +1692,24 @@ export default function OwnerLayout() {
         return posX === "right" ? "right-0" : "left-0";
     };
 
+    useEffect(() => {
+        if (!openOrdersTableKey && !openStaffTableKey && !openMoreTableKey) return undefined;
+
+        const handleGlobalPointerDown = (event) => {
+            if (event.target.closest(".theme-table-popover")) return;
+            if (event.target.closest("button[title*='Actions for Table'], button[aria-label*='actions'], button[title*='Assign server'], button[title*='Assigned:']")) {
+                return;
+            }
+            setOpenOrdersTableKey("");
+            setOpenStaffTableKey("");
+            setOpenMoreTableKey("");
+            setReceiptActionError("");
+        };
+
+        window.addEventListener("pointerdown", handleGlobalPointerDown);
+        return () => window.removeEventListener("pointerdown", handleGlobalPointerDown);
+    }, [openOrdersTableKey, openStaffTableKey, openMoreTableKey]);
+
     return (
         <div className="theme-page flex min-h-screen overflow-x-hidden">
             {/* Transparent backdrop overlay for navigation drawer (click-to-close without dimming) */}
@@ -1700,29 +1718,6 @@ export default function OwnerLayout() {
                     className="fixed inset-0 z-40 bg-transparent"
                     onClick={() => setSidebarOpen(false)}
                     aria-hidden="true"
-                />
-            )}
-            {(openOrdersTableKey || openStaffTableKey || openMoreTableKey) && (
-                <div
-                    className="fixed inset-0 z-40 bg-black/5"
-                    onMouseDown={() => {
-                        setOpenOrdersTableKey("");
-                        setOpenStaffTableKey("");
-                        setOpenMoreTableKey("");
-                        setReceiptActionError("");
-                    }}
-                    onTouchStart={() => {
-                        setOpenOrdersTableKey("");
-                        setOpenStaffTableKey("");
-                        setOpenMoreTableKey("");
-                        setReceiptActionError("");
-                    }}
-                    onClick={() => {
-                        setOpenOrdersTableKey("");
-                        setOpenStaffTableKey("");
-                        setOpenMoreTableKey("");
-                        setReceiptActionError("");
-                    }}
                 />
             )}
 
