@@ -17,6 +17,7 @@ export default async function inventoryRoutes(app) {
     app.post("/owner/:restaurantId/inventory/wastage", inventoryController.recordWastage);
 
     // Ledger, Reports & Settings
+    app.get("/owner/:restaurantId/inventory/batches", inventoryController.getBatches);
     app.get("/owner/:restaurantId/inventory/ledger", inventoryController.getLedger);
     app.get("/owner/:restaurantId/inventory/reports", inventoryController.getReport);
     app.put("/owner/:restaurantId/inventory/settings", inventoryController.updateSettings);

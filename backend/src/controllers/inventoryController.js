@@ -252,3 +252,19 @@ export async function updateSettings(req, res) {
         res.status(500).send({ message: err.message || "Failed to update inventory settings" });
     }
 }
+
+export async function getBatches(req, res) {
+    try {
+        const restaurantId = Number(req.params.restaurantId);
+
+        const data = await inventoryService.getInventoryBatches({
+            prisma: req.prisma,
+            restaurantId,
+        });
+
+        res.send(data);
+    } catch (err) {
+        console.error("Error fetching inventory batches:", err);
+        res.status(500).send({ message: err.message || "Failed to fetch inventory batches" });
+    }
+}

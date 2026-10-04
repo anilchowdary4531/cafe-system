@@ -730,3 +730,163 @@ export const restoreStockForOrder = async ({ tx, restaurantId, items, orderId, a
         await reverseStockForOrder({ tx, restaurantId, orderId, actor });
     }
 };
+
+/**
+ * 12. GET INVENTORY BATCHES & EXPIRY TRACKING
+ */
+export async function getInventoryBatches({ prisma, restaurantId } = {}) {
+    const rid = Number(restaurantId);
+    if (!rid)
+        return {
+            batches: [],
+            metrics: { expiringToday: 0, expiring3Days: 0, expiring7Days: 0, expired: 0 },
+        };
+
+    const materials = await prisma.rawMaterial.findMany({
+        where: { restaurantId: rid, isActive: true },
+        orderBy: { name: "asc" },
+    });
+
+    const now = new Date();
+
+    const shelfLifeMap = {
+        Dairy: 7,
+        Milk: 4,
+        Cheese: 14,
+        Produce: 5,
+        Vegetables: 5,
+        Fruits: 4,
+        Meat: 4,
+        Seafood: 3,
+        Chicken: 4,
+        Bakery: 3,
+        Bread: 3,
+        Frozen: 90,
+        IceCream: 45,
+        Beverages: 90,
+        Syrups: 180,
+        DryStore: 180,
+        Spices: 365,
+        General: 30,
+    };
+
+    const batches = [];
+    let expiringToday = 0;
+    let expiring3Days = 0;
+    let expiring7Days = 0;
+    let expired = 0;
+
+    for (const rm of materials) {
+        if (rm.currentStock <= 0) continue;
+
+        const movements = await prisma.stockMovement.findMany({
+            where: {
+                restaurantId: rid,
+                rawMaterialId: rm.id,
+                movementType: { in: ["PURCHASE", "OPENING"] },
+            },
+            orderBy: { createdAt: "desc" },
+            take: 5,
+        });
+
+        const catKey = Object.keys(shelfLifeMap).find((k) => (rm.category || "").toLowerCase().includes(k.toLowerCase())) || "General";
+        const shelfDays = shelfLifeMap[catKey] || 30;
+
+        if (movements.length > 0) {
+            let remainingStock = rm.currentStock;
+            movements.forEach((m, idx) => {
+                if (remainingStock <= 0) return;
+                const batchQty = Math.min(remainingStock, Math.max(1, m.quantity || remainingStock));
+                remainingStock -= batchQty;
+
+                const receivedDate = new Date(m.createdAt);
+                const expiryDate = new Date(receivedDate);
+                expiryDate.setDate(expiryDate.getDate() + shelfDays);
+
+                const diffTime = expiryDate.getTime() - now.getTime();
+                const daysRemaining = Math.ceil(diffTime / (1000 * 3600 * 24));
+
+                let status = "HEALTHY";
+                if (daysRemaining < 0) {
+                    status = "EXPIRED";
+                    expired++;
+                } else if (daysRemaining === 0) {
+                    status = "CRITICAL";
+                    expiringToday++;
+                } else if (daysRemaining <= 3) {
+                    status = "EXPIRING_SOON";
+                    expiring3Days++;
+                } else if (daysRemaining <= 7) {
+                    status = "WARNING";
+                    expiring7Days++;
+                }
+
+                batches.push({
+                    id: `BATCH-${rm.id}-${m.id}`,
+                    rawMaterialId: rm.id,
+                    itemName: rm.name,
+                    category: rm.category || "General",
+                    batchNumber: `BAT-${new Date(m.createdAt).getFullYear()}${String(new Date(m.createdAt).getMonth() + 1).padStart(2, "0")}-${String(rm.id).padStart(3, "0")}${idx + 1}`,
+                    quantity: batchQty,
+                    unit: rm.displayUnit || rm.baseUnit || "Kg",
+                    costPrice: m.unitCost || rm.costPerBaseUnit || 0,
+                    receivedDate: receivedDate.toISOString(),
+                    expiryDate: expiryDate.toISOString(),
+                    daysRemaining,
+                    storageLocation: rm.storageLocation || "Main Dry Store",
+                    supplier: rm.preferredSupplier || "Tiffzy Direct Supplies",
+                    status,
+                });
+            });
+        } else {
+            const receivedDate = new Date(rm.createdAt || now);
+            const expiryDate = new Date(receivedDate);
+            expiryDate.setDate(expiryDate.getDate() + shelfDays);
+
+            const diffTime = expiryDate.getTime() - now.getTime();
+            const daysRemaining = Math.ceil(diffTime / (1000 * 3600 * 24));
+
+            let status = "HEALTHY";
+            if (daysRemaining < 0) {
+                status = "EXPIRED";
+                expired++;
+            } else if (daysRemaining === 0) {
+                status = "CRITICAL";
+                expiringToday++;
+            } else if (daysRemaining <= 3) {
+                status = "EXPIRING_SOON";
+                expiring3Days++;
+            } else if (daysRemaining <= 7) {
+                status = "WARNING";
+                expiring7Days++;
+            }
+
+            batches.push({
+                id: `BATCH-${rm.id}-DEF`,
+                rawMaterialId: rm.id,
+                itemName: rm.name,
+                category: rm.category || "General",
+                batchNumber: `BAT-${new Date(receivedDate).getFullYear()}${String(new Date(receivedDate).getMonth() + 1).padStart(2, "0")}-${String(rm.id).padStart(3, "0")}`,
+                quantity: rm.currentStock,
+                unit: rm.displayUnit || rm.baseUnit || "Kg",
+                costPrice: rm.costPerBaseUnit || 0,
+                receivedDate: receivedDate.toISOString(),
+                expiryDate: expiryDate.toISOString(),
+                daysRemaining,
+                storageLocation: rm.storageLocation || "Main Dry Store",
+                supplier: rm.preferredSupplier || "Tiffzy Direct Supplies",
+                status,
+            });
+        }
+    }
+
+    return {
+        batches,
+        metrics: {
+            expiringToday,
+            expiring3Days,
+            expiring7Days,
+            expired,
+        },
+    };
+}

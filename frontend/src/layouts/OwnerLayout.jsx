@@ -691,6 +691,12 @@ export default function OwnerLayout() {
             accessKey: "supply",
         },
         {
+            label: "Expiry & Batches",
+            path: "/owner/supply-chain/inventory/expiry",
+            icon: <Clock size={18} />,
+            accessKey: "supply",
+        },
+        {
             label: "Supply Marketplace",
             path: "/owner/supply",
             icon: <Truck size={18} />,
