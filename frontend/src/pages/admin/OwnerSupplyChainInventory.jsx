@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
@@ -516,14 +516,13 @@ export default function OwnerSupplyChainInventory() {
                                         <td className="py-3 px-3 text-right">
                                             <div className="inline-flex items-center gap-1">
                                                 {/* View */}
-                                                <button
-                                                    type="button"
+                                                <Link
+                                                    to={`/owner/supply-chain/inventory/${m.id}`}
                                                     title="View Details"
-                                                    onClick={() => { setSelectedItemForAction(m); setShowViewModal(true); }}
                                                     className="p-1 rounded theme-muted hover:text-[color:var(--app-text)] hover:bg-[color:var(--app-border)]/30"
                                                 >
                                                     <Eye size={13} />
-                                                </button>
+                                                </Link>
                                                 {/* Adjust */}
                                                 <button
                                                     type="button"
