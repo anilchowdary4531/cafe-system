@@ -1108,7 +1108,7 @@ export default async function ownerRoutes(app, deps) {
       const body = req.body || {};
       const { force = false, reason = "Customer left table", performedByUserId = null, performedByName = null, performedByUserRole = "SERVER" } = body;
 
-      const table = await prisma.diningTable.findFirst({
+      let table = await prisma.diningTable.findFirst({
         where: {
           restaurantId,
           OR: [
@@ -1124,10 +1124,23 @@ export default async function ownerRoutes(app, deps) {
         },
       });
 
+      if (!table && isNumeric) {
+        table = await prisma.diningTable.findUnique({
+          where: { id: parsedId },
+          include: {
+            tableSessions: {
+              where: { status: { in: ["OPEN", "BILLING", "PAID"] } },
+              include: { orders: { include: { items: true } } },
+            },
+          },
+        });
+      }
+
       if (!table) {
         return reply.code(404).send({ success: false, message: "Table not found" });
       }
 
+      const effectiveRid = table.restaurantId || restaurantId;
       const activeSession = table.tableSessions[0];
       const activeOrders = activeSession?.orders || [];
       const unpaidOrders = activeOrders.filter((o) => o.paymentStatus === "PENDING" && o.status !== "CANCELLED");
@@ -1151,7 +1164,7 @@ export default async function ownerRoutes(app, deps) {
         // Find all active sessions for this table to get their session IDs
         const sessionsToClose = await tx.tableSession.findMany({
           where: {
-            restaurantId,
+            restaurantId: effectiveRid,
             OR: [
               { tableId: table.id },
               { tableNo: table.tableNo },
@@ -1166,7 +1179,7 @@ export default async function ownerRoutes(app, deps) {
         // Always close all active table sessions matching tableId OR tableNo
         await tx.tableSession.updateMany({
           where: {
-            restaurantId,
+            restaurantId: effectiveRid,
             OR: [
               { tableId: table.id },
               { tableNo: table.tableNo },
@@ -1188,7 +1201,7 @@ export default async function ownerRoutes(app, deps) {
 
         await tx.order.updateMany({
           where: {
-            restaurantId,
+            restaurantId: effectiveRid,
             OR: orderWhereOr,
             status: { in: ["PLACED", "ACCEPTED", "PREPARING", "READY", "OPEN", "BILLING"] },
           },
@@ -1214,7 +1227,7 @@ export default async function ownerRoutes(app, deps) {
         try {
           await tx.tableOperationLog.create({
             data: {
-              restaurantId,
+              restaurantId: effectiveRid,
               operationType: "CLEAR_TABLE",
               sourceTableId: table.id,
               sourceTableNo: table.tableNo,
@@ -1239,12 +1252,12 @@ export default async function ownerRoutes(app, deps) {
       });
 
       if (realtime?.io) {
-        realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableId: table.id, tableNo: table.tableNo });
-        realtime.io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableId: table.id, tableNo: table.tableNo });
-        realtime.io.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableId: table.id, tableNo: table.tableNo });
-        realtime.io.to(`restaurant:${restaurantId}`).emit("table:session_updated", { restaurantId, tableId: table.id, tableNo: table.tableNo });
-        realtime.io.to(`restaurant_${restaurantId}`).emit("table:layout_updated", { restaurantId });
-        realtime.io.to(`restaurant:${restaurantId}`).emit("table:layout_updated", { restaurantId });
+        realtime.io.to(`restaurant_${effectiveRid}`).emit("table:updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
+        realtime.io.to(`restaurant:${effectiveRid}`).emit("table:updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
+        realtime.io.to(`restaurant_${effectiveRid}`).emit("table:session_updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
+        realtime.io.to(`restaurant:${effectiveRid}`).emit("table:session_updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
+        realtime.io.to(`restaurant_${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
+        realtime.io.to(`restaurant:${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
       }
 
       return reply.send({
@@ -1365,20 +1378,26 @@ export default async function ownerRoutes(app, deps) {
       const { tableNo, seats, isActive, section, positionX, positionY, width, height, shape, rotation } = req.body || {};
       if (!restaurantId || !tableId) return reply.code(400).send({ message: "Invalid id values" });
 
+      let existing = await prisma.diningTable.findFirst({
+        where: { id: tableId, restaurantId },
+      });
+      if (!existing) {
+        existing = await prisma.diningTable.findUnique({ where: { id: tableId } });
+      }
+      if (!existing) {
+        return reply.code(404).send({ message: "Table not found" });
+      }
+
+      const effectiveRid = existing.restaurantId || restaurantId;
       const restaurant = await prisma.restaurant.findUnique({
-        where: { id: restaurantId },
+        where: { id: effectiveRid },
         select: { id: true, slug: true },
       });
       if (!restaurant) return reply.code(404).send({ message: "Restaurant not found" });
 
-      const existing = await prisma.diningTable.findUnique({ where: { id: tableId } });
-      if (!existing || existing.restaurantId !== restaurantId) {
-        return reply.code(404).send({ message: "Table not found" });
-      }
-
       if (tableNo && tableNo !== existing.tableNo) {
         const duplicate = await prisma.diningTable.findFirst({
-          where: { restaurantId, tableNo, NOT: { id: tableId } },
+          where: { restaurantId: effectiveRid, tableNo, NOT: { id: tableId } },
         });
         if (duplicate) return reply.code(400).send({ message: "Table number already exists" });
       }
@@ -1414,15 +1433,21 @@ export default async function ownerRoutes(app, deps) {
       const tableId = Number(req.params.tableId);
       if (!restaurantId || !tableId) return reply.code(400).send({ message: "Invalid id values" });
 
-      const table = await prisma.diningTable.findUnique({
-        where: { id: tableId },
+      let table = await prisma.diningTable.findFirst({
+        where: { id: tableId, restaurantId },
         select: { id: true, restaurantId: true },
       });
-      if (!table || table.restaurantId !== restaurantId) {
+      if (!table) {
+        table = await prisma.diningTable.findUnique({
+          where: { id: tableId },
+          select: { id: true, restaurantId: true },
+        });
+      }
+      if (!table) {
         return reply.code(404).send({ message: "Table not found" });
       }
 
-      await prisma.diningTable.delete({ where: { id: tableId } });
+      await prisma.diningTable.delete({ where: { id: table.id } });
       return { message: "Table deleted" };
     } catch (err) {
       console.log(err);

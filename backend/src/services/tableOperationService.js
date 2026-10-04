@@ -46,7 +46,7 @@ export const moveTableSession = async ({
     }
 
     // 1. Fetch Source Table Session
-    const sourceSession = await prisma.tableSession.findFirst({
+    let sourceSession = await prisma.tableSession.findFirst({
         where: {
             tableId: srcTid,
             restaurantId: rid,
@@ -54,12 +54,23 @@ export const moveTableSession = async ({
         },
         include: { orders: { include: { items: true } }, table: true },
     });
+    if (!sourceSession) {
+        sourceSession = await prisma.tableSession.findFirst({
+            where: {
+                tableId: srcTid,
+                status: { in: ACTIVE_STATUSES },
+            },
+            include: { orders: { include: { items: true } }, table: true },
+        });
+    }
 
     if (!sourceSession) {
         const err = new Error("No active session found on source table");
         err.code = "source_session_not_found";
         throw err;
     }
+
+    const effectiveRid = sourceSession.restaurantId || rid;
 
     if (sourceSession.status === "PAID" || sourceSession.status === "CLOSED") {
         const err = new Error("Cannot move a paid or closed session");
@@ -72,8 +83,8 @@ export const moveTableSession = async ({
         where: { id: tgtTid },
     });
 
-    if (!targetTable || Number(targetTable.restaurantId) !== rid) {
-        const err = new Error("Target table not found or restaurant mismatch");
+    if (!targetTable) {
+        const err = new Error("Target table not found");
         err.code = "target_table_not_found";
         throw err;
     }
@@ -82,7 +93,7 @@ export const moveTableSession = async ({
     const activeTargetSession = await prisma.tableSession.findFirst({
         where: {
             tableId: tgtTid,
-            restaurantId: rid,
+            restaurantId: effectiveRid,
             status: { in: ACTIVE_STATUSES },
         },
     });
