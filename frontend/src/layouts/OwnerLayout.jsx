@@ -21,6 +21,7 @@ import {
     IndianRupee,
     Truck,
     Package,
+    Activity,
     AlertTriangle,
     Tag,
     Award,
@@ -694,6 +695,12 @@ export default function OwnerLayout() {
             label: "Expiry & Batches",
             path: "/owner/supply-chain/inventory/expiry",
             icon: <Clock size={18} />,
+            accessKey: "supply",
+        },
+        {
+            label: "Stock Movements",
+            path: "/owner/supply-chain/inventory/movements",
+            icon: <Activity size={18} />,
             accessKey: "supply",
         },
         {
