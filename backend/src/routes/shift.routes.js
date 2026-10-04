@@ -25,8 +25,8 @@ export default async function shiftRoutes(app, deps = {}) {
     };
   };
 
-  // GET /api/shifts/current - Get active shift
-  app.get("/api/shifts/current", async (req, reply) => {
+  // GET /api/shifts/current & /shifts/current - Get active shift
+  const handleGetCurrentShift = async (req, reply) => {
     try {
       const actor = extractActor(req);
       const restaurantId = req.query.restaurantId || actor.restaurantId;
@@ -45,13 +45,15 @@ export default async function shiftRoutes(app, deps = {}) {
 
       return reply.send({ success: true, shift });
     } catch (err) {
-      console.error("[ShiftRoutes] GET /api/shifts/current error:", err);
+      console.error("[ShiftRoutes] GET /shifts/current error:", err);
       return reply.status(500).send({ error: err.message || "Failed to fetch current shift" });
     }
-  });
+  };
+  app.get("/api/shifts/current", handleGetCurrentShift);
+  app.get("/shifts/current", handleGetCurrentShift);
 
-  // POST /api/shifts/open - Open new cashier shift
-  app.post("/api/shifts/open", async (req, reply) => {
+  // POST /api/shifts/open & /shifts/open - Open new cashier shift
+  const handleOpenShift = async (req, reply) => {
     try {
       const actor = extractActor(req);
       const { restaurantId, openingCash, notes, terminalId } = req.body || {};
@@ -81,7 +83,7 @@ export default async function shiftRoutes(app, deps = {}) {
 
       return reply.send({ success: true, shift });
     } catch (err) {
-      console.error("[ShiftRoutes] POST /api/shifts/open error:", err);
+      console.error("[ShiftRoutes] POST /shifts/open error:", err);
       const statusCode = err.code === "duplicate_open_shift" ? 409 : 400;
       return reply.status(statusCode).send({
         error: err.message || "Failed to open shift",
@@ -89,10 +91,12 @@ export default async function shiftRoutes(app, deps = {}) {
         existingShift: err.existingShift || null,
       });
     }
-  });
+  };
+  app.post("/api/shifts/open", handleOpenShift);
+  app.post("/shifts/open", handleOpenShift);
 
-  // POST /api/shifts/:id/cash-in - Record Cash In
-  app.post("/api/shifts/:id/cash-in", async (req, reply) => {
+  // POST /api/shifts/:id/cash-in & /shifts/:id/cash-in - Record Cash In
+  const handleRecordCashIn = async (req, reply) => {
     try {
       const actor = extractActor(req);
       const shiftId = req.params.id;
@@ -119,13 +123,15 @@ export default async function shiftRoutes(app, deps = {}) {
 
       return reply.send({ success: true, ...result });
     } catch (err) {
-      console.error("[ShiftRoutes] POST /api/shifts/:id/cash-in error:", err);
+      console.error("[ShiftRoutes] POST /shifts/:id/cash-in error:", err);
       return reply.status(400).send({ error: err.message || "Failed to record Cash In" });
     }
-  });
+  };
+  app.post("/api/shifts/:id/cash-in", handleRecordCashIn);
+  app.post("/shifts/:id/cash-in", handleRecordCashIn);
 
-  // POST /api/shifts/:id/cash-out - Record Cash Out
-  app.post("/api/shifts/:id/cash-out", async (req, reply) => {
+  // POST /api/shifts/:id/cash-out & /shifts/:id/cash-out - Record Cash Out
+  const handleRecordCashOut = async (req, reply) => {
     try {
       const actor = extractActor(req);
       const shiftId = req.params.id;
@@ -152,13 +158,15 @@ export default async function shiftRoutes(app, deps = {}) {
 
       return reply.send({ success: true, ...result });
     } catch (err) {
-      console.error("[ShiftRoutes] POST /api/shifts/:id/cash-out error:", err);
+      console.error("[ShiftRoutes] POST /shifts/:id/cash-out error:", err);
       return reply.status(400).send({ error: err.message || "Failed to record Cash Out" });
     }
-  });
+  };
+  app.post("/api/shifts/:id/cash-out", handleRecordCashOut);
+  app.post("/shifts/:id/cash-out", handleRecordCashOut);
 
-  // POST /api/shifts/:id/close - Close shift
-  app.post("/api/shifts/:id/close", async (req, reply) => {
+  // POST /api/shifts/:id/close & /shifts/:id/close - Close shift
+  const handleCloseShiftRoute = async (req, reply) => {
     try {
       const actor = extractActor(req);
       const shiftId = req.params.id;
@@ -184,13 +192,15 @@ export default async function shiftRoutes(app, deps = {}) {
 
       return reply.send({ success: true, ...result });
     } catch (err) {
-      console.error("[ShiftRoutes] POST /api/shifts/:id/close error:", err);
+      console.error("[ShiftRoutes] POST /shifts/:id/close error:", err);
       return reply.status(400).send({ error: err.message || "Failed to close shift" });
     }
-  });
+  };
+  app.post("/api/shifts/:id/close", handleCloseShiftRoute);
+  app.post("/shifts/:id/close", handleCloseShiftRoute);
 
-  // POST /api/shifts/:id/reopen - Reopen closed shift (Manager/Owner)
-  app.post("/api/shifts/:id/reopen", async (req, reply) => {
+  // POST /api/shifts/:id/reopen & /shifts/:id/reopen - Reopen closed shift (Manager/Owner)
+  const handleReopenShiftRoute = async (req, reply) => {
     try {
       const actor = extractActor(req);
       const shiftId = req.params.id;
@@ -214,14 +224,16 @@ export default async function shiftRoutes(app, deps = {}) {
 
       return reply.send({ success: true, shift });
     } catch (err) {
-      console.error("[ShiftRoutes] POST /api/shifts/:id/reopen error:", err);
+      console.error("[ShiftRoutes] POST /shifts/:id/reopen error:", err);
       const status = err.code === "forbidden" ? 403 : 400;
       return reply.status(status).send({ error: err.message || "Failed to reopen shift" });
     }
-  });
+  };
+  app.post("/api/shifts/:id/reopen", handleReopenShiftRoute);
+  app.post("/shifts/:id/reopen", handleReopenShiftRoute);
 
-  // GET /api/shifts/history - Get shift history
-  app.get("/api/shifts/history", async (req, reply) => {
+  // GET /api/shifts/history & /shifts/history - Get shift history
+  const handleGetShiftHistory = async (req, reply) => {
     try {
       const actor = extractActor(req);
       const { restaurantId, startDate, endDate, cashierId, status, terminalId, page, limit } = req.query || {};
@@ -245,13 +257,15 @@ export default async function shiftRoutes(app, deps = {}) {
 
       return reply.send({ success: true, ...history });
     } catch (err) {
-      console.error("[ShiftRoutes] GET /api/shifts/history error:", err);
+      console.error("[ShiftRoutes] GET /shifts/history error:", err);
       return reply.status(500).send({ error: err.message || "Failed to fetch shift history" });
     }
-  });
+  };
+  app.get("/api/shifts/history", handleGetShiftHistory);
+  app.get("/shifts/history", handleGetShiftHistory);
 
-  // GET /api/day-closing/current - Get current EOD summary
-  app.get("/api/day-closing/current", async (req, reply) => {
+  // GET /api/day-closing/current & /day-closing/current - Get current EOD summary
+  const handleGetDayClosingCurrent = async (req, reply) => {
     try {
       const actor = extractActor(req);
       const { restaurantId, businessDate } = req.query || {};
@@ -269,13 +283,15 @@ export default async function shiftRoutes(app, deps = {}) {
 
       return reply.send({ success: true, summary });
     } catch (err) {
-      console.error("[ShiftRoutes] GET /api/day-closing/current error:", err);
+      console.error("[ShiftRoutes] GET /day-closing/current error:", err);
       return reply.status(500).send({ error: err.message || "Failed to fetch day closing summary" });
     }
-  });
+  };
+  app.get("/api/day-closing/current", handleGetDayClosingCurrent);
+  app.get("/day-closing/current", handleGetDayClosingCurrent);
 
-  // POST /api/day-closing/close - Execute Day Close
-  app.post("/api/day-closing/close", async (req, reply) => {
+  // POST /api/day-closing/close & /day-closing/close - Execute Day Close
+  const handleCloseDayRoute = async (req, reply) => {
     try {
       const actor = extractActor(req);
       const { restaurantId, businessDate, notes } = req.body || {};
@@ -302,7 +318,7 @@ export default async function shiftRoutes(app, deps = {}) {
 
       return reply.send({ success: true, ...result });
     } catch (err) {
-      console.error("[ShiftRoutes] POST /api/day-closing/close error:", err);
+      console.error("[ShiftRoutes] POST /day-closing/close error:", err);
       const statusCode = err.code === "unresolved_open_shifts" ? 409 : 400;
       return reply.status(statusCode).send({
         error: err.message || "Failed to close business day",
@@ -310,10 +326,12 @@ export default async function shiftRoutes(app, deps = {}) {
         openShifts: err.openShifts || [],
       });
     }
-  });
+  };
+  app.post("/api/day-closing/close", handleCloseDayRoute);
+  app.post("/day-closing/close", handleCloseDayRoute);
 
-  // GET /api/day-closing/history - Get Day Closing History
-  app.get("/api/day-closing/history", async (req, reply) => {
+  // GET /api/day-closing/history & /day-closing/history - Get Day Closing History
+  const handleGetDayClosingHistory = async (req, reply) => {
     try {
       const actor = extractActor(req);
       const { restaurantId, page, limit } = req.query || {};
@@ -332,8 +350,10 @@ export default async function shiftRoutes(app, deps = {}) {
 
       return reply.send({ success: true, ...history });
     } catch (err) {
-      console.error("[ShiftRoutes] GET /api/day-closing/history error:", err);
+      console.error("[ShiftRoutes] GET /day-closing/history error:", err);
       return reply.status(500).send({ error: err.message || "Failed to fetch day closing history" });
     }
-  });
+  };
+  app.get("/api/day-closing/history", handleGetDayClosingHistory);
+  app.get("/day-closing/history", handleGetDayClosingHistory);
 }
