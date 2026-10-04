@@ -549,7 +549,19 @@ export default function OwnerLayout() {
     const [submittingMoveTable, setSubmittingMoveTable] = useState(false);
 
     const { user, logout } = useAuth();
-    const restaurantId = Number(user?.restaurantId || 0);
+    const restaurantId = useMemo(() => {
+        const fromUser = Number(user?.restaurantId || user?.restaurant?.id || 0);
+        if (fromUser > 0) return fromUser;
+
+        const fromStorage = Number(
+            localStorage.getItem("restaurantId") ||
+            localStorage.getItem("activeRestaurantId") ||
+            0
+        );
+        if (fromStorage > 0) return fromStorage;
+
+        return 1;
+    }, [user]);
 
     const restaurantName = resolveRestaurantName(user, "Restaurant");
 

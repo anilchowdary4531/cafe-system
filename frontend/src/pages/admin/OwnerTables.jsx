@@ -317,7 +317,19 @@ export default function OwnerTables() {
         }
     }, []);
 
-    const restaurantId = user?.restaurantId;
+    const restaurantId = useMemo(() => {
+        const fromUser = Number(user?.restaurantId || user?.restaurant?.id || 0);
+        if (fromUser > 0) return fromUser;
+
+        const fromStorage = Number(
+            localStorage.getItem("restaurantId") ||
+            localStorage.getItem("activeRestaurantId") ||
+            0
+        );
+        if (fromStorage > 0) return fromStorage;
+
+        return 1;
+    }, [user]);
     const restaurantSlug = user?.restaurant?.slug;
     const tableGroupStorageKey = restaurantId
         ? `${TABLE_GROUPS_STORAGE_PREFIX}_${restaurantId}`
