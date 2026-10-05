@@ -513,7 +513,6 @@ export default async function supplyMarketplaceRoutes(app) {
             const targetReceivingStatus = String(receivingStatus).toUpperCase();
             const poStatus = targetReceivingStatus === "FULLY_RECEIVED" ? "COMPLETED" : "PARTIALLY_RECEIVED";
 
-            // Update inventory stock for items
             for (const item of existing.items) {
                 const mat = await prisma.rawMaterial.findFirst({
                     where: { restaurantId: existing.restaurantId, name: { equals: item.productName, mode: "insensitive" } },
@@ -564,6 +563,188 @@ export default async function supplyMarketplaceRoutes(app) {
             return reply.code(200).send({ message: "Goods received and inventory updated!", order: updated });
         } catch (err) {
             return reply.code(500).send({ error: err.message || "Failed to process receipt" });
+        }
+    };
+
+    // GOODS RECEIPT NOTE (GRN) HANDLERS
+    const listGoodsReceiptsHandler = async (req, reply) => {
+        try {
+            const restaurantId = req.user?.restaurantId || req.query?.restaurantId || 1;
+            const grns = await prisma.goodsReceiptNote.findMany({
+                where: { restaurantId: Number(restaurantId) },
+                include: {
+                    supplyOrder: true,
+                    supplier: { include: { profile: true } },
+                    receivedBy: { select: { id: true, name: true, role: true } },
+                    items: { include: { rawMaterial: true } },
+                },
+                orderBy: { createdAt: "desc" },
+            });
+
+            const todayStr = new Date().toISOString().split("T")[0];
+            const metrics = {
+                expectedToday: grns.filter((g) => new Date(g.receivedDate).toISOString().split("T")[0] === todayStr).length,
+                pending: grns.filter((g) => g.status === "PENDING").length,
+                partiallyReceived: grns.filter((g) => g.status === "PARTIALLY_RECEIVED").length,
+                receivedToday: grns.filter((g) => (g.status === "FULLY_RECEIVED" || g.status === "PARTIALLY_RECEIVED") && new Date(g.createdAt).toISOString().split("T")[0] === todayStr).length,
+                rejected: grns.filter((g) => g.status === "REJECTED" || g.totalRejectedQty > 0).length,
+                total: grns.length,
+            };
+
+            return reply.code(200).send({ grns, metrics });
+        } catch (err) {
+            return reply.code(500).send({ error: "Failed to fetch Goods Receipt Notes" });
+        }
+    };
+
+    const createGoodsReceiptHandler = async (req, reply) => {
+        try {
+            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || 1;
+            const receivedById = req.user?.id || req.body?.receivedById || null;
+
+            const {
+                supplyOrderId,
+                supplierId,
+                deliveryReference,
+                invoiceNumber,
+                receivedDate,
+                notes,
+                items = [],
+            } = req.body || {};
+
+            if (!items.length) {
+                return reply.code(400).send({ error: "At least one item is required for Goods Receiving" });
+            }
+
+            const count = await prisma.goodsReceiptNote.count({ where: { restaurantId: Number(restaurantId) } });
+            const grnNumber = `GRN-${new Date().getFullYear()}-${1000 + count + 1}`;
+
+            let totalExpectedQty = 0;
+            let totalReceivedQty = 0;
+            let totalDamagedQty = 0;
+            let totalRejectedQty = 0;
+
+            const formattedItems = items.map((item) => {
+                const exp = Number(item.expectedQty || 0);
+                const rec = Number(item.receivedQty || 0);
+                const dam = Number(item.damagedQty || 0);
+                const rej = Number(item.rejectedQty || 0);
+                const diff = exp - rec;
+
+                totalExpectedQty += exp;
+                totalReceivedQty += rec;
+                totalDamagedQty += dam;
+                totalRejectedQty += rej;
+
+                return {
+                    rawMaterialId: item.rawMaterialId ? Number(item.rawMaterialId) : null,
+                    itemName: String(item.itemName || "Item"),
+                    unit: String(item.unit || "kg"),
+                    expectedQty: exp,
+                    receivedQty: rec,
+                    damagedQty: dam,
+                    rejectedQty: rej,
+                    differenceQty: diff,
+                    batchNumber: item.batchNumber ? String(item.batchNumber) : null,
+                    expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
+                    storageLocation: item.storageLocation ? String(item.storageLocation) : "Main Kitchen",
+                    notes: item.notes ? String(item.notes) : null,
+                };
+            });
+
+            const differenceQty = totalExpectedQty - totalReceivedQty;
+
+            let grnStatus = "FULLY_RECEIVED";
+            if (totalReceivedQty === 0 && totalRejectedQty > 0) {
+                grnStatus = "REJECTED";
+            } else if (totalReceivedQty < totalExpectedQty) {
+                grnStatus = "PARTIALLY_RECEIVED";
+            }
+
+            const grn = await prisma.goodsReceiptNote.create({
+                data: {
+                    grnNumber,
+                    restaurantId: Number(restaurantId),
+                    supplyOrderId: supplyOrderId ? Number(supplyOrderId) : null,
+                    supplierId: supplierId ? Number(supplierId) : null,
+                    receivedById: receivedById ? Number(receivedById) : null,
+                    deliveryReference: deliveryReference ? String(deliveryReference) : null,
+                    invoiceNumber: invoiceNumber ? String(invoiceNumber) : null,
+                    totalExpectedQty,
+                    totalReceivedQty,
+                    totalDamagedQty,
+                    totalRejectedQty,
+                    differenceQty,
+                    status: grnStatus,
+                    receivedDate: receivedDate ? new Date(receivedDate) : new Date(),
+                    notes: notes ? String(notes) : null,
+                    items: {
+                        create: formattedItems,
+                    },
+                },
+                include: {
+                    supplyOrder: true,
+                    supplier: { include: { profile: true } },
+                    receivedBy: { select: { id: true, name: true, role: true } },
+                    items: { include: { rawMaterial: true } },
+                },
+            });
+
+            // CRITICAL INVENTORY UPDATE: Increase inventory strictly by actual accepted quantity (totalReceivedQty)
+            for (const item of items) {
+                const acceptedQty = Number(item.receivedQty || 0);
+                if (acceptedQty <= 0) continue;
+
+                let mat = null;
+                if (item.rawMaterialId) {
+                    mat = await prisma.rawMaterial.findUnique({ where: { id: Number(item.rawMaterialId) } });
+                } else if (item.itemName) {
+                    mat = await prisma.rawMaterial.findFirst({
+                        where: { restaurantId: Number(restaurantId), name: { equals: String(item.itemName), mode: "insensitive" } },
+                    });
+                }
+
+                if (mat) {
+                    const beforeBalance = mat.currentStock;
+                    const afterBalance = beforeBalance + acceptedQty;
+
+                    await prisma.rawMaterial.update({
+                        where: { id: mat.id },
+                        data: { currentStock: afterBalance },
+                    });
+
+                    await prisma.stockMovement.create({
+                        data: {
+                            restaurantId: Number(restaurantId),
+                            rawMaterialId: mat.id,
+                            movementType: "PURCHASE",
+                            quantity: acceptedQty,
+                            beforeBalance,
+                            afterBalance,
+                            reference: grnNumber,
+                            notes: `GRN Receipt #${grnNumber}: Accepted ${acceptedQty} ${item.unit || "kg"} (Ordered ${item.expectedQty || acceptedQty}, Shortage ${item.expectedQty - acceptedQty})`,
+                        },
+                    });
+                }
+            }
+
+            // Update SupplyOrder status if linked
+            if (supplyOrderId) {
+                await prisma.supplyOrder.update({
+                    where: { id: Number(supplyOrderId) },
+                    data: {
+                        receivingStatus: grnStatus,
+                        status: grnStatus === "FULLY_RECEIVED" ? "COMPLETED" : "PARTIALLY_RECEIVED",
+                    },
+                });
+            }
+
+            return reply.code(201).send({
+                message: `Auditable Goods Receipt Note ${grnNumber} created successfully! Inventory updated.`,
+                grn,
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to create Goods Receipt Note" });
         }
     };
 
@@ -631,7 +812,7 @@ export default async function supplyMarketplaceRoutes(app) {
     // PURCHASE ORDER MANAGEMENT ROUTES
     app.get("/owner/purchase-orders", { preHandler: [authUser] }, listPurchaseOrdersHandler);
     app.get("/api/owner/purchase-orders", { preHandler: [authUser] }, listPurchaseOrdersHandler);
-    app.get("/api/v1/owner/purchase-orders", { preHandler: [authUser] }, listPurchaseOrdersHandler);
+    app.get("/api/owner/purchase-orders", { preHandler: [authUser] }, listPurchaseOrdersHandler);
 
     app.post("/owner/purchase-orders", { preHandler: [authUser] }, createPurchaseOrderHandler);
     app.post("/api/owner/purchase-orders", { preHandler: [authUser] }, createPurchaseOrderHandler);
@@ -645,10 +826,20 @@ export default async function supplyMarketplaceRoutes(app) {
     app.put("/api/owner/purchase-orders/:id/receive", { preHandler: [authUser] }, receivePOItemsHandler);
     app.put("/api/v1/owner/purchase-orders/:id/receive", { preHandler: [authUser] }, receivePOItemsHandler);
 
+    // GOODS RECEIVING / GRN ROUTES
+    app.get("/owner/goods-receipts", { preHandler: [authUser] }, listGoodsReceiptsHandler);
+    app.get("/api/owner/goods-receipts", { preHandler: [authUser] }, listGoodsReceiptsHandler);
+    app.get("/api/v1/owner/goods-receipts", { preHandler: [authUser] }, listGoodsReceiptsHandler);
+
+    app.post("/owner/goods-receipts", { preHandler: [authUser] }, createGoodsReceiptHandler);
+    app.post("/api/owner/goods-receipts", { preHandler: [authUser] }, createGoodsReceiptHandler);
+    app.post("/api/v1/owner/goods-receipts", { preHandler: [authUser] }, createGoodsReceiptHandler);
+
     app.post("/supplier/orders/:id/accept", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "ACCEPTED"));
     app.post("/supplier/orders/:id/dispatch", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "DISPATCHED"));
     app.post("/supplier/orders/:id/complete", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "COMPLETED"));
     app.post("/supplier/orders/:id/reject", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "REJECTED"));
 }
+
 
 

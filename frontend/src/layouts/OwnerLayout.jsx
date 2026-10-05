@@ -21,6 +21,7 @@ import {
     IndianRupee,
     Truck,
     Package,
+    PackageCheck,
     Activity,
     SlidersHorizontal,
     AlertTriangle,
@@ -732,6 +733,12 @@ export default function OwnerLayout() {
             label: "Purchase Orders",
             path: "/owner/supply-chain/purchase-orders",
             icon: <ShoppingBag size={18} />,
+            accessKey: "supply",
+        },
+        {
+            label: "Goods Receiving (GRN)",
+            path: "/owner/supply-chain/receiving",
+            icon: <PackageCheck size={18} />,
             accessKey: "supply",
         },
         {

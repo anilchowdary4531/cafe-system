@@ -129,6 +129,7 @@ model Restaurant {
   staffTasks           StaffTask[]
   waitlists            Waitlist[]
   purchaseRequests     PurchaseRequest[]
+  goodsReceiptNotes    GoodsReceiptNote[]
 
   @@map("restaurants")
 }
@@ -172,6 +173,7 @@ model User {
   assignedTasks        StaffTask[]            @relation("AssignedTasks")
   prRequested          PurchaseRequest[]      @relation("PRRequestedBy")
   prApproved           PurchaseRequest[]      @relation("PRApprovedBy")
+  grnReceived          GoodsReceiptNote[]     @relation("GRNReceivedBy")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -1233,6 +1235,7 @@ model Supplier {
   settlements  SupplierSettlement[]
   reviews      SupplyReview[]
   purchaseRequests PurchaseRequest[]
+  goodsReceiptNotes GoodsReceiptNote[]
 
   @@index([status, createdAt])
   @@index([phone])
@@ -1514,6 +1517,7 @@ model SupplyOrder {
   payments        SupplyPayment[]
   refunds         SupplyRefund[]
   settlementItem  SupplierSettlementItem?
+  goodsReceiptNotes GoodsReceiptNote[]
 
   @@index([restaurantId, createdAt])
   @@index([supplierId, status, createdAt])
@@ -1939,6 +1943,7 @@ model RawMaterial {
   recipeItems     RecipeItem[]
   movements       StockMovement[]
   purchaseRequests PurchaseRequest[]
+  goodsReceiptItems GoodsReceiptItem[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId, category, isActive])
@@ -2605,6 +2610,72 @@ model PurchaseRequest {
   @@index([restaurantId, status, priority])
   @@map("purchase_requests")
 }
+
+model GoodsReceiptNote {
+  id                Int                @id @default(autoincrement())
+  grnNumber         String             @unique @map("grn_number")
+
+  restaurantId      Int                @map("restaurant_id")
+  restaurant        Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  supplyOrderId     Int?               @map("supply_order_id")
+  supplyOrder       SupplyOrder?       @relation(fields: [supplyOrderId], references: [id], onDelete: SetNull)
+
+  supplierId        Int?               @map("supplier_id")
+  supplier          Supplier?          @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  receivedById      Int?               @map("received_by_id")
+  receivedBy        User?              @relation("GRNReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+
+  deliveryReference String?            @map("delivery_reference")
+  invoiceNumber     String?            @map("invoice_number")
+
+  totalExpectedQty  Float              @default(0) @map("total_expected_qty")
+  totalReceivedQty  Float              @default(0) @map("total_received_qty")
+  totalDamagedQty   Float              @default(0) @map("total_damaged_qty")
+  totalRejectedQty  Float              @default(0) @map("total_rejected_qty")
+  differenceQty     Float              @default(0) @map("difference_qty")
+
+  status            String             @default("FULLY_RECEIVED") // PENDING | PARTIALLY_RECEIVED | FULLY_RECEIVED | REJECTED
+  receivedDate      DateTime           @default(now()) @map("received_date")
+  notes             String?
+
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at")
+
+  items             GoodsReceiptItem[]
+
+  @@index([restaurantId, status, receivedDate])
+  @@map("goods_receipt_notes")
+}
+
+model GoodsReceiptItem {
+  id              Int              @id @default(autoincrement())
+  grnId           Int              @map("grn_id")
+  grn             GoodsReceiptNote @relation(fields: [grnId], references: [id], onDelete: Cascade)
+
+  rawMaterialId   Int?             @map("raw_material_id")
+  rawMaterial     RawMaterial?     @relation(fields: [rawMaterialId], references: [id], onDelete: SetNull)
+
+  itemName        String           @map("item_name")
+  unit            String           @default("kg")
+
+  expectedQty     Float            @default(0) @map("expected_qty")
+  receivedQty     Float            @default(0) @map("received_qty")
+  damagedQty      Float            @default(0) @map("damaged_qty")
+  rejectedQty     Float            @default(0) @map("rejected_qty")
+  differenceQty   Float            @default(0) @map("difference_qty")
+
+  batchNumber     String?          @map("batch_number")
+  expiryDate      DateTime?        @map("expiry_date")
+  storageLocation String?          @default("Main Kitchen") @map("storage_location")
+  notes           String?
+
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  @@map("goods_receipt_items")
+}
+
 
 
 
