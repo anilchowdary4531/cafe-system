@@ -283,17 +283,35 @@ export default async function supplyMarketplaceRoutes(app) {
                 return reply.code(404).send({ error: "Purchase request not found" });
             }
 
-            // Create or update supply cart item if supplier is selected
             let createdOrder = null;
             if (pr.supplierId) {
-                // Pre-add to supply cart or create draft order
-                const existingProduct = await prisma.supplyProduct.findFirst({
-                    where: { supplierId: pr.supplierId, isAvailable: true },
-                });
+                const count = await prisma.supplyOrder.count({ where: { restaurantId: pr.restaurantId } });
+                const orderNo = `PO-${new Date().getFullYear()}-${1000 + count + 1}`;
 
-                if (existingProduct) {
-                    await updateSupplyCartItem(pr.restaurantId, existingProduct.id, Math.ceil(pr.quantity));
-                }
+                createdOrder = await prisma.supplyOrder.create({
+                    data: {
+                        orderNo,
+                        restaurantId: pr.restaurantId,
+                        supplierId: pr.supplierId,
+                        subtotal: pr.quantity * 100,
+                        totalAmount: pr.quantity * 100,
+                        status: "DRAFT",
+                        receivingStatus: "PENDING",
+                        paymentStatus: "PENDING",
+                        notes: `Converted from Purchase Request #${pr.requestCode}`,
+                        items: {
+                            create: [
+                                {
+                                    productName: pr.itemName,
+                                    quantity: pr.quantity,
+                                    unit: pr.unit,
+                                    unitPrice: 100,
+                                    totalPrice: pr.quantity * 100,
+                                },
+                            ],
+                        },
+                    },
+                });
             }
 
             const updated = await prisma.purchaseRequest.update({
@@ -313,9 +331,239 @@ export default async function supplyMarketplaceRoutes(app) {
             return reply.code(200).send({
                 message: "Purchase request successfully converted to Purchase Order",
                 request: updated,
+                order: createdOrder,
             });
         } catch (err) {
             return reply.code(500).send({ error: err.message || "Failed to convert purchase request to PO" });
+        }
+    };
+
+    // PURCHASE ORDER MANAGEMENT HANDLERS
+    const listPurchaseOrdersHandler = async (req, reply) => {
+        try {
+            const restaurantId = req.user?.restaurantId || req.query?.restaurantId || 1;
+            const orders = await prisma.supplyOrder.findMany({
+                where: { restaurantId: Number(restaurantId) },
+                include: {
+                    supplier: { include: { profile: true } },
+                    items: true,
+                    statusEvents: { orderBy: { createdAt: "desc" } },
+                },
+                orderBy: { createdAt: "desc" },
+            });
+
+            const metrics = {
+                draft: orders.filter((o) => o.status === "DRAFT").length,
+                pendingApproval: orders.filter((o) => o.status === "PENDING_APPROVAL").length,
+                sent: orders.filter((o) => o.status === "SENT" || o.status === "PLACED").length,
+                confirmed: orders.filter((o) => o.status === "CONFIRMED" || o.status === "ACCEPTED").length,
+                partiallyReceived: orders.filter(
+                    (o) => o.receivingStatus === "PARTIALLY_RECEIVED" || o.status === "PARTIALLY_RECEIVED"
+                ).length,
+                completed: orders.filter(
+                    (o) => o.status === "COMPLETED" || o.status === "DELIVERED" || o.receivingStatus === "FULLY_RECEIVED"
+                ).length,
+                total: orders.length,
+            };
+
+            return reply.code(200).send({ orders, metrics });
+        } catch (err) {
+            return reply.code(500).send({ error: "Failed to fetch purchase orders" });
+        }
+    };
+
+    const createPurchaseOrderHandler = async (req, reply) => {
+        try {
+            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || 1;
+            const { supplierId, deliveryAddress, expectedDeliveryDate, items = [], notes, status = "DRAFT" } = req.body || {};
+
+            if (!supplierId || !items.length) {
+                return reply.code(400).send({ error: "Supplier and at least one item are required" });
+            }
+
+            const count = await prisma.supplyOrder.count({ where: { restaurantId: Number(restaurantId) } });
+            const orderNo = `PO-${new Date().getFullYear()}-${1000 + count + 1}`;
+
+            let subtotal = 0;
+            let taxAmount = 0;
+            let discountAmount = 0;
+
+            const formattedItems = items.map((item) => {
+                const qty = Number(item.quantity || 1);
+                const rate = Number(item.unitPrice || item.rate || 0);
+                const taxPct = Number(item.taxRate || item.tax || 0);
+                const discPct = Number(item.discount || 0);
+
+                const lineGross = qty * rate;
+                const lineDisc = (lineGross * discPct) / 100;
+                const lineNet = lineGross - lineDisc;
+                const lineTax = (lineNet * taxPct) / 100;
+                const lineTotal = lineNet + lineTax;
+
+                subtotal += lineNet;
+                taxAmount += lineTax;
+                discountAmount += lineDisc;
+
+                return {
+                    productId: item.productId ? Number(item.productId) : null,
+                    productName: String(item.productName || item.itemName || "Item"),
+                    unit: String(item.unit || "pcs"),
+                    quantity: qty,
+                    unitPrice: rate,
+                    discount: lineDisc,
+                    totalPrice: lineTotal,
+                };
+            });
+
+            const totalAmount = subtotal + taxAmount;
+
+            const newPO = await prisma.supplyOrder.create({
+                data: {
+                    orderNo,
+                    restaurantId: Number(restaurantId),
+                    supplierId: Number(supplierId),
+                    subtotal,
+                    taxAmount,
+                    discountAmount,
+                    totalAmount,
+                    status: String(status).toUpperCase(),
+                    receivingStatus: "PENDING",
+                    paymentStatus: "PENDING",
+                    deliveryAddress: deliveryAddress ? String(deliveryAddress) : null,
+                    expectedDeliveryDate: expectedDeliveryDate ? new Date(expectedDeliveryDate) : null,
+                    notes: notes ? String(notes) : null,
+                    items: {
+                        create: formattedItems,
+                    },
+                    statusEvents: {
+                        create: [
+                            {
+                                status: String(status).toUpperCase(),
+                                notes: `PO created as ${status}`,
+                                createdRole: req.user?.role || "OWNER",
+                                createdBy: req.user?.name || "User",
+                            },
+                        ],
+                    },
+                },
+                include: {
+                    supplier: { include: { profile: true } },
+                    items: true,
+                    statusEvents: true,
+                },
+            });
+
+            return reply.code(201).send({ message: "Purchase Order created successfully", order: newPO });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to create Purchase Order" });
+        }
+    };
+
+    const updatePOStatusHandler = async (req, reply) => {
+        try {
+            const orderId = Number(req.params.id);
+            const { status, notes } = req.body || {};
+
+            const existing = await prisma.supplyOrder.findUnique({ where: { id: orderId } });
+            if (!existing) {
+                return reply.code(404).send({ error: "Purchase Order not found" });
+            }
+
+            const targetStatus = String(status).toUpperCase();
+
+            const updated = await prisma.supplyOrder.update({
+                where: { id: orderId },
+                data: {
+                    status: targetStatus,
+                    statusEvents: {
+                        create: {
+                            status: targetStatus,
+                            notes: notes || `Status changed to ${targetStatus}`,
+                            createdRole: req.user?.role || "OWNER",
+                            createdBy: req.user?.name || "User",
+                        },
+                    },
+                },
+                include: {
+                    supplier: { include: { profile: true } },
+                    items: true,
+                    statusEvents: { orderBy: { createdAt: "desc" } },
+                },
+            });
+
+            return reply.code(200).send({ message: `PO status updated to ${targetStatus}`, order: updated });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to update PO status" });
+        }
+    };
+
+    const receivePOItemsHandler = async (req, reply) => {
+        try {
+            const orderId = Number(req.params.id);
+            const { receivingStatus = "FULLY_RECEIVED", notes } = req.body || {};
+
+            const existing = await prisma.supplyOrder.findUnique({
+                where: { id: orderId },
+                include: { items: true },
+            });
+            if (!existing) {
+                return reply.code(404).send({ error: "Purchase Order not found" });
+            }
+
+            const targetReceivingStatus = String(receivingStatus).toUpperCase();
+            const poStatus = targetReceivingStatus === "FULLY_RECEIVED" ? "COMPLETED" : "PARTIALLY_RECEIVED";
+
+            // Update inventory stock for items
+            for (const item of existing.items) {
+                const mat = await prisma.rawMaterial.findFirst({
+                    where: { restaurantId: existing.restaurantId, name: { equals: item.productName, mode: "insensitive" } },
+                });
+
+                if (mat) {
+                    await prisma.rawMaterial.update({
+                        where: { id: mat.id },
+                        data: { currentStock: mat.currentStock + item.quantity },
+                    });
+
+                    await prisma.stockMovement.create({
+                        data: {
+                            restaurantId: existing.restaurantId,
+                            rawMaterialId: mat.id,
+                            movementType: "PURCHASE",
+                            quantity: item.quantity,
+                            beforeBalance: mat.currentStock,
+                            afterBalance: mat.currentStock + item.quantity,
+                            reference: existing.orderNo,
+                            notes: `Received from PO #${existing.orderNo}`,
+                        },
+                    });
+                }
+            }
+
+            const updated = await prisma.supplyOrder.update({
+                where: { id: orderId },
+                data: {
+                    receivingStatus: targetReceivingStatus,
+                    status: poStatus,
+                    statusEvents: {
+                        create: {
+                            status: poStatus,
+                            notes: notes || `Goods received: ${targetReceivingStatus}`,
+                            createdRole: req.user?.role || "OWNER",
+                            createdBy: req.user?.name || "User",
+                        },
+                    },
+                },
+                include: {
+                    supplier: { include: { profile: true } },
+                    items: true,
+                    statusEvents: { orderBy: { createdAt: "desc" } },
+                },
+            });
+
+            return reply.code(200).send({ message: "Goods received and inventory updated!", order: updated });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to process receipt" });
         }
     };
 
@@ -380,9 +628,27 @@ export default async function supplyMarketplaceRoutes(app) {
     app.post("/api/owner/purchase-requests/:id/convert", { preHandler: [authUser] }, convertPurchaseRequestToPOHandler);
     app.post("/api/v1/owner/purchase-requests/:id/convert", { preHandler: [authUser] }, convertPurchaseRequestToPOHandler);
 
+    // PURCHASE ORDER MANAGEMENT ROUTES
+    app.get("/owner/purchase-orders", { preHandler: [authUser] }, listPurchaseOrdersHandler);
+    app.get("/api/owner/purchase-orders", { preHandler: [authUser] }, listPurchaseOrdersHandler);
+    app.get("/api/v1/owner/purchase-orders", { preHandler: [authUser] }, listPurchaseOrdersHandler);
+
+    app.post("/owner/purchase-orders", { preHandler: [authUser] }, createPurchaseOrderHandler);
+    app.post("/api/owner/purchase-orders", { preHandler: [authUser] }, createPurchaseOrderHandler);
+    app.post("/api/v1/owner/purchase-orders", { preHandler: [authUser] }, createPurchaseOrderHandler);
+
+    app.put("/owner/purchase-orders/:id/status", { preHandler: [authUser] }, updatePOStatusHandler);
+    app.put("/api/owner/purchase-orders/:id/status", { preHandler: [authUser] }, updatePOStatusHandler);
+    app.put("/api/v1/owner/purchase-orders/:id/status", { preHandler: [authUser] }, updatePOStatusHandler);
+
+    app.put("/owner/purchase-orders/:id/receive", { preHandler: [authUser] }, receivePOItemsHandler);
+    app.put("/api/owner/purchase-orders/:id/receive", { preHandler: [authUser] }, receivePOItemsHandler);
+    app.put("/api/v1/owner/purchase-orders/:id/receive", { preHandler: [authUser] }, receivePOItemsHandler);
+
     app.post("/supplier/orders/:id/accept", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "ACCEPTED"));
     app.post("/supplier/orders/:id/dispatch", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "DISPATCHED"));
     app.post("/supplier/orders/:id/complete", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "COMPLETED"));
     app.post("/supplier/orders/:id/reject", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "REJECTED"));
 }
+
 

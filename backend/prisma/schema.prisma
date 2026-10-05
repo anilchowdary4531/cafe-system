@@ -1500,6 +1500,9 @@ model SupplyOrder {
   paymentStatus   String     @default("PENDING") @map("payment_status") // PENDING | PAID | FAILED | REFUNDED
   paymentMode     String?    @map("payment_mode") // ONLINE | CASH_ON_DELIVERY | CREDIT
 
+  expectedDeliveryDate DateTime? @map("expected_delivery_date")
+  receivingStatus      String    @default("PENDING") @map("receiving_status") // PENDING | PARTIALLY_RECEIVED | FULLY_RECEIVED
+
   notes           String?
   deliveryAddress String?    @map("delivery_address")
 

@@ -729,6 +729,12 @@ export default function OwnerLayout() {
             accessKey: "supply",
         },
         {
+            label: "Purchase Orders",
+            path: "/owner/supply-chain/purchase-orders",
+            icon: <ShoppingBag size={18} />,
+            accessKey: "supply",
+        },
+        {
             label: "Supply Marketplace",
             path: "/owner/supply",
             icon: <Truck size={18} />,

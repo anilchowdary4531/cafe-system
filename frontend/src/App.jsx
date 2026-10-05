@@ -95,6 +95,7 @@ import OwnerSupplyChainAdjustments from "./pages/admin/OwnerSupplyChainAdjustmen
 import OwnerSupplyChainValuation from "./pages/admin/OwnerSupplyChainValuation";
 import OwnerSupplyChainSuppliers from "./pages/admin/OwnerSupplyChainSuppliers";
 import OwnerSupplyChainPurchaseRequests from "./pages/admin/OwnerSupplyChainPurchaseRequests";
+import OwnerSupplyChainPurchaseOrders from "./pages/admin/OwnerSupplyChainPurchaseOrders";
 import SuperAdminSupplyChain from "./pages/super-admin/SuperAdminSupplyChain";
 import NewOrder from "./pages/admin/NewOrder.jsx";
 import PaymentSuccess from "./pages/admin/PaymentSuccess.jsx";
@@ -614,6 +615,7 @@ export default function App() {
                         <Route path="supply-chain/inventory/valuation" element={<OwnerSupplyChainValuation />} />
                         <Route path="supply-chain/suppliers" element={<OwnerSupplyChainSuppliers />} />
                         <Route path="supply-chain/purchase-requests" element={<OwnerSupplyChainPurchaseRequests />} />
+                        <Route path="supply-chain/purchase-orders" element={<OwnerSupplyChainPurchaseOrders />} />
                         <Route path="supply-chain/inventory/:itemId" element={<OwnerSupplyChainInventoryDetail />} />
                         <Route path="delivery" element={<OwnerDeliveryManager />} />
                         <Route path="delivery-partners" element={<OwnerDeliveryPartners />} />
