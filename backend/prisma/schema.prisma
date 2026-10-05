@@ -136,6 +136,7 @@ model Restaurant {
   storageLocations     StorageLocation[]
   rawMaterialLocations RawMaterialLocation[]
   stockTransfers       StockTransfer[]
+  physicalStockCounts  PhysicalStockCount[]
 
   @@map("restaurants")
 }
@@ -188,6 +189,9 @@ model User {
   transfersApproved    StockTransfer[]        @relation("TransferApprovedBy")
   transfersDispatched  StockTransfer[]        @relation("TransferDispatchedBy")
   transfersReceived    StockTransfer[]        @relation("TransferReceivedBy")
+  stockCountsAssigned  PhysicalStockCount[]   @relation("StockCountAssignedTo")
+  stockCountsCreated   PhysicalStockCount[]   @relation("StockCountCreatedBy")
+  stockCountsApproved  PhysicalStockCount[]   @relation("StockCountApprovedBy")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -1969,6 +1973,7 @@ model RawMaterial {
   purchaseInvoiceItems PurchaseInvoiceItem[]
   locations         RawMaterialLocation[]
   transfers         StockTransfer[]
+  stockCountItems   StockCountItem[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId, category, isActive])
@@ -2866,6 +2871,7 @@ model StorageLocation {
   items           RawMaterialLocation[]
   sourceTransfers StockTransfer[]        @relation("SourceLocation")
   destTransfers   StockTransfer[]        @relation("DestLocation")
+  physicalStockCounts PhysicalStockCount[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId, isActive])
@@ -2961,6 +2967,75 @@ model StockTransfer {
   @@index([restaurantId, status, createdAt])
   @@map("stock_transfers")
 }
+
+model PhysicalStockCount {
+  id                  Int                     @id @default(autoincrement())
+  countCode           String                  @unique @map("count_code")
+
+  restaurantId        Int                     @map("restaurant_id")
+  restaurant          Restaurant              @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  locationId          Int?                    @map("location_id")
+  location            StorageLocation?        @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  locationName        String                  @default("Main Warehouse") @map("location_name")
+  category            String                  @default("ALL")
+
+  status              String                  @default("COUNTING") // DRAFT | COUNTING | REVIEW | APPROVED | ADJUSTED | REJECTED
+
+  totalItems          Int                     @default(0) @map("total_items")
+  matchedItems        Int                     @default(0) @map("matched_items")
+  varianceItems       Int                     @default(0) @map("variance_items")
+  totalVarianceValue  Float                   @default(0) @map("total_variance_value")
+
+  assignedToId        Int?                    @map("assigned_to_id")
+  assignedTo          User?                   @relation("StockCountAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  createdById         Int?                    @map("created_by_id")
+  createdBy           User?                   @relation("StockCountCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  approvedById        Int?                    @map("approved_by_id")
+  approvedBy          User?                   @relation("StockCountApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  notes               String?
+  adjustmentApplied   Boolean                 @default(false) @map("adjustment_applied")
+  approvedAt          DateTime?               @map("approved_at")
+
+  createdAt           DateTime                @default(now()) @map("created_at")
+  updatedAt           DateTime                @default(now()) @updatedAt @map("updated_at")
+
+  items               StockCountItem[]
+
+  @@index([restaurantId, status, createdAt])
+  @@map("physical_stock_counts")
+}
+
+model StockCountItem {
+  id                  Int                     @id @default(autoincrement())
+  countId             Int                     @map("count_id")
+  count               PhysicalStockCount      @relation(fields: [countId], references: [id], onDelete: Cascade)
+
+  rawMaterialId       Int?                    @map("raw_material_id")
+  rawMaterial         RawMaterial?            @relation(fields: [rawMaterialId], references: [id], onDelete: SetNull)
+
+  itemName            String                  @map("item_name")
+  category            String                  @default("General")
+  unit                String                  @default("kg")
+
+  systemQty           Float                   @default(0) @map("system_qty")
+  physicalQty         Float                   @default(0) @map("physical_qty")
+  difference          Float                   @default(0)
+  costPerUnit         Float                   @default(0) @map("cost_per_unit")
+  varianceValue       Float                   @default(0) @map("variance_value")
+
+  notes               String?
+  countedAt           DateTime?               @map("counted_at")
+
+  createdAt           DateTime                @default(now()) @map("created_at")
+
+  @@map("stock_count_items")
+}
+
 
 
 

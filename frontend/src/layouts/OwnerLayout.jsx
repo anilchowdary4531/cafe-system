@@ -44,6 +44,7 @@ import {
     CreditCard,
     Warehouse,
     ArrowLeftRight,
+    ClipboardCheck,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
@@ -768,6 +769,12 @@ export default function OwnerLayout() {
             label: "Stock Transfers",
             path: "/owner/supply-chain/transfers",
             icon: <ArrowLeftRight size={18} />,
+            accessKey: "supply",
+        },
+        {
+            label: "Physical Stock Counts",
+            path: "/owner/supply-chain/stock-counts",
+            icon: <ClipboardCheck size={18} />,
             accessKey: "supply",
         },
         {

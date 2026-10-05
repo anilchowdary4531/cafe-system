@@ -1718,6 +1718,321 @@ export default async function supplyMarketplaceRoutes(app) {
         }
     };
 
+    const listPhysicalStockCountsHandler = async (req, reply) => {
+        try {
+            const restaurantId = getRestaurantId(req);
+
+            const counts = await prisma.physicalStockCount.findMany({
+                where: { restaurantId },
+                include: {
+                    location: true,
+                    assignedTo: { select: { id: true, name: true, role: true } },
+                    createdBy: { select: { id: true, name: true, role: true } },
+                    approvedBy: { select: { id: true, name: true, role: true } },
+                    items: {
+                        include: { rawMaterial: true },
+                        orderBy: { id: "asc" },
+                    },
+                },
+                orderBy: { createdAt: "desc" },
+            });
+
+            let countingCount = 0;
+            let reviewCount = 0;
+            let approvedCount = 0;
+            let adjustedCount = 0;
+            let totalVarianceValue = 0;
+
+            counts.forEach((c) => {
+                totalVarianceValue += c.totalVarianceValue || 0;
+                const st = String(c.status).toUpperCase();
+                if (st === "COUNTING" || st === "DRAFT") countingCount++;
+                else if (st === "REVIEW") reviewCount++;
+                else if (st === "APPROVED") approvedCount++;
+                else if (st === "ADJUSTED") adjustedCount++;
+            });
+
+            return reply.code(200).send({
+                counts,
+                metrics: {
+                    totalCounts: counts.length,
+                    countingCount,
+                    reviewCount,
+                    approvedCount,
+                    adjustedCount,
+                    totalVarianceValue,
+                },
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to list physical stock counts" });
+        }
+    };
+
+    const createPhysicalStockCountHandler = async (req, reply) => {
+        try {
+            const restaurantId = getRestaurantId(req);
+            const createdById = req.user?.id || null;
+            const { locationId, category = "ALL", assignedToId, notes } = req.body || {};
+
+            let loc = null;
+            if (locationId) {
+                loc = await prisma.storageLocation.findUnique({ where: { id: Number(locationId) } });
+            }
+
+            let materials = [];
+            if (loc) {
+                const locItems = await prisma.rawMaterialLocation.findMany({
+                    where: { locationId: loc.id, restaurantId },
+                    include: { rawMaterial: true },
+                });
+                materials = locItems.map((li) => ({
+                    rawMaterialId: li.rawMaterialId,
+                    itemName: li.rawMaterial?.name || "Raw Material",
+                    category: li.rawMaterial?.category || "General",
+                    unit: li.rawMaterial?.displayUnit || li.rawMaterial?.baseUnit || "kg",
+                    systemQty: li.quantity || 0,
+                    costPerUnit: li.rawMaterial?.costPerBaseUnit || 0,
+                }));
+            }
+
+            if (materials.length === 0) {
+                const allMats = await prisma.rawMaterial.findMany({
+                    where: {
+                        restaurantId,
+                        isActive: true,
+                        ...(category !== "ALL" ? { category: { equals: category, mode: "insensitive" } } : {}),
+                    },
+                });
+                materials = allMats.map((m) => ({
+                    rawMaterialId: m.id,
+                    itemName: m.name,
+                    category: m.category || "General",
+                    unit: m.displayUnit || m.baseUnit || "kg",
+                    systemQty: m.currentStock || 0,
+                    costPerUnit: m.costPerBaseUnit || 0,
+                }));
+            }
+
+            const rand = Math.floor(1000 + Math.random() * 9000);
+            const countCode = `CNT-${new Date().toISOString().slice(0, 7).replace("-", "")}-${rand}`;
+
+            const newCount = await prisma.physicalStockCount.create({
+                data: {
+                    countCode,
+                    restaurantId,
+                    locationId: loc ? loc.id : null,
+                    locationName: loc ? loc.name : "All Storage Zones",
+                    category: String(category),
+                    status: "COUNTING",
+                    totalItems: materials.length,
+                    matchedItems: materials.length,
+                    varianceItems: 0,
+                    totalVarianceValue: 0,
+                    assignedToId: assignedToId ? Number(assignedToId) : createdById,
+                    createdById,
+                    notes: notes ? String(notes) : null,
+                    items: {
+                        create: materials.map((m) => ({
+                            rawMaterialId: m.rawMaterialId,
+                            itemName: m.itemName,
+                            category: m.category,
+                            unit: m.unit,
+                            systemQty: m.systemQty,
+                            physicalQty: m.systemQty,
+                            difference: 0,
+                            costPerUnit: m.costPerUnit,
+                            varianceValue: 0,
+                        })),
+                    },
+                },
+                include: {
+                    location: true,
+                    assignedTo: { select: { id: true, name: true, role: true } },
+                    createdBy: { select: { id: true, name: true, role: true } },
+                    items: true,
+                },
+            });
+
+            return reply.code(201).send({
+                message: `Physical stock count session ${countCode} started!`,
+                count: newCount,
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to create physical stock count" });
+        }
+    };
+
+    const updatePhysicalStockCountItemsHandler = async (req, reply) => {
+        try {
+            const countId = Number(req.params.id);
+            const { items = [], status = "REVIEW", notes } = req.body || {};
+
+            const count = await prisma.physicalStockCount.findUnique({
+                where: { id: countId },
+                include: { items: true },
+            });
+
+            if (!count) {
+                return reply.code(404).send({ error: "Stock count session not found" });
+            }
+
+            for (const itemInput of items) {
+                const existingItem = count.items.find((it) => it.id === Number(itemInput.id));
+                if (existingItem) {
+                    const physicalQty = Number(itemInput.physicalQty !== undefined ? itemInput.physicalQty : existingItem.physicalQty);
+                    const diff = physicalQty - existingItem.systemQty;
+                    const varVal = Math.abs(diff) * existingItem.costPerUnit;
+
+                    await prisma.stockCountItem.update({
+                        where: { id: existingItem.id },
+                        data: {
+                            physicalQty,
+                            difference: diff,
+                            varianceValue: varVal,
+                            notes: itemInput.notes ? String(itemInput.notes) : existingItem.notes,
+                            countedAt: new Date(),
+                        },
+                    });
+                }
+            }
+
+            const updatedItems = await prisma.stockCountItem.findMany({ where: { countId } });
+            let matchedItems = 0;
+            let varianceItems = 0;
+            let totalVarianceValue = 0;
+
+            updatedItems.forEach((it) => {
+                if (Math.abs(it.difference) < 0.001) {
+                    matchedItems++;
+                } else {
+                    varianceItems++;
+                    totalVarianceValue += Math.abs(it.varianceValue || 0);
+                }
+            });
+
+            const updatedCount = await prisma.physicalStockCount.update({
+                where: { id: countId },
+                data: {
+                    status: String(status).toUpperCase(),
+                    totalItems: updatedItems.length,
+                    matchedItems,
+                    varianceItems,
+                    totalVarianceValue,
+                    notes: notes ? String(notes) : count.notes,
+                },
+                include: {
+                    location: true,
+                    assignedTo: { select: { id: true, name: true, role: true } },
+                    createdBy: { select: { id: true, name: true, role: true } },
+                    items: { orderBy: { id: "asc" } },
+                },
+            });
+
+            return reply.code(200).send({
+                message: "Physical stock count updated successfully",
+                count: updatedCount,
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to update stock count items" });
+        }
+    };
+
+    const approvePhysicalStockCountHandler = async (req, reply) => {
+        try {
+            const restaurantId = getRestaurantId(req);
+            const approvedById = req.user?.id || null;
+            const countId = Number(req.params.id);
+            const { status = "APPROVED", notes } = req.body || {};
+
+            const count = await prisma.physicalStockCount.findUnique({
+                where: { id: countId },
+                include: { items: { include: { rawMaterial: true } }, location: true },
+            });
+
+            if (!count) {
+                return reply.code(404).send({ error: "Physical stock count session not found" });
+            }
+
+            const targetStatus = String(status).toUpperCase();
+            let adjustmentApplied = count.adjustmentApplied;
+
+            if (["APPROVED", "ADJUSTED"].includes(targetStatus) && !adjustmentApplied) {
+                for (const item of count.items) {
+                    if (Math.abs(item.difference) >= 0.001 && item.rawMaterialId) {
+                        const mat = item.rawMaterial;
+                        if (mat) {
+                            const beforeBalance = mat.currentStock;
+                            const afterBalance = Math.max(0, beforeBalance + item.difference);
+
+                            await prisma.rawMaterial.update({
+                                where: { id: mat.id },
+                                data: { currentStock: afterBalance },
+                            });
+
+                            if (count.locationId) {
+                                const locItem = await prisma.rawMaterialLocation.findUnique({
+                                    where: {
+                                        locationId_rawMaterialId: {
+                                            locationId: count.locationId,
+                                            rawMaterialId: mat.id,
+                                        },
+                                    },
+                                });
+
+                                if (locItem) {
+                                    await prisma.rawMaterialLocation.update({
+                                        where: { id: locItem.id },
+                                        data: { quantity: Math.max(0, locItem.quantity + item.difference) },
+                                    });
+                                }
+                            }
+
+                            await prisma.stockMovement.create({
+                                data: {
+                                    restaurantId,
+                                    rawMaterialId: mat.id,
+                                    movementType: "ADJUSTMENT",
+                                    quantity: item.difference,
+                                    beforeBalance,
+                                    afterBalance,
+                                    reference: count.countCode,
+                                    notes: `Physical Stock Count Audit #${count.countCode}: Physical count was ${item.physicalQty} vs system ${item.systemQty} (Diff: ${item.difference} ${item.unit}). Approved by Manager.`,
+                                },
+                            });
+                        }
+                    }
+                }
+                adjustmentApplied = true;
+            }
+
+            const updated = await prisma.physicalStockCount.update({
+                where: { id: countId },
+                data: {
+                    status: targetStatus === "APPROVED" ? "ADJUSTED" : targetStatus,
+                    adjustmentApplied,
+                    approvedById,
+                    approvedAt: new Date(),
+                    notes: notes ? String(notes) : count.notes,
+                },
+                include: {
+                    location: true,
+                    assignedTo: { select: { id: true, name: true, role: true } },
+                    createdBy: { select: { id: true, name: true, role: true } },
+                    approvedBy: { select: { id: true, name: true, role: true } },
+                    items: { orderBy: { id: "asc" } },
+                },
+            });
+
+            return reply.code(200).send({
+                message: `Physical Stock Count approved! Stock adjustments applied to inventory.`,
+                count: updated,
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to approve physical stock count" });
+        }
+    };
+
+
 
 
 
@@ -1856,9 +2171,22 @@ export default async function supplyMarketplaceRoutes(app) {
     app.post("/api/owner/stock-transfers", { preHandler: [authUser] }, createStockTransferHandler);
     app.post("/api/v1/owner/stock-transfers", { preHandler: [authUser] }, createStockTransferHandler);
 
-    app.put("/owner/stock-transfers/:id/status", { preHandler: [authUser] }, updateStockTransferStatusHandler);
-    app.put("/api/owner/stock-transfers/:id/status", { preHandler: [authUser] }, updateStockTransferStatusHandler);
-    app.put("/api/v1/owner/stock-transfers/:id/status", { preHandler: [authUser] }, updateStockTransferStatusHandler);
+    // PHYSICAL STOCK COUNTS ROUTES
+    app.get("/owner/stock-counts", { preHandler: [authUser] }, listPhysicalStockCountsHandler);
+    app.get("/api/owner/stock-counts", { preHandler: [authUser] }, listPhysicalStockCountsHandler);
+    app.get("/api/v1/owner/stock-counts", { preHandler: [authUser] }, listPhysicalStockCountsHandler);
+
+    app.post("/owner/stock-counts", { preHandler: [authUser] }, createPhysicalStockCountHandler);
+    app.post("/api/owner/stock-counts", { preHandler: [authUser] }, createPhysicalStockCountHandler);
+    app.post("/api/v1/owner/stock-counts", { preHandler: [authUser] }, createPhysicalStockCountHandler);
+
+    app.put("/owner/stock-counts/:id/items", { preHandler: [authUser] }, updatePhysicalStockCountItemsHandler);
+    app.put("/api/owner/stock-counts/:id/items", { preHandler: [authUser] }, updatePhysicalStockCountItemsHandler);
+    app.put("/api/v1/owner/stock-counts/:id/items", { preHandler: [authUser] }, updatePhysicalStockCountItemsHandler);
+
+    app.put("/owner/stock-counts/:id/approve", { preHandler: [authUser] }, approvePhysicalStockCountHandler);
+    app.put("/api/owner/stock-counts/:id/approve", { preHandler: [authUser] }, approvePhysicalStockCountHandler);
+    app.put("/api/v1/owner/stock-counts/:id/approve", { preHandler: [authUser] }, approvePhysicalStockCountHandler);
 
     app.post("/supplier/orders/:id/accept", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "ACCEPTED"));
     app.post("/supplier/orders/:id/dispatch", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "DISPATCHED"));
