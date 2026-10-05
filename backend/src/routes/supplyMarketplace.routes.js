@@ -1406,99 +1406,318 @@ export default async function supplyMarketplaceRoutes(app) {
         }
     };
 
-    const transferStockHandler = async (req, reply) => {
+    const listStockTransfersHandler = async (req, reply) => {
+        try {
+            const restaurantId = getRestaurantId(req);
+
+            const transfers = await prisma.stockTransfer.findMany({
+                where: { restaurantId },
+                include: {
+                    fromLocation: true,
+                    toLocation: true,
+                    fromBranch: true,
+                    toBranch: true,
+                    rawMaterial: true,
+                    requestedBy: { select: { id: true, name: true, role: true } },
+                    approvedBy: { select: { id: true, name: true, role: true } },
+                    dispatchedBy: { select: { id: true, name: true, role: true } },
+                    receivedBy: { select: { id: true, name: true, role: true } },
+                },
+                orderBy: { createdAt: "desc" },
+            });
+
+            let requestedCount = 0;
+            let approvedCount = 0;
+            let dispatchedCount = 0;
+            let inTransitCount = 0;
+            let receivedCount = 0;
+            let completedCount = 0;
+            let rejectedCount = 0;
+
+            transfers.forEach((t) => {
+                const st = String(t.status).toUpperCase();
+                if (st === "REQUESTED") requestedCount++;
+                else if (st === "APPROVED") approvedCount++;
+                else if (st === "DISPATCHED") dispatchedCount++;
+                else if (st === "IN_TRANSIT") inTransitCount++;
+                else if (st === "RECEIVED") receivedCount++;
+                else if (st === "COMPLETED") completedCount++;
+                else if (st === "REJECTED") rejectedCount++;
+            });
+
+            return reply.code(200).send({
+                transfers,
+                metrics: {
+                    totalTransfers: transfers.length,
+                    requestedCount,
+                    approvedCount,
+                    dispatchedCount,
+                    inTransitCount,
+                    receivedCount,
+                    completedCount,
+                    rejectedCount,
+                },
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to list stock transfers" });
+        }
+    };
+
+    const createStockTransferHandler = async (req, reply) => {
         try {
             const restaurantId = getRestaurantId(req);
             const requestedById = req.user?.id || null;
-            const { fromLocationId, toLocationId, rawMaterialId, quantity, reason } = req.body || {};
+            const {
+                transferType = "LOCATION_TO_LOCATION",
+                fromLocationId,
+                toLocationId,
+                fromBranchId,
+                toBranchId,
+                fromName,
+                toName,
+                rawMaterialId,
+                itemName,
+                requestedQty,
+                unit,
+                reason,
+                notes,
+            } = req.body || {};
 
-            const fromLocId = Number(fromLocationId);
-            const toLocId = Number(toLocationId);
-            const matId = Number(rawMaterialId);
-            const qty = Number(quantity || 0);
-
-            if (fromLocId === toLocId) {
-                return reply.code(400).send({ error: "Source and Destination locations must be different" });
-            }
-            if (qty <= 0) {
-                return reply.code(400).send({ error: "Transfer quantity must be greater than zero" });
-            }
-
-            const mat = await prisma.rawMaterial.findUnique({ where: { id: matId } });
-            if (!mat) {
-                return reply.code(404).send({ error: "Raw Material not found" });
-            }
-
-            const sourceItem = await prisma.rawMaterialLocation.findUnique({
-                where: { locationId_rawMaterialId: { locationId: fromLocId, rawMaterialId: matId } },
-            });
-            const sourceQty = sourceItem?.quantity || 0;
-            if (sourceQty < qty) {
-                return reply.code(400).send({ error: `Insufficient stock in source location. Available: ${sourceQty}` });
+            const reqQty = Number(requestedQty || 0);
+            if (reqQty <= 0) {
+                return reply.code(400).send({ error: "Transfer requested quantity must be greater than 0" });
             }
 
-            await prisma.rawMaterialLocation.update({
-                where: { id: sourceItem.id },
-                data: { quantity: Math.max(0, sourceQty - qty) },
-            });
-
-            await prisma.rawMaterialLocation.upsert({
-                where: { locationId_rawMaterialId: { locationId: toLocId, rawMaterialId: matId } },
-                update: { quantity: { increment: qty } },
-                create: {
-                    restaurantId,
-                    locationId: toLocId,
-                    rawMaterialId: matId,
-                    quantity: qty,
-                    minStock: mat.minimumStock || 0,
-                },
-            });
+            let mat = null;
+            if (rawMaterialId) {
+                mat = await prisma.rawMaterial.findUnique({ where: { id: Number(rawMaterialId) } });
+            }
 
             const rand = Math.floor(1000 + Math.random() * 9000);
             const transferCode = `TRF-${new Date().toISOString().slice(0, 7).replace("-", "")}-${rand}`;
 
-            const transfer = await prisma.stockTransfer.create({
+            const newTransfer = await prisma.stockTransfer.create({
                 data: {
                     transferCode,
                     restaurantId,
-                    fromLocationId: fromLocId,
-                    toLocationId: toLocId,
-                    rawMaterialId: matId,
-                    itemName: mat.name,
-                    quantity: qty,
-                    unit: mat.displayUnit || mat.baseUnit || "kg",
-                    reason: reason ? String(reason) : "Internal Warehouse Transfer",
-                    status: "COMPLETED",
+                    transferType: String(transferType).toUpperCase(),
+                    fromLocationId: fromLocationId ? Number(fromLocationId) : null,
+                    toLocationId: toLocationId ? Number(toLocationId) : null,
+                    fromBranchId: fromBranchId ? Number(fromBranchId) : null,
+                    toBranchId: toBranchId ? Number(toBranchId) : null,
+                    fromName: fromName ? String(fromName) : null,
+                    toName: toName ? String(toName) : null,
+                    rawMaterialId: mat ? mat.id : (rawMaterialId ? Number(rawMaterialId) : null),
+                    itemName: itemName ? String(itemName) : (mat?.name || "Raw Material"),
+                    unit: unit || mat?.displayUnit || mat?.baseUnit || "kg",
+                    requestedQty: reqQty,
+                    dispatchedQty: reqQty,
+                    receivedQty: 0,
+                    differenceQty: 0,
+                    status: "REQUESTED",
+                    inventoryDecremented: false,
+                    inventoryIncremented: false,
+                    reason: reason ? String(reason) : "Stock Transfer Request",
+                    notes: notes ? String(notes) : null,
                     requestedById,
                 },
                 include: {
                     fromLocation: true,
                     toLocation: true,
+                    fromBranch: true,
+                    toBranch: true,
                     rawMaterial: true,
+                    requestedBy: { select: { id: true, name: true, role: true } },
                 },
             });
 
-            await prisma.stockMovement.create({
+            return reply.code(201).send({
+                message: `Stock transfer request ${transferCode} created successfully!`,
+                transfer: newTransfer,
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to create stock transfer" });
+        }
+    };
+
+    const updateStockTransferStatusHandler = async (req, reply) => {
+        try {
+            const restaurantId = getRestaurantId(req);
+            const userId = req.user?.id || null;
+            const transferId = Number(req.params.id);
+            const { status, dispatchedQty, receivedQty, discrepancyReason, notes } = req.body || {};
+
+            const transfer = await prisma.stockTransfer.findUnique({
+                where: { id: transferId },
+                include: { fromLocation: true, toLocation: true, rawMaterial: true },
+            });
+
+            if (!transfer) {
+                return reply.code(404).send({ error: "Stock transfer record not found" });
+            }
+
+            const newStatus = String(status || transfer.status).toUpperCase();
+            let inventoryDecremented = transfer.inventoryDecremented;
+            let inventoryIncremented = transfer.inventoryIncremented;
+
+            const dispQty = dispatchedQty !== undefined ? Number(dispatchedQty) : (transfer.dispatchedQty || transfer.requestedQty);
+            let recQty = receivedQty !== undefined ? Number(receivedQty) : transfer.receivedQty;
+            let diffQty = transfer.differenceQty;
+
+            let approvedById = transfer.approvedById;
+            let dispatchedById = transfer.dispatchedById;
+            let receivedById = transfer.receivedById;
+            let dispatchedAt = transfer.dispatchedAt;
+            let receivedAt = transfer.receivedAt;
+
+            if (newStatus === "APPROVED" && !approvedById) {
+                approvedById = userId;
+            }
+
+            // RULE 1: DECREMENT FROM SOURCE ONLY WHEN DISPATCHED / IN_TRANSIT
+            const isDispatchStatus = ["DISPATCHED", "IN_TRANSIT", "RECEIVED", "COMPLETED"].includes(newStatus);
+            if (isDispatchStatus && !inventoryDecremented) {
+                dispatchedById = userId;
+                dispatchedAt = new Date();
+
+                const matId = transfer.rawMaterialId;
+                if (matId && transfer.fromLocationId) {
+                    const sourceItem = await prisma.rawMaterialLocation.findUnique({
+                        where: {
+                            locationId_rawMaterialId: {
+                                locationId: transfer.fromLocationId,
+                                rawMaterialId: matId,
+                            },
+                        },
+                    });
+
+                    if (sourceItem) {
+                        const currentSourceLocQty = sourceItem.quantity || 0;
+                        await prisma.rawMaterialLocation.update({
+                            where: { id: sourceItem.id },
+                            data: { quantity: Math.max(0, currentSourceLocQty - dispQty) },
+                        });
+                    }
+                }
+
+                inventoryDecremented = true;
+
+                if (transfer.rawMaterialId) {
+                    const mat = transfer.rawMaterial;
+                    if (mat) {
+                        await prisma.stockMovement.create({
+                            data: {
+                                restaurantId,
+                                rawMaterialId: mat.id,
+                                movementType: "TRANSFER",
+                                quantity: -dispQty,
+                                beforeBalance: mat.currentStock,
+                                afterBalance: Math.max(0, mat.currentStock - dispQty),
+                                reference: transfer.transferCode,
+                                notes: `Stock Transfer #${transfer.transferCode} DISPATCHED: ${dispQty} ${transfer.unit} from ${transfer.fromLocation?.name || transfer.fromName || "Warehouse"}.`,
+                            },
+                        });
+                    }
+                }
+            }
+
+            // RULE 2: INCREMENT AT DESTINATION ONLY WHEN RECEIVED / COMPLETED
+            const isReceiveStatus = ["RECEIVED", "COMPLETED"].includes(newStatus);
+            if (isReceiveStatus && !inventoryIncremented) {
+                receivedById = userId;
+                receivedAt = new Date();
+
+                if (receivedQty !== undefined) {
+                    recQty = Number(receivedQty);
+                } else if (recQty === 0) {
+                    recQty = dispQty;
+                }
+                diffQty = dispQty - recQty;
+
+                const matId = transfer.rawMaterialId;
+                if (matId && transfer.toLocationId) {
+                    const mat = transfer.rawMaterial;
+                    await prisma.rawMaterialLocation.upsert({
+                        where: {
+                            locationId_rawMaterialId: {
+                                locationId: transfer.toLocationId,
+                                rawMaterialId: matId,
+                            },
+                        },
+                        update: { quantity: { increment: recQty } },
+                        create: {
+                            restaurantId,
+                            locationId: transfer.toLocationId,
+                            rawMaterialId: matId,
+                            quantity: recQty,
+                            minStock: mat?.minimumStock || 0,
+                        },
+                    });
+                }
+
+                if (matId && transfer.rawMaterial) {
+                    const mat = transfer.rawMaterial;
+                    await prisma.rawMaterial.update({
+                        where: { id: mat.id },
+                        data: { currentStock: { increment: recQty } },
+                    });
+
+                    await prisma.stockMovement.create({
+                        data: {
+                            restaurantId,
+                            rawMaterialId: mat.id,
+                            movementType: "RECEIPT",
+                            quantity: recQty,
+                            beforeBalance: mat.currentStock,
+                            afterBalance: mat.currentStock + recQty,
+                            reference: transfer.transferCode,
+                            notes: `Stock Transfer #${transfer.transferCode} RECEIVED: ${recQty} ${transfer.unit} at ${transfer.toLocation?.name || transfer.toName || "Kitchen"}.`,
+                        },
+                    });
+                }
+
+                inventoryIncremented = true;
+            }
+
+            const updatedTransfer = await prisma.stockTransfer.update({
+                where: { id: transferId },
                 data: {
-                    restaurantId,
-                    rawMaterialId: matId,
-                    movementType: "TRANSFER",
-                    quantity: 0,
-                    beforeBalance: mat.currentStock,
-                    afterBalance: mat.currentStock,
-                    reference: transferCode,
-                    notes: `Transferred ${qty} ${mat.displayUnit || mat.baseUnit || "kg"} from ${transfer.fromLocation?.name} to ${transfer.toLocation?.name}.`,
+                    status: newStatus,
+                    dispatchedQty: dispQty,
+                    receivedQty: recQty,
+                    differenceQty: diffQty,
+                    inventoryDecremented,
+                    inventoryIncremented,
+                    discrepancyReason: discrepancyReason ? String(discrepancyReason) : transfer.discrepancyReason,
+                    notes: notes ? String(notes) : transfer.notes,
+                    approvedById,
+                    dispatchedById,
+                    receivedById,
+                    dispatchedAt,
+                    receivedAt,
+                },
+                include: {
+                    fromLocation: true,
+                    toLocation: true,
+                    fromBranch: true,
+                    toBranch: true,
+                    rawMaterial: true,
+                    requestedBy: { select: { id: true, name: true, role: true } },
+                    approvedBy: { select: { id: true, name: true, role: true } },
+                    dispatchedBy: { select: { id: true, name: true, role: true } },
+                    receivedBy: { select: { id: true, name: true, role: true } },
                 },
             });
 
             return reply.code(200).send({
-                message: `Stock transfer of ${qty} ${mat.name} completed successfully!`,
-                transfer,
+                message: `Stock transfer status updated to ${newStatus}`,
+                transfer: updatedTransfer,
             });
         } catch (err) {
-            return reply.code(500).send({ error: err.message || "Failed to execute stock transfer" });
+            return reply.code(500).send({ error: err.message || "Failed to update transfer status" });
         }
     };
+
 
 
 
@@ -1628,9 +1847,18 @@ export default async function supplyMarketplaceRoutes(app) {
     app.put("/api/owner/storage-locations/:id", { preHandler: [authUser] }, updateStorageLocationHandler);
     app.put("/api/v1/owner/storage-locations/:id", { preHandler: [authUser] }, updateStorageLocationHandler);
 
-    app.post("/owner/stock-transfers", { preHandler: [authUser] }, transferStockHandler);
-    app.post("/api/owner/stock-transfers", { preHandler: [authUser] }, transferStockHandler);
-    app.post("/api/v1/owner/stock-transfers", { preHandler: [authUser] }, transferStockHandler);
+    // STOCK TRANSFERS ROUTES
+    app.get("/owner/stock-transfers", { preHandler: [authUser] }, listStockTransfersHandler);
+    app.get("/api/owner/stock-transfers", { preHandler: [authUser] }, listStockTransfersHandler);
+    app.get("/api/v1/owner/stock-transfers", { preHandler: [authUser] }, listStockTransfersHandler);
+
+    app.post("/owner/stock-transfers", { preHandler: [authUser] }, createStockTransferHandler);
+    app.post("/api/owner/stock-transfers", { preHandler: [authUser] }, createStockTransferHandler);
+    app.post("/api/v1/owner/stock-transfers", { preHandler: [authUser] }, createStockTransferHandler);
+
+    app.put("/owner/stock-transfers/:id/status", { preHandler: [authUser] }, updateStockTransferStatusHandler);
+    app.put("/api/owner/stock-transfers/:id/status", { preHandler: [authUser] }, updateStockTransferStatusHandler);
+    app.put("/api/v1/owner/stock-transfers/:id/status", { preHandler: [authUser] }, updateStockTransferStatusHandler);
 
     app.post("/supplier/orders/:id/accept", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "ACCEPTED"));
     app.post("/supplier/orders/:id/dispatch", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "DISPATCHED"));

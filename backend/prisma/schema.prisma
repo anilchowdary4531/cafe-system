@@ -185,6 +185,9 @@ model User {
   spRecorded           SupplierPayment[]      @relation("SPRecordedBy")
   managedLocations     StorageLocation[]      @relation("LocationManager")
   transfersRequested   StockTransfer[]        @relation("TransferRequestedBy")
+  transfersApproved    StockTransfer[]        @relation("TransferApprovedBy")
+  transfersDispatched  StockTransfer[]        @relation("TransferDispatchedBy")
+  transfersReceived    StockTransfer[]        @relation("TransferReceivedBy")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -792,6 +795,8 @@ model Branch {
   deliveryPartners    DeliveryPartner[]
   deliveries          Delivery[]
   coupons             Coupon[]
+  transfersFrom       StockTransfer[]        @relation("SourceBranch")
+  transfersTo         StockTransfer[]        @relation("DestBranch")
 
   @@unique([restaurantId, name])
   @@index([restaurantId, isActive])
@@ -2892,36 +2897,71 @@ model RawMaterialLocation {
 }
 
 model StockTransfer {
-  id                Int                    @id @default(autoincrement())
-  transferCode      String                 @unique @map("transfer_code")
+  id                    Int                    @id @default(autoincrement())
+  transferCode          String                 @unique @map("transfer_code")
 
-  restaurantId      Int                    @map("restaurant_id")
-  restaurant        Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  restaurantId          Int                    @map("restaurant_id")
+  restaurant            Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
-  fromLocationId    Int                    @map("from_location_id")
-  fromLocation      StorageLocation        @relation("SourceLocation", fields: [fromLocationId], references: [id], onDelete: Cascade)
+  transferType          String                 @default("LOCATION_TO_LOCATION") @map("transfer_type") // LOCATION_TO_LOCATION | WAREHOUSE_TO_BRANCH | WAREHOUSE_TO_KITCHEN
 
-  toLocationId      Int                    @map("to_location_id")
-  toLocation        StorageLocation        @relation("DestLocation", fields: [toLocationId], references: [id], onDelete: Cascade)
+  fromLocationId        Int?                   @map("from_location_id")
+  fromLocation          StorageLocation?       @relation("SourceLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
 
-  rawMaterialId     Int?                   @map("raw_material_id")
-  rawMaterial       RawMaterial?           @relation(fields: [rawMaterialId], references: [id], onDelete: SetNull)
+  toLocationId          Int?                   @map("to_location_id")
+  toLocation            StorageLocation?       @relation("DestLocation", fields: [toLocationId], references: [id], onDelete: SetNull)
 
-  itemName          String                 @map("item_name")
-  quantity          Float                  @default(0)
-  unit              String                 @default("kg")
-  reason            String?
-  status            String                 @default("COMPLETED")
+  fromBranchId          Int?                   @map("from_branch_id")
+  fromBranch            Branch?                @relation("SourceBranch", fields: [fromBranchId], references: [id], onDelete: SetNull)
 
-  requestedById     Int?                   @map("requested_by_id")
-  requestedBy       User?                  @relation("TransferRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  toBranchId            Int?                   @map("to_branch_id")
+  toBranch              Branch?                @relation("DestBranch", fields: [toBranchId], references: [id], onDelete: SetNull)
 
-  createdAt         DateTime               @default(now()) @map("created_at")
-  updatedAt         DateTime               @default(now()) @updatedAt @map("updated_at")
+  fromName              String?                @map("from_name")
+  toName                String?                @map("to_name")
 
-  @@index([restaurantId, fromLocationId, toLocationId])
+  rawMaterialId         Int?                   @map("raw_material_id")
+  rawMaterial           RawMaterial?           @relation(fields: [rawMaterialId], references: [id], onDelete: SetNull)
+
+  itemName              String                 @map("item_name")
+  unit                  String                 @default("kg")
+
+  requestedQty          Float                  @default(0) @map("requested_qty")
+  dispatchedQty         Float                  @default(0) @map("dispatched_qty")
+  receivedQty           Float                  @default(0) @map("received_qty")
+  differenceQty         Float                  @default(0) @map("difference_qty")
+
+  status                String                 @default("REQUESTED") // REQUESTED | APPROVED | DISPATCHED | IN_TRANSIT | RECEIVED | COMPLETED | REJECTED
+
+  inventoryDecremented  Boolean                @default(false) @map("inventory_decremented")
+  inventoryIncremented  Boolean                @default(false) @map("inventory_incremented")
+
+  reason                String?
+  notes                 String?
+  discrepancyReason     String?                @map("discrepancy_reason")
+
+  requestedById         Int?                   @map("requested_by_id")
+  requestedBy           User?                  @relation("TransferRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  approvedById          Int?                   @map("approved_by_id")
+  approvedBy            User?                  @relation("TransferApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  dispatchedById        Int?                   @map("dispatched_by_id")
+  dispatchedBy          User?                  @relation("TransferDispatchedBy", fields: [dispatchedById], references: [id], onDelete: SetNull)
+
+  receivedById          Int?                   @map("received_by_id")
+  receivedBy            User?                  @relation("TransferReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+
+  dispatchedAt          DateTime?              @map("dispatched_at")
+  receivedAt            DateTime?              @map("received_at")
+
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @default(now()) @updatedAt @map("updated_at")
+
+  @@index([restaurantId, status, createdAt])
   @@map("stock_transfers")
 }
+
 
 
 
