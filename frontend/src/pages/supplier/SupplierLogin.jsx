@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Truck, ArrowRight, Package, Building2, ShieldCheck, RefreshCw } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
+import { writeStaffSession } from "../../utils/staffSessionStorage";
 import BrandLogo from "../../components/BrandLogo";
 import LanguageSelector from "../../components/LanguageSelector";
 
@@ -62,10 +63,21 @@ export default function SupplierLogin() {
                     email: form.email,
                     password: form.password,
                 });
-                localStorage.setItem("token", res.data.token);
+                const token = res.data.token;
+                localStorage.setItem("token", token);
+                localStorage.setItem("supplierToken", token);
                 if (res.data.refreshToken) {
                     localStorage.setItem("supplier_refresh_token", res.data.refreshToken);
                 }
+                const sessionUser = {
+                    id: res.data.supplier?.id || 1,
+                    name: res.data.supplier?.businessName || "Supplier User",
+                    email: res.data.supplier?.email || form.email,
+                    role: "OWNER",
+                    access: { supply: true }
+                };
+                localStorage.setItem("user", JSON.stringify(sessionUser));
+                writeStaffSession({ token, user: sessionUser });
                 showToast("Supplier login successful!");
                 navigate("/supplier");
             } else if (subMode === "register") {
