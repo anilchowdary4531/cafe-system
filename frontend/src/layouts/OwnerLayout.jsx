@@ -42,6 +42,7 @@ import {
     Trash2,
     Receipt,
     CreditCard,
+    Warehouse,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
@@ -754,6 +755,12 @@ export default function OwnerLayout() {
             label: "Invoices & Payments",
             path: "/owner/supply-chain/invoices",
             icon: <Receipt size={18} />,
+            accessKey: "supply",
+        },
+        {
+            label: "Warehouse Locations",
+            path: "/owner/supply-chain/warehouse",
+            icon: <Warehouse size={18} />,
             accessKey: "supply",
         },
         {

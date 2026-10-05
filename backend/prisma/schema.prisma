@@ -133,6 +133,9 @@ model Restaurant {
   purchaseReturns      PurchaseReturn[]
   purchaseInvoices     PurchaseInvoice[]
   supplierPayments     SupplierPayment[]
+  storageLocations     StorageLocation[]
+  rawMaterialLocations RawMaterialLocation[]
+  stockTransfers       StockTransfer[]
 
   @@map("restaurants")
 }
@@ -180,6 +183,8 @@ model User {
   prnCreated           PurchaseReturn[]       @relation("PRNCreatedBy")
   piCreated            PurchaseInvoice[]      @relation("PICreatedBy")
   spRecorded           SupplierPayment[]      @relation("SPRecordedBy")
+  managedLocations     StorageLocation[]      @relation("LocationManager")
+  transfersRequested   StockTransfer[]        @relation("TransferRequestedBy")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -1957,6 +1962,8 @@ model RawMaterial {
   goodsReceiptItems GoodsReceiptItem[]
   purchaseReturns   PurchaseReturn[]
   purchaseInvoiceItems PurchaseInvoiceItem[]
+  locations         RawMaterialLocation[]
+  transfers         StockTransfer[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId, category, isActive])
@@ -2829,6 +2836,93 @@ model SupplierPayment {
   @@index([restaurantId, paymentDate])
   @@map("supplier_payments")
 }
+
+model StorageLocation {
+  id              Int                    @id @default(autoincrement())
+  code            String                 @unique @map("code")
+  name            String
+  type            String                 @default("DRY")
+  description     String?
+  temperature     String?
+  capacityUnit    String?                @default("sqft") @map("capacity_unit")
+  capacityValue   Float?                 @default(0) @map("capacity_value")
+  isDefault       Boolean                @default(false) @map("is_default")
+  isActive        Boolean                @default(true) @map("is_active")
+
+  restaurantId    Int                    @map("restaurant_id")
+  restaurant      Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  managerId       Int?                   @map("manager_id")
+  manager         User?                  @relation("LocationManager", fields: [managerId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @default(now()) @updatedAt @map("updated_at")
+
+  items           RawMaterialLocation[]
+  sourceTransfers StockTransfer[]        @relation("SourceLocation")
+  destTransfers   StockTransfer[]        @relation("DestLocation")
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId, isActive])
+  @@map("storage_locations")
+}
+
+model RawMaterialLocation {
+  id              Int                    @id @default(autoincrement())
+  restaurantId    Int                    @map("restaurant_id")
+  restaurant      Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  locationId      Int                    @map("location_id")
+  location        StorageLocation        @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  rawMaterialId   Int                    @map("raw_material_id")
+  rawMaterial     RawMaterial            @relation(fields: [rawMaterialId], references: [id], onDelete: Cascade)
+
+  quantity        Float                  @default(0)
+  minStock        Float                  @default(0) @map("min_stock")
+  rackNumber      String?                @map("rack_number")
+  shelfNumber     String?                @map("shelf_number")
+
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([locationId, rawMaterialId])
+  @@index([restaurantId, locationId])
+  @@map("raw_material_locations")
+}
+
+model StockTransfer {
+  id                Int                    @id @default(autoincrement())
+  transferCode      String                 @unique @map("transfer_code")
+
+  restaurantId      Int                    @map("restaurant_id")
+  restaurant        Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  fromLocationId    Int                    @map("from_location_id")
+  fromLocation      StorageLocation        @relation("SourceLocation", fields: [fromLocationId], references: [id], onDelete: Cascade)
+
+  toLocationId      Int                    @map("to_location_id")
+  toLocation        StorageLocation        @relation("DestLocation", fields: [toLocationId], references: [id], onDelete: Cascade)
+
+  rawMaterialId     Int?                   @map("raw_material_id")
+  rawMaterial       RawMaterial?           @relation(fields: [rawMaterialId], references: [id], onDelete: SetNull)
+
+  itemName          String                 @map("item_name")
+  quantity          Float                  @default(0)
+  unit              String                 @default("kg")
+  reason            String?
+  status            String                 @default("COMPLETED")
+
+  requestedById     Int?                   @map("requested_by_id")
+  requestedBy       User?                  @relation("TransferRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @default(now()) @updatedAt @map("updated_at")
+
+  @@index([restaurantId, fromLocationId, toLocationId])
+  @@map("stock_transfers")
+}
+
 
 
 

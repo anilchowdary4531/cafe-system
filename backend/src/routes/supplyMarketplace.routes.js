@@ -1182,6 +1182,325 @@ export default async function supplyMarketplaceRoutes(app) {
         }
     };
 
+    const listStorageLocationsHandler = async (req, reply) => {
+        try {
+            const restaurantId = getRestaurantId(req);
+
+            const defaultLocations = [
+                { name: "Main Store", code: "LOC-MAIN", type: "DRY", isDefault: true, description: "Primary central inventory warehouse", temperature: "Ambient (20-25°C)" },
+                { name: "Cold Storage", code: "LOC-COLD", type: "COLD", isDefault: false, description: "Chilled dairy, produce & fresh ingredients", temperature: "2°C to 8°C" },
+                { name: "Freezer", code: "LOC-FREEZER", type: "FREEZER", isDefault: false, description: "Frozen meats, seafood & frozen items", temperature: "-18°C" },
+                { name: "Dry Storage", code: "LOC-DRY", type: "DRY", isDefault: false, description: "Grains, pulses, flours, spices & canned goods", temperature: "Ambient (20-25°C)" },
+                { name: "Beverage Store", code: "LOC-BEVERAGE", type: "BEVERAGE", isDefault: false, description: "Syrups, squashes, coffee beans, tea leaves & sodas", temperature: "Ambient (18-22°C)" },
+                { name: "Packaging Store", code: "LOC-PACKAGING", type: "PACKAGING", isDefault: false, description: "Takeaway containers, cups, bags, boxes & cutlery", temperature: "Dry Ambient" },
+            ];
+
+            for (const loc of defaultLocations) {
+                await prisma.storageLocation.upsert({
+                    where: { restaurantId_name: { restaurantId, name: loc.name } },
+                    update: {},
+                    create: {
+                        restaurantId,
+                        name: loc.name,
+                        code: `${loc.code}-${restaurantId}`,
+                        type: loc.type,
+                        description: loc.description,
+                        temperature: loc.temperature,
+                        isDefault: loc.isDefault,
+                    },
+                });
+            }
+
+            const rawMaterials = await prisma.rawMaterial.findMany({ where: { restaurantId, isActive: true } });
+            const locations = await prisma.storageLocation.findMany({ where: { restaurantId, isActive: true } });
+
+            const mainStoreLoc = locations.find((l) => l.name === "Main Store") || locations[0];
+
+            if (mainStoreLoc && rawMaterials.length > 0) {
+                for (const mat of rawMaterials) {
+                    await prisma.rawMaterialLocation.upsert({
+                        where: {
+                            locationId_rawMaterialId: {
+                                locationId: mainStoreLoc.id,
+                                rawMaterialId: mat.id,
+                            },
+                        },
+                        update: {},
+                        create: {
+                            restaurantId,
+                            locationId: mainStoreLoc.id,
+                            rawMaterialId: mat.id,
+                            quantity: mat.currentStock || 0,
+                            minStock: mat.minimumStock || 0,
+                        },
+                    });
+                }
+            }
+
+            const allLocations = await prisma.storageLocation.findMany({
+                where: { restaurantId, isActive: true },
+                include: {
+                    manager: { select: { id: true, name: true, role: true } },
+                    items: {
+                        include: {
+                            rawMaterial: true,
+                        },
+                    },
+                    sourceTransfers: {
+                        include: { rawMaterial: true, toLocation: true },
+                        orderBy: { createdAt: "desc" },
+                        take: 10,
+                    },
+                    destTransfers: {
+                        include: { rawMaterial: true, fromLocation: true },
+                        orderBy: { createdAt: "desc" },
+                        take: 10,
+                    },
+                },
+                orderBy: { id: "asc" },
+            });
+
+            let totalStockItems = 0;
+            let totalWarehouseValue = 0;
+            let totalLowStockCount = 0;
+
+            const enrichedLocations = allLocations.map((loc) => {
+                let locValue = 0;
+                let lowStock = 0;
+                let expiringCount = 0;
+
+                const locItems = (loc.items || []).map((it) => {
+                    const mat = it.rawMaterial;
+                    const qty = it.quantity || 0;
+                    const cost = mat?.costPerBaseUnit || 0;
+                    const val = qty * cost;
+
+                    locValue += val;
+
+                    if (qty <= (it.minStock || mat?.minimumStock || 0)) {
+                        lowStock++;
+                    }
+
+                    return {
+                        id: it.id,
+                        rawMaterialId: it.rawMaterialId,
+                        name: mat?.name || "Raw Material",
+                        code: mat?.code || `RM-${it.rawMaterialId}`,
+                        category: mat?.category || "General",
+                        quantity: qty,
+                        unit: mat?.displayUnit || mat?.baseUnit || "kg",
+                        minStock: it.minStock || mat?.minimumStock || 0,
+                        costPerUnit: cost,
+                        totalValue: val,
+                        rackNumber: it.rackNumber,
+                        shelfNumber: it.shelfNumber,
+                    };
+                });
+
+                totalStockItems += locItems.length;
+                totalWarehouseValue += locValue;
+                totalLowStockCount += lowStock;
+
+                return {
+                    id: loc.id,
+                    code: loc.code,
+                    name: loc.name,
+                    type: loc.type,
+                    description: loc.description,
+                    temperature: loc.temperature,
+                    capacityUnit: loc.capacityUnit,
+                    capacityValue: loc.capacityValue,
+                    isDefault: loc.isDefault,
+                    manager: loc.manager,
+                    metrics: {
+                        stockItemsCount: locItems.length,
+                        inventoryValue: locValue,
+                        lowStockCount: lowStock,
+                        expiringItemsCount: expiringCount,
+                    },
+                    items: locItems,
+                    transfers: [
+                        ...(loc.sourceTransfers || []).map((t) => ({ ...t, direction: "OUTGOING" })),
+                        ...(loc.destTransfers || []).map((t) => ({ ...t, direction: "INCOMING" })),
+                    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+                };
+            });
+
+            return reply.code(200).send({
+                locations: enrichedLocations,
+                summary: {
+                    totalLocations: enrichedLocations.length,
+                    totalStockItems,
+                    totalWarehouseValue,
+                    totalLowStockCount,
+                },
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to fetch storage locations" });
+        }
+    };
+
+    const createStorageLocationHandler = async (req, reply) => {
+        try {
+            const restaurantId = getRestaurantId(req);
+            const { name, type, description, temperature, capacityValue, managerId } = req.body || {};
+
+            if (!name) {
+                return reply.code(400).send({ error: "Location name is required" });
+            }
+
+            const rand = Math.floor(1000 + Math.random() * 9000);
+            const code = `LOC-${name.slice(0, 4).toUpperCase()}-${rand}`;
+
+            const newLoc = await prisma.storageLocation.create({
+                data: {
+                    restaurantId,
+                    code,
+                    name: String(name),
+                    type: type ? String(type).toUpperCase() : "DRY",
+                    description: description ? String(description) : null,
+                    temperature: temperature ? String(temperature) : null,
+                    capacityValue: capacityValue ? Number(capacityValue) : 0,
+                    managerId: managerId ? Number(managerId) : null,
+                },
+                include: {
+                    manager: { select: { id: true, name: true, role: true } },
+                },
+            });
+
+            return reply.code(201).send({
+                message: "Storage location created successfully",
+                location: newLoc,
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to create storage location" });
+        }
+    };
+
+    const updateStorageLocationHandler = async (req, reply) => {
+        try {
+            const locId = Number(req.params.id);
+            const { name, type, description, temperature, capacityValue, managerId } = req.body || {};
+
+            const updatedLoc = await prisma.storageLocation.update({
+                where: { id: locId },
+                data: {
+                    name: name ? String(name) : undefined,
+                    type: type ? String(type).toUpperCase() : undefined,
+                    description: description ? String(description) : undefined,
+                    temperature: temperature ? String(temperature) : undefined,
+                    capacityValue: capacityValue !== undefined ? Number(capacityValue) : undefined,
+                    managerId: managerId ? Number(managerId) : undefined,
+                },
+                include: {
+                    manager: { select: { id: true, name: true, role: true } },
+                },
+            });
+
+            return reply.code(200).send({
+                message: "Storage location updated successfully",
+                location: updatedLoc,
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to update storage location" });
+        }
+    };
+
+    const transferStockHandler = async (req, reply) => {
+        try {
+            const restaurantId = getRestaurantId(req);
+            const requestedById = req.user?.id || null;
+            const { fromLocationId, toLocationId, rawMaterialId, quantity, reason } = req.body || {};
+
+            const fromLocId = Number(fromLocationId);
+            const toLocId = Number(toLocationId);
+            const matId = Number(rawMaterialId);
+            const qty = Number(quantity || 0);
+
+            if (fromLocId === toLocId) {
+                return reply.code(400).send({ error: "Source and Destination locations must be different" });
+            }
+            if (qty <= 0) {
+                return reply.code(400).send({ error: "Transfer quantity must be greater than zero" });
+            }
+
+            const mat = await prisma.rawMaterial.findUnique({ where: { id: matId } });
+            if (!mat) {
+                return reply.code(404).send({ error: "Raw Material not found" });
+            }
+
+            const sourceItem = await prisma.rawMaterialLocation.findUnique({
+                where: { locationId_rawMaterialId: { locationId: fromLocId, rawMaterialId: matId } },
+            });
+            const sourceQty = sourceItem?.quantity || 0;
+            if (sourceQty < qty) {
+                return reply.code(400).send({ error: `Insufficient stock in source location. Available: ${sourceQty}` });
+            }
+
+            await prisma.rawMaterialLocation.update({
+                where: { id: sourceItem.id },
+                data: { quantity: Math.max(0, sourceQty - qty) },
+            });
+
+            await prisma.rawMaterialLocation.upsert({
+                where: { locationId_rawMaterialId: { locationId: toLocId, rawMaterialId: matId } },
+                update: { quantity: { increment: qty } },
+                create: {
+                    restaurantId,
+                    locationId: toLocId,
+                    rawMaterialId: matId,
+                    quantity: qty,
+                    minStock: mat.minimumStock || 0,
+                },
+            });
+
+            const rand = Math.floor(1000 + Math.random() * 9000);
+            const transferCode = `TRF-${new Date().toISOString().slice(0, 7).replace("-", "")}-${rand}`;
+
+            const transfer = await prisma.stockTransfer.create({
+                data: {
+                    transferCode,
+                    restaurantId,
+                    fromLocationId: fromLocId,
+                    toLocationId: toLocId,
+                    rawMaterialId: matId,
+                    itemName: mat.name,
+                    quantity: qty,
+                    unit: mat.displayUnit || mat.baseUnit || "kg",
+                    reason: reason ? String(reason) : "Internal Warehouse Transfer",
+                    status: "COMPLETED",
+                    requestedById,
+                },
+                include: {
+                    fromLocation: true,
+                    toLocation: true,
+                    rawMaterial: true,
+                },
+            });
+
+            await prisma.stockMovement.create({
+                data: {
+                    restaurantId,
+                    rawMaterialId: matId,
+                    movementType: "TRANSFER",
+                    quantity: 0,
+                    beforeBalance: mat.currentStock,
+                    afterBalance: mat.currentStock,
+                    reference: transferCode,
+                    notes: `Transferred ${qty} ${mat.displayUnit || mat.baseUnit || "kg"} from ${transfer.fromLocation?.name} to ${transfer.toLocation?.name}.`,
+                },
+            });
+
+            return reply.code(200).send({
+                message: `Stock transfer of ${qty} ${mat.name} completed successfully!`,
+                transfer,
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to execute stock transfer" });
+        }
+    };
+
+
 
     app.get("/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
     app.get("/api/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
@@ -1295,6 +1614,23 @@ export default async function supplyMarketplaceRoutes(app) {
     app.post("/owner/purchase-invoices/:id/payments", { preHandler: [authUser] }, recordSupplierPaymentHandler);
     app.post("/api/owner/purchase-invoices/:id/payments", { preHandler: [authUser] }, recordSupplierPaymentHandler);
     app.post("/api/v1/owner/purchase-invoices/:id/payments", { preHandler: [authUser] }, recordSupplierPaymentHandler);
+
+    // WAREHOUSE & STORAGE LOCATION ROUTES
+    app.get("/owner/storage-locations", { preHandler: [authUser] }, listStorageLocationsHandler);
+    app.get("/api/owner/storage-locations", { preHandler: [authUser] }, listStorageLocationsHandler);
+    app.get("/api/v1/owner/storage-locations", { preHandler: [authUser] }, listStorageLocationsHandler);
+
+    app.post("/owner/storage-locations", { preHandler: [authUser] }, createStorageLocationHandler);
+    app.post("/api/owner/storage-locations", { preHandler: [authUser] }, createStorageLocationHandler);
+    app.post("/api/v1/owner/storage-locations", { preHandler: [authUser] }, createStorageLocationHandler);
+
+    app.put("/owner/storage-locations/:id", { preHandler: [authUser] }, updateStorageLocationHandler);
+    app.put("/api/owner/storage-locations/:id", { preHandler: [authUser] }, updateStorageLocationHandler);
+    app.put("/api/v1/owner/storage-locations/:id", { preHandler: [authUser] }, updateStorageLocationHandler);
+
+    app.post("/owner/stock-transfers", { preHandler: [authUser] }, transferStockHandler);
+    app.post("/api/owner/stock-transfers", { preHandler: [authUser] }, transferStockHandler);
+    app.post("/api/v1/owner/stock-transfers", { preHandler: [authUser] }, transferStockHandler);
 
     app.post("/supplier/orders/:id/accept", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "ACCEPTED"));
     app.post("/supplier/orders/:id/dispatch", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "DISPATCHED"));
