@@ -723,6 +723,12 @@ export default function OwnerLayout() {
             accessKey: "supply",
         },
         {
+            label: "Purchase Requests",
+            path: "/owner/supply-chain/purchase-requests",
+            icon: <ClipboardPlus size={18} />,
+            accessKey: "supply",
+        },
+        {
             label: "Supply Marketplace",
             path: "/owner/supply",
             icon: <Truck size={18} />,

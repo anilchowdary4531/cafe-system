@@ -128,6 +128,7 @@ model Restaurant {
   staffAttendances     StaffAttendance[]
   staffTasks           StaffTask[]
   waitlists            Waitlist[]
+  purchaseRequests     PurchaseRequest[]
 
   @@map("restaurants")
 }
@@ -169,6 +170,8 @@ model User {
   staffAttendances     StaffAttendance[]
   attendanceCorrections AttendanceCorrection[] @relation("CorrectionUser")
   assignedTasks        StaffTask[]            @relation("AssignedTasks")
+  prRequested          PurchaseRequest[]      @relation("PRRequestedBy")
+  prApproved           PurchaseRequest[]      @relation("PRApprovedBy")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -1229,6 +1232,7 @@ model Supplier {
   orders       SupplyOrder[]
   settlements  SupplierSettlement[]
   reviews      SupplyReview[]
+  purchaseRequests PurchaseRequest[]
 
   @@index([status, createdAt])
   @@index([phone])
@@ -1931,6 +1935,7 @@ model RawMaterial {
 
   recipeItems     RecipeItem[]
   movements       StockMovement[]
+  purchaseRequests PurchaseRequest[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId, category, isActive])
@@ -2555,6 +2560,47 @@ model StaffTask {
   @@index([restaurantId, category])
   @@index([assignedTo, isCompleted])
   @@map("staff_tasks")
+}
+
+model PurchaseRequest {
+  id              Int           @id @default(autoincrement())
+  requestCode     String        @unique @map("request_code")
+
+  restaurantId    Int           @map("restaurant_id")
+  restaurant      Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  requestedById   Int?          @map("requested_by_id")
+  requestedBy     User?         @relation("PRRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  approvedById    Int?          @map("approved_by_id")
+  approvedBy      User?         @relation("PRApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  rawMaterialId   Int?          @map("raw_material_id")
+  rawMaterial     RawMaterial?  @relation(fields: [rawMaterialId], references: [id], onDelete: SetNull)
+
+  supplierId      Int?          @map("supplier_id")
+  supplier        Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  itemName        String        @map("item_name")
+  category        String        @default("General")
+  quantity        Float
+  unit            String        @default("kg")
+
+  priority        String        @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  status          String        @default("DRAFT")  // DRAFT | SUBMITTED | APPROVED | REJECTED | CONVERTED_TO_PO
+
+  requiredDate    DateTime?     @map("required_date")
+  reason          String?
+  rejectionReason String?       @map("rejection_reason")
+  notes           String?
+
+  convertedOrderId Int?         @map("converted_order_id")
+
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  @@index([restaurantId, status, priority])
+  @@map("purchase_requests")
 }
 
 
