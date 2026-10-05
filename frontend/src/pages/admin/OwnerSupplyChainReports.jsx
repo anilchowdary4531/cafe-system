@@ -44,6 +44,8 @@ import {
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 
+import SupplyChainSubNav from "../../components/SupplyChainSubNav";
+
 const COLORS = ["#f97316", "#3b82f6", "#10b981", "#8b5cf6", "#ec4899", "#64748b"];
 
 export default function OwnerSupplyChainReports() {
@@ -143,6 +145,8 @@ export default function OwnerSupplyChainReports() {
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6 lg:p-8 font-sans">
+            {/* Global Horizontal Enterprise Sub-Nav Bar */}
+            <SupplyChainSubNav />
             {/* Top Bar Header */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
                 <div>

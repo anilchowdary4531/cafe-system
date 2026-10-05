@@ -518,8 +518,8 @@ export default function SupplierDashboard() {
                     />
 
                     <aside className="theme-sidebar relative z-10 w-72 max-w-[85vw] h-full p-4 flex flex-col justify-between shadow-2xl border-r theme-border animate-in slide-in-from-left duration-200">
-                        <div>
-                            <div className="flex items-center justify-between px-2 py-3 mb-4 border-b theme-border">
+                        <div className="flex-1 flex flex-col min-h-0">
+                            <div className="flex items-center justify-between px-2 py-3 mb-3 border-b theme-border flex-shrink-0">
                                 <div className="flex items-center gap-3">
                                     <div className="theme-card flex h-10 w-10 items-center justify-center rounded-2xl">
                                         <BrandLogo className="h-7 w-7" title="Brand logo" />
@@ -538,7 +538,7 @@ export default function SupplierDashboard() {
                                 </button>
                             </div>
 
-                            <nav className="space-y-1.5">
+                            <nav className="space-y-1.5 overflow-y-auto flex-1 pr-1 max-h-[calc(100vh-140px)]">
                                 {navTabs.map((tab) => {
                                     const Icon = tab.icon;
                                     const isActive = activeTab === tab.id;
