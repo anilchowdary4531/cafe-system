@@ -70,6 +70,8 @@ export async function upsertRecipe({
             unit,
             baseQuantity,
             wastagePercent: Number(item.wastagePercent || 0),
+            yieldPercent: Number(item.yieldPercent !== undefined ? item.yieldPercent : 100),
+            prepLossPercent: Number(item.prepLossPercent || 0),
         };
     });
 
@@ -212,18 +214,24 @@ export async function calculateRecipeCost({ prisma, restaurantId, menuItemId, va
         for (const item of r.items || []) {
             const rm = item.rawMaterial;
             if (!rm) continue;
-            const grossBaseQty = item.baseQuantity * (1 + (item.wastagePercent || 0) / 100);
+
+            const yieldFactor = (item.yieldPercent && item.yieldPercent > 0) ? (item.yieldPercent / 100) : 1;
+            const prepLossFactor = 1 + ((item.prepLossPercent || 0) / 100) + ((item.wastagePercent || 0) / 100);
+            const grossBaseQty = (item.baseQuantity * prepLossFactor) / yieldFactor;
             const itemCost = grossBaseQty * (rm.costPerBaseUnit || 0);
 
             totalCost += itemCost;
             ingredientBreakdown.push({
                 rawMaterialId: rm.id,
                 rawMaterialName: rm.name,
-                baseQuantity: item.baseQuantity,
-                wastagePercent: item.wastagePercent,
-                grossBaseQuantity: grossBaseQty,
+                quantity: item.quantity,
                 unit: item.unit,
-                costPerBaseUnit: rm.costPerBaseUnit,
+                baseQuantity: item.baseQuantity,
+                wastagePercent: item.wastagePercent || 0,
+                yieldPercent: item.yieldPercent || 100,
+                prepLossPercent: item.prepLossPercent || 0,
+                grossBaseQuantity: grossBaseQty,
+                costPerBaseUnit: rm.costPerBaseUnit || 0,
                 totalCost: itemCost,
             });
         }

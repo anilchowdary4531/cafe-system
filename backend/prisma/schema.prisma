@@ -137,6 +137,7 @@ model Restaurant {
   rawMaterialLocations RawMaterialLocation[]
   stockTransfers       StockTransfer[]
   physicalStockCounts  PhysicalStockCount[]
+  supplierNegotiations SupplierNegotiation[]
 
   @@map("restaurants")
 }
@@ -1259,6 +1260,7 @@ model Supplier {
   purchaseReturns   PurchaseReturn[]
   purchaseInvoices  PurchaseInvoice[]
   supplierPayments  SupplierPayment[]
+  negotiations      SupplierNegotiation[]
 
   @@index([status, createdAt])
   @@index([phone])
@@ -1357,6 +1359,7 @@ model SupplyProduct {
   cartItems    SupplyCartItem[]
   orderItems   SupplyOrderItem[]
   reviews      SupplyReview[]
+  negotiations SupplierNegotiation[]
 
   @@index([supplierId, status, isDeleted])
   @@index([categoryId, availability, status])
@@ -2022,6 +2025,8 @@ model RecipeItem {
   baseQuantity    Float             @map("base_quantity") // Converted to rawMaterial.baseUnit
 
   wastagePercent  Float             @default(0) @map("wastage_percent")
+  yieldPercent    Float             @default(100) @map("yield_percent")
+  prepLossPercent Float             @default(0) @map("prep_loss_percent")
 
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at")
@@ -3034,6 +3039,66 @@ model StockCountItem {
   createdAt           DateTime                @default(now()) @map("created_at")
 
   @@map("stock_count_items")
+}
+
+///////////////////////////////////////////////////////////
+// B2B PRICE NEGOTIATION & CHAT HUB MODELS
+///////////////////////////////////////////////////////////
+
+model SupplierNegotiation {
+  id              Int                  @id @default(autoincrement())
+  negotiationNo   String               @unique @map("negotiation_no")
+
+  restaurantId    Int                  @map("restaurant_id")
+  restaurant      Restaurant           @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  supplierId      Int                  @map("supplier_id")
+  supplier        Supplier             @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  productId       Int?                 @map("product_id")
+  product         SupplyProduct?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  productName     String               @map("product_name")
+  quantity        Float
+  unit            String
+
+  catalogPrice    Float                @map("catalog_price")
+  currentOffer    Float                @map("current_offer")
+  counterOffer    Float?               @map("counter_offer")
+  finalPrice      Float?               @map("final_price")
+
+  // STATUS: ACTIVE | PENDING | ACCEPTED | REJECTED | EXPIRED | PO_GENERATED
+  status          String               @default("ACTIVE")
+
+  purchaseOrderId Int?                 @map("purchase_order_id")
+
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @default(now()) @updatedAt @map("updated_at")
+
+  messages        NegotiationMessage[]
+
+  @@index([restaurantId, status, createdAt])
+  @@index([supplierId, status, createdAt])
+  @@map("supplier_negotiations")
+}
+
+model NegotiationMessage {
+  id            Int                 @id @default(autoincrement())
+  negotiationId Int                 @map("negotiation_id")
+  negotiation   SupplierNegotiation @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
+
+  senderRole    String              @map("sender_role") // RESTAURANT | SUPPLIER
+  senderName    String              @map("sender_name")
+  message       String
+  proposedPrice Float?              @map("proposed_price")
+
+  // TYPE: OFFER | COUNTER_OFFER | ACCEPTANCE | REJECTION | MESSAGE
+  type          String              @default("MESSAGE")
+
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  @@index([negotiationId, createdAt])
+  @@map("negotiation_messages")
 }
 
 

@@ -45,6 +45,9 @@ import {
     Warehouse,
     ArrowLeftRight,
     ClipboardCheck,
+    Handshake,
+    Boxes,
+    ShoppingCart,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
@@ -778,9 +781,45 @@ export default function OwnerLayout() {
             accessKey: "supply",
         },
         {
+            label: "Recipes & Ingredients",
+            path: "/owner/supply-chain/recipes",
+            icon: <ChefHat size={18} />,
+            accessKey: "inventory",
+        },
+        {
+            label: "Consumption Intelligence",
+            path: "/owner/supply-chain/consumption",
+            icon: <Activity size={18} />,
+            accessKey: "inventory",
+        },
+        {
+            label: "Wastage Management",
+            path: "/owner/supply-chain/wastage",
+            icon: <Trash2 size={18} />,
+            accessKey: "inventory",
+        },
+        {
             label: "Supply Marketplace",
-            path: "/owner/supply",
-            icon: <Truck size={18} />,
+            path: "/owner/supply-chain/marketplace",
+            icon: <ShoppingCart size={18} />,
+            accessKey: "supply",
+        },
+        {
+            label: "Price Negotiations",
+            path: "/owner/supply-chain/negotiations",
+            icon: <Handshake size={18} />,
+            accessKey: "supply",
+        },
+        {
+            label: "Payments & Settlement",
+            path: "/owner/supply-chain/payments",
+            icon: <CreditCard size={18} />,
+            accessKey: "supply",
+        },
+        {
+            label: "Supply Reports & Intel",
+            path: "/owner/supply-chain/reports",
+            icon: <BarChart3 size={18} />,
             accessKey: "supply",
         },
         {

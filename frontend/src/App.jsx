@@ -102,6 +102,13 @@ import OwnerSupplyChainInvoices from "./pages/admin/OwnerSupplyChainInvoices";
 import OwnerSupplyChainWarehouse from "./pages/admin/OwnerSupplyChainWarehouse";
 import OwnerSupplyChainTransfers from "./pages/admin/OwnerSupplyChainTransfers";
 import OwnerSupplyChainStockCounts from "./pages/admin/OwnerSupplyChainStockCounts";
+import OwnerSupplyChainRecipes from "./pages/admin/OwnerSupplyChainRecipes";
+import OwnerSupplyChainConsumption from "./pages/admin/OwnerSupplyChainConsumption";
+import OwnerSupplyChainWastage from "./pages/admin/OwnerSupplyChainWastage";
+import OwnerSupplyChainMarketplace from "./pages/admin/OwnerSupplyChainMarketplace";
+import OwnerSupplyChainNegotiations from "./pages/admin/OwnerSupplyChainNegotiations";
+import OwnerSupplyChainPayments from "./pages/admin/OwnerSupplyChainPayments";
+import OwnerSupplyChainReports from "./pages/admin/OwnerSupplyChainReports";
 import SuperAdminSupplyChain from "./pages/super-admin/SuperAdminSupplyChain";
 import NewOrder from "./pages/admin/NewOrder.jsx";
 import PaymentSuccess from "./pages/admin/PaymentSuccess.jsx";
@@ -611,8 +618,9 @@ export default function App() {
                         <Route path="staff-tasks" element={<OwnerStaffTasks />} />
                         <Route path="settings" element={<OwnerSettings />} />
                         <Route path="notifications" element={<OwnerNotifications />} />
-                        <Route path="supply" element={<OwnerSupplyMarketplace />} />
+                        <Route path="supply" element={<OwnerSupplyChainMarketplace />} />
                         <Route path="supply-chain" element={<OwnerSupplyChainIntelligence />} />
+                        <Route path="supply-chain/marketplace" element={<OwnerSupplyChainMarketplace />} />
                         <Route path="supply-chain/inventory" element={<OwnerSupplyChainInventory />} />
                         <Route path="supply-chain/inventory/low-stock" element={<OwnerSupplyChainLowStock />} />
                         <Route path="supply-chain/inventory/expiry" element={<OwnerSupplyChainExpiry />} />
@@ -628,6 +636,12 @@ export default function App() {
                         <Route path="supply-chain/warehouse" element={<OwnerSupplyChainWarehouse />} />
                         <Route path="supply-chain/transfers" element={<OwnerSupplyChainTransfers />} />
                         <Route path="supply-chain/stock-counts" element={<OwnerSupplyChainStockCounts />} />
+                        <Route path="supply-chain/recipes" element={<OwnerSupplyChainRecipes />} />
+                        <Route path="supply-chain/consumption" element={<OwnerSupplyChainConsumption />} />
+                        <Route path="supply-chain/wastage" element={<OwnerSupplyChainWastage />} />
+                        <Route path="supply-chain/negotiations" element={<OwnerSupplyChainNegotiations />} />
+                        <Route path="supply-chain/payments" element={<OwnerSupplyChainPayments />} />
+                        <Route path="supply-chain/reports" element={<OwnerSupplyChainReports />} />
                         <Route path="supply-chain/inventory/:itemId" element={<OwnerSupplyChainInventoryDetail />} />
                         <Route path="delivery" element={<OwnerDeliveryManager />} />
                         <Route path="delivery-partners" element={<OwnerDeliveryPartners />} />
