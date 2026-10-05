@@ -131,6 +131,8 @@ model Restaurant {
   purchaseRequests     PurchaseRequest[]
   goodsReceiptNotes    GoodsReceiptNote[]
   purchaseReturns      PurchaseReturn[]
+  purchaseInvoices     PurchaseInvoice[]
+  supplierPayments     SupplierPayment[]
 
   @@map("restaurants")
 }
@@ -176,6 +178,8 @@ model User {
   prApproved           PurchaseRequest[]      @relation("PRApprovedBy")
   grnReceived          GoodsReceiptNote[]     @relation("GRNReceivedBy")
   prnCreated           PurchaseReturn[]       @relation("PRNCreatedBy")
+  piCreated            PurchaseInvoice[]      @relation("PICreatedBy")
+  spRecorded           SupplierPayment[]      @relation("SPRecordedBy")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -1239,6 +1243,8 @@ model Supplier {
   purchaseRequests PurchaseRequest[]
   goodsReceiptNotes GoodsReceiptNote[]
   purchaseReturns   PurchaseReturn[]
+  purchaseInvoices  PurchaseInvoice[]
+  supplierPayments  SupplierPayment[]
 
   @@index([status, createdAt])
   @@index([phone])
@@ -1522,6 +1528,7 @@ model SupplyOrder {
   settlementItem  SupplierSettlementItem?
   goodsReceiptNotes GoodsReceiptNote[]
   purchaseReturns   PurchaseReturn[]
+  purchaseInvoices  PurchaseInvoice[]
 
   @@index([restaurantId, createdAt])
   @@index([supplierId, status, createdAt])
@@ -1949,6 +1956,7 @@ model RawMaterial {
   purchaseRequests PurchaseRequest[]
   goodsReceiptItems GoodsReceiptItem[]
   purchaseReturns   PurchaseReturn[]
+  purchaseInvoiceItems PurchaseInvoiceItem[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId, category, isActive])
@@ -2650,6 +2658,7 @@ model GoodsReceiptNote {
 
   items             GoodsReceiptItem[]
   purchaseReturns   PurchaseReturn[]
+  purchaseInvoices  PurchaseInvoice[]
 
   @@index([restaurantId, status, receivedDate])
   @@map("goods_receipt_notes")
@@ -2724,6 +2733,103 @@ model PurchaseReturn {
   @@index([restaurantId, status, createdAt])
   @@map("purchase_returns")
 }
+
+model PurchaseInvoice {
+  id                Int                     @id @default(autoincrement())
+  invoiceNumber     String                  @unique @map("invoice_number")
+  vendorInvoiceNo   String?                 @map("vendor_invoice_no")
+
+  restaurantId      Int                     @map("restaurant_id")
+  restaurant        Restaurant              @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  supplierId        Int?                    @map("supplier_id")
+  supplier          Supplier?               @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  supplyOrderId     Int?                    @map("supply_order_id")
+  supplyOrder       SupplyOrder?            @relation(fields: [supplyOrderId], references: [id], onDelete: SetNull)
+
+  grnId             Int?                    @map("grn_id")
+  grn               GoodsReceiptNote?       @relation(fields: [grnId], references: [id], onDelete: SetNull)
+
+  createdById       Int?                    @map("created_by_id")
+  createdBy         User?                   @relation("PICreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  invoiceDate       DateTime                @default(now()) @map("invoice_date")
+  dueDate           DateTime?               @map("due_date")
+
+  subtotal          Float                   @default(0)
+  taxAmount         Float                   @default(0) @map("tax_amount")
+  discount          Float                   @default(0)
+  totalAmount       Float                   @default(0) @map("total_amount")
+  paidAmount        Float                   @default(0) @map("paid_amount")
+  balance           Float                   @default(0)
+
+  status            String                  @default("UNPAID") // UNPAID | PARTIALLY_PAID | PAID | OVERDUE
+
+  gstin             String?
+  notes             String?
+  paymentTerms      String?                 @map("payment_terms")
+
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @default(now()) @updatedAt @map("updated_at")
+
+  items             PurchaseInvoiceItem[]
+  payments          SupplierPayment[]
+
+  @@index([restaurantId, status, invoiceDate])
+  @@map("purchase_invoices")
+}
+
+model PurchaseInvoiceItem {
+  id                Int                     @id @default(autoincrement())
+  invoiceId         Int                     @map("invoice_id")
+  invoice           PurchaseInvoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  rawMaterialId     Int?                    @map("raw_material_id")
+  rawMaterial       RawMaterial?            @relation(fields: [rawMaterialId], references: [id], onDelete: SetNull)
+
+  itemName          String                  @map("item_name")
+  quantity          Float                   @default(0)
+  unit              String                  @default("kg")
+  unitPrice         Float                   @default(0) @map("unit_price")
+  taxRate           Float                   @default(0) @map("tax_rate")
+  taxAmount         Float                   @default(0) @map("tax_amount")
+  subtotal          Float                   @default(0)
+  total             Float                   @default(0)
+
+  createdAt         DateTime                @default(now()) @map("created_at")
+
+  @@map("purchase_invoice_items")
+}
+
+model SupplierPayment {
+  id                Int                     @id @default(autoincrement())
+  paymentCode       String                  @unique @map("payment_code")
+
+  restaurantId      Int                     @map("restaurant_id")
+  restaurant        Restaurant              @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  invoiceId         Int?                    @map("invoice_id")
+  invoice           PurchaseInvoice?        @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  supplierId        Int?                    @map("supplier_id")
+  supplier          Supplier?               @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  recordedById      Int?                    @map("recorded_by_id")
+  recordedBy        User?                   @relation("SPRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  paymentDate       DateTime                @default(now()) @map("payment_date")
+  amount            Float                   @default(0)
+  paymentMethod     String                  @default("BANK_TRANSFER") @map("payment_method") // BANK_TRANSFER | UPI | CASH | CHEQUE | CREDIT_NOTE
+  referenceNo       String?                 @map("reference_no")
+  notes             String?
+
+  createdAt         DateTime                @default(now()) @map("created_at")
+
+  @@index([restaurantId, paymentDate])
+  @@map("supplier_payments")
+}
+
 
 
 

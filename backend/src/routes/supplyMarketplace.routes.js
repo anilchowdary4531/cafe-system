@@ -928,6 +928,261 @@ export default async function supplyMarketplaceRoutes(app) {
         }
     };
 
+    const listPurchaseInvoicesHandler = async (req, reply) => {
+        try {
+            const restaurantId = getRestaurantId(req);
+
+            const now = new Date();
+            await prisma.purchaseInvoice.updateMany({
+                where: {
+                    restaurantId,
+                    status: { in: ["UNPAID", "PARTIALLY_PAID"] },
+                    dueDate: { lt: now },
+                },
+                data: { status: "OVERDUE" },
+            });
+
+            const invoices = await prisma.purchaseInvoice.findMany({
+                where: { restaurantId },
+                include: {
+                    supplier: { include: { profile: true } },
+                    supplyOrder: true,
+                    grn: true,
+                    createdBy: { select: { id: true, name: true, role: true } },
+                    items: { include: { rawMaterial: true } },
+                    payments: {
+                        include: { recordedBy: { select: { id: true, name: true } } },
+                        orderBy: { paymentDate: "desc" },
+                    },
+                },
+                orderBy: { invoiceDate: "desc" },
+            });
+
+            let totalPurchases = 0;
+            let unpaidCount = 0;
+            let partiallyPaidCount = 0;
+            let paidCount = 0;
+            let overdueCount = 0;
+            let totalUnpaidAmount = 0;
+            let totalPaidAmount = 0;
+            let totalBalanceAmount = 0;
+
+            invoices.forEach((inv) => {
+                totalPurchases += inv.totalAmount || 0;
+                totalPaidAmount += inv.paidAmount || 0;
+                totalBalanceAmount += inv.balance || 0;
+
+                const st = String(inv.status).toUpperCase();
+                if (st === "UNPAID") unpaidCount++;
+                else if (st === "PARTIALLY_PAID") partiallyPaidCount++;
+                else if (st === "PAID") paidCount++;
+                else if (st === "OVERDUE") overdueCount++;
+
+                if (["UNPAID", "PARTIALLY_PAID", "OVERDUE"].includes(st)) {
+                    totalUnpaidAmount += inv.balance || 0;
+                }
+            });
+
+            return reply.code(200).send({
+                invoices,
+                metrics: {
+                    totalInvoices: invoices.length,
+                    totalPurchases,
+                    unpaidCount,
+                    partiallyPaidCount,
+                    paidCount,
+                    overdueCount,
+                    totalUnpaidAmount,
+                    totalPaidAmount,
+                    totalBalanceAmount,
+                },
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to list purchase invoices" });
+        }
+    };
+
+    const createPurchaseInvoiceHandler = async (req, reply) => {
+        try {
+            const restaurantId = getRestaurantId(req);
+            const createdById = req.user?.id || null;
+            const {
+                supplierId,
+                supplyOrderId,
+                grnId,
+                vendorInvoiceNo,
+                invoiceDate,
+                dueDate,
+                paymentTerms,
+                gstin,
+                notes,
+                items = [],
+                discount = 0,
+            } = req.body || {};
+
+            const rand = Math.floor(1000 + Math.random() * 9000);
+            const invoiceNumber = `INV-${new Date().toISOString().slice(0, 7).replace("-", "")}-${rand}`;
+
+            let subtotal = 0;
+            let totalTax = 0;
+
+            const parsedItems = items.map((it) => {
+                const qty = Number(it.quantity || 0);
+                const rate = Number(it.unitPrice || 0);
+                const itemSubtotal = qty * rate;
+                const taxRate = Number(it.taxRate || 0);
+                const taxAmount = (itemSubtotal * taxRate) / 100;
+                const itemTotal = itemSubtotal + taxAmount;
+
+                subtotal += itemSubtotal;
+                totalTax += taxAmount;
+
+                return {
+                    rawMaterialId: it.rawMaterialId ? Number(it.rawMaterialId) : null,
+                    itemName: it.itemName ? String(it.itemName) : "Raw Material",
+                    quantity: qty,
+                    unit: it.unit || "kg",
+                    unitPrice: rate,
+                    taxRate,
+                    taxAmount,
+                    subtotal: itemSubtotal,
+                    total: itemTotal,
+                };
+            });
+
+            const discountVal = Number(discount || 0);
+            const totalAmount = Math.max(0, subtotal + totalTax - discountVal);
+
+            const invDate = invoiceDate ? new Date(invoiceDate) : new Date();
+            const due = dueDate ? new Date(dueDate) : new Date(invDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+            const isOverdue = due < new Date();
+            const status = isOverdue ? "OVERDUE" : "UNPAID";
+
+            const newInvoice = await prisma.purchaseInvoice.create({
+                data: {
+                    invoiceNumber,
+                    vendorInvoiceNo: vendorInvoiceNo ? String(vendorInvoiceNo) : null,
+                    restaurantId,
+                    supplierId: supplierId ? Number(supplierId) : null,
+                    supplyOrderId: supplyOrderId ? Number(supplyOrderId) : null,
+                    grnId: grnId ? Number(grnId) : null,
+                    createdById,
+                    invoiceDate: invDate,
+                    dueDate: due,
+                    paymentTerms: paymentTerms ? String(paymentTerms) : "Net 30",
+                    gstin: gstin ? String(gstin) : null,
+                    notes: notes ? String(notes) : null,
+                    subtotal,
+                    taxAmount: totalTax,
+                    discount: discountVal,
+                    totalAmount,
+                    paidAmount: 0,
+                    balance: totalAmount,
+                    status,
+                    items: {
+                        create: parsedItems,
+                    },
+                },
+                include: {
+                    supplier: { include: { profile: true } },
+                    supplyOrder: true,
+                    grn: true,
+                    createdBy: { select: { id: true, name: true, role: true } },
+                    items: true,
+                    payments: true,
+                },
+            });
+
+            return reply.code(201).send({
+                message: "Purchase Invoice created successfully",
+                purchaseInvoice: newInvoice,
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to create Purchase Invoice" });
+        }
+    };
+
+    const recordSupplierPaymentHandler = async (req, reply) => {
+        try {
+            const restaurantId = getRestaurantId(req);
+            const recordedById = req.user?.id || null;
+            const invoiceId = Number(req.params.id);
+            const { amount, paymentMethod, referenceNo, paymentDate, notes } = req.body || {};
+
+            const existingInv = await prisma.purchaseInvoice.findUnique({
+                where: { id: invoiceId },
+                include: { supplier: true },
+            });
+
+            if (!existingInv) {
+                return reply.code(404).send({ error: "Purchase Invoice not found" });
+            }
+
+            const payAmount = Number(amount || 0);
+            if (payAmount <= 0) {
+                return reply.code(400).send({ error: "Payment amount must be greater than zero" });
+            }
+
+            const rand = Math.floor(1000 + Math.random() * 9000);
+            const paymentCode = `PAY-${new Date().toISOString().slice(0, 7).replace("-", "")}-${rand}`;
+
+            const newPayment = await prisma.supplierPayment.create({
+                data: {
+                    paymentCode,
+                    restaurantId,
+                    invoiceId: existingInv.id,
+                    supplierId: existingInv.supplierId,
+                    recordedById,
+                    paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+                    amount: payAmount,
+                    paymentMethod: paymentMethod ? String(paymentMethod).toUpperCase() : "BANK_TRANSFER",
+                    referenceNo: referenceNo ? String(referenceNo) : null,
+                    notes: notes ? String(notes) : null,
+                },
+                include: {
+                    recordedBy: { select: { id: true, name: true, role: true } },
+                },
+            });
+
+            const newPaidAmount = (existingInv.paidAmount || 0) + payAmount;
+            const newBalance = Math.max(0, existingInv.totalAmount - newPaidAmount);
+
+            let newStatus = existingInv.status;
+            if (newBalance <= 0) {
+                newStatus = "PAID";
+            } else if (newPaidAmount > 0) {
+                newStatus = "PARTIALLY_PAID";
+            }
+
+            const updatedInvoice = await prisma.purchaseInvoice.update({
+                where: { id: existingInv.id },
+                data: {
+                    paidAmount: newPaidAmount,
+                    balance: newBalance,
+                    status: newStatus,
+                },
+                include: {
+                    supplier: { include: { profile: true } },
+                    items: true,
+                    payments: {
+                        include: { recordedBy: { select: { id: true, name: true } } },
+                        orderBy: { paymentDate: "desc" },
+                    },
+                },
+            });
+
+            return reply.code(200).send({
+                message: `Payment of ₹${payAmount.toFixed(2)} recorded successfully! Invoice status updated to ${newStatus}.`,
+                payment: newPayment,
+                invoice: updatedInvoice,
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to record payment" });
+        }
+    };
+
+
     app.get("/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
     app.get("/api/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
     app.get("/api/v1/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
@@ -1027,6 +1282,19 @@ export default async function supplyMarketplaceRoutes(app) {
     app.put("/owner/purchase-returns/:id/status", { preHandler: [authUser] }, updatePurchaseReturnStatusHandler);
     app.put("/api/owner/purchase-returns/:id/status", { preHandler: [authUser] }, updatePurchaseReturnStatusHandler);
     app.put("/api/v1/owner/purchase-returns/:id/status", { preHandler: [authUser] }, updatePurchaseReturnStatusHandler);
+
+    // PURCHASE INVOICES & PAYMENTS ROUTES
+    app.get("/owner/purchase-invoices", { preHandler: [authUser] }, listPurchaseInvoicesHandler);
+    app.get("/api/owner/purchase-invoices", { preHandler: [authUser] }, listPurchaseInvoicesHandler);
+    app.get("/api/v1/owner/purchase-invoices", { preHandler: [authUser] }, listPurchaseInvoicesHandler);
+
+    app.post("/owner/purchase-invoices", { preHandler: [authUser] }, createPurchaseInvoiceHandler);
+    app.post("/api/owner/purchase-invoices", { preHandler: [authUser] }, createPurchaseInvoiceHandler);
+    app.post("/api/v1/owner/purchase-invoices", { preHandler: [authUser] }, createPurchaseInvoiceHandler);
+
+    app.post("/owner/purchase-invoices/:id/payments", { preHandler: [authUser] }, recordSupplierPaymentHandler);
+    app.post("/api/owner/purchase-invoices/:id/payments", { preHandler: [authUser] }, recordSupplierPaymentHandler);
+    app.post("/api/v1/owner/purchase-invoices/:id/payments", { preHandler: [authUser] }, recordSupplierPaymentHandler);
 
     app.post("/supplier/orders/:id/accept", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "ACCEPTED"));
     app.post("/supplier/orders/:id/dispatch", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "DISPATCHED"));

@@ -40,6 +40,8 @@ import {
     Unlock,
     Undo2,
     Trash2,
+    Receipt,
+    CreditCard,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
@@ -746,6 +748,12 @@ export default function OwnerLayout() {
             label: "Purchase Returns",
             path: "/owner/supply-chain/purchase-returns",
             icon: <Undo2 size={18} />,
+            accessKey: "supply",
+        },
+        {
+            label: "Invoices & Payments",
+            path: "/owner/supply-chain/invoices",
+            icon: <Receipt size={18} />,
             accessKey: "supply",
         },
         {
