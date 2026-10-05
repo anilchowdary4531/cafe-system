@@ -440,6 +440,15 @@ export default function SupplierDashboard() {
         { id: "sales", label: "Sales & Analytics", icon: BarChart3, locked: !isAccountActive },
         { id: "customers", label: "B2B Customers", icon: Users, count: customers.length, locked: !isAccountActive },
         { id: "chat", label: "B2B Negotiation & Chat", icon: MessageSquare, count: chatThreads.length, locked: !isAccountActive },
+        { id: "price-negotiations", label: "Price Negotiations", icon: Handshake, path: "/owner/supply-chain/negotiations", locked: !isAccountActive },
+        { id: "payments-settlement", label: "Payments & Settlement", icon: CreditCard, path: "/owner/supply-chain/payments", locked: !isAccountActive },
+        { id: "supply-reports", label: "Supply Reports & Intel", icon: BarChart3, path: "/owner/supply-chain/reports", locked: !isAccountActive },
+        { id: "supply-marketplace", label: "Supply Marketplace", icon: ShoppingBag, path: "/owner/supply-chain/marketplace", locked: !isAccountActive },
+        { id: "recipes", label: "Recipes & Ingredients", icon: ChefHat, path: "/owner/supply-chain/recipes", locked: !isAccountActive },
+        { id: "consumption", label: "Consumption Intel", icon: Activity, path: "/owner/supply-chain/consumption", locked: !isAccountActive },
+        { id: "wastage", label: "Wastage Management", icon: Trash2, path: "/owner/supply-chain/wastage", locked: !isAccountActive },
+        { id: "stock-counts", label: "Stock Counts", icon: ClipboardCheck, path: "/owner/supply-chain/stock-counts", locked: !isAccountActive },
+        { id: "stock-transfers", label: "Stock Transfers", icon: ArrowLeftRight, path: "/owner/supply-chain/transfers", locked: !isAccountActive },
         { id: "profile", label: isAccountActive ? "Profile & KYC" : "KYC Verification Form", icon: Building2, locked: false },
     ];
 
@@ -542,6 +551,11 @@ export default function SupplierDashboard() {
                                                     showToast("Your account is pending Super Admin verification", { type: "info" });
                                                     return;
                                                 }
+                                                if (tab.path) {
+                                                    setSidebarOpen(false);
+                                                    navigate(tab.path);
+                                                    return;
+                                                }
                                                 setActiveTab(tab.id);
                                                 setSidebarOpen(false);
                                             }}
@@ -570,42 +584,6 @@ export default function SupplierDashboard() {
                                     );
                                 })}
                             </nav>
-
-                            {/* ALL SUPPLY CHAIN MODULES DIRECT LINK SECTION */}
-                            <div className="pt-4 border-t theme-border mt-4">
-                                <p className="text-[10px] font-extrabold uppercase tracking-wider theme-muted mb-2 px-2">
-                                    Supply Chain Operating Hub
-                                </p>
-                                <div className="space-y-1">
-                                    {[
-                                        { label: "Price Negotiations", path: "/owner/supply-chain/negotiations", icon: Handshake },
-                                        { label: "Payments & Settlement", path: "/owner/supply-chain/payments", icon: CreditCard },
-                                        { label: "Supply Reports & Intel", path: "/owner/supply-chain/reports", icon: BarChart3 },
-                                        { label: "Supply Marketplace", path: "/owner/supply-chain/marketplace", icon: ShoppingBag },
-                                        { label: "Recipes & Ingredients", path: "/owner/supply-chain/recipes", icon: ChefHat },
-                                        { label: "Consumption Intel", path: "/owner/supply-chain/consumption", icon: Activity },
-                                        { label: "Wastage Management", path: "/owner/supply-chain/wastage", icon: Trash2 },
-                                        { label: "Stock Counts", path: "/owner/supply-chain/stock-counts", icon: ClipboardCheck },
-                                        { label: "Stock Transfers", path: "/owner/supply-chain/transfers", icon: ArrowLeftRight },
-                                    ].map((item, idx) => {
-                                        const ItemIcon = item.icon;
-                                        return (
-                                            <button
-                                                key={idx}
-                                                type="button"
-                                                onClick={() => {
-                                                    setSidebarOpen(false);
-                                                    navigate(item.path);
-                                                }}
-                                                className="w-full px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2.5 theme-soft-button hover:theme-panel text-left cursor-pointer"
-                                            >
-                                                <ItemIcon size={15} className="theme-accent-text" />
-                                                <span>{item.label}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
                         </div>
 
                         <div className="border-t theme-border pt-4 px-1 space-y-3">
