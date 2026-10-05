@@ -748,6 +748,186 @@ export default async function supplyMarketplaceRoutes(app) {
         }
     };
 
+    // PURCHASE RETURNS HANDLERS
+    const listPurchaseReturnsHandler = async (req, reply) => {
+        try {
+            const restaurantId = req.user?.restaurantId || req.query?.restaurantId || 1;
+            const returns = await prisma.purchaseReturn.findMany({
+                where: { restaurantId: Number(restaurantId) },
+                include: {
+                    supplier: { include: { profile: true } },
+                    supplyOrder: true,
+                    grn: true,
+                    rawMaterial: true,
+                    createdBy: { select: { id: true, name: true, role: true } },
+                },
+                orderBy: { createdAt: "desc" },
+            });
+
+            const metrics = {
+                pending: returns.filter((r) => r.status === "PENDING" || r.status === "DRAFT").length,
+                approved: returns.filter((r) => r.status === "APPROVED").length,
+                returned: returns.filter((r) => r.status === "RETURNED" || r.status === "COMPLETED").length,
+                replacementPending: returns.filter(
+                    (r) => r.resolution === "REPLACEMENT" && r.status !== "COMPLETED" && r.status !== "REJECTED"
+                ).length,
+                refundPending: returns.filter(
+                    (r) => r.resolution === "REFUND" && r.status !== "COMPLETED" && r.status !== "REJECTED"
+                ).length,
+                total: returns.length,
+            };
+
+            return reply.code(200).send({ returns, metrics });
+        } catch (err) {
+            return reply.code(500).send({ error: "Failed to fetch Purchase Returns" });
+        }
+    };
+
+    const createPurchaseReturnHandler = async (req, reply) => {
+        try {
+            const restaurantId = req.user?.restaurantId || req.body?.restaurantId || 1;
+            const createdById = req.user?.id || req.body?.createdById || null;
+
+            const {
+                supplierId,
+                supplyOrderId,
+                grnId,
+                rawMaterialId,
+                itemName,
+                quantity,
+                unit = "kg",
+                unitPrice = 0,
+                reason = "Damaged",
+                resolution = "REFUND",
+                notes,
+                attachmentUrl,
+            } = req.body || {};
+
+            if (!itemName || !quantity) {
+                return reply.code(400).send({ error: "Item name and return quantity are required" });
+            }
+
+            const count = await prisma.purchaseReturn.count({ where: { restaurantId: Number(restaurantId) } });
+            const returnCode = `RET-${new Date().getFullYear()}-${1000 + count + 1}`;
+            const totalValue = Number(quantity) * Number(unitPrice);
+
+            const newReturn = await prisma.purchaseReturn.create({
+                data: {
+                    returnCode,
+                    restaurantId: Number(restaurantId),
+                    supplierId: supplierId ? Number(supplierId) : null,
+                    supplyOrderId: supplyOrderId ? Number(supplyOrderId) : null,
+                    grnId: grnId ? Number(grnId) : null,
+                    rawMaterialId: rawMaterialId ? Number(rawMaterialId) : null,
+                    createdById: createdById ? Number(createdById) : null,
+                    itemName: String(itemName).trim(),
+                    quantity: Number(quantity),
+                    unit: String(unit),
+                    unitPrice: Number(unitPrice),
+                    totalValue,
+                    reason: String(reason),
+                    resolution: String(resolution).toUpperCase(),
+                    status: "PENDING", // Stock is NOT deducted yet!
+                    stockDeducted: false,
+                    notes: notes ? String(notes) : null,
+                    attachmentUrl: attachmentUrl ? String(attachmentUrl) : null,
+                },
+                include: {
+                    supplier: { include: { profile: true } },
+                    supplyOrder: true,
+                    grn: true,
+                    rawMaterial: true,
+                    createdBy: { select: { id: true, name: true, role: true } },
+                },
+            });
+
+            return reply.code(201).send({
+                message: "Purchase Return initiated! Stock will be deducted upon confirmation.",
+                purchaseReturn: newReturn,
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to create Purchase Return" });
+        }
+    };
+
+    const updatePurchaseReturnStatusHandler = async (req, reply) => {
+        try {
+            const returnId = Number(req.params.id);
+            const { status, notes } = req.body || {};
+
+            const existing = await prisma.purchaseReturn.findUnique({
+                where: { id: returnId },
+                include: { rawMaterial: true },
+            });
+            if (!existing) {
+                return reply.code(404).send({ error: "Purchase Return record not found" });
+            }
+
+            const targetStatus = String(status).toUpperCase();
+            let stockDeducted = existing.stockDeducted;
+
+            // CRITICAL INVENTORY RULE: Remove returned stock ONLY when confirmed/approved
+            const isConfirmationStatus = ["APPROVED", "RETURNED", "COMPLETED", "REPLACEMENT_PENDING", "REFUND_PENDING"].includes(targetStatus);
+
+            if (isConfirmationStatus && !stockDeducted) {
+                let mat = existing.rawMaterial;
+                if (!mat && existing.itemName) {
+                    mat = await prisma.rawMaterial.findFirst({
+                        where: { restaurantId: existing.restaurantId, name: { equals: existing.itemName, mode: "insensitive" } },
+                    });
+                }
+
+                if (mat) {
+                    const beforeBalance = mat.currentStock;
+                    const afterBalance = Math.max(0, beforeBalance - existing.quantity);
+
+                    await prisma.rawMaterial.update({
+                        where: { id: mat.id },
+                        data: { currentStock: afterBalance },
+                    });
+
+                    await prisma.stockMovement.create({
+                        data: {
+                            restaurantId: existing.restaurantId,
+                            rawMaterialId: mat.id,
+                            movementType: "RETURN",
+                            quantity: -existing.quantity,
+                            beforeBalance,
+                            afterBalance,
+                            reference: existing.returnCode,
+                            notes: `Purchase Return #${existing.returnCode}: Deducted ${existing.quantity} ${existing.unit} due to ${existing.reason}.`,
+                        },
+                    });
+
+                    stockDeducted = true;
+                }
+            }
+
+            const updated = await prisma.purchaseReturn.update({
+                where: { id: returnId },
+                data: {
+                    status: targetStatus,
+                    stockDeducted,
+                    notes: notes ? String(notes) : existing.notes,
+                },
+                include: {
+                    supplier: { include: { profile: true } },
+                    supplyOrder: true,
+                    grn: true,
+                    rawMaterial: true,
+                    createdBy: { select: { id: true, name: true, role: true } },
+                },
+            });
+
+            return reply.code(200).send({
+                message: `Purchase Return status updated to ${targetStatus}${stockDeducted ? " (Returned inventory deducted)" : ""}`,
+                purchaseReturn: updated,
+            });
+        } catch (err) {
+            return reply.code(500).send({ error: err.message || "Failed to update Purchase Return status" });
+        }
+    };
+
     app.get("/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
     app.get("/api/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
     app.get("/api/v1/marketplace/products", { preHandler: [authUser] }, browseProductsHandler);
@@ -812,7 +992,7 @@ export default async function supplyMarketplaceRoutes(app) {
     // PURCHASE ORDER MANAGEMENT ROUTES
     app.get("/owner/purchase-orders", { preHandler: [authUser] }, listPurchaseOrdersHandler);
     app.get("/api/owner/purchase-orders", { preHandler: [authUser] }, listPurchaseOrdersHandler);
-    app.get("/api/owner/purchase-orders", { preHandler: [authUser] }, listPurchaseOrdersHandler);
+    app.get("/api/v1/owner/purchase-orders", { preHandler: [authUser] }, listPurchaseOrdersHandler);
 
     app.post("/owner/purchase-orders", { preHandler: [authUser] }, createPurchaseOrderHandler);
     app.post("/api/owner/purchase-orders", { preHandler: [authUser] }, createPurchaseOrderHandler);
@@ -835,11 +1015,25 @@ export default async function supplyMarketplaceRoutes(app) {
     app.post("/api/owner/goods-receipts", { preHandler: [authUser] }, createGoodsReceiptHandler);
     app.post("/api/v1/owner/goods-receipts", { preHandler: [authUser] }, createGoodsReceiptHandler);
 
+    // PURCHASE RETURNS ROUTES
+    app.get("/owner/purchase-returns", { preHandler: [authUser] }, listPurchaseReturnsHandler);
+    app.get("/api/owner/purchase-returns", { preHandler: [authUser] }, listPurchaseReturnsHandler);
+    app.get("/api/v1/owner/purchase-returns", { preHandler: [authUser] }, listPurchaseReturnsHandler);
+
+    app.post("/owner/purchase-returns", { preHandler: [authUser] }, createPurchaseReturnHandler);
+    app.post("/api/owner/purchase-returns", { preHandler: [authUser] }, createPurchaseReturnHandler);
+    app.post("/api/v1/owner/purchase-returns", { preHandler: [authUser] }, createPurchaseReturnHandler);
+
+    app.put("/owner/purchase-returns/:id/status", { preHandler: [authUser] }, updatePurchaseReturnStatusHandler);
+    app.put("/api/owner/purchase-returns/:id/status", { preHandler: [authUser] }, updatePurchaseReturnStatusHandler);
+    app.put("/api/v1/owner/purchase-returns/:id/status", { preHandler: [authUser] }, updatePurchaseReturnStatusHandler);
+
     app.post("/supplier/orders/:id/accept", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "ACCEPTED"));
     app.post("/supplier/orders/:id/dispatch", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "DISPATCHED"));
     app.post("/supplier/orders/:id/complete", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "COMPLETED"));
     app.post("/supplier/orders/:id/reject", { preHandler: [authSupplier] }, (req, reply) => updateOrderStatusHandler(req, reply, "REJECTED"));
 }
+
 
 
 

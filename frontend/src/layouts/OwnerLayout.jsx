@@ -38,6 +38,7 @@ import {
     Link2,
     Move,
     Unlock,
+    Undo2,
     Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -739,6 +740,12 @@ export default function OwnerLayout() {
             label: "Goods Receiving (GRN)",
             path: "/owner/supply-chain/receiving",
             icon: <PackageCheck size={18} />,
+            accessKey: "supply",
+        },
+        {
+            label: "Purchase Returns",
+            path: "/owner/supply-chain/purchase-returns",
+            icon: <Undo2 size={18} />,
             accessKey: "supply",
         },
         {

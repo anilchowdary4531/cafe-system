@@ -130,6 +130,7 @@ model Restaurant {
   waitlists            Waitlist[]
   purchaseRequests     PurchaseRequest[]
   goodsReceiptNotes    GoodsReceiptNote[]
+  purchaseReturns      PurchaseReturn[]
 
   @@map("restaurants")
 }
@@ -174,6 +175,7 @@ model User {
   prRequested          PurchaseRequest[]      @relation("PRRequestedBy")
   prApproved           PurchaseRequest[]      @relation("PRApprovedBy")
   grnReceived          GoodsReceiptNote[]     @relation("GRNReceivedBy")
+  prnCreated           PurchaseReturn[]       @relation("PRNCreatedBy")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -1236,6 +1238,7 @@ model Supplier {
   reviews      SupplyReview[]
   purchaseRequests PurchaseRequest[]
   goodsReceiptNotes GoodsReceiptNote[]
+  purchaseReturns   PurchaseReturn[]
 
   @@index([status, createdAt])
   @@index([phone])
@@ -1518,6 +1521,7 @@ model SupplyOrder {
   refunds         SupplyRefund[]
   settlementItem  SupplierSettlementItem?
   goodsReceiptNotes GoodsReceiptNote[]
+  purchaseReturns   PurchaseReturn[]
 
   @@index([restaurantId, createdAt])
   @@index([supplierId, status, createdAt])
@@ -1944,6 +1948,7 @@ model RawMaterial {
   movements       StockMovement[]
   purchaseRequests PurchaseRequest[]
   goodsReceiptItems GoodsReceiptItem[]
+  purchaseReturns   PurchaseReturn[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId, category, isActive])
@@ -2644,6 +2649,7 @@ model GoodsReceiptNote {
   updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at")
 
   items             GoodsReceiptItem[]
+  purchaseReturns   PurchaseReturn[]
 
   @@index([restaurantId, status, receivedDate])
   @@map("goods_receipt_notes")
@@ -2675,6 +2681,50 @@ model GoodsReceiptItem {
 
   @@map("goods_receipt_items")
 }
+
+model PurchaseReturn {
+  id                Int                @id @default(autoincrement())
+  returnCode        String             @unique @map("return_code")
+
+  restaurantId      Int                @map("restaurant_id")
+  restaurant        Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  supplierId        Int?               @map("supplier_id")
+  supplier          Supplier?          @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  supplyOrderId     Int?               @map("supply_order_id")
+  supplyOrder       SupplyOrder?       @relation(fields: [supplyOrderId], references: [id], onDelete: SetNull)
+
+  grnId             Int?               @map("grn_id")
+  grn               GoodsReceiptNote?  @relation(fields: [grnId], references: [id], onDelete: SetNull)
+
+  rawMaterialId     Int?               @map("raw_material_id")
+  rawMaterial       RawMaterial?       @relation(fields: [rawMaterialId], references: [id], onDelete: SetNull)
+
+  createdById       Int?               @map("created_by_id")
+  createdBy         User?              @relation("PRNCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  itemName          String             @map("item_name")
+  quantity          Float
+  unit              String             @default("kg")
+  unitPrice         Float              @default(0) @map("unit_price")
+  totalValue        Float              @default(0) @map("total_value")
+
+  reason            String             // Damaged | Expired | Wrong Item | Poor Quality | Short/Incorrect Delivery
+  resolution        String             @default("REFUND") // REPLACEMENT | REFUND | CREDIT_NOTE
+  status            String             @default("PENDING") // PENDING | APPROVED | RETURNED | REPLACEMENT_PENDING | REFUND_PENDING | COMPLETED | REJECTED
+
+  notes             String?
+  attachmentUrl     String?            @map("attachment_url")
+  stockDeducted     Boolean            @default(false) @map("stock_deducted")
+
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at")
+
+  @@index([restaurantId, status, createdAt])
+  @@map("purchase_returns")
+}
+
 
 
 
