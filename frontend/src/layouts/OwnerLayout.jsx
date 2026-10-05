@@ -875,11 +875,13 @@ export default function OwnerLayout() {
     const firstAllowedPath = visibleNavItems[0]?.path || "/owner";
 
     const findRouteAccess = (pathname) =>
-        navItems.find((item) =>
-            item.path === "/owner"
-                ? pathname === "/owner"
-                : pathname.startsWith(item.path)
-        );
+        [...navItems]
+            .sort((a, b) => b.path.length - a.path.length)
+            .find((item) =>
+                item.path === "/owner"
+                    ? pathname === "/owner"
+                    : pathname.startsWith(item.path)
+            );
 
     const canAccessCurrentRoute = (() => {
         const match = findRouteAccess(location.pathname);
