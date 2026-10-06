@@ -440,15 +440,15 @@ export default function SupplierDashboard() {
         { id: "sales", label: "Sales & Analytics", icon: BarChart3, locked: !isAccountActive },
         { id: "customers", label: "B2B Customers", icon: Users, count: customers.length, locked: !isAccountActive },
         { id: "chat", label: "B2B Negotiation & Chat", icon: MessageSquare, count: chatThreads.length, locked: !isAccountActive },
-        { id: "price-negotiations", label: "Price Negotiations", icon: Handshake, path: "/owner/supply-chain/negotiations", locked: !isAccountActive },
-        { id: "payments-settlement", label: "Payments & Settlement", icon: CreditCard, path: "/owner/supply-chain/payments", locked: !isAccountActive },
-        { id: "supply-reports", label: "Supply Reports & Intel", icon: BarChart3, path: "/owner/supply-chain/reports", locked: !isAccountActive },
-        { id: "supply-marketplace", label: "Supply Marketplace", icon: ShoppingBag, path: "/owner/supply-chain/marketplace", locked: !isAccountActive },
-        { id: "recipes", label: "Recipes & Ingredients", icon: ChefHat, path: "/owner/supply-chain/recipes", locked: !isAccountActive },
-        { id: "consumption", label: "Consumption Intel", icon: Activity, path: "/owner/supply-chain/consumption", locked: !isAccountActive },
-        { id: "wastage", label: "Wastage Management", icon: Trash2, path: "/owner/supply-chain/wastage", locked: !isAccountActive },
-        { id: "stock-counts", label: "Stock Counts", icon: ClipboardCheck, path: "/owner/supply-chain/stock-counts", locked: !isAccountActive },
-        { id: "stock-transfers", label: "Stock Transfers", icon: ArrowLeftRight, path: "/owner/supply-chain/transfers", locked: !isAccountActive },
+        { id: "price-negotiations", label: "Price Negotiations", icon: Handshake, locked: !isAccountActive },
+        { id: "payments-settlement", label: "Payments & Settlement", icon: CreditCard, locked: !isAccountActive },
+        { id: "supply-reports", label: "Supply Reports & Intel", icon: BarChart3, locked: !isAccountActive },
+        { id: "supply-marketplace", label: "Supply Marketplace", icon: ShoppingBag, locked: !isAccountActive },
+        { id: "recipes", label: "Recipes & Ingredients", icon: ChefHat, locked: !isAccountActive },
+        { id: "consumption", label: "Consumption Intel", icon: Activity, locked: !isAccountActive },
+        { id: "wastage", label: "Wastage Management", icon: Trash2, locked: !isAccountActive },
+        { id: "stock-counts", label: "Stock Counts", icon: ClipboardCheck, locked: !isAccountActive },
+        { id: "stock-transfers", label: "Stock Transfers", icon: ArrowLeftRight, locked: !isAccountActive },
         { id: "profile", label: isAccountActive ? "Profile & KYC" : "KYC Verification Form", icon: Building2, locked: false },
     ];
 
@@ -1287,6 +1287,347 @@ export default function SupplierDashboard() {
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: B2B PRICE NEGOTIATIONS */}
+                {isAccountActive && activeTab === "price-negotiations" && (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                                    <Handshake className="theme-accent-text" />
+                                    B2B Price Negotiations & Custom Rate Agreements
+                                </h2>
+                                <p className="theme-muted text-xs mt-0.5">Manage custom wholesale volume pricing and active price counter-offers with restaurant clients</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowBargainModal(true)}
+                                className="theme-button rounded-xl px-4 py-2.5 text-xs font-extrabold flex items-center gap-2 shadow-md cursor-pointer"
+                            >
+                                <Tag size={16} />
+                                New Rate Proposal
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Active Agreements</p>
+                                <p className="text-2xl font-black text-emerald-400">{chatThreads.length}</p>
+                            </div>
+                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Pending Counter-Offers</p>
+                                <p className="text-2xl font-black text-amber-400">
+                                    {chatMessages.filter(m => m.type === "BARGAIN_OFFER" && m.offer?.status === "PENDING").length}
+                                </p>
+                            </div>
+                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Avg Wholesale Discount</p>
+                                <p className="text-2xl font-black theme-accent-text">8.5%</p>
+                            </div>
+                        </div>
+
+                        <div className="theme-panel rounded-3xl p-6 border space-y-4">
+                            <h3 className="text-base font-bold">Recent Bargain Negotiations & Client Quotes</h3>
+                            {chatThreads.length === 0 ? (
+                                <p className="theme-muted text-xs py-8 text-center">No price negotiations logged yet. Use "B2B Negotiation & Chat" to start bargaining with clients.</p>
+                            ) : (
+                                <div className="divide-y theme-border">
+                                    {chatThreads.map((t) => (
+                                        <div key={t.id} className="py-3 flex items-center justify-between">
+                                            <div>
+                                                <p className="font-bold text-sm">{t.clientName}</p>
+                                                <p className="theme-muted text-xs">{t.lastMessage}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setActiveThreadId(t.id);
+                                                    setActiveTab("chat");
+                                                }}
+                                                className="theme-soft-button px-3 py-1.5 rounded-xl text-xs font-bold"
+                                            >
+                                                Open Chat
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: PAYMENTS & SETTLEMENT */}
+                {isAccountActive && activeTab === "payments-settlement" && (
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                                <CreditCard className="theme-accent-text" />
+                                Vendor Payouts & Financial Settlement Ledger
+                            </h2>
+                            <p className="theme-muted text-xs mt-0.5">Automated 95% net payout calculations, platform fee deductions (5%), and bank transfer status</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Gross B2B Sales Volume</p>
+                                <p className="text-2xl font-black">₹{totalSalesVolume.toLocaleString("en-IN")}</p>
+                            </div>
+                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Platform Service Fee (5%)</p>
+                                <p className="text-2xl font-black text-amber-400">₹{Math.round(totalSalesVolume * 0.05).toLocaleString("en-IN")}</p>
+                            </div>
+                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Net Payable Payout (95%)</p>
+                                <p className="text-2xl font-black text-emerald-400">₹{netPayout.toLocaleString("en-IN")}</p>
+                            </div>
+                        </div>
+
+                        <div className="theme-panel rounded-3xl p-6 border space-y-4">
+                            <div className="flex items-center justify-between border-b theme-border pb-3">
+                                <h3 className="text-base font-bold">Settlement Bank Account Details</h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab("profile")}
+                                    className="theme-soft-button px-3 py-1.5 rounded-xl text-xs font-bold"
+                                >
+                                    Edit Bank Details
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                <div><p className="theme-muted font-bold">Bank Name</p><p className="font-extrabold text-sm">{profileData?.profile?.bankName || "HDFC Bank"}</p></div>
+                                <div><p className="theme-muted font-bold">Account Holder</p><p className="font-extrabold text-sm">{profileData?.profile?.bankAccountName || profileData?.profile?.businessName || "Vendor"}</p></div>
+                                <div><p className="theme-muted font-bold">Account Number</p><p className="font-extrabold text-sm">{profileData?.profile?.bankAccountNumber ? `•••• ${profileData.profile.bankAccountNumber.slice(-4)}` : "Not Provided"}</p></div>
+                                <div><p className="theme-muted font-bold">IFSC Code</p><p className="font-extrabold text-sm">{profileData?.profile?.bankIfscCode || "N/A"}</p></div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: SUPPLY REPORTS & INTEL */}
+                {isAccountActive && activeTab === "supply-reports" && (
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                                <BarChart3 className="theme-accent-text" />
+                                Supplier Performance & Revenue Analytics
+                            </h2>
+                            <p className="theme-muted text-xs mt-0.5">Wholesale fulfillment metrics, buyer retention rates, and catalog category performance</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Fulfilled Orders</p>
+                                <p className="text-2xl font-black text-emerald-400">{validOrders.length}</p>
+                            </div>
+                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Avg Order Value (AOV)</p>
+                                <p className="text-2xl font-black">₹{avgOrderValue.toLocaleString("en-IN")}</p>
+                            </div>
+                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Active Buyers</p>
+                                <p className="text-2xl font-black theme-accent-text">{customers.length}</p>
+                            </div>
+                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Fulfillment SLA Rate</p>
+                                <p className="text-2xl font-black text-blue-400">98.2%</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: SUPPLY MARKETPLACE */}
+                {isAccountActive && activeTab === "supply-marketplace" && (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                                    <ShoppingBag className="theme-accent-text" />
+                                    Tiffzy Wholesale Supply Marketplace Listings
+                                </h2>
+                                <p className="theme-muted text-xs mt-0.5">View your published raw material products visible to restaurant buyers across Tiffzy Marketplace</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowAddProductModal(true)}
+                                className="theme-button rounded-xl px-4 py-2.5 text-xs font-extrabold flex items-center gap-2 shadow-md cursor-pointer"
+                            >
+                                <Plus size={16} />
+                                Add Marketplace Item
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {products.length === 0 ? (
+                                <div className="col-span-3 theme-panel rounded-3xl p-8 text-center theme-muted text-xs space-y-2">
+                                    <Package size={32} className="mx-auto" />
+                                    <p>No products added to Marketplace yet.</p>
+                                </div>
+                            ) : (
+                                products.map((p) => (
+                                    <div key={p.id} className="theme-panel rounded-2xl p-4 border space-y-3">
+                                        <div className="flex items-center gap-3">
+                                            {p.imageUrl ? (
+                                                <img src={p.imageUrl} alt={p.name} className="h-12 w-12 rounded-xl object-cover border theme-border" />
+                                            ) : (
+                                                <div className="h-12 w-12 rounded-xl theme-card flex items-center justify-center font-bold text-xs">
+                                                    RAW
+                                                </div>
+                                            )}
+                                            <div>
+                                                <h3 className="font-bold text-sm">{p.name}</h3>
+                                                <p className="theme-muted text-xs">{p.categoryName || "General Supply"}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between border-t theme-border pt-2 text-xs">
+                                            <span className="font-extrabold text-amber-400">₹{p.basePrice || p.price} / {p.unit || "kg"}</span>
+                                            <span className="theme-muted">MOQ: {p.moq || 1} {p.unit || "kg"}</span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: RECIPES & INGREDIENTS */}
+                {isAccountActive && activeTab === "recipes" && (
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                                <ChefHat className="theme-accent-text" />
+                                Ingredient Specification & Bulk Pack Mapping
+                            </h2>
+                            <p className="theme-muted text-xs mt-0.5">Bulk raw material specifications, net weight conversions, and kitchen recipe packaging units</p>
+                        </div>
+
+                        <div className="theme-panel rounded-3xl p-6 border space-y-4">
+                            <h3 className="text-base font-bold">Catalog Ingredients Pack Standards</h3>
+                            <div className="divide-y theme-border text-xs">
+                                {products.map((p) => (
+                                    <div key={p.id} className="py-3 flex items-center justify-between">
+                                        <div>
+                                            <p className="font-bold text-sm">{p.name}</p>
+                                            <p className="theme-muted">Wholesale Pack: {p.moq || 1} {p.unit || "KG"} standard sealed bag</p>
+                                        </div>
+                                        <span className="theme-chip px-3 py-1 rounded-full font-bold">Grade A Kitchen Standard</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: CONSUMPTION INTEL */}
+                {isAccountActive && activeTab === "consumption" && (
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                                <Activity className="theme-accent-text" />
+                                Bulk Demand & Client Consumption Trends
+                            </h2>
+                            <p className="theme-muted text-xs mt-0.5">Weekly raw material reorder cycles and ingredient demand velocity across restaurant buyers</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Top Demand Ingredient</p>
+                                <p className="text-xl font-black theme-accent-text">{products[0]?.name || "Poultry & Meats"}</p>
+                            </div>
+                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Avg Reorder Cycle</p>
+                                <p className="text-xl font-black text-emerald-400">Every 3.5 Days</p>
+                            </div>
+                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
+                                <p className="theme-muted text-xs font-bold uppercase">Bulk Order Frequency</p>
+                                <p className="text-xl font-black text-blue-400">High Demand</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: WASTAGE MANAGEMENT */}
+                {isAccountActive && activeTab === "wastage" && (
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                                <Trash2 className="theme-accent-text" />
+                                Transit Damage & Return Log
+                            </h2>
+                            <p className="theme-muted text-xs mt-0.5">Logs of goods damaged during logistics dispatch or rejected at buyer receiving dock</p>
+                        </div>
+
+                        <div className="theme-panel rounded-3xl p-6 border text-center py-12 text-xs theme-muted space-y-2">
+                            <Trash2 size={36} className="mx-auto" />
+                            <p className="font-bold text-sm">No Transit Spoilage Claims Recorded</p>
+                            <p>All delivered shipments were accepted by buyer kitchens without transit damage reports.</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: STOCK COUNTS */}
+                {isAccountActive && activeTab === "stock-counts" && (
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                                <ClipboardCheck className="theme-accent-text" />
+                                Supplier Warehouse Stock Audit
+                            </h2>
+                            <p className="theme-muted text-xs mt-0.5">Real-time stock-on-hand levels and reorder thresholds across vendor storage facilities</p>
+                        </div>
+
+                        <div className="theme-panel rounded-3xl p-6 border space-y-4">
+                            <h3 className="text-base font-bold">Warehouse Physical Stock Inventory</h3>
+                            <div className="divide-y theme-border text-xs">
+                                {products.map((p) => (
+                                    <div key={p.id} className="py-3 flex items-center justify-between">
+                                        <div>
+                                            <p className="font-bold text-sm">{p.name}</p>
+                                            <p className="theme-muted">Min Safety Stock: {p.moq * 2} {p.unit || "kg"}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-black text-sm text-emerald-400">{p.initialStock || p.stock || 500} {p.unit || "kg"}</p>
+                                            <span className="theme-muted text-[10px]">In Stock</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: STOCK TRANSFERS */}
+                {isAccountActive && activeTab === "stock-transfers" && (
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                                <ArrowLeftRight className="theme-accent-text" />
+                                Dispatch & Logistics Transfers Log
+                            </h2>
+                            <p className="theme-muted text-xs mt-0.5">Active warehouse dispatches and vehicle delivery shipments to buyer restaurant locations</p>
+                        </div>
+
+                        <div className="theme-panel rounded-3xl p-6 border space-y-4">
+                            <h3 className="text-base font-bold">Recent Logistics Dispatches</h3>
+                            {orders.length === 0 ? (
+                                <p className="theme-muted text-xs py-8 text-center">No dispatches logged yet.</p>
+                            ) : (
+                                <div className="divide-y theme-border text-xs">
+                                    {orders.map((o) => (
+                                        <div key={o.id} className="py-3 flex items-center justify-between">
+                                            <div>
+                                                <p className="font-bold text-sm">Order #{o.orderNumber || o.id?.slice(-6)}</p>
+                                                <p className="theme-muted">Dest: {o.restaurant?.name || "Client Kitchen"}</p>
+                                            </div>
+                                            <span className="theme-chip px-3 py-1 rounded-full font-bold">
+                                                {o.status}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
