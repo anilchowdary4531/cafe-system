@@ -1,5 +1,6 @@
-import OwnerSupplyChain from "./OwnerSupplyChain";
+import { Navigate } from "react-router-dom";
 
 export default function OwnerInventory() {
-    return <OwnerSupplyChain />;
+    return <Navigate to="/owner/supply-chain/inventory" replace />;
 }
+
