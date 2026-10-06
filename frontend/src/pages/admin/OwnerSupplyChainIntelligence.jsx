@@ -345,80 +345,73 @@ export default function OwnerSupplyChainIntelligence() {
                 </div>
             </div>
 
-            {/* 5 METRIC CARDS */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                {/* 1. Inventory Value */}
-                <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-card-bg)] p-3.5 shadow-sm">
-                    <div className="flex items-center justify-between text-xs theme-muted">
-                        <span className="font-semibold uppercase tracking-wider">Inventory Value</span>
-                        <DollarSign size={15} className="text-emerald-500" />
-                    </div>
-                    <div className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
-                        {formatMoney(inventoryValuation)}
-                    </div>
-                    <div className="mt-1 flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                        <ArrowUpRight size={12} />
-                        <span>{materials.length} Raw Materials Total</span>
-                    </div>
+            {/* FLAT SUPPLY CHAIN PERFORMANCE OVERVIEW — MATCHING /OWNER/ANALYTICS */}
+            <div className="border-b border-slate-200/80 dark:border-slate-800/80 pb-4 space-y-3">
+                <div className="text-xs font-bold text-orange-500 uppercase tracking-wider flex items-center gap-2">
+                    <span>PERIOD PERFORMANCE OVERVIEW</span>
+                    <span className="text-slate-300 dark:text-slate-700">•</span>
+                    <span className="text-slate-500 dark:text-slate-400 font-normal">REAL-TIME INVENTORY & PROCUREMENT INTEL</span>
                 </div>
 
-                {/* 2. Low Stock Items */}
-                <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-card-bg)] p-3.5 shadow-sm">
-                    <div className="flex items-center justify-between text-xs theme-muted">
-                        <span className="font-semibold uppercase tracking-wider">Low Stock Items</span>
-                        <AlertTriangle size={15} className={lowStockItems.length > 0 ? "text-amber-500" : "text-emerald-500"} />
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-6 pt-1">
+                    {/* 1. Inventory Value */}
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">INVENTORY VALUE</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight mt-0.5">
+                            {formatMoney(inventoryValuation)}
+                        </p>
+                        <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1">
+                            <ArrowUpRight size={12} />
+                            <span>{materials.length} Raw Materials Total</span>
+                        </p>
                     </div>
-                    <div className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
-                        {lowStockItems.length} Items
-                    </div>
-                    <div className="mt-1 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-                        <AlertCircle size={12} />
-                        <span>Below min threshold</span>
-                    </div>
-                </div>
 
-                {/* 3. Pending Purchase Orders */}
-                <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-card-bg)] p-3.5 shadow-sm">
-                    <div className="flex items-center justify-between text-xs theme-muted">
-                        <span className="font-semibold uppercase tracking-wider">Pending PO Orders</span>
-                        <ShoppingCart size={15} className="text-blue-500" />
+                    {/* 2. Low Stock Items */}
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">LOW STOCK ITEMS</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight mt-0.5">
+                            {lowStockItems.length}
+                        </p>
+                        <p className={`text-[11px] font-semibold flex items-center gap-1 mt-1 ${lowStockItems.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600"}`}>
+                            <AlertCircle size={12} />
+                            <span>Below min threshold</span>
+                        </p>
                     </div>
-                    <div className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
-                        {pendingPOOrders.length} Active POs
-                    </div>
-                    <div className="mt-1 flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 font-medium">
-                        <Clock size={12} />
-                        <span>Awaiting fulfillment</span>
-                    </div>
-                </div>
 
-                {/* 4. Pending Receipts */}
-                <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-card-bg)] p-3.5 shadow-sm">
-                    <div className="flex items-center justify-between text-xs theme-muted">
-                        <span className="font-semibold uppercase tracking-wider">Pending Receipts</span>
-                        <Truck size={15} className="text-purple-500" />
+                    {/* 3. Pending Purchase Orders */}
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">PENDING POS</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight mt-0.5">
+                            {pendingPOOrders.length}
+                        </p>
+                        <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 mt-1">
+                            <Clock size={12} />
+                            <span>Awaiting fulfillment</span>
+                        </p>
                     </div>
-                    <div className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
-                        {pendingReceipts.length || 2} Shipments
-                    </div>
-                    <div className="mt-1 flex items-center gap-1 text-[11px] text-purple-600 dark:text-purple-400 font-medium">
-                        <Boxes size={12} />
-                        <span>GRN inspection required</span>
-                    </div>
-                </div>
 
-                {/* 5. Expiring Items */}
-                <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-card-bg)] p-3.5 shadow-sm">
-                    <div className="flex items-center justify-between text-xs theme-muted">
-                        <span className="font-semibold uppercase tracking-wider">Expiring Items</span>
-                        <Flame size={15} className="text-rose-500" />
+                    {/* 4. Pending Receipts */}
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">PENDING RECEIPTS</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight mt-0.5">
+                            {pendingReceipts.length || 2}
+                        </p>
+                        <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1 mt-1">
+                            <Boxes size={12} />
+                            <span>GRN inspection required</span>
+                        </p>
                     </div>
-                    <div className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
-                        {expiringSoonItems.length} Batches
-                    </div>
-                    <div className="mt-1 flex items-center gap-1 text-[11px] text-rose-600 dark:text-rose-400 font-medium">
-                        <ShieldAlert size={12} />
-                        <span>Near expiration alert</span>
+
+                    {/* 5. Expiring Items */}
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">EXPIRING BATCHES</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight mt-0.5">
+                            {expiringSoonItems.length}
+                        </p>
+                        <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1 mt-1">
+                            <ShieldAlert size={12} />
+                            <span>Near expiration alert</span>
+                        </p>
                     </div>
                 </div>
             </div>
