@@ -24,6 +24,8 @@ import {
     ChevronRight,
 } from "lucide-react";
 import { api } from "../../utils/apiClient";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
+import SupplyChainSubNav from "../../components/SupplyChainSubNav";
 
 export default function OwnerSupplyChainLowStock() {
     const navigate = useNavigate();
@@ -333,15 +335,15 @@ export default function OwnerSupplyChainLowStock() {
 
     if (loading && materials.length === 0) {
         return (
-            <div className="min-h-screen bg-[#faf9f6] p-6 flex flex-col justify-center items-center font-sans">
-                <div className="w-12 h-12 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mb-4" />
-                <p className="text-slate-600 font-medium text-sm">Evaluating low stock intelligence & reorder thresholds...</p>
+            <div className="min-h-screen bg-slate-50 p-6 flex flex-col justify-center items-center font-sans">
+                <div className="w-10 h-10 border-3 border-orange-500 border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-slate-600 font-medium text-xs">Evaluating low stock intelligence & reorder thresholds...</p>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#faf9f6] text-slate-800 font-sans p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
+        <section className="space-y-4 font-sans text-sm text-[color:var(--app-text)] pb-12">
             {/* Toast Notification */}
             {toastMessage && (
                 <div
@@ -358,13 +360,16 @@ export default function OwnerSupplyChainLowStock() {
             <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="space-y-1">
-                        <Link
-                            to="/owner/supply-chain/inventory"
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600 hover:text-amber-700 transition-colors mb-1"
-                        >
-                            <ArrowLeft size={14} /> Back to Master Inventory
-                        </Link>
-                        <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-3">
+                            <OwnerMenuButton />
+                            <Link
+                                to="/owner/supply-chain/inventory"
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600 hover:text-amber-700 transition-colors"
+                            >
+                                <ArrowLeft size={14} /> Back to Master Inventory
+                            </Link>
+                        </div>
+                        <div className="flex items-center gap-3 flex-wrap pt-1">
                             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
                                 <AlertTriangle size={28} className="text-rose-600" />
                                 Low Stock Intelligence
@@ -403,6 +408,9 @@ export default function OwnerSupplyChainLowStock() {
                     </div>
                 </div>
             </div>
+
+            {/* HORIZONTAL SUB-NAVIGATION BAR */}
+            <SupplyChainSubNav />
 
             {/* TOP METRIC CARDS (4 Cards) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -881,6 +889,6 @@ export default function OwnerSupplyChainLowStock() {
                     </div>
                 </div>
             )}
-        </div>
+        </section>
     );
 }

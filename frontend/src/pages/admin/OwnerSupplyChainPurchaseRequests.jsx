@@ -26,6 +26,8 @@ import {
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import { useAuth } from "../../context/AuthContext";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
+import SupplyChainSubNav from "../../components/SupplyChainSubNav";
 
 export default function OwnerSupplyChainPurchaseRequests() {
     const { user } = useAuth();
@@ -291,42 +293,49 @@ export default function OwnerSupplyChainPurchaseRequests() {
     return (
         <div className="min-h-screen bg-[#F8FAFC] text-slate-800 p-4 md:p-6 font-sans">
             {/* Page Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <div>
-                    <div className="flex items-center gap-2 text-xs font-semibold text-orange-600 uppercase tracking-wider">
-                        <span>Supply Chain</span>
-                        <span>/</span>
-                        <span>Requisitions</span>
+            <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm mb-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <OwnerMenuButton />
+                            <div className="flex items-center gap-2 text-xs font-semibold text-orange-600 uppercase tracking-wider">
+                                <span>Supply Chain</span>
+                                <span>/</span>
+                                <span>Requisitions</span>
+                            </div>
+                        </div>
+                        <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight mt-1 flex items-center gap-2">
+                            <FileCheck2 className="text-orange-500" size={28} />
+                            Purchase Requests
+                        </h1>
+                        <p className="text-slate-500 text-sm mt-0.5">
+                            Allow kitchen & store staff to request raw materials before generating formal Purchase Orders.
+                        </p>
                     </div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight mt-1 flex items-center gap-2">
-                        <FileCheck2 className="text-orange-500" size={28} />
-                        Purchase Requests
-                    </h1>
-                    <p className="text-slate-500 text-sm mt-0.5">
-                        Allow kitchen & store staff to request raw materials before generating formal Purchase Orders.
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={handleRefresh}
-                        className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 shadow-2xs transition ${
-                            refreshing ? "opacity-60 cursor-not-allowed" : ""
-                        }`}
-                        disabled={refreshing}
-                    >
-                        <RefreshCw size={15} className={refreshing ? "animate-spin text-orange-500" : ""} />
-                        Refresh
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleRefresh}
+                            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 shadow-2xs transition ${
+                                refreshing ? "opacity-60 cursor-not-allowed" : ""
+                            }`}
+                            disabled={refreshing}
+                        >
+                            <RefreshCw size={15} className={refreshing ? "animate-spin text-orange-500" : ""} />
+                            Refresh
+                        </button>
 
-                    <button
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm rounded-xl shadow-sm hover:shadow-md transition cursor-pointer"
-                    >
-                        <Plus size={18} />
-                        Create Request
-                    </button>
+                        <button
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm rounded-xl shadow-sm hover:shadow-md transition cursor-pointer"
+                        >
+                            <Plus size={18} />
+                            Create Request
+                        </button>
+                    </div>
                 </div>
             </div>
+
+            <SupplyChainSubNav />
 
             {/* Top Metric Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

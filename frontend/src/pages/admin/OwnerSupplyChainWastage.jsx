@@ -12,17 +12,13 @@ import {
     Calendar,
     RefreshCw,
     X,
-    AlertTriangle,
-    Building2,
-    User,
-    FileText,
-    CheckCircle2,
-    Layers,
     Save,
     Clock,
 } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
+import SupplyChainSubNav from "../../components/SupplyChainSubNav";
 
 const WASTAGE_CATEGORIES = [
     "Expired",
@@ -175,103 +171,114 @@ export default function OwnerSupplyChainWastage() {
     };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6 text-slate-100">
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-xl">
-                <div>
-                    <div className="flex items-center gap-3">
-                        <div className="p-3 bg-rose-500/10 text-rose-400 rounded-xl border border-rose-500/20">
-                            <Trash2 className="w-6 h-6" />
+        <section className="space-y-4 font-sans text-sm text-slate-900 pb-12">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80 print:hidden">
+                <div className="flex items-center gap-2">
+                    <OwnerMenuButton />
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-xl font-bold tracking-tight text-slate-900">Wastage Management</h1>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 uppercase tracking-wider">
+                                Spoilage Audit
+                            </span>
                         </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-white tracking-tight">Wastage Management</h1>
-                            <p className="text-sm text-slate-400">
-                                Track kitchen spoilage, expiry, and prep waste with auditable stock movements.
-                            </p>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                            <span>Supply Chain</span>
+                            <span>/</span>
+                            <span className="text-slate-700 font-medium">Wastage</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     <button
                         onClick={fetchWastageData}
                         disabled={refreshing}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition font-medium text-sm"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold rounded-xl text-xs transition cursor-pointer disabled:opacity-50"
                     >
-                        <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                        <RefreshCw size={13} className={refreshing ? "animate-spin text-orange-500" : ""} />
                         Refresh
                     </button>
 
                     <button
                         onClick={handleOpenRecordModal}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-rose-500 hover:bg-rose-400 text-white font-bold rounded-xl text-sm transition shadow-lg shadow-rose-500/10"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs transition shadow-2xs cursor-pointer"
                     >
-                        <Plus className="w-4 h-4" /> Record Wastage
+                        <Plus size={14} /> Record Wastage
                     </button>
                 </div>
             </div>
 
+            {/* Subnav */}
+            <SupplyChainSubNav />
+
             {/* Metrics Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 backdrop-blur-xl">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider">Today's Wastage</span>
-                        <Clock className="w-4 h-4 text-rose-400" />
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-2xs">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                        <span>Today's Wastage</span>
+                        <Clock className="w-3.5 h-3.5 text-rose-500" />
                     </div>
-                    <div className="text-2xl font-bold text-rose-400">
+                    <div className="text-xl font-bold text-rose-600">
                         ₹{metrics.todayWastageValue.toFixed(2)}
                     </div>
-                    <p className="text-xs text-slate-400 mt-2">Value of items wasted today</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Value wasted today</p>
                 </div>
 
-                <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 backdrop-blur-xl">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider">This Month</span>
-                        <Calendar className="w-4 h-4 text-amber-400" />
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-2xs">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                        <span>This Month</span>
+                        <Calendar className="w-3.5 h-3.5 text-amber-500" />
                     </div>
-                    <div className="text-2xl font-bold text-amber-400">
+                    <div className="text-xl font-bold text-amber-600">
                         ₹{metrics.monthWastageValue.toFixed(2)}
                     </div>
-                    <p className="text-xs text-slate-400 mt-2">Cumulative monthly waste value</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Cumulative monthly waste</p>
                 </div>
 
-                <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 backdrop-blur-xl">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider">Wastage Value</span>
-                        <DollarSign className="w-4 h-4 text-cyan-400" />
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-2xs">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                        <span>Wastage Value</span>
+                        <DollarSign className="w-3.5 h-3.5 text-cyan-500" />
                     </div>
-                    <div className="text-2xl font-bold text-white">
+                    <div className="text-xl font-bold text-slate-900">
                         ₹{metrics.totalWastageValue.toFixed(2)}
                     </div>
-                    <p className="text-xs text-slate-400 mt-2">Total historical loss recorded</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Total historical loss</p>
                 </div>
 
-                <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 backdrop-blur-xl">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider">Wastage %</span>
-                        <Percent className="w-4 h-4 text-purple-400" />
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-2xs">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                        <span>Wastage %</span>
+                        <Percent className="w-3.5 h-3.5 text-purple-500" />
                     </div>
-                    <div className="text-2xl font-bold text-purple-400">
-                        {metrics.wastagePercent.toFixed(2)}%
+                    <div className="flex items-baseline gap-2">
+                        <div className={`text-xl font-bold ${metrics.wastagePercent <= 2.5 ? "text-emerald-600" : "text-rose-600"}`}>
+                            {metrics.wastagePercent.toFixed(2)}%
+                        </div>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${metrics.wastagePercent <= 2.5 ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"}`}>
+                            {metrics.wastagePercent <= 2.5 ? "Healthy" : "Alert"}
+                        </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-2">Target benchmark: &lt; 2.5%</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Target benchmark: &lt; 2.5%</p>
                 </div>
             </div>
 
-            {/* VISUAL CHARTS SECTION */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Visual Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                 {/* Wastage by Category */}
-                <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 backdrop-blur-xl space-y-3">
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-3">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                            <PieChart className="w-4 h-4 text-amber-400" /> Wastage by Category
+                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <PieChart className="w-3.5 h-3.5 text-amber-500" /> Wastage by Category
                         </h3>
                     </div>
 
                     {charts.byCategory.length === 0 ? (
-                        <div className="py-8 text-center text-xs text-slate-500">No category breakdown data</div>
+                        <div className="py-6 text-center text-xs text-slate-400">No category breakdown data</div>
                     ) : (
-                        <div className="space-y-2.5">
+                        <div className="space-y-2">
                             {charts.byCategory.map((cat, idx) => {
                                 const maxVal = charts.byCategory[0]?.value || 1;
                                 const pct = Math.round((cat.value / maxVal) * 100);
@@ -279,10 +286,10 @@ export default function OwnerSupplyChainWastage() {
                                 return (
                                     <div key={idx} className="space-y-1">
                                         <div className="flex justify-between text-xs">
-                                            <span className="text-slate-300 font-medium">{cat.category} ({cat.count})</span>
-                                            <span className="text-rose-400 font-bold">₹{cat.value.toFixed(2)}</span>
+                                            <span className="text-slate-700 font-medium">{cat.category} ({cat.count})</span>
+                                            <span className="text-rose-600 font-bold">₹{cat.value.toFixed(2)}</span>
                                         </div>
-                                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                                             <div className="bg-rose-500 h-full rounded-full" style={{ width: `${pct}%` }} />
                                         </div>
                                     </div>
@@ -292,18 +299,18 @@ export default function OwnerSupplyChainWastage() {
                     )}
                 </div>
 
-                {/* Wastage by Item */}
-                <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 backdrop-blur-xl space-y-3">
+                {/* Top Wasted Items */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-3">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                            <BarChart3 className="w-4 h-4 text-emerald-400" /> Top Wasted Items
+                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <BarChart3 className="w-3.5 h-3.5 text-emerald-500" /> Top Wasted Items
                         </h3>
                     </div>
 
                     {charts.byItem.length === 0 ? (
-                        <div className="py-8 text-center text-xs text-slate-500">No item breakdown data</div>
+                        <div className="py-6 text-center text-xs text-slate-400">No item breakdown data</div>
                     ) : (
-                        <div className="space-y-2.5">
+                        <div className="space-y-2">
                             {charts.byItem.slice(0, 5).map((item, idx) => {
                                 const maxVal = charts.byItem[0]?.value || 1;
                                 const pct = Math.round((item.value / maxVal) * 100);
@@ -311,10 +318,10 @@ export default function OwnerSupplyChainWastage() {
                                 return (
                                     <div key={idx} className="space-y-1">
                                         <div className="flex justify-between text-xs">
-                                            <span className="text-slate-300 font-medium truncate max-w-[150px]">{item.item}</span>
-                                            <span className="text-amber-400 font-bold">₹{item.value.toFixed(2)}</span>
+                                            <span className="text-slate-700 font-medium truncate max-w-[150px]">{item.item}</span>
+                                            <span className="text-amber-600 font-bold">₹{item.value.toFixed(2)}</span>
                                         </div>
-                                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                                             <div className="bg-amber-500 h-full rounded-full" style={{ width: `${pct}%` }} />
                                         </div>
                                     </div>
@@ -324,33 +331,32 @@ export default function OwnerSupplyChainWastage() {
                     )}
                 </div>
 
-                {/* Wastage Trend */}
-                <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 backdrop-blur-xl space-y-3">
+                {/* 14-Day Wastage Trend */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-3">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                            <TrendingDown className="w-4 h-4 text-cyan-400" /> 14-Day Wastage Trend
+                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <TrendingDown className="w-3.5 h-3.5 text-cyan-500" /> 14-Day Wastage Trend
                         </h3>
                     </div>
 
                     {charts.trend.length === 0 ? (
-                        <div className="py-8 text-center text-xs text-slate-500">No trend timeline data</div>
+                        <div className="py-6 text-center text-xs text-slate-400">No trend timeline data</div>
                     ) : (
-                        <div className="h-36 flex items-end justify-between gap-1.5 pt-4">
+                        <div className="h-28 flex items-end justify-between gap-1.5 pt-3">
                             {charts.trend.map((t, idx) => {
                                 const maxVal = Math.max(...charts.trend.map((x) => x.value)) || 1;
                                 const heightPct = Math.max(10, Math.round((t.value / maxVal) * 100));
 
                                 return (
                                     <div key={idx} className="flex-1 flex flex-col items-center gap-1 group relative">
-                                        {/* Tooltip */}
-                                        <div className="absolute -top-8 bg-slate-800 text-[10px] text-white px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap border border-slate-700 shadow">
+                                        <div className="absolute -top-7 bg-slate-900 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap shadow-xs z-10">
                                             ₹{t.value.toFixed(0)}
                                         </div>
                                         <div
-                                            className={`w-full rounded-t transition-all ${t.value > 0 ? "bg-cyan-500 hover:bg-cyan-400" : "bg-slate-800"}`}
+                                            className={`w-full rounded-t transition-all ${t.value > 0 ? "bg-cyan-500 hover:bg-cyan-600" : "bg-slate-100"}`}
                                             style={{ height: `${heightPct}%` }}
                                         />
-                                        <span className="text-[9px] text-slate-500 tracking-tighter truncate w-full text-center">{t.label.split(" ")[0]}</span>
+                                        <span className="text-[9px] text-slate-400 tracking-tighter truncate w-full text-center">{t.label.split(" ")[0]}</span>
                                     </div>
                                 );
                             })}
@@ -360,29 +366,29 @@ export default function OwnerSupplyChainWastage() {
             </div>
 
             {/* Filter Toolbar */}
-            <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 backdrop-blur-xl flex flex-col md:flex-row gap-4 justify-between items-center">
-                <div className="relative w-full md:w-80">
-                    <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs flex flex-col sm:flex-row gap-3 justify-between items-center">
+                <div className="relative w-full sm:w-80">
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Search item, location, or reason..."
+                        placeholder="Search item, location, or notes..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-500"
                     />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                    <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/80">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 w-full sm:w-auto">
                         <Filter className="w-3.5 h-3.5 text-slate-400" />
                         <select
                             value={categoryFilter}
                             onChange={(e) => setCategoryFilter(e.target.value)}
-                            className="bg-transparent text-sm text-slate-200 focus:outline-none"
+                            className="bg-transparent text-xs font-medium text-slate-700 focus:outline-none cursor-pointer w-full"
                         >
-                            <option value="ALL" className="bg-slate-900">All Categories</option>
+                            <option value="ALL">All Categories</option>
                             {WASTAGE_CATEGORIES.map((cat) => (
-                                <option key={cat} value={cat} className="bg-slate-900">{cat}</option>
+                                <option key={cat} value={cat}>{cat}</option>
                             ))}
                         </select>
                     </div>
@@ -390,45 +396,47 @@ export default function OwnerSupplyChainWastage() {
             </div>
 
             {/* Wastage Log Table */}
-            <div className="bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden backdrop-blur-xl">
-                <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-200/80 flex items-center justify-between">
                     <div>
-                        <h3 className="text-base font-bold text-white">Auditable Wastage Log</h3>
-                        <p className="text-xs text-slate-400">Inventory movement records of all recorded spoilage and losses</p>
+                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Auditable Wastage Log</h3>
+                        <p className="text-xs text-slate-500">Inventory movement records of all recorded spoilage and losses</p>
                     </div>
-                    <span className="text-xs text-slate-400 bg-slate-800 px-3 py-1 rounded-lg border border-slate-700">
+                    <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
                         {filteredLogs.length} Records
                     </span>
                 </div>
 
                 {loading ? (
-                    <div className="flex items-center justify-center py-20">
-                        <RefreshCw className="w-8 h-8 text-rose-500 animate-spin" />
+                    <div className="flex items-center justify-center py-16">
+                        <RefreshCw className="w-5 h-5 text-orange-500 animate-spin" />
                     </div>
                 ) : filteredLogs.length === 0 ? (
-                    <div className="text-center py-16">
-                        <Trash2 className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                        <h3 className="text-lg font-semibold text-slate-300">No wastage records found</h3>
-                        <p className="text-sm text-slate-500">Click "Record Wastage" to log kitchen waste.</p>
+                    <div className="text-center py-14 px-4">
+                        <Trash2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                        <h3 className="text-xs font-bold text-slate-700">No wastage records found</h3>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto mt-0.5">
+                            Click "Record Wastage" to log kitchen waste and deduct items from inventory.
+                        </p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm border-collapse">
+                        <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                                <tr className="border-b border-slate-800 bg-slate-950/40 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                                    <th className="py-3.5 px-4">Date & Time</th>
-                                    <th className="py-3.5 px-4">Item</th>
-                                    <th className="py-3.5 px-4">Reason / Category</th>
-                                    <th className="py-3.5 px-4">Location</th>
-                                    <th className="py-3.5 px-4 text-right">Quantity</th>
-                                    <th className="py-3.5 px-4 text-right">Value</th>
-                                    <th className="py-3.5 px-4">Recorded By</th>
+                                <tr className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
+                                    <th className="py-2.5 px-3.5">Date & Time</th>
+                                    <th className="py-2.5 px-3.5">Item</th>
+                                    <th className="py-2.5 px-3.5">Reason / Category</th>
+                                    <th className="py-2.5 px-3.5">Location</th>
+                                    <th className="py-2.5 px-3.5 text-right">Quantity</th>
+                                    <th className="py-2.5 px-3.5 text-right">Value</th>
+                                    <th className="py-2.5 px-3.5">Recorded By</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-800/60">
+                            <tbody className="divide-y divide-slate-100">
                                 {filteredLogs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-slate-800/40 transition">
-                                        <td className="py-3.5 px-4 text-xs text-slate-300">
+                                    <tr key={log.id} className="hover:bg-slate-50/70 transition">
+                                        <td className="py-2.5 px-3.5 text-slate-600 font-medium">
                                             {new Date(log.date).toLocaleString("en-IN", {
                                                 day: "2-digit",
                                                 month: "short",
@@ -437,28 +445,28 @@ export default function OwnerSupplyChainWastage() {
                                                 minute: "2-digit",
                                             })}
                                         </td>
-                                        <td className="py-3.5 px-4 font-semibold text-slate-100">
+                                        <td className="py-2.5 px-3.5 font-semibold text-slate-900">
                                             {log.itemName}
-                                            <span className="text-[10px] text-slate-400 block uppercase">{log.itemCategory}</span>
+                                            <span className="text-[10px] text-slate-500 block font-normal uppercase">{log.itemCategory}</span>
                                         </td>
-                                        <td className="py-3.5 px-4">
-                                            <span className="inline-block text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                        <td className="py-2.5 px-3.5">
+                                            <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
                                                 {log.category}
                                             </span>
                                             {log.notes && (
-                                                <span className="text-xs text-slate-400 block mt-1 line-clamp-1">{log.notes}</span>
+                                                <span className="text-[11px] text-slate-500 block mt-0.5 line-clamp-1">{log.notes}</span>
                                             )}
                                         </td>
-                                        <td className="py-3.5 px-4 text-xs text-slate-300">
+                                        <td className="py-2.5 px-3.5 text-slate-600">
                                             {log.location}
                                         </td>
-                                        <td className="py-3.5 px-4 text-right font-bold text-rose-400">
+                                        <td className="py-2.5 px-3.5 text-right font-bold text-rose-600">
                                             -{log.quantity} {log.unit}
                                         </td>
-                                        <td className="py-3.5 px-4 text-right font-bold text-slate-100">
+                                        <td className="py-2.5 px-3.5 text-right font-bold text-slate-900">
                                             ₹{log.value.toFixed(2)}
                                         </td>
-                                        <td className="py-3.5 px-4 text-xs text-slate-300">
+                                        <td className="py-2.5 px-3.5 text-slate-600">
                                             {log.recordedBy}
                                         </td>
                                     </tr>
@@ -469,37 +477,32 @@ export default function OwnerSupplyChainWastage() {
                 )}
             </div>
 
-            {/* RECORD WASTAGE MODAL */}
+            {/* Record Wastage Modal */}
             {isRecordModalOpen && (
-                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
-                        <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-rose-500/10 text-rose-400 rounded-xl border border-rose-500/20">
-                                    <Trash2 className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-bold text-white">Record Kitchen Wastage</h2>
-                                    <p className="text-xs text-slate-400">Deduct damaged or spoiled items from inventory</p>
-                                </div>
+                <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white border border-slate-200 w-full max-w-lg rounded-2xl p-5 shadow-xl">
+                        <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-base font-bold text-slate-900">Record Kitchen Wastage</h2>
+                                <p className="text-xs text-slate-500">Deduct damaged or spoiled items from inventory</p>
                             </div>
                             <button
                                 onClick={() => setIsRecordModalOpen(false)}
-                                className="p-2 text-slate-400 hover:text-white rounded-lg bg-slate-800 hover:bg-slate-700 transition"
+                                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition cursor-pointer"
                             >
-                                <X className="w-5 h-5" />
+                                <X size={18} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmitWastage} className="p-6 space-y-4">
+                        <form onSubmit={handleSubmitWastage} className="mt-4 space-y-3.5 text-xs">
                             {/* Raw Material Selector */}
                             <div>
-                                <label className="text-xs font-semibold text-slate-300 block mb-1">Select Raw Material Item *</label>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">Select Raw Material Item *</label>
                                 <select
                                     required
                                     value={formData.rawMaterialId}
                                     onChange={(e) => handleMaterialChange(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-500"
                                 >
                                     <option value="">-- Choose Raw Material --</option>
                                     {rawMaterials.map((rm) => (
@@ -513,7 +516,7 @@ export default function OwnerSupplyChainWastage() {
                             {/* Quantity & Unit */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-300 block mb-1">Quantity *</label>
+                                    <label className="text-xs font-bold text-slate-700 block mb-1">Quantity *</label>
                                     <input
                                         type="number"
                                         step="any"
@@ -522,28 +525,28 @@ export default function OwnerSupplyChainWastage() {
                                         placeholder="0.00"
                                         value={formData.quantity}
                                         onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-500 font-bold"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-300 block mb-1">Unit</label>
+                                    <label className="text-xs font-bold text-slate-700 block mb-1">Unit</label>
                                     <input
                                         type="text"
                                         value={formData.unit}
                                         onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                                         placeholder="g, ml, pcs"
-                                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-500"
                                     />
                                 </div>
                             </div>
 
                             {/* Category Selector */}
                             <div>
-                                <label className="text-xs font-semibold text-slate-300 block mb-1">Wastage Category / Reason *</label>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">Wastage Category / Reason *</label>
                                 <select
                                     value={formData.category}
                                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-500"
                                 >
                                     {WASTAGE_CATEGORIES.map((cat) => (
                                         <option key={cat} value={cat}>{cat}</option>
@@ -553,11 +556,11 @@ export default function OwnerSupplyChainWastage() {
 
                             {/* Location Selector */}
                             <div>
-                                <label className="text-xs font-semibold text-slate-300 block mb-1">Storage Location</label>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">Storage Location</label>
                                 <select
                                     value={formData.locationId}
                                     onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-500"
                                 >
                                     <option value="">Default / Main Store</option>
                                     {locations.map((loc) => (
@@ -568,37 +571,37 @@ export default function OwnerSupplyChainWastage() {
 
                             {/* Additional Notes */}
                             <div>
-                                <label className="text-xs font-semibold text-slate-300 block mb-1">Notes / Explanation</label>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">Notes / Explanation</label>
                                 <textarea
                                     rows={2}
-                                    placeholder="Explain why item was wasted (e.g. fridge malfunction, burnt during prep)..."
+                                    placeholder="Explain why item was wasted..."
                                     value={formData.notes}
                                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-500"
                                 />
                             </div>
 
                             {/* Live Value Preview */}
-                            <div className="bg-rose-500/10 p-3 rounded-xl border border-rose-500/20 flex items-center justify-between text-xs">
-                                <span className="text-slate-300 font-medium">Estimated Loss Value:</span>
-                                <span className="text-base font-bold text-rose-400">₹{modalLiveCost.toFixed(2)}</span>
+                            <div className="bg-rose-50 p-3 rounded-xl border border-rose-200/80 flex items-center justify-between text-xs">
+                                <span className="text-slate-700 font-medium">Estimated Loss Value:</span>
+                                <span className="text-sm font-bold text-rose-600">₹{modalLiveCost.toFixed(2)}</span>
                             </div>
 
                             {/* Buttons */}
-                            <div className="pt-2 flex justify-end gap-3">
+                            <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
                                 <button
                                     type="button"
                                     onClick={() => setIsRecordModalOpen(false)}
-                                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium transition"
+                                    className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="flex items-center gap-2 px-5 py-2 bg-rose-500 hover:bg-rose-400 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-rose-500/10"
+                                    className="inline-flex items-center gap-1.5 px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs transition shadow-2xs cursor-pointer"
                                 >
-                                    <Save className="w-4 h-4" />
+                                    <Save size={14} />
                                     {submitting ? "Saving..." : "Confirm & Deduct Stock"}
                                 </button>
                             </div>
@@ -606,6 +609,6 @@ export default function OwnerSupplyChainWastage() {
                     </div>
                 </div>
             )}
-        </div>
+        </section>
     );
 }

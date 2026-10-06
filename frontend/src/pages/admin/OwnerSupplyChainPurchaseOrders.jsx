@@ -28,6 +28,8 @@ import {
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import { useAuth } from "../../context/AuthContext";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
+import SupplyChainSubNav from "../../components/SupplyChainSubNav";
 
 export default function OwnerSupplyChainPurchaseOrders() {
     const { user } = useAuth();
@@ -339,182 +341,190 @@ export default function OwnerSupplyChainPurchaseOrders() {
     };
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC] text-slate-800 p-4 md:p-6 font-sans">
+        <section className="space-y-4 font-sans text-sm text-slate-900 pb-12">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 print:hidden">
-                <div>
-                    <div className="flex items-center gap-2 text-xs font-semibold text-orange-600 uppercase tracking-wider">
-                        <span>Procurement</span>
-                        <span>/</span>
-                        <span>Orders</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80 print:hidden">
+                <div className="flex items-center gap-2">
+                    <OwnerMenuButton />
+                    <div>
+                        <div className="flex items-center gap-2 text-xs font-semibold text-orange-600 uppercase tracking-wider">
+                            <span>Procurement</span>
+                            <span>/</span>
+                            <span>Purchase Orders</span>
+                        </div>
+                        <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                            <ShoppingBag className="text-orange-500" size={20} />
+                            Purchase Orders
+                        </h1>
                     </div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight mt-1 flex items-center gap-2">
-                        <ShoppingBag className="text-orange-500" size={28} />
-                        Purchase Orders
-                    </h1>
-                    <p className="text-slate-500 text-sm mt-0.5">
-                        Zoho/Odoo-inspired enterprise procurement workflow for restaurant raw materials and supplier POs.
-                    </p>
                 </div>
-                <div className="flex items-center gap-3">
+
+                <div className="flex items-center gap-2">
                     <button
                         onClick={handleRefresh}
-                        className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 shadow-2xs transition ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-2xs transition ${
                             refreshing ? "opacity-60 cursor-not-allowed" : ""
                         }`}
                         disabled={refreshing}
                     >
-                        <RefreshCw size={15} className={refreshing ? "animate-spin text-orange-500" : ""} />
+                        <RefreshCw size={13} className={refreshing ? "animate-spin text-orange-500" : ""} />
                         Refresh
                     </button>
 
                     <button
                         onClick={() => setIsCreateModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm rounded-xl shadow-sm hover:shadow-md transition cursor-pointer"
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs rounded-lg shadow-2xs transition cursor-pointer"
                     >
-                        <Plus size={18} />
+                        <Plus size={15} />
                         Create Purchase Order
                     </button>
                 </div>
             </div>
 
-            {/* Procurement Metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-3.5 mb-6 print:hidden">
-                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Draft</span>
-                    <div className="text-2xl font-extrabold text-slate-800 mt-1">{metrics.draft}</div>
+            <SupplyChainSubNav />
+
+            {/* KPI Metrics Row */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pb-3 border-b border-slate-200/80 print:hidden">
+                <div>
+                    <span className="text-xs text-slate-500 font-medium">Draft</span>
+                    <div className="text-xl font-bold text-slate-700 mt-0.5">{metrics.draft}</div>
                 </div>
-                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-                    <span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Pending Approval</span>
-                    <div className="text-2xl font-extrabold text-amber-900 mt-1">{metrics.pendingApproval}</div>
+                <div>
+                    <span className="text-xs text-amber-600 font-medium">Pending Approval</span>
+                    <div className="text-xl font-bold text-amber-600 mt-0.5">{metrics.pendingApproval}</div>
                 </div>
-                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-                    <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">Sent to Vendor</span>
-                    <div className="text-2xl font-extrabold text-blue-900 mt-1">{metrics.sent}</div>
+                <div>
+                    <span className="text-xs text-blue-600 font-medium">Sent to Vendor</span>
+                    <div className="text-xl font-bold text-blue-600 mt-0.5">{metrics.sent}</div>
                 </div>
-                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-                    <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Confirmed</span>
-                    <div className="text-2xl font-extrabold text-indigo-900 mt-1">{metrics.confirmed}</div>
+                <div>
+                    <span className="text-xs text-indigo-600 font-medium">Confirmed</span>
+                    <div className="text-xl font-bold text-indigo-600 mt-0.5">{metrics.confirmed}</div>
                 </div>
-                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-                    <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Partially Received</span>
-                    <div className="text-2xl font-extrabold text-amber-900 mt-1">{metrics.partiallyReceived}</div>
+                <div>
+                    <span className="text-xs text-amber-700 font-medium">Partially Received</span>
+                    <div className="text-xl font-bold text-amber-700 mt-0.5">{metrics.partiallyReceived}</div>
                 </div>
-                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-                    <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Completed</span>
-                    <div className="text-2xl font-extrabold text-emerald-900 mt-1">{metrics.completed}</div>
+                <div>
+                    <span className="text-xs text-emerald-600 font-medium">Completed</span>
+                    <div className="text-xl font-bold text-emerald-600 mt-0.5">{metrics.completed}</div>
                 </div>
             </div>
 
-            {/* Filter Toolbar */}
-            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs mb-6 space-y-3 print:hidden">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Search by PO Number, vendor company name, or contact email..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition"
-                        />
-                    </div>
+            {/* Status Tabs Bar */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none border-b border-slate-200/80 print:hidden">
+                {[
+                    { id: "ALL", label: "All Orders" },
+                    { id: "DRAFT", label: "Draft" },
+                    { id: "PENDING_APPROVAL", label: "Pending Approval" },
+                    { id: "SENT", label: "Sent / Placed" },
+                    { id: "CONFIRMED", label: "Confirmed" },
+                    { id: "PARTIALLY_RECEIVED", label: "Partially Received" },
+                    { id: "COMPLETED", label: "Completed / Delivered" },
+                    { id: "CANCELLED", label: "Cancelled" },
+                ].map((tab) => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setStatusFilter(tab.id)}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+                            statusFilter === tab.id
+                                ? "bg-orange-500 text-white shadow-2xs"
+                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                        }`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        {/* PO Status Filter */}
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl">
-                            <Filter size={14} className="text-slate-500" />
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
-                            >
-                                <option value="ALL">All PO Statuses</option>
-                                <option value="DRAFT">Draft</option>
-                                <option value="PENDING_APPROVAL">Pending Approval</option>
-                                <option value="SENT">Sent</option>
-                                <option value="CONFIRMED">Confirmed</option>
-                                <option value="PARTIALLY_RECEIVED">Partially Received</option>
-                                <option value="COMPLETED">Completed</option>
-                                <option value="CANCELLED">Cancelled</option>
-                            </select>
-                        </div>
+            {/* Compact Search & Filter Row */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 print:hidden">
+                <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                    <input
+                        type="text"
+                        placeholder="Search by PO #, vendor, or contact..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition"
+                    />
+                </div>
 
-                        {/* Receiving Status Filter */}
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl">
-                            <select
-                                value={receivingFilter}
-                                onChange={(e) => setReceivingFilter(e.target.value)}
-                                className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
-                            >
-                                <option value="ALL">All Receiving Statuses</option>
-                                <option value="PENDING">Pending Receipt</option>
-                                <option value="PARTIALLY_RECEIVED">Partially Received</option>
-                                <option value="FULLY_RECEIVED">Fully Received</option>
-                            </select>
-                        </div>
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs">
+                        <Filter size={13} className="text-slate-400" />
+                        <select
+                            value={receivingFilter}
+                            onChange={(e) => setReceivingFilter(e.target.value)}
+                            className="bg-transparent font-medium text-slate-700 focus:outline-none cursor-pointer"
+                        >
+                            <option value="ALL">All Receiving Statuses</option>
+                            <option value="PENDING">Pending Receipt</option>
+                            <option value="PARTIALLY_RECEIVED">Partially Received</option>
+                            <option value="FULLY_RECEIVED">Fully Received</option>
+                        </select>
                     </div>
                 </div>
             </div>
 
             {/* PO Main Table */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden print:hidden">
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden print:hidden">
                 {loading ? (
-                    <div className="p-12 text-center">
-                        <RefreshCw size={28} className="animate-spin text-orange-500 mx-auto mb-3" />
-                        <p className="text-slate-500 text-sm">Loading purchase orders...</p>
+                    <div className="p-10 text-center">
+                        <RefreshCw size={24} className="animate-spin text-orange-500 mx-auto mb-2" />
+                        <p className="text-slate-500 text-xs">Loading purchase orders...</p>
                     </div>
                 ) : filteredOrders.length === 0 ? (
-                    <div className="p-12 text-center">
-                        <ShoppingBag size={40} className="text-slate-300 mx-auto mb-3" />
-                        <h3 className="text-base font-bold text-slate-800">No Purchase Orders Found</h3>
-                        <p className="text-slate-500 text-xs mt-1">
+                    <div className="p-10 text-center">
+                        <ShoppingBag size={36} className="text-slate-300 mx-auto mb-2" />
+                        <h3 className="text-sm font-bold text-slate-800">No Purchase Orders Found</h3>
+                        <p className="text-slate-500 text-xs mt-0.5">
                             {searchQuery || statusFilter !== "ALL"
                                 ? "No POs match your active filters."
                                 : "Click 'Create Purchase Order' to generate your first PO."}
                         </p>
                         <button
                             onClick={() => setIsCreateModalOpen(true)}
-                            className="mt-4 px-4 py-2 bg-orange-600 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 hover:bg-orange-700"
+                            className="mt-3 px-3.5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
                         >
                             <Plus size={14} /> Create Purchase Order
                         </button>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm border-collapse">
+                        <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-xs uppercase font-bold text-slate-500 tracking-wider">
-                                    <th className="py-3.5 px-4">PO Number</th>
-                                    <th className="py-3.5 px-4">Supplier Vendor</th>
-                                    <th className="py-3.5 px-4">Order Date</th>
-                                    <th className="py-3.5 px-4">Expected Delivery</th>
-                                    <th className="py-3.5 px-4">Amount</th>
-                                    <th className="py-3.5 px-4">Payment</th>
-                                    <th className="py-3.5 px-4">Goods Receipt</th>
-                                    <th className="py-3.5 px-4">PO Status</th>
-                                    <th className="py-3.5 px-4 text-right">Actions</th>
+                                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] uppercase font-bold text-slate-500 tracking-wider">
+                                    <th className="py-2.5 px-3.5">PO Number</th>
+                                    <th className="py-2.5 px-3.5">Supplier Vendor</th>
+                                    <th className="py-2.5 px-3.5">Order Date</th>
+                                    <th className="py-2.5 px-3.5">Expected Delivery</th>
+                                    <th className="py-2.5 px-3.5">Amount</th>
+                                    <th className="py-2.5 px-3.5">Payment</th>
+                                    <th className="py-2.5 px-3.5">Goods Receipt</th>
+                                    <th className="py-2.5 px-3.5">PO Status</th>
+                                    <th className="py-2.5 px-3.5 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {filteredOrders.map((po) => (
                                     <tr key={po.id} className="hover:bg-slate-50/70 transition">
                                         {/* PO Number */}
-                                        <td className="py-3.5 px-4 font-mono font-extrabold text-slate-900 text-xs">
+                                        <td className="py-2.5 px-3.5 font-mono font-extrabold text-slate-900 text-xs">
                                             #{po.orderNo}
                                         </td>
 
                                         {/* Supplier */}
-                                        <td className="py-3.5 px-4">
+                                        <td className="py-2.5 px-3.5">
                                             <div className="flex items-center gap-2">
-                                                <div className="p-1.5 bg-orange-50 text-orange-600 rounded-lg border border-orange-100">
-                                                    <Building2 size={14} />
+                                                <div className="p-1 bg-orange-50 text-orange-600 rounded border border-orange-100">
+                                                    <Building2 size={13} />
                                                 </div>
                                                 <div>
                                                     <p className="font-bold text-slate-900 text-xs">
                                                         {po.supplier?.profile?.companyName || po.supplier?.email || "Vendor Supplier"}
                                                     </p>
-                                                    <span className="text-[10px] text-slate-500 font-medium">
+                                                    <span className="text-[10px] text-slate-400 font-medium">
                                                         {po.supplier?.phone || po.supplier?.email}
                                                     </span>
                                                 </div>
@@ -522,15 +532,15 @@ export default function OwnerSupplyChainPurchaseOrders() {
                                         </td>
 
                                         {/* Order Date */}
-                                        <td className="py-3.5 px-4 text-xs font-medium text-slate-600">
+                                        <td className="py-2.5 px-3.5 text-xs font-medium text-slate-600">
                                             {new Date(po.createdAt).toLocaleDateString()}
                                         </td>
 
                                         {/* Expected Delivery */}
-                                        <td className="py-3.5 px-4 text-xs font-medium text-slate-700">
+                                        <td className="py-2.5 px-3.5 text-xs font-medium text-slate-700">
                                             {po.expectedDeliveryDate ? (
                                                 <span className="flex items-center gap-1">
-                                                    <Calendar size={13} className="text-slate-400" />
+                                                    <Calendar size={12} className="text-slate-400" />
                                                     {new Date(po.expectedDeliveryDate).toLocaleDateString()}
                                                 </span>
                                             ) : (
@@ -539,13 +549,13 @@ export default function OwnerSupplyChainPurchaseOrders() {
                                         </td>
 
                                         {/* Amount */}
-                                        <td className="py-3.5 px-4 font-extrabold text-slate-900 text-sm">
+                                        <td className="py-2.5 px-3.5 font-extrabold text-slate-900 text-xs">
                                             ₹{Number(po.totalAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                                         </td>
 
                                         {/* Payment Status */}
-                                        <td className="py-3.5 px-4">
-                                            <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                        <td className="py-2.5 px-3.5">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                                 po.paymentStatus === "PAID" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200"
                                             }`}>
                                                 {po.paymentStatus || "UNPAID"}
@@ -553,14 +563,14 @@ export default function OwnerSupplyChainPurchaseOrders() {
                                         </td>
 
                                         {/* Goods Receipt */}
-                                        <td className="py-3.5 px-4">{renderReceivingBadge(po.receivingStatus)}</td>
+                                        <td className="py-2.5 px-3.5">{renderReceivingBadge(po.receivingStatus)}</td>
 
                                         {/* PO Status */}
-                                        <td className="py-3.5 px-4">{renderPOStatusBadge(po.status)}</td>
+                                        <td className="py-2.5 px-3.5">{renderPOStatusBadge(po.status)}</td>
 
                                         {/* Actions */}
-                                        <td className="py-3.5 px-4 text-right">
-                                            <div className="flex items-center justify-end gap-1.5">
+                                        <td className="py-2.5 px-3.5 text-right">
+                                            <div className="flex items-center justify-end gap-1">
                                                 {/* Receive Goods Button */}
                                                 {po.status !== "CANCELLED" && po.receivingStatus !== "FULLY_RECEIVED" && (
                                                     <button
@@ -568,10 +578,10 @@ export default function OwnerSupplyChainPurchaseOrders() {
                                                             setSelectedOrder(po);
                                                             setIsReceiveModalOpen(true);
                                                         }}
-                                                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 shadow-2xs cursor-pointer"
+                                                        className="px-2 py-1 rounded text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 transition cursor-pointer"
                                                         title="Receive Goods into Inventory"
                                                     >
-                                                        <PackageCheck size={13} /> Receive
+                                                        <PackageCheck size={12} /> Receive
                                                     </button>
                                                 )}
 
@@ -581,10 +591,10 @@ export default function OwnerSupplyChainPurchaseOrders() {
                                                         setSelectedOrder(po);
                                                         setIsPrintModalOpen(true);
                                                     }}
-                                                    className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+                                                    className="p-1 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
                                                     title="Print / Export PO Document"
                                                 >
-                                                    <Printer size={16} />
+                                                    <Printer size={15} />
                                                 </button>
 
                                                 {/* View Details */}
@@ -593,10 +603,10 @@ export default function OwnerSupplyChainPurchaseOrders() {
                                                         setSelectedOrder(po);
                                                         setIsDetailModalOpen(true);
                                                     }}
-                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
+                                                    className="p-1 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
                                                     title="View Full PO Details"
                                                 >
-                                                    <Eye size={16} />
+                                                    <Eye size={15} />
                                                 </button>
                                             </div>
                                         </td>
@@ -987,6 +997,6 @@ export default function OwnerSupplyChainPurchaseOrders() {
                     </div>
                 </div>
             )}
-        </div>
+        </section>
     );
 }

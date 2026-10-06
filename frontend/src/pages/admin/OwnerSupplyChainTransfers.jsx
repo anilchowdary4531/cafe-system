@@ -7,27 +7,24 @@ import {
     Clock,
     CheckCircle2,
     XCircle,
-    Building2,
     Calendar,
     RefreshCw,
     X,
     Eye,
-    AlertTriangle,
     Truck,
     PackageCheck,
     ArrowRight,
-    User,
-    FileText,
     Check,
     Ban,
     Boxes,
-    Layers,
     Warehouse,
     Utensils,
 } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import { useAuth } from "../../context/AuthContext";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
+import SupplyChainSubNav from "../../components/SupplyChainSubNav";
 
 export default function OwnerSupplyChainTransfers() {
     const { user } = useAuth();
@@ -100,13 +97,11 @@ export default function OwnerSupplyChainTransfers() {
             ]);
 
             setTransfers(trfRes.data?.transfers || []);
-            if (trfRes.data?.metrics) {
-                setMetrics(trfRes.data.metrics);
-            }
+            if (trfRes.data?.metrics) setMetrics(trfRes.data.metrics);
             setLocations(locRes.data?.locations || []);
             setRawMaterials(matRes.data?.items || []);
         } catch (err) {
-            showToast.error("Failed to load stock transfers data.");
+            showToast.error("Failed to load stock transfer requests.");
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -119,79 +114,74 @@ export default function OwnerSupplyChainTransfers() {
 
     // Filtered Transfers
     const filteredTransfers = useMemo(() => {
-        return transfers.filter((t) => {
-            const q = searchQuery.toLowerCase();
-            const code = (t.transferCode || "").toLowerCase();
-            const item = (t.itemName || "").toLowerCase();
-            const from = (t.fromLocation?.name || t.fromName || "").toLowerCase();
-            const to = (t.toLocation?.name || t.toName || "").toLowerCase();
+        return transfers.filter((trf) => {
+            const matchesSearch =
+                (trf.transferCode || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (trf.itemName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (trf.fromName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (trf.toName || "").toLowerCase().includes(searchQuery.toLowerCase());
 
-            const matchesSearch = !q || code.includes(q) || item.includes(q) || from.includes(q) || to.includes(q);
-            const matchesStatus = statusFilter === "ALL" || String(t.status).toUpperCase() === statusFilter.toUpperCase();
-            const matchesType = typeFilter === "ALL" || String(t.transferType).toUpperCase() === typeFilter.toUpperCase();
+            const matchesStatus = statusFilter === "ALL" || trf.status === statusFilter;
+            const matchesType = typeFilter === "ALL" || trf.transferType === typeFilter;
 
             return matchesSearch && matchesStatus && matchesType;
         });
     }, [transfers, searchQuery, statusFilter, typeFilter]);
 
-    // Handle Item Selection in Create Form
-    const handleItemSelect = (matId) => {
-        const mat = rawMaterials.find((m) => String(m.id) === String(matId));
-        if (mat) {
-            setCreateForm((prev) => ({
-                ...prev,
-                rawMaterialId: mat.id,
-                itemName: mat.name,
-                unit: mat.displayUnit || mat.baseUnit || "kg",
-            }));
-        }
-    };
-
-    // Create Transfer Submit
+    // Handle Create Transfer Submit
     const handleCreateTransfer = async (e) => {
         e.preventDefault();
-        if (!createForm.itemName || Number(createForm.requestedQty) <= 0) {
-            showToast.error("Please specify a valid item and quantity");
-            return;
-        }
-
         setSubmitting(true);
         try {
-            const res = await api.post("/owner/stock-transfers", createForm);
-            showToast.success(res.data?.message || "Stock transfer created!");
+            const payload = {
+                transferType: createForm.transferType,
+                fromLocationId: createForm.fromLocationId ? Number(createForm.fromLocationId) : undefined,
+                toLocationId: createForm.toLocationId ? Number(createForm.toLocationId) : undefined,
+                fromName: createForm.fromName,
+                toName: createForm.toName,
+                rawMaterialId: createForm.rawMaterialId ? Number(createForm.rawMaterialId) : undefined,
+                itemName: createForm.itemName,
+                requestedQty: Number(createForm.requestedQty),
+                unit: createForm.unit,
+                reason: createForm.reason,
+                notes: createForm.notes,
+            };
+
+            await api.post("/owner/stock-transfers", payload);
+            showToast.success("Stock Transfer request initiated!");
             setIsCreateModalOpen(false);
             fetchData();
         } catch (err) {
-            showToast.error(err.response?.data?.error || "Failed to create stock transfer");
+            showToast.error(err.response?.data?.error || "Failed to create transfer request");
         } finally {
             setSubmitting(false);
         }
     };
 
-    // Open Action Modal (Approve / Dispatch / Receive / Reject)
-    const handleOpenActionModal = (trf, actionStatus) => {
+    // Open Action Modal (Approve / Dispatch / Receive)
+    const handleOpenActionModal = (trf, status) => {
         setSelectedTransfer(trf);
-        setTargetActionStatus(actionStatus);
+        setTargetActionStatus(status);
         setActionForm({
             dispatchedQty: trf.dispatchedQty || trf.requestedQty,
             receivedQty: trf.receivedQty || trf.dispatchedQty || trf.requestedQty,
-            discrepancyReason: "",
+            discrepancyReason: trf.discrepancyReason || "",
             notes: "",
         });
         setIsActionModalOpen(true);
     };
 
-    // Action Submit (Update Status)
-    const handleExecuteStatusUpdate = async (e) => {
+    // Submit Status Transition (Approve/Dispatch/Receive)
+    const handleSubmitAction = async (e) => {
         e.preventDefault();
         if (!selectedTransfer) return;
-
         setSubmitting(true);
+
         try {
             const payload = {
                 status: targetActionStatus,
-                dispatchedQty: actionForm.dispatchedQty,
-                receivedQty: actionForm.receivedQty,
+                dispatchedQty: Number(actionForm.dispatchedQty),
+                receivedQty: Number(actionForm.receivedQty),
                 discrepancyReason: actionForm.discrepancyReason,
                 notes: actionForm.notes,
             };
@@ -216,457 +206,377 @@ export default function OwnerSupplyChainTransfers() {
         switch (st) {
             case "REQUESTED":
                 return (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        <Clock className="w-3.5 h-3.5" /> Requested
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        <Clock size={12} /> Requested
                     </span>
                 );
             case "APPROVED":
                 return (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Approved
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                        <CheckCircle2 size={12} /> Approved
                     </span>
                 );
             case "DISPATCHED":
             case "IN_TRANSIT":
                 return (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                        <Truck className="w-3.5 h-3.5 animate-pulse" /> In Transit
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
+                        <Truck size={12} className="animate-pulse" /> In Transit
                     </span>
                 );
             case "RECEIVED":
             case "COMPLETED":
                 return (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        <PackageCheck className="w-3.5 h-3.5" /> Received
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <PackageCheck size={12} /> Received
                     </span>
                 );
             case "REJECTED":
                 return (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                        <XCircle className="w-3.5 h-3.5" /> Rejected
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                        <XCircle size={12} /> Rejected
                     </span>
                 );
             default:
-                return <span className="text-xs text-slate-400">{st}</span>;
+                return <span className="text-xs text-slate-500">{st}</span>;
         }
     };
 
     return (
-        <div className="p-6 max-w-[1600px] mx-auto space-y-6 text-slate-100 font-sans">
-            {/* TOP HEADER BAR */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 backdrop-blur-md p-5 rounded-2xl border border-slate-800/80 shadow-lg">
-                <div>
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-gradient-to-tr from-cyan-500/20 to-blue-500/20 text-cyan-400 rounded-xl border border-cyan-500/30">
-                            <ArrowLeftRight className="w-6 h-6" />
+        <section className="space-y-4 font-sans text-sm text-slate-900 pb-12">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80 print:hidden">
+                <div className="flex items-center gap-2">
+                    <OwnerMenuButton />
+                    <div>
+                        <div className="flex items-center gap-2 text-xs font-semibold text-orange-600 uppercase tracking-wider">
+                            <span>Supply Chain</span>
+                            <span>/</span>
+                            <span>Stock Transfers</span>
                         </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-white tracking-tight">Stock Transfers Workflow</h1>
-                            <p className="text-xs text-slate-400">
-                                Multi-stage inventory transfers: Warehouse → Kitchen, Warehouse → Branch, Location → Location
-                            </p>
-                        </div>
+                        <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                            <ArrowLeftRight className="text-orange-500" size={20} />
+                            Stock Transfers Workflow
+                        </h1>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     <button
                         onClick={() => fetchData(true)}
                         disabled={refreshing}
-                        className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700/60 disabled:opacity-50"
-                        title="Refresh Data"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-2xs transition disabled:opacity-50 cursor-pointer"
                     >
-                        <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                        <RefreshCw size={13} className={refreshing ? "animate-spin text-orange-500" : ""} />
+                        Refresh
                     </button>
 
-                    {isManagerOrOwner && (
-                        <button
-                            onClick={() => setIsCreateModalOpen(true)}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-slate-950 font-semibold text-sm shadow-md transition-all active:scale-95"
-                        >
-                            <Plus className="w-4 h-4 stroke-[3]" />
-                            <span>Request Stock Transfer</span>
-                        </button>
-                    )}
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs rounded-lg shadow-2xs transition cursor-pointer"
+                    >
+                        <Plus size={15} />
+                        Request Transfer
+                    </button>
                 </div>
             </div>
 
-            {/* TOP METRICS CARDS */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                {/* Total Transfers */}
-                <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 shadow-md">
-                    <div className="flex items-center justify-between text-slate-400 text-xs font-medium mb-2">
-                        <span>Total Transfers</span>
-                        <ArrowLeftRight className="w-4 h-4 text-slate-400" />
-                    </div>
-                    <div className="text-2xl font-bold text-white">{metrics.totalTransfers || 0}</div>
-                    <div className="text-[11px] text-slate-400 mt-1">All inter-location & branch requests</div>
-                </div>
+            <SupplyChainSubNav />
 
-                {/* Requested */}
-                <div className="p-5 rounded-2xl bg-slate-900/70 border border-amber-500/20 shadow-md">
-                    <div className="flex items-center justify-between text-amber-400 text-xs font-medium mb-2">
-                        <span>Requested</span>
-                        <Clock className="w-4 h-4 text-amber-400" />
-                    </div>
-                    <div className="text-2xl font-bold text-amber-300">{metrics.requestedCount || 0}</div>
-                    <div className="text-[11px] text-slate-400 mt-1">Awaiting manager approval</div>
+            {/* Compact Financial KPI Row */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pb-3 border-b border-slate-200/80 print:hidden">
+                <div>
+                    <span className="text-xs text-slate-500 font-medium">Total Requests</span>
+                    <div className="text-xl font-bold text-slate-900 mt-0.5">{metrics.totalTransfers || 0}</div>
                 </div>
-
-                {/* Approved */}
-                <div className="p-5 rounded-2xl bg-slate-900/70 border border-blue-500/20 shadow-md">
-                    <div className="flex items-center justify-between text-blue-400 text-xs font-medium mb-2">
-                        <span>Approved</span>
-                        <CheckCircle2 className="w-4 h-4 text-blue-400" />
-                    </div>
-                    <div className="text-2xl font-bold text-blue-300">{metrics.approvedCount || 0}</div>
-                    <div className="text-[11px] text-slate-400 mt-1">Ready for warehouse dispatch</div>
+                <div>
+                    <span className="text-xs text-amber-600 font-medium">Pending Approval</span>
+                    <div className="text-xl font-bold text-amber-600 mt-0.5">{metrics.requestedCount || 0}</div>
                 </div>
-
-                {/* In Transit */}
-                <div className="p-5 rounded-2xl bg-slate-900/70 border border-cyan-500/20 shadow-md">
-                    <div className="flex items-center justify-between text-cyan-400 text-xs font-medium mb-2">
-                        <span>In Transit</span>
-                        <Truck className="w-4 h-4 text-cyan-400 animate-pulse" />
-                    </div>
-                    <div className="text-2xl font-bold text-cyan-300">
+                <div>
+                    <span className="text-xs text-cyan-600 font-medium">In Transit</span>
+                    <div className="text-xl font-bold text-cyan-600 mt-0.5">
                         {(metrics.dispatchedCount || 0) + (metrics.inTransitCount || 0)}
                     </div>
-                    <div className="text-[11px] text-slate-400 mt-1">Source stock decremented</div>
                 </div>
-
-                {/* Received / Completed */}
-                <div className="p-5 rounded-2xl bg-slate-900/70 border border-emerald-500/20 shadow-md">
-                    <div className="flex items-center justify-between text-emerald-400 text-xs font-medium mb-2">
-                        <span>Received / Completed</span>
-                        <PackageCheck className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <div className="text-2xl font-bold text-emerald-300">
+                <div>
+                    <span className="text-xs text-emerald-600 font-medium">Received / Completed</span>
+                    <div className="text-xl font-bold text-emerald-600 mt-0.5">
                         {(metrics.receivedCount || 0) + (metrics.completedCount || 0)}
                     </div>
-                    <div className="text-[11px] text-slate-400 mt-1">Destination stock incremented</div>
+                </div>
+                <div>
+                    <span className="text-xs text-rose-600 font-medium">Rejected</span>
+                    <div className="text-xl font-bold text-rose-600 mt-0.5">{metrics.rejectedCount || 0}</div>
                 </div>
             </div>
 
-            {/* SEARCH AND FILTER BAR */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-slate-900/40 p-4 rounded-xl border border-slate-800">
-                <div className="relative flex-1">
-                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            {/* Status Tabs Bar */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none border-b border-slate-200/80 print:hidden">
+                {["ALL", "REQUESTED", "APPROVED", "DISPATCHED", "RECEIVED", "REJECTED"].map((st) => (
+                    <button
+                        key={st}
+                        onClick={() => setStatusFilter(st)}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+                            statusFilter === st
+                                ? "bg-orange-500 text-white shadow-2xs"
+                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                        }`}
+                    >
+                        {st === "ALL" ? "All Statuses" : st}
+                    </button>
+                ))}
+            </div>
+
+            {/* Search & Filter Controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 print:hidden">
+                <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                     <input
                         type="text"
-                        placeholder="Search Transfer ID, Item Name, Source, Destination..."
+                        placeholder="Search Code, Item Name, Source or Destination..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-slate-800/80 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                        className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition"
                     />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                    {/* Status Filter */}
-                    <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/60 rounded-xl p-1 text-xs font-medium">
-                        {["ALL", "REQUESTED", "APPROVED", "DISPATCHED", "RECEIVED", "COMPLETED"].map((st) => (
-                            <button
-                                key={st}
-                                onClick={() => setStatusFilter(st)}
-                                className={`px-2.5 py-1.5 rounded-lg transition-all ${
-                                    statusFilter === st
-                                        ? "bg-cyan-500 text-slate-950 font-bold shadow-sm"
-                                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
-                                }`}
-                            >
-                                {st === "ALL" ? "All Statuses" : st}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Type Filter */}
-                    <select
-                        value={typeFilter}
-                        onChange={(e) => setTypeFilter(e.target.value)}
-                        className="px-3 py-2 bg-slate-800/80 border border-slate-700/60 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-                    >
-                        <option value="ALL">All Directions</option>
-                        <option value="LOCATION_TO_LOCATION">Storage → Storage</option>
-                        <option value="WAREHOUSE_TO_KITCHEN">Warehouse → Kitchen</option>
-                        <option value="WAREHOUSE_TO_BRANCH">Warehouse → Branch</option>
-                    </select>
                 </div>
             </div>
 
-            {/* MAIN TRANSFERS TABLE */}
-            <div className="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800/80 shadow-xl overflow-hidden">
+            {/* Transfers Table */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden print:hidden">
+                <div className="px-4 py-3 border-b border-slate-200/80 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">Inter-Location Transfer Records</h3>
+                    </div>
+                    <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {filteredTransfers.length} Transfers
+                    </span>
+                </div>
+
                 {loading ? (
-                    <div className="p-12 text-center text-slate-400 flex flex-col items-center gap-3">
-                        <RefreshCw className="w-8 h-8 animate-spin text-cyan-500" />
-                        <p className="text-sm">Loading stock transfers workflow data...</p>
+                    <div className="p-10 text-center">
+                        <RefreshCw size={24} className="animate-spin text-orange-500 mx-auto mb-2" />
+                        <p className="text-slate-500 text-xs">Loading transfer records...</p>
                     </div>
                 ) : filteredTransfers.length === 0 ? (
-                    <div className="p-12 text-center text-slate-400">
-                        <ArrowLeftRight className="w-12 h-12 stroke-[1.5] text-slate-600 mx-auto mb-3" />
-                        <h3 className="text-base font-semibold text-slate-200">No Stock Transfers Found</h3>
-                        <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                            {searchQuery || statusFilter !== "ALL" || typeFilter !== "ALL"
-                                ? "No transfers match your search or filters. Try adjusting your search query."
-                                : "Create your first Stock Transfer request to move items across warehouses, kitchens, and branches."}
-                        </p>
+                    <div className="p-10 text-center text-slate-500">
+                        <ArrowLeftRight size={32} className="text-slate-300 mx-auto mb-2" />
+                        <h3 className="text-sm font-bold text-slate-800">No transfer records found</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">Click "Request Transfer" to initiate a stock movement.</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                        <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                                <tr className="border-b border-slate-800 bg-slate-950/40 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                                    <th className="py-4 px-5">Transfer ID</th>
-                                    <th className="py-4 px-5">From (Source)</th>
-                                    <th className="py-4 px-5">To (Destination)</th>
-                                    <th className="py-4 px-5">Item</th>
-                                    <th className="py-4 px-5 text-right">Qty (Req / Disp / Rec)</th>
-                                    <th className="py-4 px-5">Requested By</th>
-                                    <th className="py-4 px-5">Date</th>
-                                    <th className="py-4 px-5">Status</th>
-                                    <th className="py-4 px-5 text-center">Actions</th>
+                                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] uppercase font-bold text-slate-500 tracking-wider">
+                                    <th className="py-2.5 px-3.5">Transfer Code</th>
+                                    <th className="py-2.5 px-3.5">Raw Material Item</th>
+                                    <th className="py-2.5 px-3.5">Source → Destination</th>
+                                    <th className="py-2.5 px-3.5 text-center">Req / Disp / Rec Qty</th>
+                                    <th className="py-2.5 px-3.5">Status</th>
+                                    <th className="py-2.5 px-3.5">Reason</th>
+                                    <th className="py-2.5 px-3.5 text-right">Workflow Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-800/60 text-sm">
-                                {filteredTransfers.map((trf) => {
-                                    const fromLocName = trf.fromLocation?.name || trf.fromName || "Main Warehouse";
-                                    const toLocName = trf.toLocation?.name || trf.toName || "Kitchen / Branch";
-
-                                    return (
-                                        <tr key={trf.id} className="hover:bg-slate-800/30 transition-colors">
-                                            {/* Transfer ID */}
-                                            <td className="py-4 px-5 font-mono font-semibold text-cyan-400">
-                                                {trf.transferCode}
-                                            </td>
-
-                                            {/* From */}
-                                            <td className="py-4 px-5 text-xs text-slate-200 font-medium">
-                                                <div className="flex items-center gap-1.5">
-                                                    <Warehouse className="w-3.5 h-3.5 text-slate-400" />
-                                                    <span>{fromLocName}</span>
-                                                </div>
-                                            </td>
-
-                                            {/* To */}
-                                            <td className="py-4 px-5 text-xs text-slate-200 font-medium">
-                                                <div className="flex items-center gap-1.5">
-                                                    <Utensils className="w-3.5 h-3.5 text-slate-400" />
-                                                    <span>{toLocName}</span>
-                                                </div>
-                                            </td>
-
-                                            {/* Item */}
-                                            <td className="py-4 px-5 font-medium text-white">
-                                                {trf.itemName}
-                                            </td>
-
-                                            {/* Quantity Breakdown */}
-                                            <td className="py-4 px-5 text-right font-mono text-xs">
-                                                <span className="text-slate-300 font-semibold">{trf.requestedQty}</span> /{" "}
-                                                <span className="text-cyan-400">{trf.dispatchedQty}</span> /{" "}
-                                                <span className="text-emerald-400 font-bold">{trf.receivedQty}</span>{" "}
-                                                <span className="text-slate-500">{trf.unit}</span>
-                                            </td>
-
-                                            {/* Requested By */}
-                                            <td className="py-4 px-5 text-xs text-slate-400">
-                                                {trf.requestedBy?.name || "Staff"}
-                                            </td>
-
-                                            {/* Date */}
-                                            <td className="py-4 px-5 text-xs text-slate-400">
-                                                {new Date(trf.createdAt).toLocaleDateString("en-IN", {
-                                                    day: "2-digit",
-                                                    month: "short",
-                                                    year: "numeric",
-                                                })}
-                                            </td>
-
-                                            {/* Status */}
-                                            <td className="py-4 px-5">{getStatusBadge(trf.status)}</td>
-
-                                            {/* Actions */}
-                                            <td className="py-4 px-5 text-center">
-                                                <div className="flex items-center justify-center gap-1.5">
+                            <tbody className="divide-y divide-slate-100">
+                                {filteredTransfers.map((trf) => (
+                                    <tr key={trf.id} className="hover:bg-slate-50/70 transition">
+                                        <td className="py-2.5 px-3.5 font-mono font-extrabold text-slate-900 text-xs">
+                                            {trf.transferCode}
+                                            <span className="text-[10px] text-slate-400 block font-sans font-medium">
+                                                {new Date(trf.createdAt).toLocaleDateString("en-IN")}
+                                            </span>
+                                        </td>
+                                        <td className="py-2.5 px-3.5 font-bold text-slate-900">{trf.itemName}</td>
+                                        <td className="py-2.5 px-3.5">
+                                            <div className="flex items-center gap-1.5 text-xs text-slate-700">
+                                                <span className="font-semibold text-slate-900">{trf.fromName}</span>
+                                                <ArrowRight size={12} className="text-orange-500 shrink-0" />
+                                                <span className="font-semibold text-slate-900">{trf.toName}</span>
+                                            </div>
+                                        </td>
+                                        <td className="py-2.5 px-3.5 text-center font-bold text-slate-900 font-mono">
+                                            {trf.requestedQty} / {trf.dispatchedQty || "-"} / {trf.receivedQty || "-"} {trf.unit}
+                                        </td>
+                                        <td className="py-2.5 px-3.5">{getStatusBadge(trf.status)}</td>
+                                        <td className="py-2.5 px-3.5 text-slate-600">{trf.reason || "—"}</td>
+                                        <td className="py-2.5 px-3.5 text-right space-x-1.5">
+                                            {trf.status === "REQUESTED" && isManagerOrOwner && (
+                                                <>
                                                     <button
-                                                        onClick={() => {
-                                                            setSelectedTransfer(trf);
-                                                            setIsDetailModalOpen(true);
-                                                        }}
-                                                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60"
-                                                        title="View Transfer Details"
+                                                        onClick={() => handleOpenActionModal(trf, "APPROVED")}
+                                                        className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition shadow-2xs cursor-pointer"
                                                     >
-                                                        <Eye className="w-4 h-4" />
+                                                        Approve
                                                     </button>
+                                                    <button
+                                                        onClick={() => handleOpenActionModal(trf, "REJECTED")}
+                                                        className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[11px] font-bold transition shadow-2xs cursor-pointer"
+                                                    >
+                                                        Reject
+                                                    </button>
+                                                </>
+                                            )}
 
-                                                    {/* Workflow Action Buttons */}
-                                                    {isManagerOrOwner && trf.status === "REQUESTED" && (
-                                                        <button
-                                                            onClick={() => handleOpenActionModal(trf, "APPROVED")}
-                                                            className="px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-xs font-semibold"
-                                                        >
-                                                            Approve
-                                                        </button>
-                                                    )}
+                                            {trf.status === "APPROVED" && (
+                                                <button
+                                                    onClick={() => handleOpenActionModal(trf, "DISPATCHED")}
+                                                    className="px-2 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-[11px] font-bold transition shadow-2xs cursor-pointer"
+                                                >
+                                                    Dispatch Stock
+                                                </button>
+                                            )}
 
-                                                    {isManagerOrOwner && (trf.status === "APPROVED" || trf.status === "REQUESTED") && (
-                                                        <button
-                                                            onClick={() => handleOpenActionModal(trf, "DISPATCHED")}
-                                                            className="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 text-xs font-semibold"
-                                                        >
-                                                            Dispatch
-                                                        </button>
-                                                    )}
+                                            {(trf.status === "DISPATCHED" || trf.status === "IN_TRANSIT") && (
+                                                <button
+                                                    onClick={() => handleOpenActionModal(trf, "RECEIVED")}
+                                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold transition shadow-2xs cursor-pointer"
+                                                >
+                                                    Confirm Receive
+                                                </button>
+                                            )}
 
-                                                    {isManagerOrOwner && (trf.status === "DISPATCHED" || trf.status === "IN_TRANSIT") && (
-                                                        <button
-                                                            onClick={() => handleOpenActionModal(trf, "RECEIVED")}
-                                                            className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold"
-                                                        >
-                                                            Receive
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedTransfer(trf);
+                                                    setIsDetailModalOpen(true);
+                                                }}
+                                                className="px-2 py-1 border border-slate-200 hover:bg-slate-100 text-slate-700 rounded text-[11px] font-semibold transition cursor-pointer"
+                                            >
+                                                Details
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                     </div>
                 )}
             </div>
 
-            {/* CREATE TRANSFER REQUEST MODAL */}
+            {/* CREATE TRANSFER MODAL */}
             {isCreateModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-6">
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg p-5 shadow-xl">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                             <div className="flex items-center gap-2">
-                                <ArrowLeftRight className="w-5 h-5 text-cyan-400" />
-                                <h2 className="text-lg font-bold text-white">Create Stock Transfer Request</h2>
+                                <div className="p-2 bg-orange-50 text-orange-500 rounded-xl border border-orange-100">
+                                    <ArrowLeftRight size={18} />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-bold text-slate-900">Request Stock Transfer</h2>
+                                    <p className="text-xs text-slate-500">Move raw materials between locations</p>
+                                </div>
                             </div>
                             <button
                                 onClick={() => setIsCreateModalOpen(false)}
-                                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition cursor-pointer"
                             >
-                                <X className="w-5 h-5" />
+                                <X size={18} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleCreateTransfer} className="space-y-4 text-xs">
+                        <form onSubmit={handleCreateTransfer} className="mt-4 space-y-3 text-xs">
                             <div>
-                                <label className="block font-medium text-slate-400 mb-1">Transfer Direction / Type</label>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">Transfer Type *</label>
                                 <select
                                     value={createForm.transferType}
                                     onChange={(e) => setCreateForm({ ...createForm, transferType: e.target.value })}
-                                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-100 focus:border-cyan-500 focus:outline-none"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
                                 >
-                                    <option value="LOCATION_TO_LOCATION">Storage Location → Storage Location</option>
                                     <option value="WAREHOUSE_TO_KITCHEN">Warehouse → Central Kitchen</option>
-                                    <option value="WAREHOUSE_TO_BRANCH">Warehouse → Restaurant Branch</option>
+                                    <option value="WAREHOUSE_TO_BRANCH">Warehouse → Branch Store</option>
+                                    <option value="LOCATION_TO_LOCATION">Location → Location</option>
                                 </select>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block font-medium text-slate-400 mb-1">Source Location (From)</label>
-                                    <select
-                                        value={createForm.fromLocationId}
-                                        onChange={(e) => setCreateForm({ ...createForm, fromLocationId: e.target.value })}
-                                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-100 focus:border-cyan-500 focus:outline-none"
-                                    >
-                                        <option value="">Select Source Location</option>
-                                        {locations.map((l) => (
-                                            <option key={l.id} value={l.id}>
-                                                {l.name} ({l.code})
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <label className="text-xs font-bold text-slate-700 block mb-1">Source Location *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={createForm.fromName}
+                                        onChange={(e) => setCreateForm({ ...createForm, fromName: e.target.value })}
+                                        placeholder="e.g. Main Store Warehouse"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                    />
                                 </div>
-
                                 <div>
-                                    <label className="block font-medium text-slate-400 mb-1">Destination (To)</label>
-                                    <select
-                                        value={createForm.toLocationId}
-                                        onChange={(e) => setCreateForm({ ...createForm, toLocationId: e.target.value })}
-                                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-100 focus:border-cyan-500 focus:outline-none"
-                                    >
-                                        <option value="">Select Destination</option>
-                                        {locations.map((l) => (
-                                            <option key={l.id} value={l.id}>
-                                                {l.name} ({l.code})
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <label className="text-xs font-bold text-slate-700 block mb-1">Destination Location *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={createForm.toName}
+                                        onChange={(e) => setCreateForm({ ...createForm, toName: e.target.value })}
+                                        placeholder="e.g. Central Kitchen"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                    />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block font-medium text-slate-400 mb-1">Select Raw Material / Item *</label>
-                                <select
-                                    value={createForm.rawMaterialId}
-                                    onChange={(e) => handleItemSelect(e.target.value)}
+                                <label className="text-xs font-bold text-slate-700 block mb-1">Item Name *</label>
+                                <input
+                                    type="text"
                                     required
-                                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-100 focus:border-cyan-500 focus:outline-none"
-                                >
-                                    <option value="">Select Item from Inventory</option>
-                                    {rawMaterials.map((m) => (
-                                        <option key={m.id} value={m.id}>
-                                            {m.name} (Stock: {m.currentStock || 0} {m.displayUnit || m.baseUnit})
-                                        </option>
-                                    ))}
-                                </select>
+                                    value={createForm.itemName}
+                                    onChange={(e) => setCreateForm({ ...createForm, itemName: e.target.value })}
+                                    placeholder="e.g. Tomatoes, Cooking Oil, Paneer"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block font-medium text-slate-400 mb-1">Requested Quantity *</label>
+                                    <label className="text-xs font-bold text-slate-700 block mb-1">Quantity Requested *</label>
                                     <input
                                         type="number"
-                                        step="0.01"
+                                        step="any"
+                                        min="0.01"
+                                        required
                                         value={createForm.requestedQty}
                                         onChange={(e) => setCreateForm({ ...createForm, requestedQty: e.target.value })}
-                                        required
-                                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm font-bold text-white focus:border-cyan-500 focus:outline-none"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:ring-1 focus:ring-orange-500"
                                     />
                                 </div>
-
                                 <div>
-                                    <label className="block font-medium text-slate-400 mb-1">Unit</label>
+                                    <label className="text-xs font-bold text-slate-700 block mb-1">Unit</label>
                                     <input
                                         type="text"
                                         value={createForm.unit}
                                         onChange={(e) => setCreateForm({ ...createForm, unit: e.target.value })}
-                                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-100 focus:border-cyan-500 focus:outline-none"
+                                        placeholder="kg, L, pcs"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-500"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block font-medium text-slate-400 mb-1">Transfer Reason / Purpose</label>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">Reason for Transfer</label>
                                 <input
                                     type="text"
-                                    placeholder="e.g. Daily kitchen prep replenishment"
                                     value={createForm.reason}
                                     onChange={(e) => setCreateForm({ ...createForm, reason: e.target.value })}
-                                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-100 focus:border-cyan-500 focus:outline-none"
+                                    placeholder="e.g. Stock Rebalancing, Low Stock Prep"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-500"
                                 />
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                            <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
                                 <button
                                     type="button"
                                     onClick={() => setIsCreateModalOpen(false)}
-                                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+                                    className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-slate-950 font-bold shadow-md disabled:opacity-50"
+                                    className="inline-flex items-center gap-1.5 px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs transition shadow-2xs cursor-pointer"
                                 >
-                                    {submitting ? "Submitting..." : "Submit Request"}
+                                    <Plus size={14} />
+                                    {submitting ? "Initiating..." : "Submit Request"}
                                 </button>
                             </div>
                         </form>
@@ -674,250 +584,86 @@ export default function OwnerSupplyChainTransfers() {
                 </div>
             )}
 
-            {/* WORKFLOW ACTION MODAL (APPROVE / DISPATCH / RECEIVE) */}
+            {/* ACTION MODAL (APPROVE / DISPATCH / RECEIVE) */}
             {isActionModalOpen && selectedTransfer && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-6">
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white border border-slate-200 w-full max-w-md rounded-2xl p-5 shadow-xl">
+                        <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
                             <div>
-                                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <span>Action: {targetActionStatus}</span>
+                                <h2 className="text-base font-bold text-slate-900">
+                                    Update Transfer Status: {targetActionStatus}
                                 </h2>
-                                <p className="text-xs text-slate-400 font-mono mt-0.5">{selectedTransfer.transferCode}</p>
+                                <p className="text-xs text-slate-500">Transfer Ref: {selectedTransfer.transferCode}</p>
                             </div>
                             <button
                                 onClick={() => setIsActionModalOpen(false)}
-                                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition cursor-pointer"
                             >
-                                <X className="w-5 h-5" />
+                                <X size={18} />
                             </button>
                         </div>
 
-                        {/* Summary Banner */}
-                        <div className="bg-slate-950/80 p-4 rounded-xl border border-slate-800 space-y-1 text-xs">
-                            <div className="flex justify-between">
-                                <span className="text-slate-400">Item:</span>
-                                <span className="font-semibold text-white">{selectedTransfer.itemName}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-slate-400">Requested Qty:</span>
-                                <span className="font-bold text-amber-300">
-                                    {selectedTransfer.requestedQty} {selectedTransfer.unit}
-                                </span>
-                            </div>
-                        </div>
-
-                        <form onSubmit={handleExecuteStatusUpdate} className="space-y-4 text-xs">
+                        <form onSubmit={handleSubmitAction} className="mt-4 space-y-3 text-xs">
                             {targetActionStatus === "DISPATCHED" && (
                                 <div>
-                                    <label className="block font-medium text-slate-400 mb-1">
-                                        Dispatched Quantity (Source stock will be decremented) *
-                                    </label>
+                                    <label className="text-xs font-bold text-slate-700 block mb-1">Dispatched Quantity</label>
                                     <input
                                         type="number"
-                                        step="0.01"
+                                        step="any"
+                                        required
                                         value={actionForm.dispatchedQty}
                                         onChange={(e) => setActionForm({ ...actionForm, dispatchedQty: e.target.value })}
-                                        required
-                                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm font-bold text-cyan-400 focus:border-cyan-500 focus:outline-none"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:ring-1 focus:ring-orange-500"
                                     />
                                 </div>
                             )}
 
                             {targetActionStatus === "RECEIVED" && (
-                                <>
-                                    <div>
-                                        <label className="block font-medium text-slate-400 mb-1">
-                                            Received Quantity (Destination stock will be incremented) *
-                                        </label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={actionForm.receivedQty}
-                                            onChange={(e) => setActionForm({ ...actionForm, receivedQty: e.target.value })}
-                                            required
-                                            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm font-bold text-emerald-400 focus:border-emerald-500 focus:outline-none"
-                                        />
-                                    </div>
-
-                                    {Number(actionForm.dispatchedQty) !== Number(actionForm.receivedQty) && (
-                                        <div>
-                                            <label className="block font-medium text-rose-400 mb-1">
-                                                Discrepancy / Variance Reason
-                                            </label>
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. 1 kg spilled / damaged during transit"
-                                                value={actionForm.discrepancyReason}
-                                                onChange={(e) => setActionForm({ ...actionForm, discrepancyReason: e.target.value })}
-                                                className="w-full px-3 py-2 bg-slate-800 border border-rose-500/50 rounded-xl text-xs text-slate-100 focus:outline-none"
-                                            />
-                                        </div>
-                                    )}
-                                </>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 block mb-1">Actual Received Quantity</label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        required
+                                        value={actionForm.receivedQty}
+                                        onChange={(e) => setActionForm({ ...actionForm, receivedQty: e.target.value })}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                    />
+                                </div>
                             )}
 
                             <div>
-                                <label className="block font-medium text-slate-400 mb-1">Notes / Remarks</label>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">Notes / Discrepancy Comments</label>
                                 <textarea
                                     rows={2}
-                                    placeholder="Add optional workflow comments..."
+                                    placeholder="Add any logistics or receipt comments..."
                                     value={actionForm.notes}
                                     onChange={(e) => setActionForm({ ...actionForm, notes: e.target.value })}
-                                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-500"
                                 />
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                            <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
                                 <button
                                     type="button"
                                     onClick={() => setIsActionModalOpen(false)}
-                                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+                                    className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-slate-950 font-bold shadow-md disabled:opacity-50"
+                                    className="inline-flex items-center gap-1.5 px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs transition shadow-2xs cursor-pointer"
                                 >
-                                    {submitting ? "Executing..." : `Confirm ${targetActionStatus}`}
+                                    <Check size={14} />
+                                    {submitting ? "Processing..." : `Confirm ${targetActionStatus}`}
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
-
-            {/* TRANSFER DETAIL VIEW MODAL */}
-            {isDetailModalOpen && selectedTransfer && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6">
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                            <div>
-                                <div className="flex items-center gap-3">
-                                    <h2 className="text-xl font-bold font-mono text-cyan-400">{selectedTransfer.transferCode}</h2>
-                                    {getStatusBadge(selectedTransfer.status)}
-                                </div>
-                                <p className="text-xs text-slate-400 mt-1">
-                                    Transfer Type: <span className="text-slate-200">{selectedTransfer.transferType?.replace("_", " ")}</span>
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => setIsDetailModalOpen(false)}
-                                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        {/* Source & Destination */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-1 text-xs">
-                                <div className="text-slate-400 font-medium mb-1 flex items-center gap-1.5">
-                                    <Warehouse className="w-4 h-4 text-cyan-400" />
-                                    <span>Source (From)</span>
-                                </div>
-                                <div className="text-sm font-bold text-white">
-                                    {selectedTransfer.fromLocation?.name || selectedTransfer.fromName || "Main Warehouse"}
-                                </div>
-                            </div>
-
-                            <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-1 text-xs">
-                                <div className="text-slate-400 font-medium mb-1 flex items-center gap-1.5">
-                                    <Utensils className="w-4 h-4 text-emerald-400" />
-                                    <span>Destination (To)</span>
-                                </div>
-                                <div className="text-sm font-bold text-white">
-                                    {selectedTransfer.toLocation?.name || selectedTransfer.toName || "Central Kitchen"}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Quantity Breakdown Grid */}
-                        <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800 space-y-3">
-                            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                                Quantity Breakdown & Variance
-                            </h3>
-                            <div className="grid grid-cols-4 gap-4 text-center">
-                                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-                                    <div className="text-[11px] text-slate-400">Requested</div>
-                                    <div className="text-lg font-bold text-amber-300">
-                                        {selectedTransfer.requestedQty} {selectedTransfer.unit}
-                                    </div>
-                                </div>
-
-                                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-                                    <div className="text-[11px] text-slate-400">Dispatched</div>
-                                    <div className="text-lg font-bold text-cyan-300">
-                                        {selectedTransfer.dispatchedQty} {selectedTransfer.unit}
-                                    </div>
-                                </div>
-
-                                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-                                    <div className="text-[11px] text-slate-400">Received</div>
-                                    <div className="text-lg font-bold text-emerald-300">
-                                        {selectedTransfer.receivedQty} {selectedTransfer.unit}
-                                    </div>
-                                </div>
-
-                                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-                                    <div className="text-[11px] text-slate-400">Difference</div>
-                                    <div className={`text-lg font-bold ${selectedTransfer.differenceQty > 0 ? "text-rose-400" : "text-slate-400"}`}>
-                                        {selectedTransfer.differenceQty} {selectedTransfer.unit}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Discrepancy & Notes */}
-                        {selectedTransfer.discrepancyReason && (
-                            <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-300 space-y-1">
-                                <div className="font-bold flex items-center gap-1.5">
-                                    <AlertTriangle className="w-4 h-4 text-rose-400" /> Discrepancy Remarks
-                                </div>
-                                <p>{selectedTransfer.discrepancyReason}</p>
-                            </div>
-                        )}
-
-                        {/* Audit Log */}
-                        <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
-                            <div className="text-slate-400 font-semibold mb-2">Workflow Timeline & Audit</div>
-                            <div className="flex justify-between border-b border-slate-800/60 pb-1.5">
-                                <span className="text-slate-400">Requested By:</span>
-                                <span className="text-slate-200">
-                                    {selectedTransfer.requestedBy?.name || "Staff"} on{" "}
-                                    {new Date(selectedTransfer.createdAt).toLocaleString("en-IN")}
-                                </span>
-                            </div>
-                            {selectedTransfer.approvedBy && (
-                                <div className="flex justify-between border-b border-slate-800/60 pb-1.5">
-                                    <span className="text-slate-400">Approved By:</span>
-                                    <span className="text-slate-200">{selectedTransfer.approvedBy.name}</span>
-                                </div>
-                            )}
-                            {selectedTransfer.dispatchedBy && (
-                                <div className="flex justify-between border-b border-slate-800/60 pb-1.5">
-                                    <span className="text-slate-400">Dispatched By:</span>
-                                    <span className="text-slate-200">
-                                        {selectedTransfer.dispatchedBy.name}
-                                        {selectedTransfer.dispatchedAt && ` (${new Date(selectedTransfer.dispatchedAt).toLocaleString("en-IN")})`}
-                                    </span>
-                                </div>
-                            )}
-                            {selectedTransfer.receivedBy && (
-                                <div className="flex justify-between">
-                                    <span className="text-slate-400">Received By:</span>
-                                    <span className="text-slate-200">
-                                        {selectedTransfer.receivedBy.name}
-                                        {selectedTransfer.receivedAt && ` (${new Date(selectedTransfer.receivedAt).toLocaleString("en-IN")})`}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
+        </section>
     );
 }

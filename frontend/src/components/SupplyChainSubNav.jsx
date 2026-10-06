@@ -14,7 +14,8 @@ import {
     Handshake,
     CreditCard,
     BarChart3,
-    Activity
+    Activity,
+    Settings
 } from "lucide-react";
 
 export const SUPPLY_CHAIN_NAV_ITEMS = [
@@ -32,7 +33,8 @@ export const SUPPLY_CHAIN_NAV_ITEMS = [
     { id: "marketplace", label: "Marketplace", path: "/owner/supply-chain/marketplace", icon: Store },
     { id: "negotiations", label: "Negotiations", path: "/owner/supply-chain/negotiations", icon: Handshake },
     { id: "payments", label: "Payments", path: "/owner/supply-chain/payments", icon: CreditCard },
-    { id: "reports", label: "Reports & Intel", path: "/owner/supply-chain/reports", icon: BarChart3 }
+    { id: "reports", label: "Reports & Intel", path: "/owner/supply-chain/reports", icon: BarChart3 },
+    { id: "settings", label: "Settings", path: "/owner/supply-chain/settings", icon: Settings }
 ];
 
 export default function SupplyChainSubNav() {
@@ -40,9 +42,9 @@ export default function SupplyChainSubNav() {
     const location = useLocation();
 
     return (
-        <div className="w-full bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 sticky top-0 z-30 mb-6 shadow-sm">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                <nav className="flex items-center gap-1 overflow-x-auto py-2.5 scrollbar-none">
+        <div className="w-full bg-[color:var(--app-card-bg,#ffffff)] border-b border-[color:var(--app-border,#e2e8f0)]/80 sticky top-0 z-30 mb-5 shadow-xs">
+            <div className="max-w-7xl mx-auto px-2 sm:px-4">
+                <nav className="flex items-center gap-1 overflow-x-auto py-2 scrollbar-none">
                     {SUPPLY_CHAIN_NAV_ITEMS.map((item) => {
                         const Icon = item.icon;
                         const isActive =
@@ -54,13 +56,13 @@ export default function SupplyChainSubNav() {
                             <button
                                 key={item.id}
                                 onClick={() => navigate(item.path)}
-                                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                                     isActive
-                                        ? "bg-orange-500 text-slate-950 font-bold shadow-md shadow-orange-500/20"
-                                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                                        ? "bg-orange-500 text-white font-bold shadow-xs"
+                                        : "text-[color:var(--app-text-muted,#64748b)] hover:text-[color:var(--app-text,#1e293b)] hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                 }`}
                             >
-                                <Icon size={15} className={isActive ? "text-slate-950 stroke-[2.5]" : "text-slate-400"} />
+                                <Icon size={14} className={isActive ? "text-white" : "text-slate-400"} />
                                 <span>{item.label}</span>
                             </button>
                         );

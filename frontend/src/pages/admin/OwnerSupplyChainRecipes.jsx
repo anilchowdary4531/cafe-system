@@ -7,24 +7,19 @@ import {
     ChefHat,
     DollarSign,
     TrendingUp,
-    TrendingDown,
     PieChart,
     AlertCircle,
-    CheckCircle2,
     RefreshCw,
     X,
     Edit3,
     Trash2,
     Layers,
-    Scale,
-    Percent,
-    ArrowUpRight,
-    Info,
-    Sparkles,
     Save,
 } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
+import OwnerMenuButton from "../../components/OwnerMenuButton";
+import SupplyChainSubNav from "../../components/SupplyChainSubNav";
 
 export default function OwnerSupplyChainRecipes() {
     const [recipes, setRecipes] = useState([]);
@@ -176,7 +171,6 @@ export default function OwnerSupplyChainRecipes() {
                 const yieldFactor = Number(row.yieldPercent) > 0 ? Number(row.yieldPercent) / 100 : 1;
                 const prepLossFactor = 1 + (Number(row.prepLossPercent || 0) / 100) + (Number(row.wastagePercent || 0) / 100);
                 
-                // Note: assuming row.quantity is in base unit or standard display unit
                 const grossBaseQty = (qty * prepLossFactor) / yieldFactor;
                 const ingCost = grossBaseQty * (rm.costPerBaseUnit || 0);
                 totalCost += ingCost;
@@ -235,48 +229,59 @@ export default function OwnerSupplyChainRecipes() {
     };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6 text-slate-100">
+        <section className="space-y-4 font-sans text-sm text-[color:var(--app-text,#1e293b)] pb-12">
             {/* Header Section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-xl">
-                <div>
-                    <div className="flex items-center gap-3">
-                        <div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
-                            <ChefHat className="w-6 h-6" />
+            <header className="pb-3 border-b border-[color:var(--app-border,#e2e8f0)]/80">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <div className="flex items-center gap-3">
+                            <OwnerMenuButton />
+                            <div className="flex items-center gap-2">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-500 text-white shadow-xs">
+                                    <ChefHat size={16} />
+                                </div>
+                                <h2 className="text-xl font-bold tracking-tight text-[color:var(--app-text,#1e293b)] sm:text-2xl">
+                                    Recipes & Ingredient Mapping
+                                </h2>
+                                <span className="inline-flex items-center rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-semibold text-orange-600">
+                                    BILL OF MATERIALS
+                                </span>
+                            </div>
                         </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-white tracking-tight">Recipes & Ingredient Mapping</h1>
-                            <p className="text-sm text-slate-400">
-                                Link Tiffzy menu items with raw material inventory to track food cost % and gross margins.
-                            </p>
-                        </div>
+                        <p className="text-xs text-[color:var(--app-text-muted,#64748b)] mt-1">
+                            Link Tiffzy menu items with raw material inventory to track food cost % and gross margins.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={fetchRecipes}
+                            disabled={refreshing}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+                        >
+                            <RefreshCw size={13} className={refreshing ? "animate-spin text-orange-500" : ""} />
+                            Refresh
+                        </button>
                     </div>
                 </div>
+            </header>
 
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={fetchRecipes}
-                        disabled={refreshing}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition font-medium text-sm"
-                    >
-                        <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-                        Refresh
-                    </button>
-                </div>
-            </div>
+            {/* HORIZONTAL SUB-NAVIGATION BAR */}
+            <SupplyChainSubNav />
 
             {/* Metrics Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 backdrop-blur-xl">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider">Recipe Coverage</span>
-                        <Utensils className="w-4 h-4 text-amber-400" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">
+                        <span>Recipe Coverage</span>
+                        <Utensils className="w-4 h-4 text-orange-500" />
                     </div>
-                    <div className="text-2xl font-bold text-white">
-                        {summary.configuredRecipes} <span className="text-sm text-slate-400 font-normal">/ {summary.totalMenuItems} Menu Items</span>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                        {summary.configuredRecipes} <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">/ {summary.totalMenuItems} Menu Items</span>
                     </div>
-                    <div className="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
                         <div
-                            className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                            className="bg-orange-500 h-full rounded-full transition-all duration-500"
                             style={{
                                 width: `${summary.totalMenuItems > 0 ? (summary.configuredRecipes / summary.totalMenuItems) * 100 : 0}%`,
                             }}
@@ -284,86 +289,86 @@ export default function OwnerSupplyChainRecipes() {
                     </div>
                 </div>
 
-                <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 backdrop-blur-xl">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider">Avg Food Cost %</span>
-                        <PieChart className="w-4 h-4 text-emerald-400" />
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">
+                        <span>Avg Food Cost %</span>
+                        <PieChart className="w-4 h-4 text-emerald-500" />
                     </div>
-                    <div className="text-2xl font-bold text-emerald-400">
+                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                         {summary.avgFoodCostPercent.toFixed(1)}%
                     </div>
-                    <p className="text-xs text-slate-400 mt-2">Target benchmark: &lt; 30.0%</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Target benchmark: &lt; 30.0%</p>
                 </div>
 
-                <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 backdrop-blur-xl">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider">Avg Gross Margin</span>
-                        <TrendingUp className="w-4 h-4 text-cyan-400" />
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">
+                        <span>Avg Gross Margin</span>
+                        <TrendingUp className="w-4 h-4 text-cyan-500" />
                     </div>
-                    <div className="text-2xl font-bold text-cyan-400">
+                    <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
                         {summary.avgGrossMarginPercent.toFixed(1)}%
                     </div>
-                    <p className="text-xs text-slate-400 mt-2">Avg profitability across menu</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Avg profitability across menu</p>
                 </div>
 
-                <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 backdrop-blur-xl">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider">Active Raw Materials</span>
-                        <Layers className="w-4 h-4 text-purple-400" />
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">
+                        <span>Active Raw Materials</span>
+                        <Layers className="w-4 h-4 text-purple-500" />
                     </div>
-                    <div className="text-2xl font-bold text-white">
+                    <div className="text-2xl font-bold text-slate-900 dark:text-white">
                         {rawMaterials.length}
                     </div>
-                    <p className="text-xs text-slate-400 mt-2">Available inventory ingredients</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Available inventory ingredients</p>
                 </div>
             </div>
 
             {/* Filter & Search Toolbar */}
-            <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 backdrop-blur-xl flex flex-col md:flex-row gap-4 justify-between items-center">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-xs flex flex-col md:flex-row gap-3 justify-between items-center">
                 <div className="relative w-full md:w-80">
-                    <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
                     <input
                         type="text"
                         placeholder="Search menu item or ingredient..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
                     />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                     {/* Category Filter */}
-                    <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/80">
+                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
                         <Filter className="w-3.5 h-3.5 text-slate-400" />
                         <select
                             value={categoryFilter}
                             onChange={(e) => setCategoryFilter(e.target.value)}
-                            className="bg-transparent text-sm text-slate-200 focus:outline-none"
+                            className="bg-transparent text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
                         >
-                            <option value="ALL" className="bg-slate-900">All Categories</option>
+                            <option value="ALL">All Categories</option>
                             {categories.filter((c) => c !== "ALL").map((cat) => (
-                                <option key={cat} value={cat} className="bg-slate-900">{cat}</option>
+                                <option key={cat} value={cat}>{cat}</option>
                             ))}
                         </select>
                     </div>
 
                     {/* Status Filter */}
-                    <div className="flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/80 text-xs font-medium">
+                    <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold">
                         <button
                             onClick={() => setStatusFilter("ALL")}
-                            className={`px-3 py-1 rounded-lg transition ${statusFilter === "ALL" ? "bg-amber-500 text-slate-950 font-semibold" : "text-slate-400 hover:text-white"}`}
+                            className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${statusFilter === "ALL" ? "bg-orange-500 text-white font-bold shadow-xs" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
                         >
                             All ({recipes.length})
                         </button>
                         <button
                             onClick={() => setStatusFilter("CONFIGURED")}
-                            className={`px-3 py-1 rounded-lg transition ${statusFilter === "CONFIGURED" ? "bg-emerald-500 text-slate-950 font-semibold" : "text-slate-400 hover:text-white"}`}
+                            className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${statusFilter === "CONFIGURED" ? "bg-emerald-600 text-white font-bold shadow-xs" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
                         >
                             Mapped ({summary.configuredRecipes})
                         </button>
                         <button
                             onClick={() => setStatusFilter("MISSING")}
-                            className={`px-3 py-1 rounded-lg transition ${statusFilter === "MISSING" ? "bg-rose-500 text-white font-semibold" : "text-slate-400 hover:text-white"}`}
+                            className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${statusFilter === "MISSING" ? "bg-rose-600 text-white font-bold shadow-xs" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
                         >
                             Unmapped ({recipes.length - summary.configuredRecipes})
                         </button>
@@ -373,86 +378,86 @@ export default function OwnerSupplyChainRecipes() {
 
             {/* Recipe Items Grid */}
             {loading ? (
-                <div className="flex items-center justify-center py-20">
-                    <RefreshCw className="w-8 h-8 text-amber-500 animate-spin" />
+                <div className="flex items-center justify-center py-16">
+                    <RefreshCw className="w-6 h-6 text-orange-500 animate-spin" />
                 </div>
             ) : filteredRecipes.length === 0 ? (
-                <div className="text-center py-16 bg-slate-900/40 rounded-2xl border border-slate-800">
-                    <ChefHat className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                    <h3 className="text-lg font-semibold text-slate-300">No menu items found</h3>
-                    <p className="text-sm text-slate-500">Try adjusting your search query or filters.</p>
+                <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <ChefHat className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No menu items found</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Try adjusting your search query or filters.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredRecipes.map((item) => {
                         const foodCostBadgeColor =
                             item.foodCostPercent === 0
-                                ? "bg-slate-800 text-slate-400 border-slate-700"
+                                ? "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
                                 : item.foodCostPercent <= 28
-                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
                                 : item.foodCostPercent <= 35
-                                ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                                : "bg-rose-500/10 text-rose-400 border-rose-500/30";
+                                ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                                : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20";
 
                         return (
                             <div
                                 key={item.id}
-                                className="bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden hover:border-slate-700 transition flex flex-col justify-between"
+                                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition flex flex-col justify-between"
                             >
-                                <div className="p-5 space-y-4">
+                                <div className="p-4 space-y-3">
                                     {/* Item Header */}
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20">
                                                 {item.category || "General"}
                                             </span>
-                                            <h3 className="text-lg font-bold text-white mt-1.5 leading-tight">{item.name}</h3>
+                                            <h3 className="text-base font-bold text-slate-900 dark:text-white mt-1 leading-tight">{item.name}</h3>
                                         </div>
                                         <div className="text-right">
-                                            <span className="text-xs text-slate-400 block">Selling Price</span>
-                                            <span className="text-lg font-bold text-emerald-400">₹{item.sellingPrice.toFixed(2)}</span>
+                                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Selling Price</span>
+                                            <span className="text-base font-bold text-emerald-600 dark:text-emerald-400">₹{item.sellingPrice.toFixed(2)}</span>
                                         </div>
                                     </div>
 
                                     {/* Cost Breakdown */}
-                                    <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80 grid grid-cols-3 gap-2 text-center">
+                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/60 grid grid-cols-3 gap-2 text-center">
                                         <div>
-                                            <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Recipe Cost</span>
-                                            <span className="text-sm font-semibold text-slate-200">₹{item.recipeCost.toFixed(2)}</span>
+                                            <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Recipe Cost</span>
+                                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">₹{item.recipeCost.toFixed(2)}</span>
                                         </div>
                                         <div>
-                                            <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Food Cost %</span>
-                                            <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded-full border mt-0.5 ${foodCostBadgeColor}`}>
+                                            <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Food Cost %</span>
+                                            <span className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded border mt-0.5 ${foodCostBadgeColor}`}>
                                                 {item.hasRecipe ? `${item.foodCostPercent.toFixed(1)}%` : "N/A"}
                                             </span>
                                         </div>
                                         <div>
-                                            <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Gross Margin</span>
-                                            <span className="text-sm font-semibold text-cyan-400">₹{item.grossMargin.toFixed(2)}</span>
+                                            <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Gross Margin</span>
+                                            <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400">₹{item.grossMargin.toFixed(2)}</span>
                                         </div>
                                     </div>
 
                                     {/* Ingredients List */}
                                     <div>
-                                        <div className="flex items-center justify-between mb-2 text-xs text-slate-400">
-                                            <span className="font-semibold uppercase tracking-wider">Ingredients ({item.ingredients.length})</span>
-                                            {item.hasRecipe && <span className="text-slate-500">v{item.recipeVersion}</span>}
+                                        <div className="flex items-center justify-between mb-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                            <span className="font-semibold uppercase tracking-wider text-[10px]">Ingredients ({item.ingredients.length})</span>
+                                            {item.hasRecipe && <span className="text-[10px]">v{item.recipeVersion}</span>}
                                         </div>
 
                                         {item.ingredients.length === 0 ? (
-                                            <div className="p-3 bg-amber-500/5 border border-dashed border-amber-500/20 rounded-xl text-center">
-                                                <AlertCircle className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-                                                <span className="text-xs text-amber-300">No ingredients mapped yet</span>
+                                            <div className="p-3 bg-amber-500/5 border border-dashed border-amber-500/20 rounded-lg text-center">
+                                                <AlertCircle className="w-3.5 h-3.5 text-amber-500 mx-auto mb-0.5" />
+                                                <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">No ingredients mapped yet</span>
                                             </div>
                                         ) : (
-                                            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                                            <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
                                                 {item.ingredients.map((ing, idx) => (
-                                                    <div key={idx} className="flex items-center justify-between text-xs bg-slate-800/40 px-2.5 py-1.5 rounded-lg border border-slate-800">
-                                                        <span className="text-slate-300 font-medium">{ing.name}</span>
-                                                        <div className="flex items-center gap-2 text-slate-400">
+                                                    <div key={idx} className="flex items-center justify-between text-xs bg-slate-50 dark:bg-slate-800/40 px-2.5 py-1 rounded border border-slate-100 dark:border-slate-800">
+                                                        <span className="text-slate-800 dark:text-slate-200 font-medium">{ing.name}</span>
+                                                        <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-[11px]">
                                                             <span>{ing.quantity} {ing.unit}</span>
-                                                            <span className="text-slate-500">•</span>
-                                                            <span className="text-slate-300 font-semibold">₹{ing.totalCost.toFixed(2)}</span>
+                                                            <span>•</span>
+                                                            <span className="text-slate-900 dark:text-slate-200 font-semibold">₹{ing.totalCost.toFixed(2)}</span>
                                                         </div>
                                                     </div>
                                                 ))}
@@ -462,12 +467,12 @@ export default function OwnerSupplyChainRecipes() {
                                 </div>
 
                                 {/* Card Footer Action */}
-                                <div className="p-4 bg-slate-950/40 border-t border-slate-800/80">
+                                <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800">
                                     <button
                                         onClick={() => handleOpenEditor(item)}
-                                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-200 rounded-xl font-medium text-sm border border-slate-700 hover:border-amber-400 transition"
+                                        className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-lg text-xs transition shadow-xs cursor-pointer"
                                     >
-                                        <Edit3 className="w-4 h-4" />
+                                        <Edit3 size={13} />
                                         {item.hasRecipe ? "Edit Recipe & BOM" : "Map Ingredients"}
                                     </button>
                                 </div>
@@ -479,69 +484,69 @@ export default function OwnerSupplyChainRecipes() {
 
             {/* RECIPE BUILDER MODAL */}
             {isModalOpen && editingItem && (
-                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+                <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-4xl rounded-xl shadow-xl flex flex-col max-h-[90vh] overflow-hidden">
                         {/* Modal Header */}
-                        <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
-                                    <ChefHat className="w-5 h-5" />
+                        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-orange-500/10 text-orange-600 rounded-lg border border-orange-500/20">
+                                    <ChefHat size={18} />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-white">{editingItem.name}</h2>
-                                    <p className="text-xs text-slate-400">Category: {editingItem.category} • Selling Price: ₹{editingItem.sellingPrice}</p>
+                                    <h2 className="text-base font-bold text-slate-900 dark:text-white">{editingItem.name}</h2>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Category: {editingItem.category} • Selling Price: ₹{editingItem.sellingPrice}</p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="p-2 text-slate-400 hover:text-white rounded-lg bg-slate-800 hover:bg-slate-700 transition"
+                                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
                             >
-                                <X className="w-5 h-5" />
+                                <X size={18} />
                             </button>
                         </div>
 
                         {/* Live Metrics Header Inside Modal */}
-                        <div className="bg-slate-950/60 p-4 border-b border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                        <div className="bg-slate-50 dark:bg-slate-800/40 p-3 border-b border-slate-200 dark:border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
                             <div>
-                                <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Selling Price</span>
-                                <span className="text-base font-bold text-emerald-400">₹{editingItem.sellingPrice.toFixed(2)}</span>
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Selling Price</span>
+                                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">₹{editingItem.sellingPrice.toFixed(2)}</span>
                             </div>
                             <div>
-                                <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Calculated Recipe Cost</span>
-                                <span className="text-base font-bold text-white">₹{modalLiveMetrics.recipeCost.toFixed(2)}</span>
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Calculated Recipe Cost</span>
+                                <span className="text-sm font-bold text-slate-900 dark:text-white">₹{modalLiveMetrics.recipeCost.toFixed(2)}</span>
                             </div>
                             <div>
-                                <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Food Cost %</span>
-                                <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded-full border mt-0.5 ${
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Food Cost %</span>
+                                <span className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded border mt-0.5 ${
                                     modalLiveMetrics.foodCostPercent <= 28
-                                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
                                         : modalLiveMetrics.foodCostPercent <= 35
-                                        ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                                        : "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                                        ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                                        : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20"
                                 }`}>
                                     {modalLiveMetrics.foodCostPercent.toFixed(1)}%
                                 </span>
                             </div>
                             <div>
-                                <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Gross Profit Margin</span>
-                                <span className="text-base font-bold text-cyan-400">₹{modalLiveMetrics.grossMargin.toFixed(2)} ({modalLiveMetrics.grossMarginPercent.toFixed(1)}%)</span>
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Gross Margin</span>
+                                <span className="text-sm font-bold text-cyan-600 dark:text-cyan-400">₹{modalLiveMetrics.grossMargin.toFixed(2)} ({modalLiveMetrics.grossMarginPercent.toFixed(1)}%)</span>
                             </div>
                         </div>
 
                         {/* Modal Body - Ingredient Mapping Editor */}
-                        <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                        <div className="p-5 overflow-y-auto space-y-3.5 flex-1">
                             <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-bold text-slate-200 uppercase tracking-wider">Recipe Ingredients Breakdown</h4>
+                                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Recipe Ingredients Breakdown</h4>
                                 <button
                                     type="button"
                                     onClick={handleAddIngredientRow}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold transition"
+                                    className="inline-flex items-center gap-1 px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
                                 >
-                                    <Plus className="w-4 h-4" /> Add Ingredient
+                                    <Plus size={13} /> Add Ingredient
                                 </button>
                             </div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-2.5">
                                 {recipeItems.map((row, idx) => {
                                     const selectedRm = rawMaterials.find((r) => r.id === Number(row.rawMaterialId));
                                     const qty = Number(row.quantity || 0);
@@ -553,15 +558,15 @@ export default function OwnerSupplyChainRecipes() {
                                     return (
                                         <div
                                             key={idx}
-                                            className="bg-slate-950/80 p-4 rounded-xl border border-slate-800 grid grid-cols-1 md:grid-cols-12 gap-3 items-center"
+                                            className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/60 grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center"
                                         >
                                             {/* Raw Material Select */}
                                             <div className="md:col-span-4">
-                                                <label className="text-[10px] font-semibold text-slate-400 block mb-1">Raw Material Ingredient</label>
+                                                <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Raw Material Ingredient</label>
                                                 <select
                                                     value={row.rawMaterialId}
                                                     onChange={(e) => handleUpdateRow(idx, "rawMaterialId", e.target.value)}
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2.5 py-1 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
                                                 >
                                                     <option value="">Select Raw Material</option>
                                                     {rawMaterials.map((rm) => (
@@ -574,66 +579,66 @@ export default function OwnerSupplyChainRecipes() {
 
                                             {/* Quantity & Unit */}
                                             <div className="md:col-span-2">
-                                                <label className="text-[10px] font-semibold text-slate-400 block mb-1">Quantity</label>
+                                                <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Quantity</label>
                                                 <input
                                                     type="number"
                                                     step="any"
                                                     min="0"
                                                     value={row.quantity}
                                                     onChange={(e) => handleUpdateRow(idx, "quantity", e.target.value)}
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2.5 py-1 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
                                                 />
                                             </div>
 
                                             <div className="md:col-span-2">
-                                                <label className="text-[10px] font-semibold text-slate-400 block mb-1">Unit</label>
+                                                <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Unit</label>
                                                 <input
                                                     type="text"
                                                     value={row.unit}
                                                     onChange={(e) => handleUpdateRow(idx, "unit", e.target.value)}
                                                     placeholder="g, ml, pcs"
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2.5 py-1 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
                                                 />
                                             </div>
 
                                             {/* Yield % */}
                                             <div className="md:col-span-1">
-                                                <label className="text-[10px] font-semibold text-slate-400 block mb-1">Yield %</label>
+                                                <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Yield %</label>
                                                 <input
                                                     type="number"
                                                     min="1"
                                                     max="100"
                                                     value={row.yieldPercent}
                                                     onChange={(e) => handleUpdateRow(idx, "yieldPercent", e.target.value)}
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
                                                 />
                                             </div>
 
                                             {/* Prep Loss % */}
                                             <div className="md:col-span-1">
-                                                <label className="text-[10px] font-semibold text-slate-400 block mb-1">Prep Loss %</label>
+                                                <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Loss %</label>
                                                 <input
                                                     type="number"
                                                     min="0"
                                                     max="100"
                                                     value={row.prepLossPercent}
                                                     onChange={(e) => handleUpdateRow(idx, "prepLossPercent", e.target.value)}
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
                                                 />
                                             </div>
 
                                             {/* Cost & Delete */}
-                                            <div className="md:col-span-2 flex items-center justify-between gap-2 pl-2">
+                                            <div className="md:col-span-2 flex items-center justify-between gap-1.5 pl-1">
                                                 <div className="text-right">
-                                                    <span className="text-[10px] text-slate-400 block">Est. Cost</span>
-                                                    <span className="text-xs font-bold text-amber-400">₹{ingCost.toFixed(2)}</span>
+                                                    <span className="text-[9px] text-slate-500 dark:text-slate-400 block">Est. Cost</span>
+                                                    <span className="text-xs font-bold text-orange-600 dark:text-orange-400">₹{ingCost.toFixed(2)}</span>
                                                 </div>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRemoveIngredientRow(idx)}
-                                                    className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-500/20 rounded-lg transition"
+                                                    className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded transition cursor-pointer"
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
+                                                    <Trash2 size={14} />
                                                 </button>
                                             </div>
                                         </div>
@@ -643,11 +648,11 @@ export default function OwnerSupplyChainRecipes() {
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="p-5 border-t border-slate-800 bg-slate-900/80 flex justify-end gap-3">
+                        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-2">
                             <button
                                 type="button"
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium text-sm transition"
+                                className="px-3.5 py-1.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                             >
                                 Cancel
                             </button>
@@ -655,15 +660,15 @@ export default function OwnerSupplyChainRecipes() {
                                 type="button"
                                 onClick={handleSaveRecipe}
                                 disabled={saving}
-                                className="flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm transition shadow-lg shadow-amber-500/10"
+                                className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-lg text-xs transition shadow-xs cursor-pointer"
                             >
-                                <Save className="w-4 h-4" />
-                                {saving ? "Saving Recipe..." : "Save Recipe & BOM"}
+                                <Save size={14} />
+                                {saving ? "Saving..." : "Save Recipe & BOM"}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
-        </div>
+        </section>
     );
 }

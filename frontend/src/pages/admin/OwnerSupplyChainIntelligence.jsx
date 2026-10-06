@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
+import SupplyChainSubNav from "../../components/SupplyChainSubNav";
 import {
     AlertCircle,
     AlertTriangle,
@@ -298,6 +299,9 @@ export default function OwnerSupplyChainIntelligence() {
                     </div>
                 </div>
             </header>
+
+            {/* HORIZONTAL SUB-NAVIGATION BAR */}
+            <SupplyChainSubNav />
 
             {/* QUICK ACTIONS TOOLBAR */}
             <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-card-bg)] shadow-sm">
