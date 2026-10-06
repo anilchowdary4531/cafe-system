@@ -348,7 +348,7 @@ export default function OwnerSupplyChainAdjustments() {
 
             {/* HEADER CONSOLE BAR */}
             <header className="sticky top-0 z-30 bg-white border-b border-slate-200/80 shadow-2xs">
-                <div className="mx-auto max-w-7xl px-4 py-3.5 sm:px-6 lg:px-8">
+                <div className="w-full px-3 py-3">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
@@ -421,58 +421,37 @@ export default function OwnerSupplyChainAdjustments() {
                 </div>
             </header>
 
-            <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+            <main className="w-full px-3 py-4 space-y-4">
                 <SupplyChainSubNav />
 
-                {/* ADJUSTMENT METRICS ROW (4 Cards) */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-                    {/* Adjustments Today */}
-                    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Adjustments Today</span>
-                            <div className="text-2xl font-black text-slate-900 tracking-tight">{metrics.adjustmentsToday}</div>
-                            <p className="text-[11px] text-slate-500 font-medium">Audit events logged today</p>
+                {/* ADJUSTMENT METRICS ROW (Flat Horizontal Analytics Layout) */}
+                <div className="border-b border-slate-200/80 pb-4 space-y-2">
+                    <p className="text-[11px] font-bold text-orange-500 uppercase tracking-wider">ADJUSTMENT PERFORMANCE OVERVIEW</p>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div>
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">ADJUSTMENTS TODAY</span>
+                            <div className="text-2xl font-black text-slate-900 tracking-tight mt-0.5">{metrics.adjustmentsToday}</div>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">Audit events logged today</p>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 border border-slate-200/70">
-                            <Calendar size={18} />
-                        </div>
-                    </div>
 
-                    {/* Stock Increases (Green) */}
-                    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Stock Increases</span>
-                            <div className="text-2xl font-black text-emerald-700 tracking-tight">+{metrics.positiveCount}</div>
-                            <p className="text-[11px] text-slate-500 font-medium">Surplus physical stock added</p>
+                        <div>
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">STOCK INCREASES</span>
+                            <div className="text-2xl font-black text-emerald-600 tracking-tight mt-0.5">+{metrics.positiveCount}</div>
+                            <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Surplus physical stock added</p>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <TrendingUp size={18} />
-                        </div>
-                    </div>
 
-                    {/* Stock Decreases (Red) */}
-                    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Stock Decreases</span>
-                            <div className="text-2xl font-black text-rose-700 tracking-tight">-{metrics.negativeCount}</div>
-                            <p className="text-[11px] text-slate-500 font-medium">Deficit, waste & loss removals</p>
+                        <div>
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">STOCK DECREASES</span>
+                            <div className="text-2xl font-black text-rose-600 tracking-tight mt-0.5">-{metrics.negativeCount}</div>
+                            <p className="text-[11px] text-rose-600 font-medium mt-0.5">Deficit, waste & loss removals</p>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200">
-                            <TrendingDown size={18} />
-                        </div>
-                    </div>
 
-                    {/* Total Financial Impact */}
-                    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Financial Impact</span>
-                            <div className="text-2xl font-black text-slate-900 tracking-tight">
-                                ₹{metrics.totalValue.toLocaleString("en-IN")}
+                        <div>
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">FINANCIAL IMPACT</span>
+                            <div className={`text-2xl font-black tracking-tight mt-0.5 ${metrics.totalNetValuationChange < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                                {metrics.totalNetValuationChange < 0 ? "-" : "+"}₹{Math.abs(metrics.totalNetValuationChange).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                             </div>
-                            <p className="text-[11px] text-slate-500 font-medium">Combined inventory valuation</p>
-                        </div>
-                        <div className="p-2.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200">
-                            <DollarSign size={18} />
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">Net inventory asset variance</p>
                         </div>
                     </div>
                 </div>

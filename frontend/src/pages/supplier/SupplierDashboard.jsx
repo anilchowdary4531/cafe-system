@@ -606,8 +606,8 @@ export default function SupplierDashboard() {
                 </div>
             )}
 
-            {/* MAIN CONTENT AREA */}
-            <main className="mx-auto max-w-7xl w-full p-4 sm:p-6 space-y-6 flex-1">
+            {/* MAIN CONTENT AREA — FULL WIDTH MATCHING /OWNER/ANALYTICS */}
+            <main className="w-full px-4 sm:px-6 py-4 space-y-4 flex-1">
 
                 {/* IF ACCOUNT IS NOT ACTIVE — SHOW VERIFICATION PENDING BANNER & MANDATORY KYC FORM ONLY */}
                 {!isAccountActive && (

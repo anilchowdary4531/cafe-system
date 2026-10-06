@@ -275,7 +275,7 @@ export default function OwnerSupplyChainReceiving() {
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-12">
             {/* Header Console Bar */}
             <header className="sticky top-0 z-30 bg-white border-b border-slate-200/80 shadow-2xs">
-                <div className="mx-auto max-w-7xl px-4 py-3.5 sm:px-6 lg:px-8">
+                <div className="w-full px-3 py-3">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
@@ -319,39 +319,42 @@ export default function OwnerSupplyChainReceiving() {
                 </div>
             </header>
 
-            <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+            <main className="w-full px-3 py-4 space-y-4">
                 <SupplyChainSubNav />
 
-                {/* Metrics Cards (5 Compact Cards) */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
-                    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Expected Today</span>
-                        <div className="text-2xl font-black text-slate-900 tracking-tight mt-1">{metrics.expectedToday}</div>
-                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">Scheduled deliveries</p>
-                    </div>
+                {/* Metrics Row (Flat Horizontal Analytics Layout) */}
+                <div className="border-b border-slate-200/80 pb-4 space-y-2">
+                    <p className="text-[11px] font-bold text-orange-500 uppercase tracking-wider">RECEIVING PERFORMANCE OVERVIEW</p>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                        <div>
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">EXPECTED TODAY</span>
+                            <div className="text-2xl font-black text-slate-900 tracking-tight mt-0.5">{metrics.expectedToday}</div>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">Scheduled deliveries</p>
+                        </div>
 
-                    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-                        <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">Pending Inspection</span>
-                        <div className="text-2xl font-black text-amber-900 tracking-tight mt-1">{metrics.pending}</div>
-                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">Awaiting verification</p>
-                    </div>
+                        <div>
+                            <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">PENDING INSPECTION</span>
+                            <div className="text-2xl font-black text-amber-900 tracking-tight mt-0.5">{metrics.pending}</div>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">Awaiting verification</p>
+                        </div>
 
-                    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-                        <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">Partially Received</span>
-                        <div className="text-2xl font-black text-amber-900 tracking-tight mt-1">{metrics.partiallyReceived}</div>
-                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">Short shipments</p>
-                    </div>
+                        <div>
+                            <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">PARTIALLY RECEIVED</span>
+                            <div className="text-2xl font-black text-amber-900 tracking-tight mt-0.5">{metrics.partiallyReceived}</div>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">Short shipments</p>
+                        </div>
 
-                    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-                        <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Received Today</span>
-                        <div className="text-2xl font-black text-emerald-700 tracking-tight mt-1">{metrics.receivedToday}</div>
-                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">Added to stock</p>
-                    </div>
+                        <div>
+                            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">RECEIVED TODAY</span>
+                            <div className="text-2xl font-black text-emerald-700 tracking-tight mt-0.5">{metrics.receivedToday}</div>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">Added to stock</p>
+                        </div>
 
-                    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-                        <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wider">Rejected / Damaged</span>
-                        <div className="text-2xl font-black text-rose-700 tracking-tight mt-1">{metrics.rejected}</div>
-                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">Quality variance records</p>
+                        <div>
+                            <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wider">REJECTED / DAMAGED</span>
+                            <div className="text-2xl font-black text-rose-700 tracking-tight mt-0.5">{metrics.rejected}</div>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">Quality variance records</p>
+                        </div>
                     </div>
                 </div>
 
