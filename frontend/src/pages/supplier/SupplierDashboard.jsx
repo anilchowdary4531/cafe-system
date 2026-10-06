@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
     Truck,
     Package,
@@ -139,11 +139,10 @@ const getSupplyProductImageUrl = (item) => {
     return "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80";
 };
 
-
-
 export default function SupplierDashboard() {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState("dashboard"); // 'dashboard' | 'products' | 'orders' | 'sales' | 'customers' | 'chat' | 'profile'
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get("tab") || "dashboard";
     const [loading, setLoading] = useState(true);
     const [profileData, setProfileData] = useState(null);
     const [products, setProducts] = useState([]);
@@ -151,6 +150,11 @@ export default function SupplierDashboard() {
     const [showAddProductModal, setShowAddProductModal] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [savingProfile, setSavingProfile] = useState(false);
+
+    const changeTab = (tabId) => {
+        setSearchParams({ tab: tabId });
+        setSidebarOpen(false);
+    };
 
     // B2B Negotiation & Chat State
     const [chatThreads, setChatThreads] = useState([]);
@@ -551,13 +555,7 @@ export default function SupplierDashboard() {
                                                     showToast("Your account is pending Super Admin verification", { type: "info" });
                                                     return;
                                                 }
-                                                if (tab.path) {
-                                                    setSidebarOpen(false);
-                                                    navigate(tab.path);
-                                                    return;
-                                                }
-                                                setActiveTab(tab.id);
-                                                setSidebarOpen(false);
+                                                changeTab(tab.id);
                                             }}
                                             className={`w-full px-4 py-3 rounded-2xl text-sm font-bold transition flex items-center justify-between cursor-pointer ${
                                                 tab.locked
@@ -895,7 +893,7 @@ export default function SupplierDashboard() {
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => setActiveTab("products")}
+                                            onClick={() => changeTab("products")}
                                             className="text-xs font-bold text-orange-500 hover:text-orange-600 hover:underline"
                                         >
                                             View All ({products.length})
@@ -934,7 +932,7 @@ export default function SupplierDashboard() {
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => setActiveTab("orders")}
+                                            onClick={() => changeTab("orders")}
                                             className="text-xs font-bold text-orange-500 hover:text-orange-600 hover:underline"
                                         >
                                             View All ({orders.length})
