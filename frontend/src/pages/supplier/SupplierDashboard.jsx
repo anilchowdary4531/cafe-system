@@ -519,7 +519,7 @@ export default function SupplierDashboard() {
                                 <div className="flex items-center gap-2.5">
                                     <BrandLogo className="h-8 w-8" title="Tiffzy logo" />
                                     <div>
-                                        <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 leading-none">
+                                        <h1 className="text-xl font-black tracking-tight text-orange-500 leading-none">
                                             Tiffzy
                                         </h1>
                                         <span className="text-orange-500 text-[10px] font-extrabold uppercase tracking-wider block mt-0.5">
