@@ -519,7 +519,7 @@ export default function SupplierDashboard() {
                                         <h1 className="text-xl font-black tracking-tight text-orange-500 leading-none">
                                             Tiffzy
                                         </h1>
-                                        <span className="text-orange-500 text-[10px] font-extrabold uppercase tracking-wider block mt-0.5">
+                                        <span className="text-slate-900 dark:text-slate-100 text-[10px] font-extrabold uppercase tracking-wider block mt-0.5">
                                             SUPPLY
                                         </span>
                                     </div>
