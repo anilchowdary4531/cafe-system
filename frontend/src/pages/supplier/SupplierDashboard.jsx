@@ -467,11 +467,11 @@ export default function SupplierDashboard() {
                         <button
                             type="button"
                             onClick={() => setSidebarOpen(!sidebarOpen)}
-                            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white transition flex items-center gap-2 cursor-pointer shadow-2xs active:scale-95"
-                            title="Toggle navigation drawer"
+                            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500 hover:bg-orange-600 text-white shadow-md transition active:scale-95 cursor-pointer shrink-0"
+                            title="Toggle navigation menu"
+                            aria-label="Toggle navigation menu"
                         >
-                            {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
-                            <span>{sidebarOpen ? "Close Menu" : "Menu"}</span>
+                            {sidebarOpen ? <X size={22} className="text-white" /> : <Menu size={22} className="text-white stroke-[2.5]" />}
                         </button>
 
                         <div className="flex items-center gap-2.5">
