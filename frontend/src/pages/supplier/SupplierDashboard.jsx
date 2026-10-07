@@ -479,8 +479,8 @@ export default function SupplierDashboard() {
                                 <BrandLogo className="h-6 w-6" title="Brand logo" />
                             </div>
                             <div>
-                                <h1 className="text-base font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                                    {profileData?.profile?.businessName || "Tiffzy Supply"}
+                                <h1 className="text-xl font-black tracking-tight text-orange-500 flex items-center gap-2">
+                                    Tiffzy
                                     <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 uppercase tracking-wider">
                                         SUPPLY PORTAL
                                     </span>
