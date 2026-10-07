@@ -481,9 +481,6 @@ export default function SupplierDashboard() {
                             <div>
                                 <h1 className="text-xl font-black tracking-tight text-orange-500 flex items-center gap-2">
                                     Tiffzy
-                                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 uppercase tracking-wider">
-                                        SUPPLY PORTAL
-                                    </span>
                                 </h1>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium hidden sm:block">
                                     Status:{" "}
