@@ -849,123 +849,119 @@ export default function SupplierDashboard() {
                             </div>
                         </div>
 
-                        {/* COMPACT KPI METRIC CARDS ROW */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200/80 dark:border-slate-800/80 space-y-1 shadow-xs">
-                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Active Products</p>
-                                <div className="flex items-baseline justify-between">
-                                    <p className="text-3xl font-extrabold text-slate-900 dark:text-slate-100">{products.length}</p>
-                                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">In Marketplace</span>
-                                </div>
+                        {/* PERIOD PERFORMANCE OVERVIEW — FLAT PAPER STYLE MATCHING OWNER ANALYTICS */}
+                        <div className="border-b border-slate-200/80 dark:border-slate-800/80 pb-4">
+                            <div className="text-xs font-bold uppercase tracking-wider text-orange-500 mb-2">
+                                PERIOD PERFORMANCE OVERVIEW
                             </div>
 
-                            <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200/80 dark:border-slate-800/80 space-y-1 shadow-xs">
-                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">B2B Restaurant Orders</p>
-                                <div className="flex items-baseline justify-between">
-                                    <p className="text-3xl font-extrabold text-slate-900 dark:text-slate-100">{orders.length}</p>
-                                    <span className="text-xs font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Total Placed</span>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-1">
+                                <div>
+                                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Products</p>
+                                    <p className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight mt-0.5">{products.length}</p>
+                                    <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">In Marketplace</p>
                                 </div>
-                            </div>
 
-                            <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200/80 dark:border-slate-800/80 space-y-1 shadow-xs">
-                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Sales Volume</p>
-                                <div className="flex items-baseline justify-between">
-                                    <p className="text-3xl font-extrabold text-orange-500">₹{totalSalesVolume.toLocaleString("en-IN")}</p>
-                                    <span className="text-xs font-semibold text-orange-600 bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded-full">Gross B2B</span>
+                                <div>
+                                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">B2B Restaurant Orders</p>
+                                    <p className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight mt-0.5">{orders.length}</p>
+                                    <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Total Placed</p>
                                 </div>
-                            </div>
 
-                            <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200/80 dark:border-slate-800/80 space-y-1 shadow-xs">
-                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Low Stock Alerts</p>
-                                <div className="flex items-baseline justify-between">
-                                    <p className="text-3xl font-extrabold text-rose-500">
+                                <div>
+                                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Sales Volume</p>
+                                    <p className="text-2xl font-black text-orange-500 tracking-tight mt-0.5">₹{totalSalesVolume.toLocaleString("en-IN")}</p>
+                                    <p className="text-[11px] font-semibold text-orange-600 dark:text-orange-400 mt-0.5">Gross B2B</p>
+                                </div>
+
+                                <div>
+                                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Low Stock Alerts</p>
+                                    <p className="text-2xl font-black text-rose-500 tracking-tight mt-0.5">
                                         {products.filter((p) => (p.inventory?.availableStock || 0) <= 10).length}
                                     </p>
-                                    <span className="text-xs font-semibold text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full">Requires Restock</span>
+                                    <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 mt-0.5">Requires Restock</p>
                                 </div>
                             </div>
                         </div>
 
-                        {/* CONTENT SECTION DIVIDER */}
-                        <div className="border-t border-slate-200/80 dark:border-slate-800/80 pt-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Recent Catalog Products */}
-                                <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800/80 space-y-4 shadow-xs">
-                                    <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 pb-3">
-                                        <div>
-                                            <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">Catalog Products</h3>
-                                            <p className="text-xs text-slate-500">Published wholesale items available for restaurant orders</p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => changeTab("products")}
-                                            className="text-xs font-bold text-orange-500 hover:text-orange-600 hover:underline"
-                                        >
-                                            View All ({products.length})
-                                        </button>
+                        {/* CONTENT SECTION — FLAT PAPER LAYOUT WITH THIN SEPARATORS */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+                            {/* Recent Catalog Products */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 pb-2">
+                                    <div>
+                                        <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">Catalog Products</h3>
+                                        <p className="text-[11px] text-slate-500">Published wholesale items available for restaurant orders</p>
                                     </div>
-                                    {products.length === 0 ? (
-                                        <div className="py-8 text-center text-xs text-slate-500 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
-                                            No products published yet. Click "Add Product" above to list wholesale items.
-                                        </div>
-                                    ) : (
-                                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                                            {products.slice(0, 4).map((p) => (
-                                                <div key={p.id} className="py-3 flex items-center justify-between text-xs">
-                                                    <div>
-                                                        <p className="font-bold text-slate-900 dark:text-slate-100 text-sm">{p.name}</p>
-                                                        <p className="text-slate-500 mt-0.5">MOQ: {p.moq} {p.unit}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <span className="font-extrabold text-orange-500 text-sm">
-                                                            ₹{p.prices?.[0]?.basePrice || p.basePrice || p.price || 100} / {p.unit}
-                                                        </span>
-                                                        <p className="text-[11px] text-slate-500 mt-0.5">Category: {p.categoryName || "General"}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => changeTab("products")}
+                                        className="text-xs font-bold text-orange-500 hover:underline cursor-pointer"
+                                    >
+                                        View All ({products.length})
+                                    </button>
                                 </div>
+                                {products.length === 0 ? (
+                                    <div className="py-6 text-center text-xs text-slate-500">
+                                        No products published yet. Click "Add Product" above to list wholesale items.
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-slate-200/60 dark:divide-slate-800/60">
+                                        {products.slice(0, 4).map((p) => (
+                                            <div key={p.id} className="py-2.5 flex items-center justify-between text-xs">
+                                                <div>
+                                                    <p className="font-bold text-slate-900 dark:text-slate-100">{p.name}</p>
+                                                    <p className="text-slate-500 text-[11px] mt-0.5">MOQ: {p.moq} {p.unit}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="font-bold text-orange-500">
+                                                        ₹{p.prices?.[0]?.basePrice || p.basePrice || p.price || 100} / {p.unit}
+                                                    </span>
+                                                    <p className="text-[11px] text-slate-500 mt-0.5">Category: {p.categoryName || "General"}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
 
-                                {/* Recent Live Orders */}
-                                <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800/80 space-y-4 shadow-xs">
-                                    <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 pb-3">
-                                        <div>
-                                            <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">Recent B2B Orders</h3>
-                                            <p className="text-xs text-slate-500">Incoming wholesale order fulfillments from buyer kitchens</p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => changeTab("orders")}
-                                            className="text-xs font-bold text-orange-500 hover:text-orange-600 hover:underline"
-                                        >
-                                            View All ({orders.length})
-                                        </button>
+                            {/* Recent Live Orders */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 pb-2">
+                                    <div>
+                                        <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">Recent B2B Orders</h3>
+                                        <p className="text-[11px] text-slate-500">Incoming wholesale order fulfillments from buyer kitchens</p>
                                     </div>
-                                    {orders.length === 0 ? (
-                                        <div className="py-8 text-center text-xs text-slate-500 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
-                                            No incoming orders yet. Orders placed by restaurant buyers will appear here.
-                                        </div>
-                                    ) : (
-                                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                                            {orders.slice(0, 4).map((o) => (
-                                                <div key={o.id} className="py-3 flex items-center justify-between text-xs">
-                                                    <div>
-                                                        <p className="font-bold text-orange-500 text-sm">{o.orderNo}</p>
-                                                        <p className="text-slate-500 mt-0.5">Buyer: {o.restaurant?.name || "Tiffzy Cafe Client"}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">₹{o.totalAmount}</p>
-                                                        <span className="inline-block mt-0.5 px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                                                            {o.status}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => changeTab("orders")}
+                                        className="text-xs font-bold text-orange-500 hover:underline cursor-pointer"
+                                    >
+                                        View All ({orders.length})
+                                    </button>
                                 </div>
+                                {orders.length === 0 ? (
+                                    <div className="py-6 text-center text-xs text-slate-500 border border-dashed border-slate-200/80 dark:border-slate-800/80 rounded-lg">
+                                        No incoming orders yet. Orders placed by restaurant buyers will appear here.
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-slate-200/60 dark:divide-slate-800/60">
+                                        {orders.slice(0, 4).map((o) => (
+                                            <div key={o.id} className="py-2.5 flex items-center justify-between text-xs">
+                                                <div>
+                                                    <p className="font-bold text-orange-500">{o.orderNo}</p>
+                                                    <p className="text-slate-500 text-[11px] mt-0.5">Buyer: {o.restaurant?.name || "Tiffzy Cafe Client"}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="font-bold text-slate-900 dark:text-slate-100">₹{o.totalAmount}</p>
+                                                    <span className="inline-block mt-0.5 px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                                                        {o.status}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
