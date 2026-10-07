@@ -495,25 +495,6 @@ export default function SupplierDashboard() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 sm:gap-3">
-                        <button
-                            type="button"
-                            onClick={loadData}
-                            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition flex items-center gap-1.5 cursor-pointer"
-                        >
-                            <RefreshCw size={14} className={loading ? "animate-spin text-orange-500" : ""} />
-                            <span className="hidden sm:inline">Sync Data</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={handleLogout}
-                            className="rounded-xl border border-rose-200 dark:border-rose-950 bg-rose-50 dark:bg-rose-950/40 px-3.5 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 transition flex items-center gap-1.5 cursor-pointer"
-                        >
-                            <LogOut size={14} />
-                            <span className="hidden sm:inline">Logout</span>
-                        </button>
-                    </div>
                 </div>
             </header>
 
