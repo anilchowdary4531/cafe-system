@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
     AlertTriangle,
@@ -419,8 +419,15 @@ export default function Server() {
 
     // Auto-select table if query param ?table=X is provided
     const urlTableParam = searchParams.get("table");
+    const autoSelectedRef = useRef(null);
     useEffect(() => {
-        if (!urlTableParam || tables.length === 0) return;
+        if (!urlTableParam) {
+            autoSelectedRef.current = null;
+            return;
+        }
+        if (tables.length === 0) return;
+        if (autoSelectedRef.current === urlTableParam) return;
+
         const normParam = normalizeTableKey(urlTableParam);
         const matched = tables.find((t) => {
             const tNo = String(t.tableNo || "").trim();
@@ -432,6 +439,7 @@ export default function Server() {
             );
         });
         if (matched) {
+            autoSelectedRef.current = urlTableParam;
             handleSelectTableForOrder(matched);
         }
     }, [urlTableParam, tables, handleSelectTableForOrder]);
@@ -1212,6 +1220,7 @@ export default function Server() {
                                 </button>
                                 <button
                                     onClick={() => {
+                                        setSelectedTable(null);
                                         setViewMode("FLOOR_PLAN");
                                         setSearchParams({}, { replace: true });
                                     }}

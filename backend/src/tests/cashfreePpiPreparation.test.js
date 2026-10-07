@@ -1,4 +1,4 @@
-import { test, describe } from "node:test";
+import { test, describe, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import Fastify from "fastify";
 import jwt from "@fastify/jwt";
@@ -21,6 +21,27 @@ import {
 import ppiWalletRoutes from "../routes/ppiWallet.routes.js";
 
 describe("Cashfree PPI Wallet Preparation Layer Tests", () => {
+  let origClientId, origClientSecret, origProgramId;
+
+  beforeEach(() => {
+    origClientId = process.env.CASHFREE_PPI_CLIENT_ID;
+    origClientSecret = process.env.CASHFREE_PPI_CLIENT_SECRET;
+    origProgramId = process.env.CASHFREE_PPI_PROGRAM_ID;
+
+    delete process.env.CASHFREE_PPI_CLIENT_ID;
+    delete process.env.CASHFREE_PPI_CLIENT_SECRET;
+    delete process.env.CASHFREE_PPI_PROGRAM_ID;
+  });
+
+  afterEach(() => {
+    if (origClientId !== undefined) process.env.CASHFREE_PPI_CLIENT_ID = origClientId;
+    else delete process.env.CASHFREE_PPI_CLIENT_ID;
+    if (origClientSecret !== undefined) process.env.CASHFREE_PPI_CLIENT_SECRET = origClientSecret;
+    else delete process.env.CASHFREE_PPI_CLIENT_SECRET;
+    if (origProgramId !== undefined) process.env.CASHFREE_PPI_PROGRAM_ID = origProgramId;
+    else delete process.env.CASHFREE_PPI_PROGRAM_ID;
+  });
+
   test("1. Application and PPI Config start safely without PPI credentials", () => {
     assert.strictEqual(typeof getPpiBaseUrl(), "string");
     assert.strictEqual(getPpiBaseUrl(), "https://sandbox.cashfree.com/ppi");

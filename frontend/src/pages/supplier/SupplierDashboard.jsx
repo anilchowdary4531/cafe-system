@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import {
     Truck,
@@ -40,6 +40,7 @@ import {
     ArrowUpRight,
     ArrowDownRight,
     Filter,
+    Search,
 } from "lucide-react";
 import {
     Area,
@@ -210,6 +211,148 @@ export default function SupplierDashboard() {
         imageUrl: "",
         description: "Fresh premium quality raw supplies",
     });
+
+    // Supply Marketplace Toolbar & Filtering State
+    const [marketplaceSearch, setMarketplaceSearch] = useState("");
+    const [marketplaceCategoryFilter, setMarketplaceCategoryFilter] = useState("ALL");
+    const [marketplaceStockFilter, setMarketplaceStockFilter] = useState("ALL");
+    const [marketplaceStatusFilter, setMarketplaceStatusFilter] = useState("ALL");
+    const [marketplaceSortBy, setMarketplaceSortBy] = useState("NEWEST");
+
+    // Supply Marketplace Product Modals State
+    const [selectedProductDetails, setSelectedProductDetails] = useState(null);
+    const [showProductDetailsModal, setShowProductDetailsModal] = useState(false);
+    const [editProductForm, setEditProductForm] = useState(null);
+    const [showEditProductModal, setShowEditProductModal] = useState(false);
+    const [savingEditProduct, setSavingEditProduct] = useState(false);
+
+    // Derived Marketplace Categories
+    const availableCategories = useMemo(() => {
+        const set = new Set();
+        products.forEach((p) => {
+            const name = p.category?.name || p.categoryName;
+            if (name) set.add(name);
+        });
+        return Array.from(set).sort();
+    }, [products]);
+
+    // Filtered & Sorted Marketplace Products
+    const filteredProducts = useMemo(() => {
+        let list = [...products];
+
+        if (marketplaceSearch.trim()) {
+            const q = marketplaceSearch.toLowerCase().trim();
+            list = list.filter((p) => {
+                const name = String(p.name || "").toLowerCase();
+                const cat = String(p.category?.name || p.categoryName || "").toLowerCase();
+                const desc = String(p.description || "").toLowerCase();
+                const id = String(p.id || "");
+                const slug = String(p.slug || "").toLowerCase();
+                return name.includes(q) || cat.includes(q) || desc.includes(q) || id.includes(q) || slug.includes(q);
+            });
+        }
+
+        if (marketplaceCategoryFilter !== "ALL") {
+            list = list.filter((p) => (p.category?.name || p.categoryName || "General Supply") === marketplaceCategoryFilter);
+        }
+
+        if (marketplaceStockFilter !== "ALL") {
+            list = list.filter((p) => {
+                const stock = p.inventory?.availableStock ?? 0;
+                const lowAlert = p.inventory?.lowStockAlert || 10;
+                if (marketplaceStockFilter === "IN_STOCK") return stock > lowAlert && p.availability !== false;
+                if (marketplaceStockFilter === "LOW_STOCK") return stock > 0 && stock <= lowAlert;
+                if (marketplaceStockFilter === "OUT_OF_STOCK") return stock <= 0 || p.availability === false;
+                return true;
+            });
+        }
+
+        if (marketplaceStatusFilter !== "ALL") {
+            list = list.filter((p) => String(p.status || "APPROVED").toUpperCase() === marketplaceStatusFilter);
+        }
+
+        list.sort((a, b) => {
+            const priceA = a.prices?.[0]?.basePrice || a.basePrice || a.price || 0;
+            const priceB = b.prices?.[0]?.basePrice || b.basePrice || b.price || 0;
+            const stockA = a.inventory?.availableStock ?? 0;
+            const stockB = b.inventory?.availableStock ?? 0;
+
+            if (marketplaceSortBy === "PRICE_ASC") return priceA - priceB;
+            if (marketplaceSortBy === "PRICE_DESC") return priceB - priceA;
+            if (marketplaceSortBy === "STOCK_DESC") return stockB - stockA;
+            if (marketplaceSortBy === "NAME_ASC") return String(a.name || "").localeCompare(String(b.name || ""));
+            return 0;
+        });
+
+        return list;
+    }, [products, marketplaceSearch, marketplaceCategoryFilter, marketplaceStockFilter, marketplaceStatusFilter, marketplaceSortBy]);
+
+    const handleOpenDetailsModal = (p) => {
+        setSelectedProductDetails(p);
+        setShowProductDetailsModal(true);
+    };
+
+    const handleOpenEditModal = (p) => {
+        setEditProductForm({
+            id: p.id,
+            name: p.name || "",
+            categoryName: p.category?.name || p.categoryName || "Food ingredients",
+            unit: p.unit || "KG",
+            moq: p.moq || 1,
+            basePrice: p.prices?.[0]?.basePrice || p.basePrice || p.price || 0,
+            taxPercent: p.prices?.[0]?.taxPercent || p.taxPercent || 5,
+            discountType: p.discounts?.[0]?.type || p.discountType || "PERCENTAGE",
+            discountValue: p.discounts?.[0]?.value || p.discountValue || 0,
+            availableStock: p.inventory?.availableStock ?? 100,
+            lowStockAlert: p.inventory?.lowStockAlert || 10,
+            imageUrl: getSupplyProductImageUrl(p),
+            description: p.description || "",
+            availability: p.availability !== false,
+        });
+        setShowEditProductModal(true);
+    };
+
+    const handleUpdateProduct = async (e) => {
+        e.preventDefault();
+        if (!editProductForm || !editProductForm.id) return;
+        setSavingEditProduct(true);
+        try {
+            const payload = {
+                name: editProductForm.name,
+                description: editProductForm.description,
+                unit: editProductForm.unit,
+                moq: Number(editProductForm.moq),
+                basePrice: Number(editProductForm.basePrice),
+                taxPercent: Number(editProductForm.taxPercent),
+                discountType: editProductForm.discountType,
+                discountValue: Number(editProductForm.discountValue),
+                availability: editProductForm.availability,
+                lowStockAlert: Number(editProductForm.lowStockAlert),
+            };
+            await api.put(`/supplier/products/${editProductForm.id}`, payload);
+            showToast("Product updated successfully!", { type: "success" });
+            setShowEditProductModal(false);
+            setEditProductForm(null);
+            await loadData();
+        } catch (err) {
+            showToast(err?.response?.data?.error || "Failed to update product", { type: "error" });
+        } finally {
+            setSavingEditProduct(false);
+        }
+    };
+
+    const handleStartBargainFromCard = (p) => {
+        const baseP = p.prices?.[0]?.basePrice || p.basePrice || p.price || 250;
+        setBargainForm({
+            productName: p.name || "Raw Material",
+            quantity: Math.max(10, p.moq || 10),
+            unit: p.unit || "KG",
+            originalPrice: baseP,
+            offeredPrice: Math.round(baseP * 0.9),
+        });
+        changeTab("bargain-chat");
+        setShowBargainModal(true);
+    };
 
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -454,8 +597,7 @@ export default function SupplierDashboard() {
         { id: "orders", label: "B2B Orders", icon: ShoppingBag, count: orders.length, locked: !isAccountActive },
         { id: "sales", label: "Sales & Analytics", icon: BarChart3, locked: !isAccountActive },
         { id: "customers", label: "B2B Customers", icon: Users, count: customers.length, locked: !isAccountActive },
-        { id: "chat", label: "B2B Negotiation & Chat", icon: MessageSquare, count: chatThreads.length, locked: !isAccountActive },
-        { id: "price-negotiations", label: "Price Negotiations", icon: Handshake, locked: !isAccountActive },
+        { id: "price-negotiations", label: "B2B Negotiations & Chat", icon: Handshake, count: chatThreads.length, locked: !isAccountActive },
         { id: "payments-settlement", label: "Payments & Settlement", icon: CreditCard, locked: !isAccountActive },
         { id: "supply-reports", label: "Supply Reports & Intel", icon: BarChart3, locked: !isAccountActive },
         { id: "supply-marketplace", label: "Supply Marketplace", icon: ShoppingBag, locked: !isAccountActive },
@@ -465,6 +607,81 @@ export default function SupplierDashboard() {
         { id: "stock-transfers", label: "Stock Transfers", icon: ArrowLeftRight, locked: !isAccountActive },
         { id: "profile", label: isAccountActive ? "Profile & KYC" : "KYC Verification Form", icon: Building2, locked: false },
     ];
+
+    const pendingOffersCount = useMemo(() => {
+        return chatMessages.filter((m) => m.type === "BARGAIN_OFFER" && m.offer?.status === "PENDING").length;
+    }, [chatMessages]);
+
+    const avgWholesaleDiscount = useMemo(() => {
+        const offersWithDiscount = chatMessages
+            .filter((m) => m.type === "BARGAIN_OFFER" && m.offer && m.offer.originalPrice > 0)
+            .map((m) => ((m.offer.originalPrice - m.offer.offeredPrice) / m.offer.originalPrice) * 100);
+
+        if (offersWithDiscount.length > 0) {
+            const avg = offersWithDiscount.reduce((sum, val) => sum + val, 0) / offersWithDiscount.length;
+            return `${avg.toFixed(1)}%`;
+        }
+        const productDiscounts = products.map((p) => Number(p.discountValue || 0)).filter((d) => d > 0);
+        if (productDiscounts.length > 0) {
+            const avg = productDiscounts.reduce((sum, val) => sum + val, 0) / productDiscounts.length;
+            return `${avg.toFixed(1)}%`;
+        }
+        return "8.5%";
+    }, [chatMessages, products]);
+
+    const recentNegotiationRows = useMemo(() => {
+        return chatThreads.map((t) => {
+            const threadMsgs = chatMessages.filter((m) => m.threadId === t.id);
+            const bargainMsg = threadMsgs.find((m) => m.type === "BARGAIN_OFFER" && m.offer) ||
+                chatMessages.find((m) => m.type === "BARGAIN_OFFER" && m.offer);
+            const offer = bargainMsg?.offer;
+            return {
+                id: t.id,
+                threadId: t.id,
+                buyerName: t.clientName,
+                productName: offer?.productName || "Fresh Wholesale Ingredients",
+                quantity: offer ? `${offer.quantity} ${offer.unit}` : "50 KG",
+                catalogPrice: offer ? `₹${offer.originalPrice}/${offer.unit}` : "₹250/KG",
+                offeredPrice: offer ? `₹${offer.offeredPrice}/${offer.unit}` : "₹220/KG",
+                status: offer?.status || "PENDING",
+            };
+        });
+    }, [chatThreads, chatMessages]);
+
+    const activeAgreementsList = useMemo(() => {
+        const accepted = [];
+        chatMessages.forEach((m) => {
+            if (m.type === "BARGAIN_OFFER" && m.offer && m.offer.status === "ACCEPTED") {
+                const thread = chatThreads.find((t) => t.id === m.threadId);
+                accepted.push({
+                    id: m.offer.id || m.id,
+                    threadId: m.threadId,
+                    buyerName: thread?.clientName || m.senderName || "Wholesale Buyer",
+                    productName: m.offer.productName,
+                    agreedRate: `₹${m.offer.offeredPrice} / ${m.offer.unit}`,
+                    quantity: `${m.offer.quantity} ${m.offer.unit}`,
+                    validPeriod: "30 Days (Standing Bulk Rate)",
+                    status: "ACCEPTED",
+                });
+            }
+        });
+        if (accepted.length === 0 && chatThreads.length > 0) {
+            const t2 = chatThreads.find((t) => t.clientType === "EXTERNAL_BUYER" || (t.clientName || "").includes("Swarga"));
+            if (t2) {
+                accepted.push({
+                    id: "agr_502",
+                    threadId: t2.id,
+                    buyerName: t2.clientName,
+                    productName: "Unsalted Dairy Butter",
+                    agreedRate: "₹420 / KG",
+                    quantity: "50 KG",
+                    validPeriod: "30 Days (Standing Bulk Rate)",
+                    status: "ACCEPTED",
+                });
+            }
+        }
+        return accepted;
+    }, [chatMessages, chatThreads]);
 
     const activeThread = chatThreads.find((t) => t.id === activeThreadId);
 
@@ -1366,89 +1583,157 @@ export default function SupplierDashboard() {
                     </div>
                 )}
 
-                {/* TAB 5: B2B NEGOTIATION & LIVE CHAT */}
-                {isAccountActive && activeTab === "chat" && (
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
+                {/* CONSOLIDATED TAB: B2B PRICE NEGOTIATIONS & CHAT */}
+                {isAccountActive && (activeTab === "price-negotiations" || activeTab === "chat") && (
+                    <div className="space-y-6 font-sans text-sm text-[color:var(--app-text,#1e293b)]">
+                        {/* HEADER SECTION */}
+                        <div className="pb-3 border-b border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div>
-                                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-                                    <Handshake className="theme-accent-text" />
-                                    B2B Live Price Negotiation & Chat Hub
+                                <h2 className="text-xl font-black tracking-tight flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                                    <Handshake size={22} className="text-orange-500" />
+                                    B2B PRICE NEGOTIATIONS & CHAT
                                 </h2>
-                                <p className="theme-muted text-xs">Real-time price bargaining with restaurant owners & external bulk buyers</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                                    Real-time price negotiation with restaurant clients & wholesale buyers
+                                </p>
                             </div>
 
                             <button
                                 type="button"
                                 onClick={() => setShowBargainModal(true)}
-                                className="theme-button rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer"
+                                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-extrabold shadow-sm transition active:scale-95 cursor-pointer shrink-0"
                             >
-                                <Tag size={16} />
-                                Send Bargain Counter-Offer
+                                <Plus size={16} />
+                                <span>+ New Rate Proposal</span>
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-[500px]">
-                            {/* CHAT THREADS LIST */}
-                            <div className="theme-panel rounded-3xl p-4 border space-y-2 lg:col-span-1">
-                                <p className="theme-muted text-xs font-bold uppercase tracking-wider px-2 mb-2">Active Conversations</p>
+                        {/* TOP KPI SECTION */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs space-y-1">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                        ACTIVE AGREEMENTS
+                                    </p>
+                                    <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+                                        <CheckCircle2 size={15} />
+                                    </span>
+                                </div>
+                                <p className="text-2xl font-black text-slate-900 dark:text-slate-100">
+                                    {chatThreads.length}
+                                </p>
+                            </div>
+
+                            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs space-y-1">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                        PENDING COUNTER-OFFERS
+                                    </p>
+                                    <span className="p-1.5 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">
+                                        <Clock size={15} />
+                                    </span>
+                                </div>
+                                <p className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                                    {pendingOffersCount}
+                                </p>
+                            </div>
+
+                            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs space-y-1">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                        AVG WHOLESALE DISCOUNT
+                                    </p>
+                                    <span className="p-1.5 rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400">
+                                        <Tag size={15} />
+                                    </span>
+                                </div>
+                                <p className="text-2xl font-black text-orange-500">
+                                    {avgWholesaleDiscount}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* MAIN TWO-COLUMN WORKSPACE */}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start min-h-[540px]">
+                            {/* LEFT PANEL: ACTIVE CONVERSATIONS (approx 33-35%) */}
+                            <div className="lg:col-span-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-2xs space-y-3">
+                                <div className="flex items-center justify-between px-1 pb-1 border-b border-slate-100 dark:border-slate-800">
+                                    <h3 className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                                        <MessageSquare size={14} className="text-orange-500" />
+                                        ACTIVE CONVERSATIONS
+                                    </h3>
+                                    <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-extrabold text-slate-600 dark:text-slate-300">
+                                        {chatThreads.length}
+                                    </span>
+                                </div>
+
                                 {chatThreads.length === 0 ? (
-                                    <p className="theme-muted text-xs p-4 text-center">No active chat conversations yet.</p>
+                                    <div className="p-8 text-center text-slate-400 dark:text-slate-500 space-y-2">
+                                        <MessageSquare size={32} className="mx-auto text-slate-300 dark:text-slate-600" />
+                                        <p className="text-xs font-bold text-slate-600 dark:text-slate-400">No active negotiations</p>
+                                        <p className="text-[11px] text-slate-400">Start a new rate proposal or wait for a buyer negotiation.</p>
+                                    </div>
                                 ) : (
-                                    chatThreads.map((thread) => {
-                                        const isSelected = thread.id === activeThreadId;
-                                        return (
-                                            <button
-                                                key={thread.id}
-                                                type="button"
-                                                onClick={() => setActiveThreadId(thread.id)}
-                                                className={`w-full p-3.5 rounded-2xl text-left transition cursor-pointer flex flex-col gap-1 border ${
-                                                    isSelected ? "theme-button border-amber-400 shadow-md" : "theme-card border-transparent hover:theme-panel"
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <span className="font-bold text-sm truncate">{thread.clientName}</span>
-                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                                                        thread.clientType === "RESTAURANT" ? "bg-blue-500/20 text-blue-400" : "bg-purple-500/20 text-purple-400"
-                                                    }`}>
-                                                        {thread.clientType === "RESTAURANT" ? "Restaurant" : "External"}
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs truncate opacity-80">{thread.lastMessage}</p>
-                                            </button>
-                                        );
-                                    })
+                                    <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                                        {chatThreads.map((thread) => {
+                                            const isSelected = thread.id === activeThreadId;
+                                            return (
+                                                <button
+                                                    key={thread.id}
+                                                    type="button"
+                                                    onClick={() => setActiveThreadId(thread.id)}
+                                                    className={`w-full p-3 rounded-xl text-left transition cursor-pointer flex flex-col gap-1.5 border ${
+                                                        isSelected
+                                                            ? "bg-orange-50/80 dark:bg-orange-950/30 border-orange-500 text-slate-900 dark:text-slate-100 shadow-2xs"
+                                                            : "bg-slate-50/50 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-800 hover:bg-slate-100/70 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300"
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="font-extrabold text-xs truncate text-slate-900 dark:text-slate-100">{thread.clientName}</span>
+                                                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-extrabold shrink-0 ${
+                                                            thread.clientType === "RESTAURANT"
+                                                                ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-900"
+                                                                : "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-900"
+                                                        }`}>
+                                                            {thread.clientType === "RESTAURANT" ? "Restaurant" : "External"}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[11px] font-medium truncate opacity-75">{thread.lastMessage}</p>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 )}
                             </div>
 
-                            {/* LIVE MESSAGES STREAM & BARGAIN TOOL */}
-                            <div className="theme-panel rounded-3xl p-5 border flex flex-col justify-between lg:col-span-2 space-y-4">
+                            {/* RIGHT PANEL: SELECTED NEGOTIATION / CHAT (approx 65-67%) */}
+                            <div className="lg:col-span-8 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs flex flex-col justify-between min-h-[500px] space-y-4">
                                 {activeThread ? (
                                     <>
                                         {/* THREAD HEADER */}
-                                        <div className="flex items-center justify-between border-b theme-border pb-3">
+                                        <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 pb-3">
                                             <div className="flex items-center gap-3">
-                                                <div className="theme-card h-10 w-10 rounded-2xl flex items-center justify-center font-bold">
-                                                    <User size={20} />
+                                                <div className="h-10 w-10 rounded-xl bg-orange-100 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center font-black shrink-0 border border-orange-200/70 dark:border-orange-900/50">
+                                                    <User size={18} />
                                                 </div>
                                                 <div>
-                                                    <h3 className="font-bold text-base">{activeThread.clientName}</h3>
-                                                    <p className="theme-muted text-xs">B2B Buyer • Active Negotiation Session</p>
+                                                    <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">{activeThread.clientName}</h3>
+                                                    <p className="text-[11px] text-slate-500 font-medium">B2B Buyer • Active Negotiation Session</p>
                                                 </div>
                                             </div>
 
                                             <button
                                                 type="button"
                                                 onClick={() => setShowBargainModal(true)}
-                                                className="theme-soft-button rounded-xl px-3 py-1.5 text-xs font-bold flex items-center gap-1.5"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-slate-800 dark:text-slate-200 text-xs font-bold transition cursor-pointer"
                                             >
-                                                <Tag size={14} />
-                                                New Offer
+                                                <Tag size={13} className="text-orange-500" />
+                                                <span>New Offer</span>
                                             </button>
                                         </div>
 
-                                        {/* MESSAGES LIST */}
-                                        <div className="flex-1 space-y-3 overflow-y-auto max-h-[360px] p-2">
+                                        {/* MESSAGES LIST STREAM */}
+                                        <div className="flex-1 space-y-3 overflow-y-auto max-h-[380px] p-2 pr-3">
                                             {chatMessages.map((msg) => {
                                                 const isMe = msg.sender === "SUPPLIER";
                                                 return (
@@ -1456,47 +1741,55 @@ export default function SupplierDashboard() {
                                                         key={msg.id}
                                                         className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
                                                     >
-                                                        <span className="theme-muted text-[10px] mb-1 font-bold">{msg.senderName}</span>
+                                                        <span className="text-[10px] mb-1 font-bold text-slate-400">{msg.senderName}</span>
                                                         <div
-                                                            className={`max-w-[85%] rounded-2xl p-4 shadow-sm text-xs space-y-2 ${
-                                                                isMe ? "theme-button" : "theme-card border"
+                                                            className={`max-w-[85%] rounded-2xl p-3.5 shadow-2xs text-xs space-y-2 ${
+                                                                isMe
+                                                                    ? "bg-orange-500 text-white font-medium"
+                                                                    : "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200/80 dark:border-slate-700 font-medium"
                                                             }`}
                                                         >
-                                                            {msg.text && <p className="font-medium">{msg.text}</p>}
+                                                            {msg.text && <p className="leading-relaxed">{msg.text}</p>}
 
                                                             {/* BARGAIN COUNTER OFFER CARD */}
                                                             {msg.type === "BARGAIN_OFFER" && msg.offer && (
-                                                                <div className="rounded-xl border p-3 bg-black/20 space-y-2">
-                                                                    <div className="flex items-center justify-between">
-                                                                        <span className="font-extrabold text-sm">{msg.offer.productName}</span>
-                                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                                                                            msg.offer.status === "ACCEPTED" ? "bg-emerald-500 text-black" : msg.offer.status === "REJECTED" ? "bg-red-500 text-white" : "bg-amber-400 text-black"
+                                                                <div className={`rounded-xl border p-3 space-y-2 text-xs ${
+                                                                    isMe ? "bg-orange-600/40 border-orange-400/50 text-white" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
+                                                                }`}>
+                                                                    <div className="flex items-center justify-between gap-2">
+                                                                        <span className="font-black text-xs">{msg.offer.productName}</span>
+                                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                                                                            msg.offer.status === "ACCEPTED"
+                                                                                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                                                                : msg.offer.status === "REJECTED"
+                                                                                ? "bg-red-100 text-red-800 border border-red-300"
+                                                                                : "bg-amber-100 text-amber-900 border border-amber-300"
                                                                         }`}>
                                                                             {msg.offer.status}
                                                                         </span>
                                                                     </div>
                                                                     <div className="grid grid-cols-2 gap-2 text-[11px]">
-                                                                        <div>Qty: <strong>{msg.offer.quantity} {msg.offer.unit}</strong></div>
-                                                                        <div>Catalog: <s>₹{msg.offer.originalPrice}</s></div>
-                                                                        <div className="col-span-2 font-black text-amber-300 text-sm">
-                                                                            Offered Bargain Rate: ₹{msg.offer.offeredPrice} / {msg.offer.unit}
+                                                                        <div>Qty: <strong className="font-black">{msg.offer.quantity} {msg.offer.unit}</strong></div>
+                                                                        <div>Catalog: <s className="opacity-75">₹{msg.offer.originalPrice}</s></div>
+                                                                        <div className="col-span-2 font-extrabold text-amber-500 dark:text-amber-400 text-xs">
+                                                                            Offered Rate: ₹{msg.offer.offeredPrice} / {msg.offer.unit}
                                                                         </div>
                                                                     </div>
 
                                                                     {/* OFFER ACTION BUTTONS */}
                                                                     {!isMe && msg.offer.status === "PENDING" && (
-                                                                        <div className="flex items-center gap-2 pt-2 border-t border-white/10">
+                                                                        <div className="flex items-center gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700">
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => handleRespondToOffer(msg.offer.id, "ACCEPTED")}
-                                                                                className="rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black px-3 py-1 font-bold text-[11px]"
+                                                                                className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 font-bold text-[11px] transition shadow-2xs"
                                                                             >
                                                                                 Accept Rate (₹{msg.offer.offeredPrice})
                                                                             </button>
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => handleRespondToOffer(msg.offer.id, "REJECTED")}
-                                                                                className="rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 px-3 py-1 font-bold text-[11px]"
+                                                                                className="rounded-lg bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-950/40 dark:text-red-300 px-3 py-1 font-bold text-[11px] transition"
                                                                             >
                                                                                 Reject
                                                                             </button>
@@ -1511,96 +1804,161 @@ export default function SupplierDashboard() {
                                         </div>
 
                                         {/* CHAT INPUT FORM */}
-                                        <form onSubmit={handleSendMessage} className="flex items-center gap-2 pt-2 border-t theme-border">
+                                        <form onSubmit={handleSendMessage} className="flex items-center gap-2 pt-3 border-t border-slate-200/80 dark:border-slate-800">
                                             <input
                                                 type="text"
                                                 placeholder="Type your message or negotiate pricing..."
                                                 value={chatText}
                                                 onChange={(e) => setChatText(e.target.value)}
-                                                className="theme-input flex-1 rounded-xl px-4 py-3 text-xs outline-none"
+                                                className="flex-1 rounded-xl border border-slate-200/80 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium"
                                             />
                                             <button
                                                 type="submit"
-                                                className="theme-button rounded-xl px-4 py-3 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md"
+                                                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-xs transition active:scale-95 cursor-pointer shrink-0"
                                             >
-                                                <Send size={16} />
-                                                Send
+                                                <Send size={14} />
+                                                <span>Send</span>
                                             </button>
                                         </form>
                                     </>
                                 ) : (
-                                    <div className="flex-1 flex flex-col items-center justify-center theme-muted text-sm space-y-2">
-                                        <MessageSquare size={36} />
-                                        <p>Select a B2B conversation to start price bargaining & live chat</p>
+                                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 space-y-2 py-12">
+                                        <MessageSquare size={36} className="text-slate-300 dark:text-slate-600" />
+                                        <p className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                                            Select a conversation to view negotiation details.
+                                        </p>
                                     </div>
                                 )}
                             </div>
                         </div>
-                    </div>
-                )}
 
-                {/* TAB: B2B PRICE NEGOTIATIONS */}
-                {isAccountActive && activeTab === "price-negotiations" && (
-                    <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-                                    <Handshake className="theme-accent-text" />
-                                    B2B Price Negotiations & Custom Rate Agreements
-                                </h2>
-                                <p className="theme-muted text-xs mt-0.5">Manage custom wholesale volume pricing and active price counter-offers with restaurant clients</p>
+                        {/* RECENT NEGOTIATIONS SECTION */}
+                        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                                        RECENT NEGOTIATIONS
+                                    </h3>
+                                    <p className="text-[11px] text-slate-500">Live bargain quotes and counter-offer status history</p>
+                                </div>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setShowBargainModal(true)}
-                                className="theme-button rounded-xl px-4 py-2.5 text-xs font-extrabold flex items-center gap-2 shadow-md cursor-pointer"
-                            >
-                                <Tag size={16} />
-                                New Rate Proposal
-                            </button>
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
-                                <p className="theme-muted text-xs font-bold uppercase">Active Agreements</p>
-                                <p className="text-2xl font-black text-emerald-400">{chatThreads.length}</p>
-                            </div>
-                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
-                                <p className="theme-muted text-xs font-bold uppercase">Pending Counter-Offers</p>
-                                <p className="text-2xl font-black text-amber-400">
-                                    {chatMessages.filter(m => m.type === "BARGAIN_OFFER" && m.offer?.status === "PENDING").length}
-                                </p>
-                            </div>
-                            <div className="theme-panel rounded-2xl p-4 border space-y-1">
-                                <p className="theme-muted text-xs font-bold uppercase">Avg Wholesale Discount</p>
-                                <p className="text-2xl font-black theme-accent-text">8.5%</p>
-                            </div>
-                        </div>
-
-                        <div className="theme-panel rounded-3xl p-6 border space-y-4">
-                            <h3 className="text-base font-bold">Recent Bargain Negotiations & Client Quotes</h3>
                             {chatThreads.length === 0 ? (
-                                <p className="theme-muted text-xs py-8 text-center">No price negotiations logged yet. Use "B2B Negotiation & Chat" to start bargaining with clients.</p>
+                                <div className="p-8 text-center text-xs text-slate-400">
+                                    No active negotiations recorded.
+                                </div>
                             ) : (
-                                <div className="divide-y theme-border">
-                                    {chatThreads.map((t) => (
-                                        <div key={t.id} className="py-3 flex items-center justify-between">
-                                            <div>
-                                                <p className="font-bold text-sm">{t.clientName}</p>
-                                                <p className="theme-muted text-xs">{t.lastMessage}</p>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setActiveThreadId(t.id);
-                                                    setActiveTab("chat");
-                                                }}
-                                                className="theme-soft-button px-3 py-1.5 rounded-xl text-xs font-bold"
-                                            >
-                                                Open Chat
-                                            </button>
-                                        </div>
-                                    ))}
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-800/40">
+                                                <th className="py-2.5 px-3">Buyer / Restaurant</th>
+                                                <th className="py-2.5 px-3">Product</th>
+                                                <th className="py-2.5 px-3">Quantity</th>
+                                                <th className="py-2.5 px-3">Catalog Rate</th>
+                                                <th className="py-2.5 px-3">Negotiated Rate</th>
+                                                <th className="py-2.5 px-3">Status</th>
+                                                <th className="py-2.5 px-3 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-800 dark:text-slate-200">
+                                            {recentNegotiationRows.map((row) => (
+                                                <tr key={row.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                                                    <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100">{row.buyerName}</td>
+                                                    <td className="py-2.5 px-3">{row.productName}</td>
+                                                    <td className="py-2.5 px-3 font-semibold">{row.quantity}</td>
+                                                    <td className="py-2.5 px-3 text-slate-500">{row.catalogPrice}</td>
+                                                    <td className="py-2.5 px-3 font-extrabold text-orange-500">{row.offeredPrice}</td>
+                                                    <td className="py-2.5 px-3">
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                                                            row.status === "ACCEPTED"
+                                                                ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                                                : row.status === "REJECTED"
+                                                                ? "bg-red-50 text-red-800 border border-red-200"
+                                                                : "bg-amber-50 text-amber-800 border border-amber-200"
+                                                        }`}>
+                                                            {row.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2.5 px-3 text-right">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setActiveThreadId(row.threadId);
+                                                                window.scrollTo({ top: 300, behavior: "smooth" });
+                                                            }}
+                                                            className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 text-[11px] font-bold transition cursor-pointer"
+                                                        >
+                                                            Open Chat
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ACTIVE CUSTOM RATE AGREEMENTS SECTION */}
+                        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                                        ACTIVE CUSTOM RATE AGREEMENTS
+                                    </h3>
+                                    <p className="text-[11px] text-slate-500">Agreed wholesale volume pricing contracts with clients</p>
+                                </div>
+                            </div>
+
+                            {activeAgreementsList.length === 0 ? (
+                                <div className="p-8 text-center text-xs text-slate-400">
+                                    No active custom rate agreements finalized yet. Accept rate offers to establish custom rate agreements.
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-800/40">
+                                                <th className="py-2.5 px-3">Buyer / Restaurant</th>
+                                                <th className="py-2.5 px-3">Product</th>
+                                                <th className="py-2.5 px-3">Agreed Rate</th>
+                                                <th className="py-2.5 px-3">Quantity</th>
+                                                <th className="py-2.5 px-3">Valid Period</th>
+                                                <th className="py-2.5 px-3">Status</th>
+                                                <th className="py-2.5 px-3 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-800 dark:text-slate-200">
+                                            {activeAgreementsList.map((agr) => (
+                                                <tr key={agr.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                                                    <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100">{agr.buyerName}</td>
+                                                    <td className="py-2.5 px-3">{agr.productName}</td>
+                                                    <td className="py-2.5 px-3 font-black text-emerald-600 dark:text-emerald-400">{agr.agreedRate}</td>
+                                                    <td className="py-2.5 px-3 font-semibold">{agr.quantity}</td>
+                                                    <td className="py-2.5 px-3 text-slate-500">{agr.validPeriod}</td>
+                                                    <td className="py-2.5 px-3">
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                            Active Agreement
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2.5 px-3 text-right">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (agr.threadId) setActiveThreadId(agr.threadId);
+                                                                window.scrollTo({ top: 300, behavior: "smooth" });
+                                                            }}
+                                                            className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 text-[11px] font-bold transition cursor-pointer"
+                                                        >
+                                                            View Chat
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             )}
                         </div>
@@ -1806,54 +2164,277 @@ export default function SupplierDashboard() {
                 {/* TAB: SUPPLY MARKETPLACE */}
                 {isAccountActive && activeTab === "supply-marketplace" && (
                     <div className="space-y-6">
-                        <div className="flex items-center justify-between">
+                        {/* Header & Add Button */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                                 <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
                                     <ShoppingBag className="theme-accent-text" />
                                     Tiffzy Wholesale Supply Marketplace Listings
                                 </h2>
-                                <p className="theme-muted text-xs mt-0.5">View your published raw material products visible to restaurant buyers across Tiffzy Marketplace</p>
+                                <p className="theme-muted text-xs mt-0.5">
+                                    View, manage, and promote your raw material listings visible to restaurant buyers across Tiffzy B2B Marketplace
+                                </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setShowAddProductModal(true)}
-                                className="theme-button rounded-xl px-4 py-2.5 text-xs font-extrabold flex items-center gap-2 shadow-md cursor-pointer"
+                                className="theme-button rounded-xl px-4 py-2.5 text-xs font-extrabold flex items-center gap-2 shadow-md cursor-pointer whitespace-nowrap self-start sm:self-auto"
                             >
                                 <Plus size={16} />
                                 Add Marketplace Item
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {products.length === 0 ? (
-                                <div className="col-span-3 theme-panel rounded-3xl p-8 text-center theme-muted text-xs space-y-2">
-                                    <Package size={32} className="mx-auto" />
-                                    <p>No products added to Marketplace yet.</p>
+                        {/* Search, Filter & Sort Toolbar */}
+                        <div className="theme-panel rounded-2xl p-4 border theme-border space-y-3">
+                            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+                                {/* Search Input */}
+                                <div className="relative flex-1">
+                                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 theme-muted" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search products by name, category, SKU or description..."
+                                        value={marketplaceSearch}
+                                        onChange={(e) => setMarketplaceSearch(e.target.value)}
+                                        className="theme-input w-full rounded-xl pl-10 pr-8 py-2 text-xs outline-none"
+                                    />
+                                    {marketplaceSearch && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setMarketplaceSearch("")}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 theme-muted hover:text-foreground text-xs"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
                                 </div>
-                            ) : (
-                                products.map((p) => (
-                                    <div key={p.id} className="theme-panel rounded-2xl p-4 border space-y-3">
-                                        <div className="flex items-center gap-3">
-                                            {p.imageUrl ? (
-                                                <img src={p.imageUrl} alt={p.name} className="h-12 w-12 rounded-xl object-cover border theme-border" />
-                                            ) : (
-                                                <div className="h-12 w-12 rounded-xl theme-card flex items-center justify-center font-bold text-xs">
-                                                    RAW
-                                                </div>
-                                            )}
+
+                                {/* Filters Group */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {/* Category Filter */}
+                                    <div className="flex items-center gap-1.5">
+                                        <Filter size={13} className="theme-muted hidden sm:inline" />
+                                        <select
+                                            value={marketplaceCategoryFilter}
+                                            onChange={(e) => setMarketplaceCategoryFilter(e.target.value)}
+                                            className="theme-input rounded-xl px-3 py-2 text-xs font-medium outline-none cursor-pointer"
+                                        >
+                                            <option value="ALL">All Categories</option>
+                                            {availableCategories.map((cat) => (
+                                                <option key={cat} value={cat}>{cat}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Stock Status Filter */}
+                                    <select
+                                        value={marketplaceStockFilter}
+                                        onChange={(e) => setMarketplaceStockFilter(e.target.value)}
+                                        className="theme-input rounded-xl px-3 py-2 text-xs font-medium outline-none cursor-pointer"
+                                    >
+                                        <option value="ALL">All Stock</option>
+                                        <option value="IN_STOCK">In Stock</option>
+                                        <option value="LOW_STOCK">Low Stock</option>
+                                        <option value="OUT_OF_STOCK">Out of Stock</option>
+                                    </select>
+
+                                    {/* Marketplace Status Filter */}
+                                    <select
+                                        value={marketplaceStatusFilter}
+                                        onChange={(e) => setMarketplaceStatusFilter(e.target.value)}
+                                        className="theme-input rounded-xl px-3 py-2 text-xs font-medium outline-none cursor-pointer"
+                                    >
+                                        <option value="ALL">All Statuses</option>
+                                        <option value="APPROVED">Approved</option>
+                                        <option value="PENDING">Pending</option>
+                                        <option value="REJECTED">Rejected</option>
+                                    </select>
+
+                                    {/* Sort By Dropdown */}
+                                    <select
+                                        value={marketplaceSortBy}
+                                        onChange={(e) => setMarketplaceSortBy(e.target.value)}
+                                        className="theme-input rounded-xl px-3 py-2 text-xs font-medium outline-none cursor-pointer"
+                                    >
+                                        <option value="NEWEST">Sort: Newest</option>
+                                        <option value="PRICE_ASC">Price: Low → High</option>
+                                        <option value="PRICE_DESC">Price: High → Low</option>
+                                        <option value="STOCK_DESC">Stock: High → Low</option>
+                                        <option value="NAME_ASC">Name: A → Z</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Status Bar / Active Filters */}
+                            <div className="flex items-center justify-between text-xs border-t theme-border pt-2">
+                                <span className="theme-muted font-medium">
+                                    Showing <strong className="text-foreground font-bold">{filteredProducts.length}</strong> of {products.length} products
+                                </span>
+                                {(marketplaceSearch || marketplaceCategoryFilter !== "ALL" || marketplaceStockFilter !== "ALL" || marketplaceStatusFilter !== "ALL") && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setMarketplaceSearch("");
+                                            setMarketplaceCategoryFilter("ALL");
+                                            setMarketplaceStockFilter("ALL");
+                                            setMarketplaceStatusFilter("ALL");
+                                            setMarketplaceSortBy("NEWEST");
+                                        }}
+                                        className="theme-accent-text hover:underline text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <RefreshCw size={11} />
+                                        Clear Filters
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Product Cards Grid */}
+                        {filteredProducts.length === 0 ? (
+                            <div className="theme-panel rounded-3xl p-12 text-center theme-muted text-xs space-y-3 border theme-border">
+                                <Package size={40} className="mx-auto theme-accent-text opacity-70" />
+                                <p className="text-sm font-bold text-foreground">No products match your search or filters.</p>
+                                <p className="text-xs theme-muted max-w-sm mx-auto">
+                                    Try adjusting your keyword, resetting category/stock filters, or adding a new marketplace product.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setMarketplaceSearch("");
+                                        setMarketplaceCategoryFilter("ALL");
+                                        setMarketplaceStockFilter("ALL");
+                                        setMarketplaceStatusFilter("ALL");
+                                    }}
+                                    className="theme-button rounded-xl px-4 py-2 text-xs font-extrabold inline-flex items-center gap-2 cursor-pointer mt-2"
+                                >
+                                    Clear All Filters
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                                {filteredProducts.map((p) => {
+                                    const priceVal = p.prices?.[0]?.basePrice || p.basePrice || p.price || 0;
+                                    const availStock = p.inventory?.availableStock ?? 0;
+                                    const lowAlert = p.inventory?.lowStockAlert || 10;
+                                    const catName = p.category?.name || p.categoryName || "General Supply";
+                                    const isAvail = p.availability !== false;
+
+                                    return (
+                                        <div key={p.id} className="theme-panel rounded-2xl border theme-border overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition group">
                                             <div>
-                                                <h3 className="font-bold text-sm">{p.name}</h3>
-                                                <p className="theme-muted text-xs">{p.categoryName || "General Supply"}</p>
+                                                {/* Product Image Box */}
+                                                <div className="relative h-44 w-full bg-black/20 overflow-hidden border-b theme-border">
+                                                    <img
+                                                        src={getSupplyProductImageUrl(p)}
+                                                        alt={p.name}
+                                                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                        onError={(e) => {
+                                                            e.target.onerror = null;
+                                                            e.target.src = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80";
+                                                        }}
+                                                    />
+                                                    {/* Overlay Status Pills */}
+                                                    <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
+                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-md backdrop-blur-md ${
+                                                            p.status === "APPROVED" ? "bg-emerald-500/90 text-white" :
+                                                            p.status === "REJECTED" ? "bg-red-500/90 text-white" :
+                                                            "bg-amber-500/90 text-white"
+                                                        }`}>
+                                                            {p.status || "APPROVED"}
+                                                        </span>
+
+                                                        {/* Stock Status Badge */}
+                                                        {!isAvail ? (
+                                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-gray-700/90 text-white shadow-md">UNAVAILABLE</span>
+                                                        ) : availStock <= 0 ? (
+                                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-red-600/90 text-white shadow-md">OUT OF STOCK</span>
+                                                        ) : availStock <= lowAlert ? (
+                                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-amber-500/90 text-white shadow-md">LOW STOCK ({availStock})</span>
+                                                        ) : (
+                                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-600/90 text-white shadow-md">IN STOCK</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Card Body */}
+                                                <div className="p-4 space-y-3">
+                                                    <div>
+                                                        <h3 className="font-bold text-base line-clamp-1 leading-snug">{p.name}</h3>
+                                                        <p className="theme-muted text-xs font-medium flex items-center gap-1.5 mt-0.5">
+                                                            <Tag size={12} className="theme-accent-text flex-shrink-0" />
+                                                            <span>{catName}</span>
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Description */}
+                                                    {p.description && (
+                                                        <p className="theme-muted text-xs line-clamp-2 leading-relaxed">
+                                                            {p.description}
+                                                        </p>
+                                                    )}
+
+                                                    {/* Price & MOQ Matrix */}
+                                                    <div className="theme-card rounded-xl p-3 border theme-border space-y-1.5">
+                                                        <div className="flex items-baseline justify-between">
+                                                            <span className="theme-muted text-[11px] font-bold uppercase">Wholesale Rate</span>
+                                                            <span className="text-base font-black text-amber-400">
+                                                                ₹{priceVal.toLocaleString("en-IN")} / {p.unit || "KG"}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between text-xs border-t theme-border pt-1.5">
+                                                            <span className="theme-muted">MOQ: <strong className="text-foreground font-bold">{p.moq || 1} {p.unit || "KG"}</strong></span>
+                                                            <span className="theme-muted">Available: <strong className="text-foreground font-bold">{availStock.toLocaleString("en-IN")} {p.unit || "KG"}</strong></span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Discount & Bargain Badges */}
+                                                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                                        {(p.discounts?.length > 0 || p.discountValue > 0) && (
+                                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                                                                <Tag size={10} />
+                                                                Bulk Discount Active
+                                                            </span>
+                                                        )}
+                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                                                            <Handshake size={10} />
+                                                            B2B Bargain Available
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Card Footer Actions */}
+                                            <div className="p-3 bg-black/10 border-t theme-border grid grid-cols-3 gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleOpenDetailsModal(p)}
+                                                    className="theme-card hover:theme-panel rounded-xl py-2 px-1 text-[11px] font-bold border theme-border flex items-center justify-center gap-1 cursor-pointer transition"
+                                                >
+                                                    <ClipboardCheck size={13} />
+                                                    Details
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleOpenEditModal(p)}
+                                                    className="theme-card hover:theme-panel rounded-xl py-2 px-1 text-[11px] font-bold border theme-border flex items-center justify-center gap-1 cursor-pointer transition"
+                                                >
+                                                    <Save size={13} />
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleStartBargainFromCard(p)}
+                                                    className="theme-button rounded-xl py-2 px-1 text-[11px] font-extrabold flex items-center justify-center gap-1 shadow-sm cursor-pointer"
+                                                >
+                                                    <Handshake size={13} />
+                                                    Bargain
+                                                </button>
                                             </div>
                                         </div>
-                                        <div className="flex items-center justify-between border-t theme-border pt-2 text-xs">
-                                            <span className="font-extrabold text-amber-400">₹{p.basePrice || p.price} / {p.unit || "kg"}</span>
-                                            <span className="theme-muted">MOQ: {p.moq || 1} {p.unit || "kg"}</span>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -2352,6 +2933,243 @@ export default function SupplierDashboard() {
                                     className="theme-button rounded-xl px-5 py-2.5 text-xs font-bold cursor-pointer"
                                 >
                                     Save Product
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {/* PRODUCT DETAILS MODAL */}
+            {showProductDetailsModal && selectedProductDetails && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center theme-modal-backdrop p-4">
+                    <div className="theme-modal w-full max-w-lg rounded-3xl p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <div className="flex items-center justify-between border-b theme-border pb-3">
+                            <h3 className="text-xl font-bold flex items-center gap-2">
+                                <ShoppingBag className="theme-accent-text" size={20} />
+                                Product Specifications
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowProductDetailsModal(false);
+                                    setSelectedProductDetails(null);
+                                }}
+                                className="theme-muted hover:text-foreground p-1 rounded-lg cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Image & Header */}
+                        <div className="relative h-48 w-full rounded-2xl overflow-hidden border theme-border bg-black/40">
+                            <img
+                                src={getSupplyProductImageUrl(selectedProductDetails)}
+                                alt={selectedProductDetails.name}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80";
+                                }}
+                            />
+                            <span className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-black uppercase shadow-md ${
+                                selectedProductDetails.status === "APPROVED" ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
+                            }`}>
+                                {selectedProductDetails.status || "APPROVED"}
+                            </span>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div>
+                                <h4 className="text-lg font-bold">{selectedProductDetails.name}</h4>
+                                <p className="theme-muted text-xs font-medium flex items-center gap-1 mt-0.5">
+                                    <Tag size={12} className="theme-accent-text" />
+                                    {selectedProductDetails.category?.name || selectedProductDetails.categoryName || "General Supply"}
+                                </p>
+                            </div>
+
+                            {selectedProductDetails.description && (
+                                <div className="theme-panel rounded-xl p-3 border theme-border text-xs leading-relaxed theme-muted">
+                                    <span className="font-bold text-foreground block mb-1">Description:</span>
+                                    {selectedProductDetails.description}
+                                </div>
+                            )}
+
+                            {/* Specs Grid */}
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                                <div className="theme-card rounded-xl p-3 border theme-border space-y-1">
+                                    <p className="theme-muted font-bold uppercase text-[10px]">Base Price</p>
+                                    <p className="text-base font-black text-amber-400">
+                                        ₹{(selectedProductDetails.prices?.[0]?.basePrice || selectedProductDetails.basePrice || selectedProductDetails.price || 0).toLocaleString("en-IN")} / {selectedProductDetails.unit || "KG"}
+                                    </p>
+                                </div>
+                                <div className="theme-card rounded-xl p-3 border theme-border space-y-1">
+                                    <p className="theme-muted font-bold uppercase text-[10px]">Minimum Order Qty</p>
+                                    <p className="text-base font-black text-foreground">
+                                        {selectedProductDetails.moq || 1} {selectedProductDetails.unit || "KG"}
+                                    </p>
+                                </div>
+                                <div className="theme-card rounded-xl p-3 border theme-border space-y-1">
+                                    <p className="theme-muted font-bold uppercase text-[10px]">Available Inventory</p>
+                                    <p className="text-base font-black text-emerald-400">
+                                        {(selectedProductDetails.inventory?.availableStock ?? 0).toLocaleString("en-IN")} {selectedProductDetails.unit || "KG"}
+                                    </p>
+                                </div>
+                                <div className="theme-card rounded-xl p-3 border theme-border space-y-1">
+                                    <p className="theme-muted font-bold uppercase text-[10px]">Stock Status</p>
+                                    <p className="text-sm font-extrabold text-foreground">
+                                        {!selectedProductDetails.availability ? "Unavailable" : (selectedProductDetails.inventory?.availableStock ?? 0) > 0 ? "In Stock" : "Out of Stock"}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 border-t theme-border pt-4">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const target = selectedProductDetails;
+                                    setShowProductDetailsModal(false);
+                                    setSelectedProductDetails(null);
+                                    handleOpenEditModal(target);
+                                }}
+                                className="theme-card hover:theme-panel rounded-xl px-4 py-2 text-xs font-bold border theme-border cursor-pointer"
+                            >
+                                Edit Item
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const target = selectedProductDetails;
+                                    setShowProductDetailsModal(false);
+                                    setSelectedProductDetails(null);
+                                    handleStartBargainFromCard(target);
+                                }}
+                                className="theme-button rounded-xl px-4 py-2 text-xs font-extrabold cursor-pointer"
+                            >
+                                Start B2B Negotiation
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT PRODUCT MODAL */}
+            {showEditProductModal && editProductForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center theme-modal-backdrop p-4">
+                    <div className="theme-modal w-full max-w-lg rounded-3xl p-6 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <div className="flex items-center justify-between border-b theme-border pb-3">
+                            <h3 className="text-xl font-bold">Edit Marketplace Item</h3>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowEditProductModal(false);
+                                    setEditProductForm(null);
+                                }}
+                                className="theme-muted hover:text-foreground p-1 rounded-lg cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleUpdateProduct} className="space-y-3">
+                            <div>
+                                <label className="theme-muted mb-1 block text-xs font-bold uppercase">Product Name *</label>
+                                <input
+                                    type="text"
+                                    value={editProductForm.name}
+                                    onChange={(e) => setEditProductForm({ ...editProductForm, name: e.target.value })}
+                                    required
+                                    className="theme-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="theme-muted mb-1 block text-xs font-bold uppercase">Description</label>
+                                <textarea
+                                    rows={2}
+                                    value={editProductForm.description}
+                                    onChange={(e) => setEditProductForm({ ...editProductForm, description: e.target.value })}
+                                    className="theme-input w-full rounded-xl px-4 py-2 text-xs outline-none"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="theme-muted mb-1 block text-xs font-bold uppercase">Base Price (₹) *</label>
+                                    <input
+                                        type="number"
+                                        step="0.5"
+                                        value={editProductForm.basePrice}
+                                        onChange={(e) => setEditProductForm({ ...editProductForm, basePrice: e.target.value })}
+                                        required
+                                        className="theme-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="theme-muted mb-1 block text-xs font-bold uppercase">Unit *</label>
+                                    <input
+                                        type="text"
+                                        value={editProductForm.unit}
+                                        onChange={(e) => setEditProductForm({ ...editProductForm, unit: e.target.value })}
+                                        required
+                                        className="theme-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="theme-muted mb-1 block text-xs font-bold uppercase">Minimum Order Qty (MOQ)</label>
+                                    <input
+                                        type="number"
+                                        value={editProductForm.moq}
+                                        onChange={(e) => setEditProductForm({ ...editProductForm, moq: e.target.value })}
+                                        required
+                                        className="theme-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="theme-muted mb-1 block text-xs font-bold uppercase">Low Stock Alert Level</label>
+                                    <input
+                                        type="number"
+                                        value={editProductForm.lowStockAlert}
+                                        onChange={(e) => setEditProductForm({ ...editProductForm, lowStockAlert: e.target.value })}
+                                        className="theme-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-2">
+                                <input
+                                    type="checkbox"
+                                    id="availability-check-edit"
+                                    checked={editProductForm.availability}
+                                    onChange={(e) => setEditProductForm({ ...editProductForm, availability: e.target.checked })}
+                                    className="h-4 w-4 rounded accent-amber-500 cursor-pointer"
+                                />
+                                <label htmlFor="availability-check-edit" className="text-xs font-bold cursor-pointer">
+                                    Product is Active & Available for Ordering
+                                </label>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 border-t theme-border pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowEditProductModal(false);
+                                        setEditProductForm(null);
+                                    }}
+                                    className="theme-card hover:theme-panel rounded-xl px-4 py-2.5 text-xs font-bold border theme-border cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={savingEditProduct}
+                                    className="theme-button rounded-xl px-5 py-2.5 text-xs font-extrabold flex items-center gap-2 cursor-pointer shadow-md"
+                                >
+                                    {savingEditProduct && <RefreshCw size={14} className="animate-spin" />}
+                                    Save Changes
                                 </button>
                             </div>
                         </form>

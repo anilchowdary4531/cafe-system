@@ -55,7 +55,7 @@ describe("SuperAdminCategories Page Interactive Audit", () => {
         });
 
         // 2. Click Power Toggle (Pause) on Biryani
-        const powerButtons = screen.getAllByRole("button").filter((btn) => btn.className.includes("bg-emerald-500") || btn.className.includes("bg-green-500") || btn.className.includes("bg-gray-700"));
+        const powerButtons = screen.getAllByTitle(/Pause Category|Activate Category/i);
         expect(powerButtons.length).toBeGreaterThan(0);
 
         fireEvent.click(powerButtons[0]);
@@ -65,7 +65,7 @@ describe("SuperAdminCategories Page Interactive Audit", () => {
         });
 
         // 3. Click Delete (Trash Icon) on Biryani
-        const deleteButtons = screen.getAllByRole("button").filter((btn) => btn.className.includes("bg-red-500"));
+        const deleteButtons = screen.getAllByTitle("Delete Category");
         expect(deleteButtons.length).toBeGreaterThan(0);
 
         fireEvent.click(deleteButtons[0]);
