@@ -461,29 +461,33 @@ export default function SupplierDashboard() {
     return (
         <div className="theme-page min-h-screen flex flex-col relative">
             {/* TOP HEADER BAR */}
-            <header className="theme-nav sticky top-0 z-40 px-4 sm:px-6 py-4 border-b shadow-sm">
-                <div className="mx-auto flex max-w-7xl items-center justify-between">
+            <header className="sticky top-0 z-40 px-4 sm:px-6 py-3 border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+                <div className="w-full flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
                             onClick={() => setSidebarOpen(!sidebarOpen)}
-                            className="theme-button px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 cursor-pointer shadow-md"
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white transition flex items-center gap-2 cursor-pointer shadow-2xs active:scale-95"
+                            title="Toggle navigation drawer"
                         >
                             {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
                             <span>{sidebarOpen ? "Close Menu" : "Menu"}</span>
                         </button>
 
                         <div className="flex items-center gap-2.5">
-                            <div className="theme-card flex h-10 w-10 items-center justify-center rounded-2xl shadow-md">
-                                <BrandLogo className="h-7 w-7" title="Brand logo" />
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 border border-orange-500/20">
+                                <BrandLogo className="h-6 w-6" title="Brand logo" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold tracking-tight">
-                                    {profileData?.profile?.businessName || "Supplier Portal"}
+                                <h1 className="text-base font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                    {profileData?.profile?.businessName || "Tiffzy Supply"}
+                                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 uppercase tracking-wider">
+                                        SUPPLY PORTAL
+                                    </span>
                                 </h1>
-                                <p className="theme-muted text-xs font-medium hidden sm:block">
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium hidden sm:block">
                                     Status:{" "}
-                                    <span className={`font-bold ${isAccountActive ? "text-emerald-400" : "text-amber-400"}`}>
+                                    <span className={`font-bold ${isAccountActive ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
                                         {profileData?.status || "PENDING VERIFICATION"}
                                     </span>
                                 </p>
@@ -495,16 +499,16 @@ export default function SupplierDashboard() {
                         <button
                             type="button"
                             onClick={loadData}
-                            className="theme-soft-button rounded-xl px-3.5 py-2 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition flex items-center gap-1.5 cursor-pointer"
                         >
-                            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-                            <span className="hidden sm:inline">Refresh</span>
+                            <RefreshCw size={14} className={loading ? "animate-spin text-orange-500" : ""} />
+                            <span className="hidden sm:inline">Sync Data</span>
                         </button>
 
                         <button
                             type="button"
                             onClick={handleLogout}
-                            className="rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-xs font-bold text-red-400 hover:bg-red-500/20 transition flex items-center gap-1.5 cursor-pointer"
+                            className="rounded-xl border border-rose-200 dark:border-rose-950 bg-rose-50 dark:bg-rose-950/40 px-3.5 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 transition flex items-center gap-1.5 cursor-pointer"
                         >
                             <LogOut size={14} />
                             <span className="hidden sm:inline">Logout</span>
@@ -513,36 +517,48 @@ export default function SupplierDashboard() {
                 </div>
             </header>
 
-            {/* COLLAPSIBLE SIDEBAR MENU DRAWER */}
+            {/* COLLAPSIBLE SIDEBAR MENU DRAWER OVERLAY — EXACT OWNER PANEL DESIGN MATCH */}
             {sidebarOpen && (
                 <div className="fixed inset-0 z-50 flex">
+                    {/* SEMI-TRANSPARENT BACKDROP */}
                     <div
-                        className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+                        className="fixed inset-0 bg-black/50 backdrop-blur-2xs transition-opacity"
                         onClick={() => setSidebarOpen(false)}
+                        aria-hidden="true"
                     />
 
-                    <aside className="theme-sidebar relative z-10 w-72 max-w-[85vw] h-full p-4 flex flex-col justify-between shadow-2xl border-r theme-border animate-in slide-in-from-left duration-200">
+                    {/* WHITE SIDEBAR DRAWER MATCHING OWNER PANEL */}
+                    <aside
+                        aria-label="Supply navigation sidebar"
+                        className="relative z-10 w-64 sm:w-72 h-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-r border-slate-200 dark:border-slate-800 shadow-2xl p-4 flex flex-col justify-between animate-in slide-in-from-left duration-200"
+                    >
                         <div className="flex-1 flex flex-col min-h-0">
-                            <div className="flex items-center justify-between px-2 py-3 mb-3 border-b theme-border flex-shrink-0">
-                                <div className="flex items-center gap-3">
-                                    <div className="theme-card flex h-10 w-10 items-center justify-center rounded-2xl">
-                                        <BrandLogo className="h-7 w-7" title="Brand logo" />
-                                    </div>
+                            {/* BRANDING HEADER */}
+                            <div className="flex items-center justify-between mb-5 pb-3 border-b border-slate-200/80 dark:border-slate-800">
+                                <div className="flex items-center gap-2.5">
+                                    <BrandLogo className="h-8 w-8" title="Tiffzy logo" />
                                     <div>
-                                        <h1 className="text-lg font-bold">Tiffzy Supply</h1>
-                                        <p className="theme-muted text-[11px]">Navigation Menu</p>
+                                        <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 leading-none">
+                                            Tiffzy
+                                        </h1>
+                                        <span className="text-orange-500 text-[10px] font-extrabold uppercase tracking-wider block mt-0.5">
+                                            SUPPLY
+                                        </span>
                                     </div>
                                 </div>
+
                                 <button
                                     type="button"
                                     onClick={() => setSidebarOpen(false)}
-                                    className="theme-soft-button p-2 rounded-xl"
+                                    className="text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl p-2 transition cursor-pointer"
+                                    title="Close navigation menu"
                                 >
                                     <X size={18} />
                                 </button>
                             </div>
 
-                            <nav className="space-y-1.5 overflow-y-auto flex-1 pr-1 max-h-[calc(100vh-140px)]">
+                            {/* NAVIGATION ITEMS LIST (OWNER PANEL STYLE: NO BOXES, SUBTLE LEFT ORANGE INDICATOR) */}
+                            <nav className="space-y-1 overflow-y-auto flex-1 pr-1">
                                 {navTabs.map((tab) => {
                                     const Icon = tab.icon;
                                     const isActive = activeTab === tab.id;
@@ -557,23 +573,25 @@ export default function SupplierDashboard() {
                                                 }
                                                 changeTab(tab.id);
                                             }}
-                                            className={`w-full px-4 py-3 rounded-2xl text-sm font-bold transition flex items-center justify-between cursor-pointer ${
+                                            className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl transition text-sm font-medium cursor-pointer ${
                                                 tab.locked
-                                                    ? "opacity-50 cursor-not-allowed theme-soft-button"
+                                                    ? "opacity-50 cursor-not-allowed text-slate-400 dark:text-slate-600"
                                                     : isActive
-                                                    ? "theme-button font-extrabold shadow-lg shadow-amber-500/20"
-                                                    : "theme-soft-button hover:theme-panel"
+                                                    ? "bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 font-bold border-l-4 border-orange-500 shadow-2xs"
+                                                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100"
                                             }`}
                                         >
                                             <div className="flex items-center gap-3">
-                                                <Icon size={18} />
+                                                <Icon size={18} className={isActive ? "text-orange-500" : "text-slate-500 dark:text-slate-400"} />
                                                 <span>{tab.label}</span>
                                             </div>
                                             {tab.locked ? (
-                                                <Lock size={14} className="theme-muted" />
+                                                <Lock size={13} className="text-slate-400" />
                                             ) : tab.count !== undefined ? (
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
-                                                    isActive ? "bg-black/20 text-black" : "theme-card"
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                    isActive
+                                                        ? "bg-orange-500 text-white"
+                                                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
                                                 }`}>
                                                     {tab.count}
                                                 </span>
@@ -584,21 +602,27 @@ export default function SupplierDashboard() {
                             </nav>
                         </div>
 
-                        <div className="border-t theme-border pt-4 px-1 space-y-3">
-                            <div className="flex items-center justify-between text-xs">
+                        {/* ACCOUNT FOOTER AREA (CLEAN WHITE OWNER-STYLE TREATMENT) */}
+                        <div className="border-t border-slate-200/80 dark:border-slate-800 pt-3 mt-auto space-y-2">
+                            <div className="flex items-center justify-between px-1">
                                 <div className="truncate pr-2">
-                                    <p className="font-bold truncate">{profileData?.profile?.businessName || "Supplier"}</p>
-                                    <p className="theme-muted text-[11px]">Status: <span className="theme-accent-text font-bold">{profileData?.status || "PENDING"}</span></p>
+                                    <p className="font-bold text-xs truncate text-slate-900 dark:text-slate-100">
+                                        {profileData?.profile?.businessName || "Supplier Account"}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                                        Status: <span className={`font-bold ${isAccountActive ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600"}`}>{profileData?.status || "PENDING"}</span>
+                                    </p>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={handleLogout}
-                                    className="p-2 rounded-xl text-red-400 hover:bg-red-500/10 transition cursor-pointer"
-                                    title="Logout"
-                                >
-                                    <LogOut size={18} />
-                                </button>
                             </div>
+
+                            <button
+                                type="button"
+                                onClick={handleLogout}
+                                className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                            >
+                                <LogOut size={16} />
+                                <span>Logout Account</span>
+                            </button>
                         </div>
                     </aside>
                 </div>
