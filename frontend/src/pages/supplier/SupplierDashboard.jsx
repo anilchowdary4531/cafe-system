@@ -987,43 +987,46 @@ export default function SupplierDashboard() {
                                 </p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                                 {products.map((p) => {
                                     const imgUrl = getSupplyProductImageUrl(p);
 
                                     return (
-                                        <div key={p.id} className="theme-panel rounded-2xl p-4 space-y-3 border shadow-sm">
-                                            <div className="h-44 w-full rounded-xl overflow-hidden border theme-border bg-black/10 shadow-inner relative flex items-center justify-center">
-                                                {imgUrl ? (
-                                                    <img
-                                                        src={imgUrl}
-                                                        alt={p.name}
-                                                        className="h-full w-full object-cover hover:scale-105 transition duration-300"
-                                                        onError={(e) => {
-                                                            e.target.onerror = null;
-                                                            e.target.src = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80";
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <div className="h-full w-full flex flex-col items-center justify-center p-4 text-center bg-amber-500/10 theme-muted">
-                                                        <Package size={36} className="theme-accent-text mb-1 opacity-80" />
-                                                        <span className="text-[11px] font-bold uppercase tracking-wider">{p.category?.name || p.category || "Raw Supply"}</span>
+                                        <div key={p.id} className="theme-panel rounded-xl p-3 border shadow-xs space-y-2 flex flex-col justify-between hover:border-orange-500/40 transition-colors">
+                                            <div className="space-y-2">
+                                                <div className="h-28 w-full rounded-lg overflow-hidden border theme-border bg-black/10 shadow-inner relative flex items-center justify-center">
+                                                    {imgUrl ? (
+                                                        <img
+                                                            src={imgUrl}
+                                                            alt={p.name}
+                                                            className="h-full w-full object-cover hover:scale-105 transition duration-300"
+                                                            onError={(e) => {
+                                                                e.target.onerror = null;
+                                                                e.target.src = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80";
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <div className="h-full w-full flex flex-col items-center justify-center p-2 text-center bg-amber-500/10 theme-muted">
+                                                            <Package size={24} className="theme-accent-text mb-0.5 opacity-80" />
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider">{p.category?.name || p.category || "Raw Supply"}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="space-y-1">
+                                                    <div className="flex items-start justify-between gap-1.5">
+                                                        <h3 className="font-bold text-xs leading-snug line-clamp-2" title={p.name}>{p.name}</h3>
+                                                        <span className="theme-button-secondary rounded-md px-1.5 py-0.5 text-[10px] font-extrabold shrink-0">
+                                                            ₹{p.prices?.[0]?.basePrice || 100}/{p.unit}
+                                                        </span>
                                                     </div>
-                                                )}
+                                                    <p className="theme-muted text-[11px]">MOQ: {p.moq} {p.unit}</p>
+                                                </div>
                                             </div>
 
-                                            <div className="flex items-start justify-between">
-                                                <div>
-                                                    <h3 className="font-bold text-base">{p.name}</h3>
-                                                    <p className="theme-muted text-xs">MOQ: {p.moq} {p.unit}</p>
-                                                </div>
-                                                <span className="theme-button-secondary rounded-full px-3 py-1 text-xs font-bold">
-                                                    ₹{p.prices?.[0]?.basePrice || 100} / {p.unit}
-                                                </span>
-                                            </div>
-                                            <div className="text-xs space-y-1 theme-muted border-t theme-border pt-3">
-                                                <p>Stock: <span className="font-bold">{p.inventory?.availableStock || 0} {p.unit}</span> available</p>
-                                                <p>Discount: <span className="font-bold theme-accent-text">{p.discounts?.[0]?.value || 0}% OFF</span></p>
+                                            <div className="text-[11px] theme-muted border-t theme-border pt-1.5 mt-1 flex items-center justify-between gap-1">
+                                                <span>Stock: <strong className="font-bold">{p.inventory?.availableStock || 0} {p.unit}</strong></span>
+                                                <span className="font-extrabold theme-accent-text text-[10px]">{p.discounts?.[0]?.value || 0}% OFF</span>
                                             </div>
                                         </div>
                                     );
