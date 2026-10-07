@@ -241,15 +241,15 @@ export default function OwnerSupplyChainRecipes() {
                                     <ChefHat size={16} />
                                 </div>
                                 <h2 className="text-xl font-bold tracking-tight text-[color:var(--app-text,#1e293b)] sm:text-2xl">
-                                    Recipes & Ingredient Mapping
+                                    Recipes & Ingredients
                                 </h2>
                                 <span className="inline-flex items-center rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-semibold text-orange-600">
-                                    BILL OF MATERIALS
+                                    INVENTORY & BOM
                                 </span>
                             </div>
                         </div>
                         <p className="text-xs text-[color:var(--app-text-muted,#64748b)] mt-1">
-                            Link Tiffzy menu items with raw material inventory to track food cost % and gross margins.
+                            Manage recipes, ingredients, quantities, BOM mappings and kitchen consumption standards.
                         </p>
                     </div>
 

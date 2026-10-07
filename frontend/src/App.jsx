@@ -637,6 +637,8 @@ export default function App() {
                         <Route path="supply-chain/warehouse" element={<OwnerSupplyChainWarehouse />} />
                         <Route path="supply-chain/transfers" element={<OwnerSupplyChainTransfers />} />
                         <Route path="supply-chain/stock-counts" element={<OwnerSupplyChainStockCounts />} />
+                        <Route path="recipes" element={<OwnerSupplyChainRecipes />} />
+                        <Route path="inventory/recipes" element={<OwnerSupplyChainRecipes />} />
                         <Route path="supply-chain/recipes" element={<OwnerSupplyChainRecipes />} />
                         <Route path="supply-chain/consumption" element={<OwnerSupplyChainConsumption />} />
                         <Route path="supply-chain/wastage" element={<OwnerSupplyChainWastage />} />

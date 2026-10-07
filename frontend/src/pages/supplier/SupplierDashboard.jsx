@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import {
     Truck,
     Package,
@@ -448,7 +448,6 @@ export default function SupplierDashboard() {
         { id: "payments-settlement", label: "Payments & Settlement", icon: CreditCard, locked: !isAccountActive },
         { id: "supply-reports", label: "Supply Reports & Intel", icon: BarChart3, locked: !isAccountActive },
         { id: "supply-marketplace", label: "Supply Marketplace", icon: ShoppingBag, locked: !isAccountActive },
-        { id: "recipes", label: "Recipes & Ingredients", icon: ChefHat, locked: !isAccountActive },
         { id: "consumption", label: "Consumption Intel", icon: Activity, locked: !isAccountActive },
         { id: "wastage", label: "Wastage Management", icon: Trash2, locked: !isAccountActive },
         { id: "stock-counts", label: "Stock Counts", icon: ClipboardCheck, locked: !isAccountActive },
@@ -1554,32 +1553,9 @@ export default function SupplierDashboard() {
                     </div>
                 )}
 
-                {/* TAB: RECIPES & INGREDIENTS */}
-                {isAccountActive && activeTab === "recipes" && (
-                    <div className="space-y-6">
-                        <div>
-                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-                                <ChefHat className="theme-accent-text" />
-                                Ingredient Specification & Bulk Pack Mapping
-                            </h2>
-                            <p className="theme-muted text-xs mt-0.5">Bulk raw material specifications, net weight conversions, and kitchen recipe packaging units</p>
-                        </div>
-
-                        <div className="theme-panel rounded-3xl p-6 border space-y-4">
-                            <h3 className="text-base font-bold">Catalog Ingredients Pack Standards</h3>
-                            <div className="divide-y theme-border text-xs">
-                                {products.map((p) => (
-                                    <div key={p.id} className="py-3 flex items-center justify-between">
-                                        <div>
-                                            <p className="font-bold text-sm">{p.name}</p>
-                                            <p className="theme-muted">Wholesale Pack: {p.moq || 1} {p.unit || "KG"} standard sealed bag</p>
-                                        </div>
-                                        <span className="theme-chip px-3 py-1 rounded-full font-bold">Grade A Kitchen Standard</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+                {/* TAB: RECIPES & INGREDIENTS - REDIRECT TO RESTAURANT OWNER PANEL */}
+                {activeTab === "recipes" && (
+                    <Navigate to="/owner/recipes" replace />
                 )}
 
                 {/* TAB: CONSUMPTION INTEL */}
