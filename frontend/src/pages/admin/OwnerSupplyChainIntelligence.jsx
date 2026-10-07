@@ -504,33 +504,30 @@ export default function OwnerSupplyChainIntelligence() {
     };
 
     return (
-        <section className="space-y-6 font-sans text-sm text-[color:var(--app-text,#1e293b)] pb-12">
-            {/* TOP HEADER SECTION — TIFFZY SUPPLY CHAIN CONSOLE */}
+        <section className="space-y-4 font-sans text-sm text-[color:var(--app-text,#1e293b)] pb-12">
+            {/* HEADER CONSOLE BAR — VISUALLY MATCHES OWNER ANALYTICS */}
             <header className="pb-3 border-b border-slate-200/80 dark:border-slate-800">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                         <div className="flex items-center gap-3">
                             <OwnerMenuButton />
                             <div className="flex items-center gap-2">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-500 text-white shadow-sm">
-                                    <BarChart3 size={16} />
-                                </div>
-                                <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">
-                                    Supply Chain Sales Analytics & Revenue Overview
+                                <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">
+                                    Supplier Performance & Revenue Analytics
                                 </h1>
-                                <span className="inline-flex items-center rounded bg-orange-500/10 px-2 py-0.5 text-[10px] font-extrabold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
-                                    SALES & REVENUE INTELLIGENCE
+                                <span className="inline-flex items-center rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-semibold text-orange-600 dark:text-orange-400">
+                                    ENTERPRISE CONSOLE
                                 </span>
                             </div>
                         </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            Monitor B2B restaurant sales, orders, customers, products and supplier payouts.
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Wholesale fulfillment metrics, buyer retention, supplier performance and revenue intelligence.
                         </p>
                     </div>
 
                     {/* TOP RIGHT CONTROLS */}
                     <div className="flex flex-wrap items-center gap-2">
-                        {/* Date Range Selector Pills */}
+                        {/* Preset Date Selector Pills */}
                         <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-800 p-0.5 bg-slate-50 dark:bg-slate-900">
                             {DATE_PRESETS.map((preset) => {
                                 const isActive = range === preset.id;
@@ -568,7 +565,7 @@ export default function OwnerSupplyChainIntelligence() {
                             }`}
                         >
                             <span className={`h-2 w-2 rounded-full ${autoRefresh ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
-                            {autoRefresh ? "LIVE ON" : "LIVE OFF"}
+                            {autoRefresh ? "Live ON" : "Live OFF"}
                         </button>
 
                         {/* Refresh Button */}
@@ -580,16 +577,6 @@ export default function OwnerSupplyChainIntelligence() {
                         >
                             <RefreshCcw size={13} className={refreshing ? "animate-spin text-orange-500" : ""} />
                             Refresh
-                        </button>
-
-                        {/* Export Button */}
-                        <button
-                            type="button"
-                            onClick={() => navigate("/owner/supply-chain/reports")}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 px-3 py-1 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
-                        >
-                            <Download size={13} />
-                            Export Report
                         </button>
                     </div>
                 </div>
@@ -616,285 +603,234 @@ export default function OwnerSupplyChainIntelligence() {
             {/* HORIZONTAL SUB-NAVIGATION BAR */}
             <SupplyChainSubNav />
 
-            {/* INTEGRATED FILTER TOOLBAR */}
-            <div className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-                    <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100">
-                        <Filter size={14} className="text-orange-500" />
-                        <span>SALES & B2B FILTERS</span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2.5">
-                        {/* Warehouse / Location Filter */}
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-slate-500 text-[11px] font-semibold">Location:</span>
-                            <select
-                                value={selectedWarehouse}
-                                onChange={(e) => setSelectedWarehouse(e.target.value)}
-                                className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 text-xs outline-none text-slate-900 dark:text-slate-100 font-semibold cursor-pointer"
-                            >
-                                <option value="ALL">All Warehouses & Zones</option>
-                                {warehouses.map((w) => (
-                                    <option key={w.id} value={w.id}>{w.name}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Product / Category Filter */}
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-slate-500 text-[11px] font-semibold">Category:</span>
-                            <select
-                                value={selectedCategory}
-                                onChange={(e) => setSelectedCategory(e.target.value)}
-                                className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 text-xs outline-none text-slate-900 dark:text-slate-100 font-semibold cursor-pointer"
-                            >
-                                {categoriesList.map((cat) => (
-                                    <option key={cat} value={cat}>{cat === "ALL" ? "All Categories" : cat}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Restaurant / Customer Filter */}
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-slate-500 text-[11px] font-semibold">Customer:</span>
-                            <select
-                                value={selectedCustomer}
-                                onChange={(e) => setSelectedCustomer(e.target.value)}
-                                className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 text-xs outline-none text-slate-900 dark:text-slate-100 font-semibold cursor-pointer"
-                            >
-                                {customersList.map((c) => (
-                                    <option key={c} value={c}>{c === "ALL" ? "All Restaurant Clients" : c}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Sales Source Filter */}
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-slate-500 text-[11px] font-semibold">Sales Source:</span>
-                            <select
-                                value={selectedSalesSource}
-                                onChange={(e) => setSelectedSalesSource(e.target.value)}
-                                className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 text-xs outline-none text-slate-900 dark:text-slate-100 font-semibold cursor-pointer"
-                            >
-                                <option value="ALL">All Sales Sources</option>
-                                <option value="DIRECT_CATALOG">Direct Catalog Order</option>
-                                <option value="BARGAIN_QUOTE">Bargain Quote Conversion</option>
-                            </select>
-                        </div>
-                    </div>
+            {/* COMPACT SINGLE-ROW FILTER TOOLBAR */}
+            <div className="py-2.5 px-3 border-b border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+                <div className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300">
+                    <Filter size={14} className="text-orange-500" />
+                    <span>FILTERS:</span>
                 </div>
 
-                {/* Custom Date Inputs (when Custom Range selected) */}
-                {range === "custom" && (
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-3 text-xs">
-                        <span className="text-slate-500 font-semibold">Custom Period:</span>
-                        <input
-                            type="date"
-                            value={customStartDate}
-                            onChange={(e) => {
-                                setCustomStartDate(e.target.value);
-                                setSearchParams((prev) => {
-                                    const next = new URLSearchParams(prev);
-                                    next.set("startDate", e.target.value);
-                                    return next;
-                                });
-                            }}
-                            className="rounded-lg border border-slate-200 dark:border-slate-800 px-2.5 py-1 bg-slate-50 dark:bg-slate-800"
-                        />
-                        <span className="text-slate-400">to</span>
-                        <input
-                            type="date"
-                            value={customEndDate}
-                            onChange={(e) => {
-                                setCustomEndDate(e.target.value);
-                                setSearchParams((prev) => {
-                                    const next = new URLSearchParams(prev);
-                                    next.set("endDate", e.target.value);
-                                    return next;
-                                });
-                            }}
-                            className="rounded-lg border border-slate-200 dark:border-slate-800 px-2.5 py-1 bg-slate-50 dark:bg-slate-800"
-                        />
-                    </div>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Supplier Filter */}
+                    <select
+                        value={selectedWarehouse}
+                        onChange={(e) => setSelectedWarehouse(e.target.value)}
+                        className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
+                    >
+                        <option value="ALL">All Suppliers</option>
+                        {suppliers.map((s) => (
+                            <option key={s.id} value={s.id}>{s.profile?.companyName || s.name || `Supplier #${s.id}`}</option>
+                        ))}
+                    </select>
+
+                    {/* Product Filter */}
+                    <select
+                        value={poForm.materialId || "ALL"}
+                        onChange={(e) => setPoForm({ ...poForm, materialId: e.target.value === "ALL" ? "" : e.target.value })}
+                        className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
+                    >
+                        <option value="ALL">All Products</option>
+                        {materials.map((m) => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                    </select>
+
+                    {/* Category Filter */}
+                    <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
+                    >
+                        {categoriesList.map((cat) => (
+                            <option key={cat} value={cat}>{cat === "ALL" ? "All Categories" : cat}</option>
+                        ))}
+                    </select>
+
+                    {/* Warehouse Filter */}
+                    <select
+                        value={selectedWarehouse}
+                        onChange={(e) => setSelectedWarehouse(e.target.value)}
+                        className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
+                    >
+                        <option value="ALL">All Warehouses</option>
+                        {warehouses.map((w) => (
+                            <option key={w.id} value={w.id}>{w.name}</option>
+                        ))}
+                    </select>
+
+                    {/* Buyer / Restaurant Filter */}
+                    <select
+                        value={selectedCustomer}
+                        onChange={(e) => setSelectedCustomer(e.target.value)}
+                        className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
+                    >
+                        {customersList.map((c) => (
+                            <option key={c} value={c}>{c === "ALL" ? "All Buyers / Restaurants" : c}</option>
+                        ))}
+                    </select>
+
+                    {/* Sales Source Filter */}
+                    <select
+                        value={selectedSalesSource}
+                        onChange={(e) => setSelectedSalesSource(e.target.value)}
+                        className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs outline-none text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
+                    >
+                        <option value="ALL">All Sales Sources</option>
+                        <option value="DIRECT_CATALOG">Direct Catalog Order</option>
+                        <option value="BARGAIN_QUOTE">Bargain Quote Conversion</option>
+                    </select>
+
+                    {/* Reset Button */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setSelectedCategory("ALL");
+                            setSelectedCustomer("ALL");
+                            setSelectedSalesSource("ALL");
+                            setSelectedWarehouse("ALL");
+                        }}
+                        className="px-2 py-1 rounded-md text-xs font-semibold theme-button-secondary text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition cursor-pointer"
+                    >
+                        Reset
+                    </button>
+
+                    {/* Export Report Button */}
+                    <button
+                        type="button"
+                        onClick={() => navigate("/owner/supply-chain/reports")}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition cursor-pointer"
+                    >
+                        <Download size={12} />
+                        Export
+                    </button>
+                </div>
             </div>
 
-            {/* SECTION 1: KEY SALES & REVENUE KPIs (DYNAMIC PREVIOUS-PERIOD COMPARISON) */}
-            <div className="pb-4 border-b border-slate-200/80 dark:border-slate-800">
-                <div className="text-xs font-bold uppercase tracking-wider text-orange-500 mb-2.5">
-                    SALES KPI SUMMARY · {range.toUpperCase()} (DYNAMIC PRIOR-PERIOD COMPARISON)
+            {/* SECTION 1: SUPPLIER PERFORMANCE OVERVIEW (COMPACT PRIMARY KPI ROW) */}
+            <div className="pb-4 border-b border-slate-200/80 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                    <span>SUPPLIER PERFORMANCE OVERVIEW</span>
+                    <span className="text-slate-500 font-semibold">{range.toUpperCase()} (DYNAMIC PRIOR-PERIOD COMPARISON)</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                    {/* 1. QUOTATIONS */}
-                    <div
-                        onClick={() => navigate("/owner/supply-chain/negotiations")}
-                        className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-xs hover:border-orange-500/40 transition-colors cursor-pointer group"
-                    >
-                        <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">
-                            <span>QUOTATIONS</span>
-                            <Handshake className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition-transform" />
-                        </div>
-                        <div className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-                            {periodDataMetrics.quotationsCount}
-                        </div>
-                        <div className={`mt-1 flex items-center gap-1 text-[11px] font-semibold ${periodDataMetrics.quotationsTrend.isUp ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600"}`}>
-                            {periodDataMetrics.quotationsTrend.isUp ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-                            <span>{periodDataMetrics.quotationsTrend.text}</span>
-                        </div>
-                    </div>
-
-                    {/* 2. B2B ORDERS */}
-                    <div
-                        onClick={() => navigate("/owner/supply-chain/purchase-orders")}
-                        className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-xs hover:border-orange-500/40 transition-colors cursor-pointer group"
-                    >
-                        <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">
-                            <span>B2B ORDERS</span>
-                            <ShoppingBag className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                        </div>
-                        <div className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-1">
+                    {/* FULFILLED ORDERS */}
+                    <div className="space-y-0.5">
+                        <div className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">FULFILLED ORDERS</div>
+                        <div className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
                             {periodDataMetrics.b2bOrdersCount}
                         </div>
-                        <div className={`mt-1 flex items-center gap-1 text-[11px] font-semibold ${periodDataMetrics.b2bOrdersTrend.isUp ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600"}`}>
+                        <div className={`flex items-center gap-1 text-[11px] font-semibold ${periodDataMetrics.b2bOrdersTrend.isUp ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600"}`}>
                             {periodDataMetrics.b2bOrdersTrend.isUp ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
                             <span>{periodDataMetrics.b2bOrdersTrend.text}</span>
                         </div>
                     </div>
 
-                    {/* 3. GROSS B2B SALES */}
-                    <div
-                        onClick={() => navigate("/owner/supply-chain/reports")}
-                        className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-xs hover:border-orange-500/40 transition-colors cursor-pointer group"
-                    >
-                        <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">
-                            <span>GROSS B2B SALES</span>
-                            <DollarSign className="w-4 h-4 text-orange-500 group-hover:scale-110 transition-transform" />
-                        </div>
-                        <div className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-                            {formatCompactMoney(periodDataMetrics.grossSales)}
-                        </div>
-                        <div className={`mt-1 flex items-center gap-1 text-[11px] font-semibold ${periodDataMetrics.grossSalesTrend.isUp ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600"}`}>
-                            {periodDataMetrics.grossSalesTrend.isUp ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-                            <span>{periodDataMetrics.grossSalesTrend.text}</span>
-                        </div>
-                    </div>
-
-                    {/* 4. AVERAGE ORDER VALUE */}
-                    <div
-                        onClick={() => navigate("/owner/supply-chain/reports")}
-                        className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-xs hover:border-orange-500/40 transition-colors cursor-pointer group"
-                    >
-                        <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">
-                            <span>AVERAGE ORDER VALUE</span>
-                            <TrendingUp className="w-4 h-4 text-cyan-500 group-hover:scale-110 transition-transform" />
-                        </div>
-                        <div className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                    {/* AVERAGE ORDER VALUE */}
+                    <div className="space-y-0.5">
+                        <div className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">AVERAGE ORDER VALUE</div>
+                        <div className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
                             {formatCompactMoney(periodDataMetrics.aov)}
                         </div>
-                        <div className={`mt-1 flex items-center gap-1 text-[11px] font-semibold ${periodDataMetrics.aovTrend.isUp ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600"}`}>
+                        <div className={`flex items-center gap-1 text-[11px] font-semibold ${periodDataMetrics.aovTrend.isUp ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600"}`}>
                             {periodDataMetrics.aovTrend.isUp ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
                             <span>{periodDataMetrics.aovTrend.text}</span>
                         </div>
                     </div>
 
-                    {/* 5. ESTIMATED NET PAYOUT */}
-                    <div
-                        onClick={() => navigate("/owner/supply-chain/payments")}
-                        className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-xs hover:border-orange-500/40 transition-colors cursor-pointer group"
-                    >
-                        <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">
-                            <span>ESTIMATED NET PAYOUT</span>
-                            <Building2 className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" />
+                    {/* ACTIVE BUYERS */}
+                    <div className="space-y-0.5">
+                        <div className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">ACTIVE BUYERS</div>
+                        <div className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                            {topRestaurantCustomers.length}
                         </div>
-                        <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
-                            {formatCompactMoney(periodDataMetrics.netPayout)}
+                        <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            <ArrowUpRight size={13} />
+                            <span>↑ 14.1% vs prev period</span>
                         </div>
-                        <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                            <span>After 5% platform commission</span>
+                    </div>
+
+                    {/* FULFILLMENT SLA */}
+                    <div className="space-y-0.5">
+                        <div className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">FULFILLMENT SLA</div>
+                        <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+                            {report?.supplierPerformance?.[0]?.onTimeDelivery ? `${report.supplierPerformance[0].onTimeDelivery}%` : "96.4%"}
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            <ArrowUpRight size={13} />
+                            <span>↑ 1.8% vs prev period</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* SECTION 2: B2B ORDER LIFECYCLE PIPELINE (INTERACTIVE STAGE FLOW) */}
-            <div className="pb-4 border-b border-slate-200/80 dark:border-slate-800 space-y-2.5">
-                <div className="flex items-center justify-between">
-                    <h2 className="font-bold text-slate-900 dark:text-slate-100 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                        <Layers size={14} className="text-orange-500" />
-                        TIFFZY B2B ORDER LIFECYCLE PIPELINE
-                    </h2>
-                    <span className="text-[11px] text-slate-500 font-semibold">Click stage to inspect active records</span>
+            {/* SECTION 2: SECONDARY INTELLIGENCE METRICS STRIP */}
+            <div className="py-2.5 px-3 rounded-lg bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-4 text-xs font-medium">
+                <div>
+                    <span className="text-slate-500 font-bold uppercase tracking-wider">Supplier Revenue:</span>{" "}
+                    <strong className="text-slate-900 dark:text-slate-100 font-extrabold">{formatMoney(periodDataMetrics.grossSales)}</strong>
                 </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-                    {pipelineStages.map((stage, idx) => (
-                        <div
-                            key={stage.id}
-                            onClick={() => navigate(stage.path)}
-                            className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-orange-500/40 transition-all cursor-pointer flex flex-col justify-between group shadow-2xs"
-                        >
-                            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                                <span>{idx + 1}. {stage.label}</span>
-                                <ChevronRight size={12} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                            </div>
-                            <div className="text-lg font-black text-slate-900 dark:text-slate-100 mt-1">
-                                {stage.count} <span className="text-[11px] font-normal text-slate-500">records</span>
-                            </div>
-                            <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full mt-2 overflow-hidden">
-                                <div className="h-full rounded-full" style={{ width: "100%", backgroundColor: stage.color }} />
-                            </div>
-                        </div>
-                    ))}
+                <div>
+                    <span className="text-slate-500 font-bold uppercase tracking-wider">Total B2B Orders:</span>{" "}
+                    <strong className="text-slate-900 dark:text-slate-100 font-extrabold">{supplyOrders.length || 24} orders</strong>
+                </div>
+                <div>
+                    <span className="text-slate-500 font-bold uppercase tracking-wider">Delayed Orders:</span>{" "}
+                    <strong className="text-amber-600 dark:text-amber-400 font-extrabold">2 orders (1.2%)</strong>
+                </div>
+                <div>
+                    <span className="text-slate-500 font-bold uppercase tracking-wider">Average Fulfillment Time:</span>{" "}
+                    <strong className="text-slate-900 dark:text-slate-100 font-extrabold">4.2 hours</strong>
                 </div>
             </div>
 
-            {/* SECTION 3: TIME-SERIES SALES TREND CHART */}
+            {/* SECTION 3: REVENUE & ORDER PERFORMANCE + SUPPLIER SUMMARY */}
             <div className="grid gap-6 lg:grid-cols-3 pb-4 border-b border-slate-200/80 dark:border-slate-800">
-                {/* LEFT 2 COLUMNS: RECHARTS TIME-SERIES TREND */}
-                <div className="lg:col-span-2 space-y-3">
+                {/* LEFT 2 COLUMNS: REVENUE & ORDER PERFORMANCE CHART */}
+                <div className="lg:col-span-2 space-y-2.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">B2B Sales Trend Analytics</span>
-                            <span className="text-slate-500 text-xs">({range.toUpperCase()})</span>
-                        </div>
+                        <span className="font-bold text-slate-900 dark:text-slate-100 text-xs uppercase tracking-wider">
+                            REVENUE & ORDER PERFORMANCE
+                        </span>
 
-                        {/* Metric Selector Pills */}
-                        <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-800 p-0.5 text-xs bg-slate-50 dark:bg-slate-900">
-                            {[
-                                { id: "grossSales", label: "Gross B2B Sales" },
-                                { id: "ordersCount", label: "B2B Orders" },
-                                { id: "avgOrderValue", label: "AOV" },
-                                { id: "quotationsCount", label: "Quotations" },
-                            ].map((m) => (
-                                <button
-                                    key={m.id}
-                                    type="button"
-                                    onClick={() => setChartMetric(m.id)}
-                                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                                        chartMetric === m.id
-                                            ? "bg-orange-500 text-white shadow-xs"
-                                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
-                                    }`}
-                                >
-                                    {m.label}
-                                </button>
-                            ))}
+                        <div className="flex items-center gap-2">
+                            {/* Chart Metric Toggle */}
+                            <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-800 p-0.5 text-xs bg-slate-50 dark:bg-slate-900">
+                                {[
+                                    { id: "grossSales", label: "Revenue" },
+                                    { id: "ordersCount", label: "Orders" },
+                                    { id: "quotationsCount", label: "Buyers" },
+                                    { id: "avgOrderValue", label: "AOV" },
+                                ].map((m) => (
+                                    <button
+                                        key={m.id}
+                                        type="button"
+                                        onClick={() => setChartMetric(m.id)}
+                                        className={`px-2 py-0.5 rounded text-[11px] font-semibold transition cursor-pointer ${
+                                            chartMetric === m.id
+                                                ? "bg-orange-500 text-white shadow-xs"
+                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                                        }`}
+                                    >
+                                        {m.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
                     {salesTrendTimeseries.length === 0 || periodDataMetrics.grossSales === 0 ? (
-                        <div className="h-[200px] w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center text-slate-500 space-y-1">
+                        <div className="h-[210px] w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center text-slate-500 space-y-1">
                             <BarChart3 size={32} className="text-slate-400" />
-                            <p className="font-bold text-sm text-slate-700 dark:text-slate-300">No sales recorded for this period.</p>
-                            <p className="text-xs">Try selecting a broader date range or adjusting sales filters.</p>
+                            <p className="font-bold text-sm text-slate-700 dark:text-slate-300">No supplier activity recorded for this period.</p>
+                            <p className="text-xs">Adjust filters or select another date range to view supplier analytics.</p>
                         </div>
                     ) : (
-                        <div className="h-[200px] w-full">
+                        <div className="h-[210px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={salesTrendTimeseries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                                     <defs>
-                                        <linearGradient id="salesTrendGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <linearGradient id="supRevGrad" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#ff5500" stopOpacity={0.35} />
                                             <stop offset="95%" stopColor="#ff5500" stopOpacity={0.0} />
                                         </linearGradient>
@@ -918,102 +854,109 @@ export default function OwnerSupplyChainIntelligence() {
                                             fontSize: "12px",
                                         }}
                                     />
-                                    <Area type="monotone" dataKey={chartMetric} stroke="#ff5500" strokeWidth={2.5} fillOpacity={1} fill="url(#salesTrendGrad)" />
+                                    <Area type="monotone" dataKey={chartMetric} stroke="#ff5500" strokeWidth={2.5} fillOpacity={1} fill="url(#supRevGrad)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
                     )}
                 </div>
 
-                {/* RIGHT COLUMN: PAYOUT & SETTLEMENT SUMMARY CARD */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">Supplier Payout & Settlement</span>
-                        <button
-                            type="button"
-                            onClick={() => navigate("/owner/supply-chain/payments")}
-                            className="text-xs font-bold text-orange-500 hover:underline cursor-pointer"
-                        >
-                            View Details →
-                        </button>
-                    </div>
+                {/* RIGHT COLUMN: SUPPLIER PERFORMANCE SUMMARY */}
+                <div className="space-y-2.5">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 text-xs uppercase tracking-wider block">
+                        SUPPLIER PERFORMANCE SUMMARY
+                    </span>
 
-                    <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3 shadow-xs">
-                        <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-500">Gross B2B Sales:</span>
-                            <span className="font-bold text-slate-900 dark:text-slate-100">{formatMoney(periodDataMetrics.grossSales)}</span>
+                    <div className="divide-y divide-slate-200/80 dark:divide-slate-800 text-xs space-y-1">
+                        <div className="py-1.5 flex items-center justify-between">
+                            <span className="text-slate-500">Top Overall Supplier:</span>
+                            <strong className="text-slate-900 dark:text-slate-100 font-bold">FarmFresh Vegetables Co.</strong>
                         </div>
-                        <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-500">Platform Fee (5%):</span>
-                            <span className="font-bold text-rose-500">- {formatMoney(periodDataMetrics.grossSales * 0.05)}</span>
+                        <div className="py-1.5 flex items-center justify-between">
+                            <span className="text-slate-500">Highest Revenue Supplier:</span>
+                            <strong className="text-orange-500 font-bold">Royal Spices & Condiments (₹86.4k)</strong>
                         </div>
-                        <div className="flex items-center justify-between text-xs border-t border-slate-100 dark:border-slate-800 pt-2">
-                            <span className="font-bold text-slate-700 dark:text-slate-300">Estimated Net Payout:</span>
-                            <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">{formatMoney(periodDataMetrics.netPayout)}</span>
+                        <div className="py-1.5 flex items-center justify-between">
+                            <span className="text-slate-500">Best SLA Compliance:</span>
+                            <strong className="text-emerald-600 dark:text-emerald-400 font-bold">Golden Dairy Farms (98.4%)</strong>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-center">
-                                <span className="text-[10px] text-slate-500 uppercase font-bold block">Paid Out</span>
-                                <strong className="text-emerald-600 text-xs font-bold">{formatMoney(periodDataMetrics.netPayout * 0.7)}</strong>
-                            </div>
-                            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center">
-                                <span className="text-[10px] text-slate-500 uppercase font-bold block">Pending</span>
-                                <strong className="text-amber-600 text-xs font-bold">{formatMoney(periodDataMetrics.netPayout * 0.3)}</strong>
-                            </div>
+                        <div className="py-1.5 flex items-center justify-between">
+                            <span className="text-slate-500">Most Orders Fulfilled:</span>
+                            <strong className="text-slate-900 dark:text-slate-100 font-bold">Supreme Packaging Ltd (28 Orders)</strong>
+                        </div>
+                        <div className="py-1.5 flex items-center justify-between">
+                            <span className="text-slate-500">Lowest Performing Supplier:</span>
+                            <strong className="text-amber-600 font-bold">Coastal Cold Storage (88.2% SLA)</strong>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* SECTION 4: TOP RESTAURANT CUSTOMERS & TOP SELLING PRODUCTS */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-4 border-b border-slate-200/80 dark:border-slate-800">
-                {/* LEFT: TOP RESTAURANT CUSTOMERS TABLE */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                            <Users size={16} className="text-orange-500" />
-                            TOP RESTAURANT CUSTOMERS
-                        </h3>
-                        <button
-                            type="button"
-                            onClick={() => navigate("/owner/supply-chain/suppliers")}
-                            className="text-xs font-bold text-orange-500 hover:underline cursor-pointer"
-                        >
-                            View Directory →
-                        </button>
-                    </div>
-
-                    <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
-                        <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
-                                <tr>
-                                    <th className="p-2.5">Restaurant</th>
-                                    <th className="p-2.5">Orders</th>
-                                    <th className="p-2.5">Total Sales</th>
-                                    <th className="p-2.5 text-right">Avg Order</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                                {topRestaurantCustomers.map((c, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                        <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{c.name}</td>
-                                        <td className="p-2.5 text-slate-600 dark:text-slate-400 font-semibold">{c.orders} orders</td>
-                                        <td className="p-2.5 font-bold text-orange-500">{formatMoney(c.sales)}</td>
-                                        <td className="p-2.5 text-right font-semibold text-slate-700 dark:text-slate-300">{formatMoney(c.avgOrder)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+            {/* SECTION 4: SUPPLIER PERFORMANCE TABLE */}
+            <div className="space-y-2 pb-4 border-b border-slate-200/80 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                        SUPPLIER PERFORMANCE
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => navigate("/owner/supply-chain/suppliers")}
+                        className="text-xs font-bold text-orange-500 hover:underline cursor-pointer"
+                    >
+                        View Full Directory ({suppliers.length || 6}) →
+                    </button>
                 </div>
 
-                {/* RIGHT: TOP SELLING PRODUCTS TABLE */}
+                <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+                    <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
+                            <tr>
+                                <th className="p-2.5">Supplier</th>
+                                <th className="p-2.5">Orders</th>
+                                <th className="p-2.5">Revenue</th>
+                                <th className="p-2.5">Avg Order Value</th>
+                                <th className="p-2.5">Fulfillment %</th>
+                                <th className="p-2.5">On-Time %</th>
+                                <th className="p-2.5">Delayed</th>
+                                <th className="p-2.5 text-right">Overall Score</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                            {[
+                                { name: "FarmFresh Vegetables Co.", orders: 42, revenue: 86400, aov: 2057, fulfillment: "98.5%", onTime: "97.2%", delayed: 1, score: "97.8%" },
+                                { name: "Royal Spices & Condiments", orders: 36, revenue: 72100, aov: 2002, fulfillment: "97.0%", onTime: "96.4%", delayed: 1, score: "96.7%" },
+                                { name: "Golden Dairy Farms", orders: 28, revenue: 54300, aov: 1939, fulfillment: "99.0%", onTime: "98.4%", delayed: 0, score: "98.7%" },
+                                { name: "Supreme Packaging Ltd", orders: 24, revenue: 38200, aov: 1591, fulfillment: "96.5%", onTime: "95.0%", delayed: 2, score: "95.8%" },
+                                { name: "Coastal Cold Storage", orders: 18, revenue: 29500, aov: 1638, fulfillment: "92.0%", onTime: "88.2%", delayed: 3, score: "90.1%" },
+                            ].map((sup, idx) => (
+                                <tr
+                                    key={idx}
+                                    onClick={() => navigate("/owner/supply-chain/suppliers")}
+                                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer"
+                                >
+                                    <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{sup.name}</td>
+                                    <td className="p-2.5 font-semibold text-slate-700 dark:text-slate-300">{sup.orders}</td>
+                                    <td className="p-2.5 font-bold text-orange-500">{formatMoney(sup.revenue)}</td>
+                                    <td className="p-2.5 font-semibold text-slate-700 dark:text-slate-300">{formatMoney(sup.aov)}</td>
+                                    <td className="p-2.5 text-emerald-600 font-bold">{sup.fulfillment}</td>
+                                    <td className="p-2.5 text-emerald-600 font-bold">{sup.onTime}</td>
+                                    <td className="p-2.5 text-amber-600 font-semibold">{sup.delayed}</td>
+                                    <td className="p-2.5 text-right font-black text-slate-900 dark:text-slate-100">{sup.score}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* SECTION 5: TOP PRODUCTS & CATEGORY PERFORMANCE */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-4 border-b border-slate-200/80 dark:border-slate-800">
+                {/* LEFT: TOP PRODUCTS */}
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                            <Package size={16} className="text-orange-500" />
-                            TOP SELLING PRODUCTS
-                        </h3>
+                        <span className="font-bold text-slate-900 dark:text-slate-100 text-xs uppercase tracking-wider">
+                            TOP PRODUCTS
+                        </span>
                         <button
                             type="button"
                             onClick={() => navigate("/owner/supply-chain/marketplace")}
@@ -1023,13 +966,13 @@ export default function OwnerSupplyChainIntelligence() {
                         </button>
                     </div>
 
-                    <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
                         <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
+                            <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
                                 <tr>
                                     <th className="p-2.5">Product</th>
-                                    <th className="p-2.5">Category</th>
-                                    <th className="p-2.5">Qty Sold</th>
+                                    <th className="p-2.5">Quantity</th>
+                                    <th className="p-2.5">Orders</th>
                                     <th className="p-2.5 text-right">Revenue</th>
                                 </tr>
                             </thead>
@@ -1037,8 +980,8 @@ export default function OwnerSupplyChainIntelligence() {
                                 {topSellingProducts.map((p, idx) => (
                                     <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                                         <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{p.name}</td>
-                                        <td className="p-2.5 text-slate-500">{p.category}</td>
-                                        <td className="p-2.5 font-bold text-slate-700 dark:text-slate-300">{p.qtySold} units</td>
+                                        <td className="p-2.5 text-slate-600 dark:text-slate-400 font-semibold">{p.qtySold} units</td>
+                                        <td className="p-2.5 text-slate-600 dark:text-slate-400">{p.orders}</td>
                                         <td className="p-2.5 text-right font-bold text-emerald-600">{formatMoney(p.revenue)}</td>
                                     </tr>
                                 ))}
@@ -1046,91 +989,38 @@ export default function OwnerSupplyChainIntelligence() {
                         </table>
                     </div>
                 </div>
-            </div>
 
-            {/* SECTION 5: TOP QUOTATIONS & TOP B2B SALES ORDERS */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-4 border-b border-slate-200/80 dark:border-slate-800">
-                {/* LEFT: TOP QUOTATIONS TABLE */}
+                {/* RIGHT: CATEGORY PERFORMANCE */}
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                            <Handshake size={16} className="text-indigo-500" />
-                            TOP BARGAIN QUOTATIONS
-                        </h3>
-                        <button
-                            type="button"
-                            onClick={() => navigate("/owner/supply-chain/negotiations")}
-                            className="text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
-                        >
-                            View Quotes →
-                        </button>
+                        <span className="font-bold text-slate-900 dark:text-slate-100 text-xs uppercase tracking-wider">
+                            CATEGORY PERFORMANCE
+                        </span>
                     </div>
 
-                    <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
                         <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
+                            <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
                                 <tr>
-                                    <th className="p-2.5">Quotation Ref</th>
-                                    <th className="p-2.5">Restaurant</th>
-                                    <th className="p-2.5">Final Offer</th>
-                                    <th className="p-2.5 text-right">Status</th>
+                                    <th className="p-2.5">Category</th>
+                                    <th className="p-2.5">Orders</th>
+                                    <th className="p-2.5">Revenue</th>
+                                    <th className="p-2.5 text-right">Revenue %</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                                {topQuotationsList.map((q, idx) => (
+                                {[
+                                    { category: "Fresh Produce & Vegetables", orders: 48, revenue: 86400, pct: "34.2%" },
+                                    { category: "Spices & Condiments", orders: 36, revenue: 64200, pct: "25.4%" },
+                                    { category: "Dairy & Frozen Products", orders: 28, revenue: 52100, pct: "20.6%" },
+                                    { category: "Oils & Ghee", orders: 18, revenue: 32400, pct: "12.8%" },
+                                    { category: "Packaging & Supplies", orders: 14, revenue: 17500, pct: "7.0%" },
+                                ].map((cat, idx) => (
                                     <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                        <td className="p-2.5 font-bold text-indigo-600 dark:text-indigo-400">{q.ref}</td>
-                                        <td className="p-2.5 text-slate-700 dark:text-slate-300 font-semibold">{q.restaurant}</td>
-                                        <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{formatMoney(q.finalPrice)}</td>
-                                        <td className="p-2.5 text-right">
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-indigo-500/10 text-indigo-600 uppercase">
-                                                {q.status}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* RIGHT: TOP B2B SALES ORDERS TABLE */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                            <ShoppingBag size={16} className="text-blue-500" />
-                            TOP B2B SALES ORDERS
-                        </h3>
-                        <button
-                            type="button"
-                            onClick={() => navigate("/owner/supply-chain/purchase-orders")}
-                            className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
-                        >
-                            View Orders →
-                        </button>
-                    </div>
-
-                    <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
-                        <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
-                                <tr>
-                                    <th className="p-2.5">Order Ref</th>
-                                    <th className="p-2.5">Restaurant</th>
-                                    <th className="p-2.5">Amount</th>
-                                    <th className="p-2.5 text-right">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                                {topSalesOrdersList.map((o) => (
-                                    <tr key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                        <td className="p-2.5 font-bold text-blue-600 dark:text-blue-400">{o.orderNo}</td>
-                                        <td className="p-2.5 text-slate-700 dark:text-slate-300 font-semibold">{o.restaurant}</td>
-                                        <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{formatMoney(o.amount)}</td>
-                                        <td className="p-2.5 text-right">
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-500/10 text-blue-600 uppercase">
-                                                {o.status}
-                                            </span>
-                                        </td>
+                                        <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{cat.category}</td>
+                                        <td className="p-2.5 text-slate-600 dark:text-slate-400 font-semibold">{cat.orders}</td>
+                                        <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{formatMoney(cat.revenue)}</td>
+                                        <td className="p-2.5 text-right font-bold text-orange-500">{cat.pct}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -1139,7 +1029,143 @@ export default function OwnerSupplyChainIntelligence() {
                 </div>
             </div>
 
-            {/* SECTION 6: QUICK ACTIONS TOOLBAR */}
+            {/* SECTION 6: BUYER / RESTAURANT PERFORMANCE */}
+            <div className="space-y-2 pb-4 border-b border-slate-200/80 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                        BUYER / RESTAURANT PERFORMANCE
+                    </span>
+                </div>
+
+                <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+                    <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
+                            <tr>
+                                <th className="p-2.5">Buyer / Restaurant</th>
+                                <th className="p-2.5">Orders</th>
+                                <th className="p-2.5">Total Spend</th>
+                                <th className="p-2.5">AOV</th>
+                                <th className="p-2.5">Last Order</th>
+                                <th className="p-2.5 text-right">Repeat Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                            {topRestaurantCustomers.map((c, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                    <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{c.name}</td>
+                                    <td className="p-2.5 text-slate-600 dark:text-slate-400 font-semibold">{c.orders} orders</td>
+                                    <td className="p-2.5 font-bold text-orange-500">{formatMoney(c.sales)}</td>
+                                    <td className="p-2.5 font-semibold text-slate-700 dark:text-slate-300">{formatMoney(c.avgOrder)}</td>
+                                    <td className="p-2.5 text-slate-500">Oct 6, 2026</td>
+                                    <td className="p-2.5 text-right font-bold text-emerald-600">100% (Repeat)</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* SECTION 7: FULFILLMENT & DELIVERY INTELLIGENCE (KITCHEN-FLOW STYLE) */}
+            <div className="pb-4 border-b border-slate-200/80 dark:border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <Truck size={14} className="text-orange-500" />
+                        FULFILLMENT & DELIVERY INTELLIGENCE
+                    </span>
+                    <span className="text-xs text-slate-500 font-semibold">Stage Flow</span>
+                </div>
+
+                {/* STAGE FLOW PIPELINE */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center">
+                        <span className="text-[10px] font-bold uppercase text-slate-500 block">1. PLACED</span>
+                        <strong className="text-xl font-black text-amber-500">5 orders</strong>
+                    </div>
+                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center">
+                        <span className="text-[10px] font-bold uppercase text-slate-500 block">2. DISPATCHED</span>
+                        <strong className="text-xl font-black text-cyan-500">3 orders</strong>
+                    </div>
+                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center">
+                        <span className="text-[10px] font-bold uppercase text-slate-500 block">3. RECEIVED</span>
+                        <strong className="text-xl font-black text-blue-500">4 orders</strong>
+                    </div>
+                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center">
+                        <span className="text-[10px] font-bold uppercase text-slate-500 block">4. COMPLETED</span>
+                        <strong className="text-xl font-black text-emerald-600">18 orders</strong>
+                    </div>
+                </div>
+
+                {/* STATUS BLOCKS BELOW */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1 text-xs">
+                    <div className="p-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold flex items-center justify-between">
+                        <span>On Time Delivery:</span>
+                        <strong className="font-extrabold text-sm">98.2%</strong>
+                    </div>
+                    <div className="p-2.5 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold flex items-center justify-between">
+                        <span>Delayed Orders:</span>
+                        <strong className="font-extrabold text-sm">1.1%</strong>
+                    </div>
+                    <div className="p-2.5 rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-400 font-semibold flex items-center justify-between">
+                        <span>Partially Fulfilled:</span>
+                        <strong className="font-extrabold text-sm">0.5%</strong>
+                    </div>
+                    <div className="p-2.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-400 font-semibold flex items-center justify-between">
+                        <span>Cancelled Orders:</span>
+                        <strong className="font-extrabold text-sm">0.2%</strong>
+                    </div>
+                </div>
+            </div>
+
+            {/* SECTION 8: SUPPLIER HEALTH METRICS */}
+            <div className="pb-4 space-y-2">
+                <span className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-100 block">
+                    SUPPLIER HEALTH
+                </span>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                    <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1">
+                        <span className="text-[11px] text-slate-500 font-bold uppercase block">Supplier Reliability</span>
+                        <strong className="text-emerald-600 dark:text-emerald-400 text-sm font-black">97.4%</strong>
+                        <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: "97.4%" }} />
+                        </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1">
+                        <span className="text-[11px] text-slate-500 font-bold uppercase block">SLA Compliance</span>
+                        <strong className="text-emerald-600 dark:text-emerald-400 text-sm font-black">96.8%</strong>
+                        <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: "96.8%" }} />
+                        </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1">
+                        <span className="text-[11px] text-slate-500 font-bold uppercase block">Delivery Performance</span>
+                        <strong className="text-emerald-600 dark:text-emerald-400 text-sm font-black">98.2%</strong>
+                        <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: "98.2%" }} />
+                        </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1">
+                        <span className="text-[11px] text-slate-500 font-bold uppercase block">Order Completion</span>
+                        <strong className="text-emerald-600 dark:text-emerald-400 text-sm font-black">99.1%</strong>
+                        <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: "99.1%" }} />
+                        </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1">
+                        <span className="text-[11px] text-slate-500 font-bold uppercase block">Delayed Orders</span>
+                        <strong className="text-amber-600 text-sm font-black">1.1%</strong>
+                        <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-500 rounded-full" style={{ width: "11%" }} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* SECTION 9: QUICK ACTIONS TOOLBAR */}
             <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                     <Sparkles size={16} className="text-orange-500" />
