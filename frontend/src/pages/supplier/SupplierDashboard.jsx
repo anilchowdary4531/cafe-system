@@ -160,30 +160,8 @@ const getSupplyProductImageUrl = (item) => {
 
 export default function SupplierDashboard() {
     const navigate = useNavigate();
-    const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
-    const activeTab = useMemo(() => {
-        const queryTab = searchParams.get("tab");
-        if (queryTab) return queryTab;
-        const path = (location.pathname || "").toLowerCase();
-        if (path.includes("notifications")) return "notifications";
-        if (path.includes("orders")) return "orders";
-        if (path.includes("marketplace")) return "supply-marketplace";
-        if (path.includes("negotiations") || path.includes("chat")) return "price-negotiations";
-        if (path.includes("payments")) return "payments-settlement";
-        if (path.includes("reports")) return "supply-reports";
-        if (path.includes("stock-counts")) return "stock-counts";
-        if (path.includes("transfers")) return "stock-transfers";
-        if (path.includes("products")) return "products";
-        if (path.includes("recipes")) return "recipes";
-        if (path.includes("consumption")) return "consumption";
-        if (path.includes("wastage")) return "wastage";
-        if (path.includes("profile")) return "profile";
-        if (path.includes("sales")) return "sales";
-        if (path.includes("customers")) return "customers";
-        return "dashboard";
-    }, [searchParams, location.pathname]);
-
+    const activeTab = searchParams.get("tab") || "dashboard";
     const [loading, setLoading] = useState(true);
     const [profileData, setProfileData] = useState(null);
     const [products, setProducts] = useState([]);
@@ -970,67 +948,67 @@ export default function SupplierDashboard() {
         <div className="theme-page min-h-screen flex flex-col relative">
             {/* TOP HEADER BAR — DASHBOARD PAGE ONLY */}
             {activeTab === "dashboard" && (
-            <header className="sticky top-0 z-40 px-4 sm:px-6 py-3 border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
-                <div className="w-full flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <button
-                            type="button"
-                            onClick={() => setSidebarOpen(!sidebarOpen)}
-                            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500 hover:bg-orange-600 text-white shadow-md transition active:scale-95 cursor-pointer shrink-0"
-                            title="Toggle navigation menu"
-                            aria-label="Toggle navigation menu"
-                        >
-                            {sidebarOpen ? <X size={22} className="text-white" /> : <Menu size={22} className="text-white stroke-[2.5]" />}
-                        </button>
+                <header className="sticky top-0 z-40 px-4 sm:px-6 py-3 border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+                    <div className="w-full flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setSidebarOpen(!sidebarOpen)}
+                                className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500 hover:bg-orange-600 text-white shadow-md transition active:scale-95 cursor-pointer shrink-0"
+                                title="Toggle navigation menu"
+                                aria-label="Toggle navigation menu"
+                            >
+                                {sidebarOpen ? <X size={22} className="text-white" /> : <Menu size={22} className="text-white stroke-[2.5]" />}
+                            </button>
 
-                        <div className="flex items-center gap-2.5">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 border border-orange-500/20">
-                                <BrandLogo className="h-6 w-6" title="Brand logo" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-black tracking-tight text-orange-500 flex items-center gap-2">
-                                    Tiffzy
-                                </h1>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium hidden sm:block">
-                                    Status:{" "}
-                                    <span className={`font-bold ${isAccountActive ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
-                                        {profileData?.status || "PENDING VERIFICATION"}
-                                    </span>
-                                </p>
+                            <div className="flex items-center gap-2.5">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 border border-orange-500/20">
+                                    <BrandLogo className="h-6 w-6" title="Brand logo" />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-black tracking-tight text-orange-500 flex items-center gap-2">
+                                        Tiffzy
+                                    </h1>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium hidden sm:block">
+                                        Status:{" "}
+                                        <span className={`font-bold ${isAccountActive ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                                            {profileData?.status || "PENDING VERIFICATION"}
+                                        </span>
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="flex items-center gap-3">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setActiveTab("notifications");
-                                setSearchParams({ tab: "notifications" });
-                            }}
-                            className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-50 hover:bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:hover:bg-orange-900/50 dark:text-orange-400 border border-orange-200/80 dark:border-orange-800/60 shadow-2xs transition active:scale-95 cursor-pointer"
-                            title="Notifications"
-                            aria-label="Notifications"
-                        >
-                            <Bell size={20} className="stroke-[2.2]" />
-                            {unreadNotifCount > 0 && (
-                                <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full bg-red-600 text-[10px] font-black text-white border-2 border-white dark:border-slate-900 shadow-xs animate-pulse">
-                                    {unreadNotifCount > 99 ? "99+" : unreadNotifCount}
-                                </span>
-                            )}
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setActiveTab("notifications");
+                                    setSearchParams({ tab: "notifications" });
+                                }}
+                                className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-50 hover:bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:hover:bg-orange-900/50 dark:text-orange-400 border border-orange-200/80 dark:border-orange-800/60 shadow-2xs transition active:scale-95 cursor-pointer"
+                                title="Notifications"
+                                aria-label="Notifications"
+                            >
+                                <Bell size={20} className="stroke-[2.2]" />
+                                {unreadNotifCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full bg-red-600 text-[10px] font-black text-white border-2 border-white dark:border-slate-900 shadow-xs animate-pulse">
+                                        {unreadNotifCount > 99 ? "99+" : unreadNotifCount}
+                                    </span>
+                                )}
+                            </button>
 
-                        <button
-                            type="button"
-                            onClick={() => navigate("/supplier/login")}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                        >
-                            <LogOut size={14} />
-                            <span className="hidden sm:inline">Logout</span>
-                        </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate("/supplier/login")}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                            >
+                                <LogOut size={14} />
+                                <span className="hidden sm:inline">Logout</span>
+                            </button>
+                        </div>
                     </div>
-                </div>
-            </header>
+                </header>
             )}
 
             {/* COLLAPSIBLE SIDEBAR MENU DRAWER OVERLAY — EXACT OWNER PANEL DESIGN MATCH */}
@@ -1089,13 +1067,12 @@ export default function SupplierDashboard() {
                                                 }
                                                 changeTab(tab.id);
                                             }}
-                                            className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl transition text-sm font-medium cursor-pointer ${
-                                                tab.locked
+                                            className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl transition text-sm font-medium cursor-pointer ${tab.locked
                                                     ? "opacity-50 cursor-not-allowed text-slate-400 dark:text-slate-600"
                                                     : isActive
-                                                    ? "bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 font-bold border-l-4 border-orange-500 shadow-2xs"
-                                                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100"
-                                            }`}
+                                                        ? "bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 font-bold border-l-4 border-orange-500 shadow-2xs"
+                                                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100"
+                                                }`}
                                         >
                                             <div className="flex items-center gap-3">
                                                 <Icon size={18} className={isActive ? "text-orange-500" : "text-slate-500 dark:text-slate-400"} />
@@ -1104,11 +1081,10 @@ export default function SupplierDashboard() {
                                             {tab.locked ? (
                                                 <Lock size={13} className="text-slate-400" />
                                             ) : tab.count !== undefined ? (
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                    isActive
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isActive
                                                         ? "bg-orange-500 text-white"
                                                         : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-                                                }`}>
+                                                    }`}>
                                                     {tab.count}
                                                 </span>
                                             ) : null}
@@ -1351,33 +1327,45 @@ export default function SupplierDashboard() {
                 {/* TAB: NOTIFICATIONS */}
                 {isAccountActive && activeTab === "notifications" && (
                     <div className="space-y-6">
-                        <SupplyChainPageHeader
-                            title="Notifications"
-                            subtitle="Real-time operational alerts for B2B orders, inventory, price negotiations, settlements, and supply chain events"
-                            badge={unreadNotifCount > 0 ? `${unreadNotifCount} Unread` : null}
-                            onMenuClick={() => setSidebarOpen(true)}
-                            actions={
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={handleMarkAllAsRead}
-                                        disabled={unreadNotifCount === 0}
-                                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                                    >
-                                        <CheckCheck size={14} className="text-emerald-500" />
-                                        Mark all as read
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={fetchNotifications}
-                                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                                    >
-                                        <RefreshCw size={14} className={loadingNotifications ? "animate-spin text-orange-500" : ""} />
-                                        Refresh
-                                    </button>
+                        {/* Header bar */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-3">
+                                    <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                        <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                                        <Bell className="theme-accent-text" />
+                                        Notifications
+                                    </h2>
+                                    {unreadNotifCount > 0 && (
+                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-orange-500 text-white shadow-xs">
+                                            {unreadNotifCount} Unread
+                                        </span>
+                                    )}
                                 </div>
-                            }
-                        />
+                                <p className="theme-muted text-xs mt-0.5">
+                                    Real-time operational alerts for B2B orders, inventory, price negotiations, settlements, and supply chain events.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2 self-start sm:self-auto">
+                                <button
+                                    type="button"
+                                    onClick={handleMarkAllAsRead}
+                                    disabled={unreadNotifCount === 0}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    <CheckCheck size={14} className="text-emerald-500" />
+                                    Mark all as read
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={fetchNotifications}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                                >
+                                    <RefreshCw size={14} className={loadingNotifications ? "animate-spin text-orange-500" : ""} />
+                                    Refresh
+                                </button>
+                            </div>
+                        </div>
 
                         {/* Filter Toolbar */}
                         <div className="theme-panel rounded-2xl p-4 border theme-border space-y-3">
@@ -1387,22 +1375,20 @@ export default function SupplierDashboard() {
                                     <button
                                         type="button"
                                         onClick={() => setNotifStatusFilter("ALL")}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                                            notifStatusFilter === "ALL"
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${notifStatusFilter === "ALL"
                                                 ? "bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs"
                                                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                        }`}
+                                            }`}
                                     >
                                         All ({notifications.length})
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setNotifStatusFilter("UNREAD")}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                                            notifStatusFilter === "UNREAD"
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${notifStatusFilter === "UNREAD"
                                                 ? "bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs"
                                                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                        }`}
+                                            }`}
                                     >
                                         Unread
                                         {unreadNotifCount > 0 && (
@@ -1414,11 +1400,10 @@ export default function SupplierDashboard() {
                                     <button
                                         type="button"
                                         onClick={() => setNotifStatusFilter("READ")}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                                            notifStatusFilter === "READ"
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${notifStatusFilter === "READ"
                                                 ? "bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs"
                                                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                        }`}
+                                            }`}
                                     >
                                         Read
                                     </button>
@@ -1539,11 +1524,10 @@ export default function SupplierDashboard() {
                                                             onClick={() => {
                                                                 if (isUnread) handleMarkAsRead(n.id);
                                                             }}
-                                                            className={`group relative rounded-2xl p-4 border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer ${
-                                                                isUnread
+                                                            className={`group relative rounded-2xl p-4 border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer ${isUnread
                                                                     ? "bg-amber-50/60 dark:bg-amber-950/20 border-amber-200/90 dark:border-amber-800/60 shadow-2xs hover:border-amber-300"
                                                                     : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 opacity-90"
-                                                            }`}
+                                                                }`}
                                                         >
                                                             {/* Left Accent indicator for unread */}
                                                             {isUnread && (
@@ -1777,21 +1761,20 @@ export default function SupplierDashboard() {
                 {/* TAB 1: CATALOG PRODUCTS */}
                 {isAccountActive && activeTab === "products" && (
                     <div className="space-y-4">
-                        <SupplyChainPageHeader
-                            title="Catalog Products"
-                            subtitle="Manage raw material items, wholesale prices, stock levels, and MOQ threshold"
-                            onMenuClick={() => setSidebarOpen(true)}
-                            actions={
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAddProductModal(true)}
-                                    className="theme-button rounded-xl px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer"
-                                >
-                                    <Plus size={16} />
-                                    Add Supply Product
-                                </button>
-                            }
-                        />
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                                Catalog Products
+                            </h2>
+                            <button
+                                type="button"
+                                onClick={() => setShowAddProductModal(true)}
+                                className="theme-button rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer"
+                            >
+                                <Plus size={16} />
+                                Add Supply Product
+                            </button>
+                        </div>
 
                         {products.length === 0 ? (
                             <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
@@ -1854,11 +1837,10 @@ export default function SupplierDashboard() {
                 {/* TAB 2: B2B ORDERS */}
                 {isAccountActive && activeTab === "orders" && (
                     <div className="space-y-4">
-                        <SupplyChainPageHeader
-                            title="Live B2B Restaurant Orders"
-                            subtitle="Incoming wholesale order fulfillments from buyer kitchens"
-                            onMenuClick={() => setSidebarOpen(true)}
-                        />
+                        <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                            <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                            Live B2B Restaurant Orders
+                        </h2>
                         {orders.length === 0 ? (
                             <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
                                 <ShoppingBag size={40} className="mx-auto theme-accent-text" />
@@ -1921,12 +1903,18 @@ export default function SupplierDashboard() {
                 {/* TAB 3: SALES & REVENUE ANALYTICS */}
                 {isAccountActive && activeTab === "sales" && (
                     <div className="space-y-6">
-                        <SupplyChainPageHeader
-                            title="Sales Analytics & Revenue Overview"
-                            subtitle="Monitor B2B restaurant sales, orders, customers, products and supplier payouts"
-                            badge="LIVE SUPPLIER SALES CONSOLE"
-                            onMenuClick={() => setSidebarOpen(true)}
-                        />
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800 pb-3">
+                            <div>
+                                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                    <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                                    Sales Analytics & Revenue Overview
+                                </h2>
+                                <p className="theme-muted text-xs mt-0.5">Monitor B2B restaurant sales, orders, customers, products and supplier payouts.</p>
+                            </div>
+                            <span className="inline-flex items-center rounded-lg bg-orange-500/10 px-2.5 py-1 text-xs font-extrabold text-orange-500 uppercase tracking-wider self-start md:self-auto">
+                                LIVE SUPPLIER SALES CONSOLE
+                            </span>
+                        </div>
 
                         {/* FILTER TOOLBAR */}
                         <div className="theme-panel rounded-2xl p-3 border space-y-3">
@@ -2136,11 +2124,11 @@ export default function SupplierDashboard() {
                 {/* TAB 4: B2B RESTAURANT CUSTOMERS */}
                 {isAccountActive && activeTab === "customers" && (
                     <div className="space-y-4">
-                        <SupplyChainPageHeader
-                            title="B2B Restaurant Customers"
-                            subtitle="Restaurants that have placed supply orders with your business"
-                            onMenuClick={() => setSidebarOpen(true)}
-                        />
+                        <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                            <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                            B2B Restaurant Customers
+                        </h2>
+                        <p className="theme-muted text-xs">Restaurants that have placed supply orders with your business</p>
 
                         {customers.length === 0 ? (
                             <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
@@ -2177,21 +2165,28 @@ export default function SupplierDashboard() {
                 {/* CONSOLIDATED TAB: B2B PRICE NEGOTIATIONS & CHAT */}
                 {isAccountActive && (activeTab === "price-negotiations" || activeTab === "chat") && (
                     <div className="space-y-6 font-sans text-sm text-[color:var(--app-text,#1e293b)]">
-                        <SupplyChainPageHeader
-                            title="B2B PRICE NEGOTIATIONS & CHAT"
-                            subtitle="Real-time price negotiation with restaurant clients & wholesale buyers"
-                            onMenuClick={() => setSidebarOpen(true)}
-                            actions={
-                                <button
-                                    type="button"
-                                    onClick={() => setShowBargainModal(true)}
-                                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-extrabold shadow-sm transition active:scale-95 cursor-pointer shrink-0"
-                                >
-                                    <Plus size={16} />
-                                    <span>+ New Rate Proposal</span>
-                                </button>
-                            }
-                        />
+                        {/* HEADER SECTION */}
+                        <div className="pb-3 border-b border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <h2 className="text-xl font-black tracking-tight flex items-center gap-2.5 text-slate-900 dark:text-slate-100">
+                                    <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                                    <Handshake size={22} className="text-orange-500" />
+                                    B2B PRICE NEGOTIATIONS & CHAT
+                                </h2>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                                    Real-time price negotiation with restaurant clients & wholesale buyers
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setShowBargainModal(true)}
+                                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-extrabold shadow-sm transition active:scale-95 cursor-pointer shrink-0"
+                            >
+                                <Plus size={16} />
+                                <span>+ New Rate Proposal</span>
+                            </button>
+                        </div>
 
                         {/* TOP KPI SECTION */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
@@ -2267,19 +2262,17 @@ export default function SupplierDashboard() {
                                                     key={thread.id}
                                                     type="button"
                                                     onClick={() => setActiveThreadId(thread.id)}
-                                                    className={`w-full p-3 rounded-xl text-left transition cursor-pointer flex flex-col gap-1.5 border ${
-                                                        isSelected
+                                                    className={`w-full p-3 rounded-xl text-left transition cursor-pointer flex flex-col gap-1.5 border ${isSelected
                                                             ? "bg-orange-50/80 dark:bg-orange-950/30 border-orange-500 text-slate-900 dark:text-slate-100 shadow-2xs"
                                                             : "bg-slate-50/50 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-800 hover:bg-slate-100/70 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300"
-                                                    }`}
+                                                        }`}
                                                 >
                                                     <div className="flex items-center justify-between gap-2">
                                                         <span className="font-extrabold text-xs truncate text-slate-900 dark:text-slate-100">{thread.clientName}</span>
-                                                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-extrabold shrink-0 ${
-                                                            thread.clientType === "RESTAURANT"
+                                                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-extrabold shrink-0 ${thread.clientType === "RESTAURANT"
                                                                 ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-900"
                                                                 : "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-900"
-                                                        }`}>
+                                                            }`}>
                                                             {thread.clientType === "RESTAURANT" ? "Restaurant" : "External"}
                                                         </span>
                                                     </div>
@@ -2328,28 +2321,25 @@ export default function SupplierDashboard() {
                                                     >
                                                         <span className="text-[10px] mb-1 font-bold text-slate-400">{msg.senderName}</span>
                                                         <div
-                                                            className={`max-w-[85%] rounded-2xl p-3.5 shadow-2xs text-xs space-y-2 ${
-                                                                isMe
+                                                            className={`max-w-[85%] rounded-2xl p-3.5 shadow-2xs text-xs space-y-2 ${isMe
                                                                     ? "bg-orange-500 text-white font-medium"
                                                                     : "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200/80 dark:border-slate-700 font-medium"
-                                                            }`}
+                                                                }`}
                                                         >
                                                             {msg.text && <p className="leading-relaxed">{msg.text}</p>}
 
                                                             {/* BARGAIN COUNTER OFFER CARD */}
                                                             {msg.type === "BARGAIN_OFFER" && msg.offer && (
-                                                                <div className={`rounded-xl border p-3 space-y-2 text-xs ${
-                                                                    isMe ? "bg-orange-600/40 border-orange-400/50 text-white" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
-                                                                }`}>
+                                                                <div className={`rounded-xl border p-3 space-y-2 text-xs ${isMe ? "bg-orange-600/40 border-orange-400/50 text-white" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
+                                                                    }`}>
                                                                     <div className="flex items-center justify-between gap-2">
                                                                         <span className="font-black text-xs">{msg.offer.productName}</span>
-                                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                                                                            msg.offer.status === "ACCEPTED"
+                                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${msg.offer.status === "ACCEPTED"
                                                                                 ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
                                                                                 : msg.offer.status === "REJECTED"
-                                                                                ? "bg-red-100 text-red-800 border border-red-300"
-                                                                                : "bg-amber-100 text-amber-900 border border-amber-300"
-                                                                        }`}>
+                                                                                    ? "bg-red-100 text-red-800 border border-red-300"
+                                                                                    : "bg-amber-100 text-amber-900 border border-amber-300"
+                                                                            }`}>
                                                                             {msg.offer.status}
                                                                         </span>
                                                                     </div>
@@ -2455,13 +2445,12 @@ export default function SupplierDashboard() {
                                                     <td className="py-2.5 px-3 text-slate-500">{row.catalogPrice}</td>
                                                     <td className="py-2.5 px-3 font-extrabold text-orange-500">{row.offeredPrice}</td>
                                                     <td className="py-2.5 px-3">
-                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                                                            row.status === "ACCEPTED"
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold ${row.status === "ACCEPTED"
                                                                 ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
                                                                 : row.status === "REJECTED"
-                                                                ? "bg-red-50 text-red-800 border border-red-200"
-                                                                : "bg-amber-50 text-amber-800 border border-amber-200"
-                                                        }`}>
+                                                                    ? "bg-red-50 text-red-800 border border-red-200"
+                                                                    : "bg-amber-50 text-amber-800 border border-amber-200"
+                                                            }`}>
                                                             {row.status}
                                                         </span>
                                                     </td>
@@ -2553,20 +2542,26 @@ export default function SupplierDashboard() {
                 {/* TAB: PAYMENTS & SETTLEMENT */}
                 {isAccountActive && activeTab === "payments-settlement" && (
                     <div className="space-y-4 font-sans text-sm text-[color:var(--app-text,#1e293b)]">
-                        <SupplyChainPageHeader
-                            title="Vendor Payouts & Financial Settlement Ledger"
-                            subtitle="Automated 95% net payout calculations, platform fee deductions (5%), and bank transfer status"
-                            onMenuClick={() => setSidebarOpen(true)}
-                            actions={
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab("profile")}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                                >
-                                    Edit Bank Details
-                                </button>
-                            }
-                        />
+                        {/* HEADER SECTION WITH SUBTLE LINE DIVIDER */}
+                        <div className="pb-3 border-b border-slate-200/80 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div>
+                                <h2 className="text-xl font-black tracking-tight flex items-center gap-2.5 text-slate-900 dark:text-slate-100">
+                                    <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                                    <CreditCard size={20} className="text-orange-500" />
+                                    Vendor Payouts & Financial Settlement Ledger
+                                </h2>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                    Automated 95% net payout calculations, platform fee deductions (5%), and bank transfer status
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab("profile")}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer self-start md:self-auto"
+                            >
+                                Edit Bank Details
+                            </button>
+                        </div>
 
                         {/* 1. HORIZONTAL COMPACT STRIP KPIs (NO CARD BOXES, SUBTLE LINE DIVIDERS) */}
                         <div className="pb-4 border-b border-slate-200/80 dark:border-slate-800">
@@ -2693,9 +2688,8 @@ export default function SupplierDashboard() {
                                                     <td className="p-2.5 text-rose-500 font-semibold">- ₹{row.fee.toLocaleString("en-IN")}</td>
                                                     <td className="p-2.5 font-black text-emerald-600">₹{row.net.toLocaleString("en-IN")}</td>
                                                     <td className="p-2.5 text-right">
-                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
-                                                            row.status === "SETTLED" ? "bg-emerald-500/15 text-emerald-600" : "bg-amber-500/15 text-amber-600"
-                                                        }`}>
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${row.status === "SETTLED" ? "bg-emerald-500/15 text-emerald-600" : "bg-amber-500/15 text-amber-600"
+                                                            }`}>
                                                             {row.status}
                                                         </span>
                                                     </td>
@@ -2712,11 +2706,14 @@ export default function SupplierDashboard() {
                 {/* TAB: SUPPLY REPORTS & INTEL */}
                 {isAccountActive && activeTab === "supply-reports" && (
                     <div className="space-y-6">
-                        <SupplyChainPageHeader
-                            title="Supplier Performance & Revenue Analytics"
-                            subtitle="Wholesale fulfillment metrics, buyer retention rates, and catalog category performance"
-                            onMenuClick={() => setSidebarOpen(true)}
-                        />
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                                <BarChart3 className="theme-accent-text" />
+                                Supplier Performance & Revenue Analytics
+                            </h2>
+                            <p className="theme-muted text-xs mt-0.5">Wholesale fulfillment metrics, buyer retention rates, and catalog category performance</p>
+                        </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="theme-panel rounded-2xl p-4 border space-y-1">
@@ -2742,21 +2739,27 @@ export default function SupplierDashboard() {
                 {/* TAB: SUPPLY MARKETPLACE */}
                 {isAccountActive && activeTab === "supply-marketplace" && (
                     <div className="space-y-6">
-                        <SupplyChainPageHeader
-                            title="Tiffzy Wholesale Supply Marketplace Listings"
-                            subtitle="View, manage, and promote your raw material listings visible to restaurant buyers across Tiffzy B2B Marketplace"
-                            onMenuClick={() => setSidebarOpen(true)}
-                            actions={
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAddProductModal(true)}
-                                    className="theme-button rounded-xl px-4 py-2.5 text-xs font-extrabold flex items-center gap-2 shadow-md cursor-pointer whitespace-nowrap"
-                                >
-                                    <Plus size={16} />
-                                    <span>Add Marketplace Item</span>
-                                </button>
-                            }
-                        />
+                        {/* Header & Add Button */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                    <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                                    <ShoppingBag className="theme-accent-text" />
+                                    Tiffzy Wholesale Supply Marketplace Listings
+                                </h2>
+                                <p className="theme-muted text-xs mt-0.5">
+                                    View, manage, and promote your raw material listings visible to restaurant buyers across Tiffzy B2B Marketplace
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowAddProductModal(true)}
+                                className="theme-button rounded-xl px-4 py-2.5 text-xs font-extrabold flex items-center gap-2 shadow-md cursor-pointer whitespace-nowrap self-start sm:self-auto"
+                            >
+                                <Plus size={16} />
+                                Add Marketplace Item
+                            </button>
+                        </div>
 
                         {/* Search, Filter & Sort Toolbar */}
                         <div className="theme-panel rounded-2xl p-4 border theme-border space-y-3">
@@ -2908,11 +2911,10 @@ export default function SupplierDashboard() {
                                                     />
                                                     {/* Overlay Status Pills */}
                                                     <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
-                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-md backdrop-blur-md ${
-                                                            p.status === "APPROVED" ? "bg-emerald-500/90 text-white" :
-                                                            p.status === "REJECTED" ? "bg-red-500/90 text-white" :
-                                                            "bg-amber-500/90 text-white"
-                                                        }`}>
+                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-md backdrop-blur-md ${p.status === "APPROVED" ? "bg-emerald-500/90 text-white" :
+                                                                p.status === "REJECTED" ? "bg-red-500/90 text-white" :
+                                                                    "bg-amber-500/90 text-white"
+                                                            }`}>
                                                             {p.status || "APPROVED"}
                                                         </span>
 
@@ -3019,11 +3021,14 @@ export default function SupplierDashboard() {
                 {/* TAB: CONSUMPTION INTEL */}
                 {isAccountActive && activeTab === "consumption" && (
                     <div className="space-y-6">
-                        <SupplyChainPageHeader
-                            title="Bulk Demand & Client Consumption Trends"
-                            subtitle="Weekly raw material reorder cycles and ingredient demand velocity across restaurant buyers"
-                            onMenuClick={() => setSidebarOpen(true)}
-                        />
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                                <Activity className="theme-accent-text" />
+                                Bulk Demand & Client Consumption Trends
+                            </h2>
+                            <p className="theme-muted text-xs mt-0.5">Weekly raw material reorder cycles and ingredient demand velocity across restaurant buyers</p>
+                        </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="theme-panel rounded-2xl p-4 border space-y-1">
@@ -3045,11 +3050,14 @@ export default function SupplierDashboard() {
                 {/* TAB: WASTAGE MANAGEMENT */}
                 {isAccountActive && activeTab === "wastage" && (
                     <div className="space-y-6">
-                        <SupplyChainPageHeader
-                            title="Transit Damage & Return Log"
-                            subtitle="Logs of goods damaged during logistics dispatch or rejected at buyer receiving dock"
-                            onMenuClick={() => setSidebarOpen(true)}
-                        />
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                                <Trash2 className="theme-accent-text" />
+                                Transit Damage & Return Log
+                            </h2>
+                            <p className="theme-muted text-xs mt-0.5">Logs of goods damaged during logistics dispatch or rejected at buyer receiving dock</p>
+                        </div>
 
                         <div className="theme-panel rounded-3xl p-6 border text-center py-12 text-xs theme-muted space-y-2">
                             <Trash2 size={36} className="mx-auto" />
@@ -3062,11 +3070,14 @@ export default function SupplierDashboard() {
                 {/* TAB: STOCK COUNTS */}
                 {isAccountActive && activeTab === "stock-counts" && (
                     <div className="space-y-6">
-                        <SupplyChainPageHeader
-                            title="Supplier Warehouse Stock Audit"
-                            subtitle="Real-time stock-on-hand levels and reorder thresholds across vendor storage facilities"
-                            onMenuClick={() => setSidebarOpen(true)}
-                        />
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                                <ClipboardCheck className="theme-accent-text" />
+                                Supplier Warehouse Stock Audit
+                            </h2>
+                            <p className="theme-muted text-xs mt-0.5">Real-time stock-on-hand levels and reorder thresholds across vendor storage facilities</p>
+                        </div>
 
                         <div className="theme-panel rounded-3xl p-6 border space-y-4">
                             <h3 className="text-base font-bold">Warehouse Physical Stock Inventory</h3>
@@ -3091,11 +3102,14 @@ export default function SupplierDashboard() {
                 {/* TAB: STOCK TRANSFERS */}
                 {isAccountActive && activeTab === "stock-transfers" && (
                     <div className="space-y-6">
-                        <SupplyChainPageHeader
-                            title="Dispatch & Logistics Transfers Log"
-                            subtitle="Active warehouse dispatches and vehicle delivery shipments to buyer restaurant locations"
-                            onMenuClick={() => setSidebarOpen(true)}
-                        />
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                                <ArrowLeftRight className="theme-accent-text" />
+                                Dispatch & Logistics Transfers Log
+                            </h2>
+                            <p className="theme-muted text-xs mt-0.5">Active warehouse dispatches and vehicle delivery shipments to buyer restaurant locations</p>
+                        </div>
 
                         <div className="theme-panel rounded-3xl p-6 border space-y-4">
                             <h3 className="text-base font-bold">Recent Logistics Dispatches</h3>
@@ -3123,11 +3137,10 @@ export default function SupplierDashboard() {
                 {/* TAB 6: ACTIVE PROFILE VIEW FOR VERIFIED SUPPLIERS */}
                 {isAccountActive && activeTab === "profile" && (
                     <div className="space-y-6">
-                        <SupplyChainPageHeader
-                            title="Supplier Profile & Business KYC Compliance"
-                            subtitle="Submit and verify legal entity, GSTIN, FSSAI, warehouse address, and bank account credentials"
-                            onMenuClick={() => setSidebarOpen(true)}
-                        />
+                        <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                            <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                            Supplier Profile & Business KYC Compliance
+                        </h2>
 
                         <form onSubmit={handleSaveProfile} className="theme-panel rounded-3xl p-6 border space-y-5">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3428,9 +3441,8 @@ export default function SupplierDashboard() {
                                                 key={preset.label}
                                                 type="button"
                                                 onClick={() => setNewProduct({ ...newProduct, imageUrl: preset.url })}
-                                                className={`text-[11px] px-2 py-1 rounded-lg border font-bold cursor-pointer transition ${
-                                                    newProduct.imageUrl === preset.url ? "theme-button border-amber-400" : "theme-card hover:theme-panel"
-                                                }`}
+                                                className={`text-[11px] px-2 py-1 rounded-lg border font-bold cursor-pointer transition ${newProduct.imageUrl === preset.url ? "theme-button border-amber-400" : "theme-card hover:theme-panel"
+                                                    }`}
                                             >
                                                 {preset.label}
                                             </button>
@@ -3540,9 +3552,8 @@ export default function SupplierDashboard() {
                                     e.target.src = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80";
                                 }}
                             />
-                            <span className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-black uppercase shadow-md ${
-                                selectedProductDetails.status === "APPROVED" ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
-                            }`}>
+                            <span className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-black uppercase shadow-md ${selectedProductDetails.status === "APPROVED" ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
+                                }`}>
                                 {selectedProductDetails.status || "APPROVED"}
                             </span>
                         </div>
