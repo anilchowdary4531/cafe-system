@@ -110,10 +110,14 @@ export const createAndDispatchNotification = async ({
 
       if (recipientType === RECIPIENT_TYPES.CUSTOMER) {
         realtime.io.to(`customer:${recipientId}`).emit("notification:new", payload);
+      } else if (recipientType === "SUPPLIER") {
+        realtime.io.to(`supplier:${recipientId}`).emit("notification:new", payload);
+        realtime.io.to(`supplier_${recipientId}`).emit("notification:new", payload);
       } else if (recipientType === RECIPIENT_TYPES.USER || recipientType === RECIPIENT_TYPES.RESTAURANT) {
         if (restaurantId) {
           realtime.io.to(`restaurant:${restaurantId}`).emit("notification:new", payload);
         }
+        realtime.io.to(`user:${recipientId}`).emit("notification:new", payload);
       }
     }
   } catch (wsErr) {
@@ -269,7 +273,20 @@ export const getUserNotifications = async ({
   let where;
   let unreadWhere;
 
-  if (recipientType === RECIPIENT_TYPES.USER || recipientType === RECIPIENT_TYPES.RESTAURANT) {
+  if (recipientType === "SUPPLIER") {
+    const supplierConditions = [
+      { recipientType: "SUPPLIER", recipientId: Number(recipientId) },
+      { recipientType: RECIPIENT_TYPES.USER, recipientId: Number(recipientId) },
+    ];
+    where = {
+      OR: supplierConditions,
+      ...(isRead !== null ? { isRead: Boolean(isRead) } : {}),
+    };
+    unreadWhere = {
+      OR: supplierConditions,
+      isRead: false,
+    };
+  } else if (recipientType === RECIPIENT_TYPES.USER || recipientType === RECIPIENT_TYPES.RESTAURANT) {
     const userOrRestaurantConditions = [
       { recipientType: RECIPIENT_TYPES.USER, recipientId: Number(recipientId) },
     ];

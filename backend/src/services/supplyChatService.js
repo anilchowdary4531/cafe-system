@@ -1,4 +1,5 @@
 import prisma from "../prisma.js";
+import { createAndDispatchNotification } from "./notificationService.js";
 
 // In-memory persistent fallback store for fast real-time B2B chat threads & bargain offers
 const chatThreadsStore = new Map();
@@ -149,6 +150,23 @@ export async function sendMessageOrOffer({ threadId, supplierId, sender, senderN
         thread.lastMessage = type === "BARGAIN_OFFER" ? `Bargain Offer: ₹${offer?.offeredPrice}/${offer?.unit}` : text;
         thread.lastUpdated = new Date().toISOString();
         chatThreadsStore.set(tId, thread);
+    }
+
+    // Dispatch persistent notification to supplier
+    if (supplierId) {
+        createAndDispatchNotification({
+            prisma,
+            recipientType: "SUPPLIER",
+            recipientId: Number(supplierId),
+            notificationType: type === "BARGAIN_OFFER" ? "BARGAIN_OFFER" : "B2B_CHAT_MESSAGE",
+            title: type === "BARGAIN_OFFER" ? "💬 New Price Bargain Offer" : "💬 New B2B Message",
+            message: type === "BARGAIN_OFFER" 
+                ? `Bargain offer received for ${offer?.productName || "Product"} at ₹${offer?.offeredPrice}/${offer?.unit || "KG"}.`
+                : `${senderName || "Buyer"}: ${text}`,
+            data: { category: "NEGOTIATIONS", actionUrl: "/supplier?tab=bargain-chat", threadId: tId },
+            priority: "NORMAL",
+            idempotencyKey: `BARGAIN_MSG:${newMsg.id}`,
+        }).catch(() => {});
     }
 
     return newMsg;

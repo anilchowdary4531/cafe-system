@@ -35,11 +35,16 @@ export default async function notificationRoutes(app, deps) {
       if (authHeader.startsWith("Bearer ")) {
         const token = authHeader.split(" ")[1];
         const decoded = app.jwt.verify(token);
-        if (decoded?.id && String(decoded?.type || "") !== "customer") {
+        if ((decoded?.id || decoded?.supplierId) && String(decoded?.type || "") !== "customer") {
+          const supplierId = decoded.supplierId ? Number(decoded.supplierId) : null;
           const restaurantId = decoded.restaurantId || decoded.restaurant_id ? Number(decoded.restaurantId || decoded.restaurant_id) : null;
+          const actorId = supplierId || Number(decoded.id);
+          const isSupplier = Boolean(supplierId || decoded.role === "SUPPLIER");
+
           return {
-            recipientType: RECIPIENT_TYPES.USER,
-            recipientId: Number(decoded.id),
+            recipientType: isSupplier ? "SUPPLIER" : RECIPIENT_TYPES.USER,
+            recipientId: actorId,
+            supplierId,
             restaurantId,
             user: decoded,
           };

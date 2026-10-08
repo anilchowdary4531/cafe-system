@@ -1,6 +1,7 @@
 import prisma from "../prisma.js";
 import { calculateFinalPrice, getSupplierProductById } from "./supplierProductService.js";
 import { ensureSupplyMarketplaceSeeded } from "./seedSupplyMarketplaceService.js";
+import { createAndDispatchNotification } from "./notificationService.js";
 
 export async function browseMarketplaceProducts(query = {}) {
     await ensureSupplyMarketplaceSeeded();
@@ -309,6 +310,34 @@ export async function placeSupplyOrder(restaurantId, { deliveryAddress, notes, p
             return createdOrder;
         });
 
+        // Dispatch B2B order notifications
+        createAndDispatchNotification({
+            prisma,
+            recipientType: "SUPPLIER",
+            recipientId: supplierId,
+            orderId: order.id,
+            notificationType: "NEW_ORDER",
+            title: "📦 New B2B Order Received",
+            message: `New wholesale supply order ${order.orderNo} received for ₹${order.totalAmount.toLocaleString("en-IN")}.`,
+            data: { category: "ORDERS", actionUrl: "/supplier?tab=orders", orderId: order.id, orderNo: order.orderNo },
+            priority: "HIGH",
+            idempotencyKey: `B2B_ORDER_CREATED_SUPP:${order.id}`,
+        }).catch(() => {});
+
+        createAndDispatchNotification({
+            prisma,
+            recipientType: "RESTAURANT",
+            recipientId: rId,
+            restaurantId: rId,
+            orderId: order.id,
+            notificationType: "ORDER_PLACED",
+            title: "🛒 Supply Order Placed",
+            message: `Wholesale order ${order.orderNo} for ₹${order.totalAmount.toLocaleString("en-IN")} placed successfully.`,
+            data: { category: "ORDERS", actionUrl: "/owner/supply", orderId: order.id, orderNo: order.orderNo },
+            priority: "NORMAL",
+            idempotencyKey: `B2B_ORDER_CREATED_REST:${order.id}`,
+        }).catch(() => {});
+
         createdOrders.push(order);
     }
 
@@ -420,6 +449,20 @@ export async function updateSupplyOrderStatus(orderId, supplierId, newStatus, no
 
         return updatedOrder;
     });
+
+    createAndDispatchNotification({
+        prisma,
+        recipientType: "RESTAURANT",
+        recipientId: order.restaurantId,
+        restaurantId: order.restaurantId,
+        orderId: order.id,
+        notificationType: `B2B_ORDER_${status}`,
+        title: `📦 Supply Order ${status}`,
+        message: `Supply order ${order.orderNo} status updated to ${status}. ${notes ? `Notes: ${notes}` : ""}`,
+        data: { category: "ORDERS", actionUrl: "/owner/supply", orderId: order.id, status },
+        priority: status === "REJECTED" || status === "CANCELLED" ? "HIGH" : "NORMAL",
+        idempotencyKey: `B2B_ORDER_STATUS:${order.id}:${status}`,
+    }).catch(() => {});
 
     return updated;
 }

@@ -1,4 +1,5 @@
 import prisma from "../prisma.js";
+import { createAndDispatchNotification } from "./notificationService.js";
 
 function slugify(text) {
     return String(text || "")

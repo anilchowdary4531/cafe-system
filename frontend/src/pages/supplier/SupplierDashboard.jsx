@@ -160,8 +160,30 @@ const getSupplyProductImageUrl = (item) => {
 
 export default function SupplierDashboard() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
-    const activeTab = searchParams.get("tab") || "dashboard";
+    const activeTab = useMemo(() => {
+        const queryTab = searchParams.get("tab");
+        if (queryTab) return queryTab;
+        const path = (location.pathname || "").toLowerCase();
+        if (path.includes("notifications")) return "notifications";
+        if (path.includes("orders")) return "orders";
+        if (path.includes("marketplace")) return "supply-marketplace";
+        if (path.includes("negotiations") || path.includes("chat")) return "price-negotiations";
+        if (path.includes("payments")) return "payments-settlement";
+        if (path.includes("reports")) return "supply-reports";
+        if (path.includes("stock-counts")) return "stock-counts";
+        if (path.includes("transfers")) return "stock-transfers";
+        if (path.includes("products")) return "products";
+        if (path.includes("recipes")) return "recipes";
+        if (path.includes("consumption")) return "consumption";
+        if (path.includes("wastage")) return "wastage";
+        if (path.includes("profile")) return "profile";
+        if (path.includes("sales")) return "sales";
+        if (path.includes("customers")) return "customers";
+        return "dashboard";
+    }, [searchParams, location.pathname]);
+
     const [loading, setLoading] = useState(true);
     const [profileData, setProfileData] = useState(null);
     const [products, setProducts] = useState([]);
@@ -1329,45 +1351,33 @@ export default function SupplierDashboard() {
                 {/* TAB: NOTIFICATIONS */}
                 {isAccountActive && activeTab === "notifications" && (
                     <div className="space-y-6">
-                        {/* Header bar */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div>
-                                <div className="flex items-center gap-3">
-                                    <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                                        <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                                        <Bell className="theme-accent-text" />
-                                        Notifications
-                                    </h2>
-                                    {unreadNotifCount > 0 && (
-                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-orange-500 text-white shadow-xs">
-                                            {unreadNotifCount} Unread
-                                        </span>
-                                    )}
+                        <SupplyChainPageHeader
+                            title="Notifications"
+                            subtitle="Real-time operational alerts for B2B orders, inventory, price negotiations, settlements, and supply chain events"
+                            badge={unreadNotifCount > 0 ? `${unreadNotifCount} Unread` : null}
+                            onMenuClick={() => setSidebarOpen(true)}
+                            actions={
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleMarkAllAsRead}
+                                        disabled={unreadNotifCount === 0}
+                                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                    >
+                                        <CheckCheck size={14} className="text-emerald-500" />
+                                        Mark all as read
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={fetchNotifications}
+                                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                                    >
+                                        <RefreshCw size={14} className={loadingNotifications ? "animate-spin text-orange-500" : ""} />
+                                        Refresh
+                                    </button>
                                 </div>
-                                <p className="theme-muted text-xs mt-0.5">
-                                    Real-time operational alerts for B2B orders, inventory, price negotiations, settlements, and supply chain events.
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2 self-start sm:self-auto">
-                                <button
-                                    type="button"
-                                    onClick={handleMarkAllAsRead}
-                                    disabled={unreadNotifCount === 0}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                                >
-                                    <CheckCheck size={14} className="text-emerald-500" />
-                                    Mark all as read
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={fetchNotifications}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                                >
-                                    <RefreshCw size={14} className={loadingNotifications ? "animate-spin text-orange-500" : ""} />
-                                    Refresh
-                                </button>
-                            </div>
-                        </div>
+                            }
+                        />
 
                         {/* Filter Toolbar */}
                         <div className="theme-panel rounded-2xl p-4 border theme-border space-y-3">
@@ -1767,20 +1777,21 @@ export default function SupplierDashboard() {
                 {/* TAB 1: CATALOG PRODUCTS */}
                 {isAccountActive && activeTab === "products" && (
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                            <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                            Catalog Products
-                        </h2>
-                            <button
-                                type="button"
-                                onClick={() => setShowAddProductModal(true)}
-                                className="theme-button rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer"
-                            >
-                                <Plus size={16} />
-                                Add Supply Product
-                            </button>
-                        </div>
+                        <SupplyChainPageHeader
+                            title="Catalog Products"
+                            subtitle="Manage raw material items, wholesale prices, stock levels, and MOQ threshold"
+                            onMenuClick={() => setSidebarOpen(true)}
+                            actions={
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAddProductModal(true)}
+                                    className="theme-button rounded-xl px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer"
+                                >
+                                    <Plus size={16} />
+                                    Add Supply Product
+                                </button>
+                            }
+                        />
 
                         {products.length === 0 ? (
                             <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
@@ -1843,10 +1854,11 @@ export default function SupplierDashboard() {
                 {/* TAB 2: B2B ORDERS */}
                 {isAccountActive && activeTab === "orders" && (
                     <div className="space-y-4">
-                        <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                            <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                            Live B2B Restaurant Orders
-                        </h2>
+                        <SupplyChainPageHeader
+                            title="Live B2B Restaurant Orders"
+                            subtitle="Incoming wholesale order fulfillments from buyer kitchens"
+                            onMenuClick={() => setSidebarOpen(true)}
+                        />
                         {orders.length === 0 ? (
                             <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
                                 <ShoppingBag size={40} className="mx-auto theme-accent-text" />
@@ -1909,18 +1921,12 @@ export default function SupplierDashboard() {
                 {/* TAB 3: SALES & REVENUE ANALYTICS */}
                 {isAccountActive && activeTab === "sales" && (
                     <div className="space-y-6">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800 pb-3">
-                            <div>
-                                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                                    <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                                    Sales Analytics & Revenue Overview
-                                </h2>
-                                <p className="theme-muted text-xs mt-0.5">Monitor B2B restaurant sales, orders, customers, products and supplier payouts.</p>
-                            </div>
-                            <span className="inline-flex items-center rounded-lg bg-orange-500/10 px-2.5 py-1 text-xs font-extrabold text-orange-500 uppercase tracking-wider self-start md:self-auto">
-                                LIVE SUPPLIER SALES CONSOLE
-                            </span>
-                        </div>
+                        <SupplyChainPageHeader
+                            title="Sales Analytics & Revenue Overview"
+                            subtitle="Monitor B2B restaurant sales, orders, customers, products and supplier payouts"
+                            badge="LIVE SUPPLIER SALES CONSOLE"
+                            onMenuClick={() => setSidebarOpen(true)}
+                        />
 
                         {/* FILTER TOOLBAR */}
                         <div className="theme-panel rounded-2xl p-3 border space-y-3">
@@ -2130,11 +2136,11 @@ export default function SupplierDashboard() {
                 {/* TAB 4: B2B RESTAURANT CUSTOMERS */}
                 {isAccountActive && activeTab === "customers" && (
                     <div className="space-y-4">
-                        <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                            <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                            B2B Restaurant Customers
-                        </h2>
-                        <p className="theme-muted text-xs">Restaurants that have placed supply orders with your business</p>
+                        <SupplyChainPageHeader
+                            title="B2B Restaurant Customers"
+                            subtitle="Restaurants that have placed supply orders with your business"
+                            onMenuClick={() => setSidebarOpen(true)}
+                        />
 
                         {customers.length === 0 ? (
                             <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
@@ -2171,28 +2177,21 @@ export default function SupplierDashboard() {
                 {/* CONSOLIDATED TAB: B2B PRICE NEGOTIATIONS & CHAT */}
                 {isAccountActive && (activeTab === "price-negotiations" || activeTab === "chat") && (
                     <div className="space-y-6 font-sans text-sm text-[color:var(--app-text,#1e293b)]">
-                        {/* HEADER SECTION */}
-                        <div className="pb-3 border-b border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div>
-                                <h2 className="text-xl font-black tracking-tight flex items-center gap-2.5 text-slate-900 dark:text-slate-100">
-                                    <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                                    <Handshake size={22} className="text-orange-500" />
-                                    B2B PRICE NEGOTIATIONS & CHAT
-                                </h2>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-                                    Real-time price negotiation with restaurant clients & wholesale buyers
-                                </p>
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={() => setShowBargainModal(true)}
-                                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-extrabold shadow-sm transition active:scale-95 cursor-pointer shrink-0"
-                            >
-                                <Plus size={16} />
-                                <span>+ New Rate Proposal</span>
-                            </button>
-                        </div>
+                        <SupplyChainPageHeader
+                            title="B2B PRICE NEGOTIATIONS & CHAT"
+                            subtitle="Real-time price negotiation with restaurant clients & wholesale buyers"
+                            onMenuClick={() => setSidebarOpen(true)}
+                            actions={
+                                <button
+                                    type="button"
+                                    onClick={() => setShowBargainModal(true)}
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-extrabold shadow-sm transition active:scale-95 cursor-pointer shrink-0"
+                                >
+                                    <Plus size={16} />
+                                    <span>+ New Rate Proposal</span>
+                                </button>
+                            }
+                        />
 
                         {/* TOP KPI SECTION */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
@@ -2554,26 +2553,20 @@ export default function SupplierDashboard() {
                 {/* TAB: PAYMENTS & SETTLEMENT */}
                 {isAccountActive && activeTab === "payments-settlement" && (
                     <div className="space-y-4 font-sans text-sm text-[color:var(--app-text,#1e293b)]">
-                        {/* HEADER SECTION WITH SUBTLE LINE DIVIDER */}
-                        <div className="pb-3 border-b border-slate-200/80 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                            <div>
-                                <h2 className="text-xl font-black tracking-tight flex items-center gap-2.5 text-slate-900 dark:text-slate-100">
-                                    <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                                    <CreditCard size={20} className="text-orange-500" />
-                                    Vendor Payouts & Financial Settlement Ledger
-                                </h2>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                    Automated 95% net payout calculations, platform fee deductions (5%), and bank transfer status
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("profile")}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer self-start md:self-auto"
-                            >
-                                Edit Bank Details
-                            </button>
-                        </div>
+                        <SupplyChainPageHeader
+                            title="Vendor Payouts & Financial Settlement Ledger"
+                            subtitle="Automated 95% net payout calculations, platform fee deductions (5%), and bank transfer status"
+                            onMenuClick={() => setSidebarOpen(true)}
+                            actions={
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab("profile")}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                                >
+                                    Edit Bank Details
+                                </button>
+                            }
+                        />
 
                         {/* 1. HORIZONTAL COMPACT STRIP KPIs (NO CARD BOXES, SUBTLE LINE DIVIDERS) */}
                         <div className="pb-4 border-b border-slate-200/80 dark:border-slate-800">
@@ -2719,14 +2712,11 @@ export default function SupplierDashboard() {
                 {/* TAB: SUPPLY REPORTS & INTEL */}
                 {isAccountActive && activeTab === "supply-reports" && (
                     <div className="space-y-6">
-                        <div>
-                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                                <BarChart3 className="theme-accent-text" />
-                                Supplier Performance & Revenue Analytics
-                            </h2>
-                            <p className="theme-muted text-xs mt-0.5">Wholesale fulfillment metrics, buyer retention rates, and catalog category performance</p>
-                        </div>
+                        <SupplyChainPageHeader
+                            title="Supplier Performance & Revenue Analytics"
+                            subtitle="Wholesale fulfillment metrics, buyer retention rates, and catalog category performance"
+                            onMenuClick={() => setSidebarOpen(true)}
+                        />
 
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="theme-panel rounded-2xl p-4 border space-y-1">
@@ -2752,27 +2742,21 @@ export default function SupplierDashboard() {
                 {/* TAB: SUPPLY MARKETPLACE */}
                 {isAccountActive && activeTab === "supply-marketplace" && (
                     <div className="space-y-6">
-                        {/* Header & Add Button */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div>
-                                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                                    <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                                    <ShoppingBag className="theme-accent-text" />
-                                    Tiffzy Wholesale Supply Marketplace Listings
-                                </h2>
-                                <p className="theme-muted text-xs mt-0.5">
-                                    View, manage, and promote your raw material listings visible to restaurant buyers across Tiffzy B2B Marketplace
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setShowAddProductModal(true)}
-                                className="theme-button rounded-xl px-4 py-2.5 text-xs font-extrabold flex items-center gap-2 shadow-md cursor-pointer whitespace-nowrap self-start sm:self-auto"
-                            >
-                                <Plus size={16} />
-                                Add Marketplace Item
-                            </button>
-                        </div>
+                        <SupplyChainPageHeader
+                            title="Tiffzy Wholesale Supply Marketplace Listings"
+                            subtitle="View, manage, and promote your raw material listings visible to restaurant buyers across Tiffzy B2B Marketplace"
+                            onMenuClick={() => setSidebarOpen(true)}
+                            actions={
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAddProductModal(true)}
+                                    className="theme-button rounded-xl px-4 py-2.5 text-xs font-extrabold flex items-center gap-2 shadow-md cursor-pointer whitespace-nowrap"
+                                >
+                                    <Plus size={16} />
+                                    <span>Add Marketplace Item</span>
+                                </button>
+                            }
+                        />
 
                         {/* Search, Filter & Sort Toolbar */}
                         <div className="theme-panel rounded-2xl p-4 border theme-border space-y-3">
@@ -3035,14 +3019,11 @@ export default function SupplierDashboard() {
                 {/* TAB: CONSUMPTION INTEL */}
                 {isAccountActive && activeTab === "consumption" && (
                     <div className="space-y-6">
-                        <div>
-                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                                <Activity className="theme-accent-text" />
-                                Bulk Demand & Client Consumption Trends
-                            </h2>
-                            <p className="theme-muted text-xs mt-0.5">Weekly raw material reorder cycles and ingredient demand velocity across restaurant buyers</p>
-                        </div>
+                        <SupplyChainPageHeader
+                            title="Bulk Demand & Client Consumption Trends"
+                            subtitle="Weekly raw material reorder cycles and ingredient demand velocity across restaurant buyers"
+                            onMenuClick={() => setSidebarOpen(true)}
+                        />
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="theme-panel rounded-2xl p-4 border space-y-1">
@@ -3064,14 +3045,11 @@ export default function SupplierDashboard() {
                 {/* TAB: WASTAGE MANAGEMENT */}
                 {isAccountActive && activeTab === "wastage" && (
                     <div className="space-y-6">
-                        <div>
-                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                                <Trash2 className="theme-accent-text" />
-                                Transit Damage & Return Log
-                            </h2>
-                            <p className="theme-muted text-xs mt-0.5">Logs of goods damaged during logistics dispatch or rejected at buyer receiving dock</p>
-                        </div>
+                        <SupplyChainPageHeader
+                            title="Transit Damage & Return Log"
+                            subtitle="Logs of goods damaged during logistics dispatch or rejected at buyer receiving dock"
+                            onMenuClick={() => setSidebarOpen(true)}
+                        />
 
                         <div className="theme-panel rounded-3xl p-6 border text-center py-12 text-xs theme-muted space-y-2">
                             <Trash2 size={36} className="mx-auto" />
@@ -3084,14 +3062,11 @@ export default function SupplierDashboard() {
                 {/* TAB: STOCK COUNTS */}
                 {isAccountActive && activeTab === "stock-counts" && (
                     <div className="space-y-6">
-                        <div>
-                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                                <ClipboardCheck className="theme-accent-text" />
-                                Supplier Warehouse Stock Audit
-                            </h2>
-                            <p className="theme-muted text-xs mt-0.5">Real-time stock-on-hand levels and reorder thresholds across vendor storage facilities</p>
-                        </div>
+                        <SupplyChainPageHeader
+                            title="Supplier Warehouse Stock Audit"
+                            subtitle="Real-time stock-on-hand levels and reorder thresholds across vendor storage facilities"
+                            onMenuClick={() => setSidebarOpen(true)}
+                        />
 
                         <div className="theme-panel rounded-3xl p-6 border space-y-4">
                             <h3 className="text-base font-bold">Warehouse Physical Stock Inventory</h3>
@@ -3116,14 +3091,11 @@ export default function SupplierDashboard() {
                 {/* TAB: STOCK TRANSFERS */}
                 {isAccountActive && activeTab === "stock-transfers" && (
                     <div className="space-y-6">
-                        <div>
-                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                                <ArrowLeftRight className="theme-accent-text" />
-                                Dispatch & Logistics Transfers Log
-                            </h2>
-                            <p className="theme-muted text-xs mt-0.5">Active warehouse dispatches and vehicle delivery shipments to buyer restaurant locations</p>
-                        </div>
+                        <SupplyChainPageHeader
+                            title="Dispatch & Logistics Transfers Log"
+                            subtitle="Active warehouse dispatches and vehicle delivery shipments to buyer restaurant locations"
+                            onMenuClick={() => setSidebarOpen(true)}
+                        />
 
                         <div className="theme-panel rounded-3xl p-6 border space-y-4">
                             <h3 className="text-base font-bold">Recent Logistics Dispatches</h3>
@@ -3151,10 +3123,11 @@ export default function SupplierDashboard() {
                 {/* TAB 6: ACTIVE PROFILE VIEW FOR VERIFIED SUPPLIERS */}
                 {isAccountActive && activeTab === "profile" && (
                     <div className="space-y-6">
-                        <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                            <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                            Supplier Profile & Business KYC Compliance
-                        </h2>
+                        <SupplyChainPageHeader
+                            title="Supplier Profile & Business KYC Compliance"
+                            subtitle="Submit and verify legal entity, GSTIN, FSSAI, warehouse address, and bank account credentials"
+                            onMenuClick={() => setSidebarOpen(true)}
+                        />
 
                         <form onSubmit={handleSaveProfile} className="theme-panel rounded-3xl p-6 border space-y-5">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -109,6 +109,14 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
       if (oid) socket.leave(`order_${oid}`);
     });
 
+    socket.on("join_supplier_room", (payload) => {
+      const sid = payload?.supplierId || payload?.id;
+      if (sid) {
+        socket.join(`supplier_${sid}`);
+        socket.join(`supplier:${sid}`);
+      }
+    });
+
     socket.on("join_restaurant_room", (payload) => {
       const rid = payload?.restaurantId;
       if (rid) {
