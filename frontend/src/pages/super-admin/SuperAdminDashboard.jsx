@@ -293,27 +293,27 @@ export default function SuperAdminDashboard() {
                 </div>
             </header>
 
-            <main className="mx-auto max-w-7xl px-4 py-6 md:px-8">
+            <main className="mx-auto max-w-7xl px-4 py-4 md:px-8">
                 {error && (
-                    <div className="mb-5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                    <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
                         {error}
                     </div>
                 )}
 
-                {/* SERVER MONITORING SECTION */}
-                <section className="theme-panel mb-6 rounded-3xl p-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 theme-border">
+                {/* SERVER MONITORING SECTION - Seamless / Borderless Style */}
+                <section className="mb-8">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b theme-border">
                         <div>
                             <div className="flex items-center gap-2.5 flex-wrap">
-                                <Server className="theme-accent-text" size={22} />
-                                <h2 className="text-xl font-bold">Server Monitoring</h2>
+                                <Server className="theme-accent-text" size={20} />
+                                <h2 className="text-xl font-bold tracking-tight">Server Monitoring</h2>
                                 {serverMetrics?.instanceId && (
-                                    <span className="font-mono text-xs px-2.5 py-1 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 font-bold">
+                                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 font-bold">
                                         EC2: {serverMetrics.instanceId}
                                     </span>
                                 )}
                             </div>
-                            <p className="theme-muted text-sm mt-1">
+                            <p className="theme-muted text-xs mt-0.5">
                                 Real-time AWS EC2 CloudWatch server metrics for CPU, Memory, and Disk utilization.
                             </p>
                         </div>
@@ -329,7 +329,7 @@ export default function SuperAdminDashboard() {
                                 type="button"
                                 onClick={() => fetchServerMetrics(true)}
                                 disabled={refreshingMetrics}
-                                className="theme-soft-button inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold cursor-pointer transition active:scale-95"
+                                className="theme-soft-button inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition active:scale-95"
                             >
                                 <RefreshCw size={13} className={refreshingMetrics ? "animate-spin text-orange-500" : ""} />
                                 <span>Refresh</span>
@@ -338,14 +338,14 @@ export default function SuperAdminDashboard() {
                     </div>
 
                     {metricsLoading ? (
-                        <div className="py-12 text-center text-sm theme-muted space-y-2">
-                            <RefreshCw size={24} className="animate-spin text-orange-500 mx-auto" />
+                        <div className="py-8 text-center text-sm theme-muted space-y-2">
+                            <RefreshCw size={22} className="animate-spin text-orange-500 mx-auto" />
                             <p>Loading server metrics...</p>
                         </div>
                     ) : metricsError && !serverMetrics ? (
-                        <div className="my-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300 flex items-center justify-between gap-4">
+                        <div className="my-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300 flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2">
-                                <AlertTriangle size={18} />
+                                <AlertTriangle size={16} />
                                 <span>{metricsError}</span>
                             </div>
                             <button
@@ -357,11 +357,11 @@ export default function SuperAdminDashboard() {
                             </button>
                         </div>
                     ) : (
-                        <div className="mt-5 grid gap-5 md:grid-cols-3">
+                        <div className="mt-4 grid gap-6 md:grid-cols-3">
                             {/* CPU CARD */}
                             <MetricCard
                                 title="CPU Usage"
-                                icon={<Cpu className="text-orange-500" size={18} />}
+                                icon={<Cpu className="text-orange-500" size={17} />}
                                 currentValue={getLatestValue(serverMetrics?.cpu)}
                                 unit="%"
                                 color="#f97316"
@@ -371,7 +371,7 @@ export default function SuperAdminDashboard() {
                             {/* RAM CARD */}
                             <MetricCard
                                 title="RAM Usage"
-                                icon={<Activity className="text-blue-500" size={18} />}
+                                icon={<Activity className="text-blue-500" size={17} />}
                                 currentValue={getLatestValue(serverMetrics?.memory)}
                                 unit="%"
                                 color="#3b82f6"
@@ -381,7 +381,7 @@ export default function SuperAdminDashboard() {
                             {/* STORAGE CARD */}
                             <MetricCard
                                 title="Storage Usage"
-                                icon={<HardDrive className="text-emerald-500" size={18} />}
+                                icon={<HardDrive className="text-emerald-500" size={17} />}
                                 currentValue={getLatestValue(serverMetrics?.disk)}
                                 unit="%"
                                 color="#22c55e"
@@ -392,61 +392,61 @@ export default function SuperAdminDashboard() {
                 </section>
 
                 {!loading && restaurants.length > 0 && (
-                    <section className="mb-6 grid gap-4 xl:grid-cols-2">
-                        <article className="theme-panel rounded-3xl p-5">
+                    <section className="mb-8 border-t theme-border pt-6 grid gap-6 xl:grid-cols-2">
+                        <article className="py-2">
                             <div className="flex items-center justify-between gap-3">
-                                <h3 className="text-lg font-bold">Users by Restaurant</h3>
-                                <span className="theme-pill rounded-full px-3 py-1 text-xs font-semibold">
+                                <h3 className="text-base font-bold">Users by Restaurant</h3>
+                                <span className="theme-pill rounded-full px-3 py-0.5 text-xs font-semibold">
                                     Total Users: {analytics.totalUsers}
                                 </span>
                             </div>
-                            <p className="theme-muted mt-1 text-sm">Bar graph showing how users are distributed.</p>
-                            <div className="mt-4 h-72">
+                            <p className="theme-muted mt-0.5 text-xs">Bar graph showing how users are distributed.</p>
+                            <div className="mt-3 h-64">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={analytics.usersBarData} margin={{ top: 8, right: 8, left: 4, bottom: 4 }}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 120, 92, 0.25)" />
-                                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                                        <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 120, 92, 0.15)" />
+                                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                                         <Tooltip formatter={(value) => [Number(value || 0), "Users"]} />
-                                        <Bar dataKey="users" radius={[8, 8, 0, 0]} fill="#f97316" />
+                                        <Bar dataKey="users" radius={[6, 6, 0, 0]} fill="#f97316" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
                         </article>
 
-                        <article className="theme-panel rounded-3xl p-5">
+                        <article className="py-2">
                             <div className="flex items-center justify-between gap-3">
-                                <h3 className="text-lg font-bold">Revenue by Restaurant</h3>
-                                <span className="theme-pill rounded-full px-3 py-1 text-xs font-semibold">
+                                <h3 className="text-base font-bold">Revenue by Restaurant</h3>
+                                <span className="theme-pill rounded-full px-3 py-0.5 text-xs font-semibold">
                                     Total Revenue: {formatMoney(analytics.totalRevenue)}
                                 </span>
                             </div>
-                            <p className="theme-muted mt-1 text-sm">Bar graph showing revenue contribution.</p>
-                            <div className="mt-4 h-72">
+                            <p className="theme-muted mt-0.5 text-xs">Bar graph showing revenue contribution.</p>
+                            <div className="mt-3 h-64">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={analytics.revenueBarData} margin={{ top: 8, right: 8, left: 4, bottom: 4 }}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 120, 92, 0.25)" />
-                                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                                        <YAxis tick={{ fontSize: 12 }} />
+                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 120, 92, 0.15)" />
+                                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                        <YAxis tick={{ fontSize: 11 }} />
                                         <Tooltip formatter={(value) => [formatMoney(value), "Revenue"]} />
-                                        <Bar dataKey="revenue" radius={[8, 8, 0, 0]} fill="#22c55e" />
+                                        <Bar dataKey="revenue" radius={[6, 6, 0, 0]} fill="#22c55e" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
                         </article>
 
-                        <article className="theme-panel rounded-3xl p-5">
-                            <h3 className="text-lg font-bold">Restaurants Status</h3>
-                            <p className="theme-muted mt-1 text-sm">Pie chart of active vs disabled restaurants.</p>
-                            <div className="mt-4 h-72">
+                        <article className="py-2">
+                            <h3 className="text-base font-bold">Restaurants Status</h3>
+                            <p className="theme-muted mt-0.5 text-xs">Pie chart of active vs disabled restaurants.</p>
+                            <div className="mt-3 h-64">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie
                                             data={analytics.restaurantStatusData}
                                             dataKey="value"
                                             nameKey="name"
-                                            innerRadius={56}
-                                            outerRadius={90}
+                                            innerRadius={50}
+                                            outerRadius={80}
                                             paddingAngle={4}
                                         >
                                             {analytics.restaurantStatusData.map((entry, index) => (
@@ -459,16 +459,16 @@ export default function SuperAdminDashboard() {
                             </div>
                         </article>
 
-                        <article className="theme-panel rounded-3xl p-5">
-                            <h3 className="text-lg font-bold">Users & Revenue Share</h3>
-                            <p className="theme-muted mt-1 text-sm">Pie charts for relative user and revenue split by restaurant.</p>
-                            <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <article className="py-2">
+                            <h3 className="text-base font-bold">Users & Revenue Share</h3>
+                            <p className="theme-muted mt-0.5 text-xs">Pie charts for relative user and revenue split by restaurant.</p>
+                            <div className="mt-3 grid gap-4 md:grid-cols-2">
                                 <div>
-                                    <p className="mb-2 text-sm font-semibold">Users Share</p>
-                                    <div className="h-56">
+                                    <p className="mb-1 text-xs font-semibold">Users Share</p>
+                                    <div className="h-52">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <PieChart>
-                                                <Pie data={analytics.usersPieData} dataKey="value" nameKey="name" outerRadius={85}>
+                                                <Pie data={analytics.usersPieData} dataKey="value" nameKey="name" outerRadius={75}>
                                                     {analytics.usersPieData.map((entry, index) => (
                                                         <Cell key={`${entry.name}-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                                                     ))}
@@ -480,11 +480,11 @@ export default function SuperAdminDashboard() {
                                 </div>
 
                                 <div>
-                                    <p className="mb-2 text-sm font-semibold">Revenue Share</p>
-                                    <div className="h-56">
+                                    <p className="mb-1 text-xs font-semibold">Revenue Share</p>
+                                    <div className="h-52">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <PieChart>
-                                                <Pie data={analytics.revenuePieData} dataKey="value" nameKey="name" outerRadius={85}>
+                                                <Pie data={analytics.revenuePieData} dataKey="value" nameKey="name" outerRadius={75}>
                                                     {analytics.revenuePieData.map((entry, index) => (
                                                         <Cell key={`${entry.name}-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                                                     ))}
@@ -499,14 +499,14 @@ export default function SuperAdminDashboard() {
                     </section>
                 )}
 
-                <section id="restaurants-section" className="theme-panel mt-2 rounded-3xl p-5">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <section id="restaurants-section" className="border-t theme-border pt-6">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pb-3">
                         <div>
                             <div className="flex items-center gap-2">
-                                <BarChart3 className="theme-accent-text" size={20} />
-                                <h2 className="text-xl font-bold">Restaurants Under Super Admin</h2>
+                                <BarChart3 className="theme-accent-text" size={18} />
+                                <h2 className="text-xl font-bold tracking-tight">Restaurants Under Super Admin</h2>
                             </div>
-                            <p className="theme-muted mt-2 text-sm">Application-wide restaurant list with owner login details.</p>
+                            <p className="theme-muted mt-0.5 text-xs">Application-wide restaurant list with owner login details.</p>
                         </div>
 
                         <form
@@ -514,9 +514,9 @@ export default function SuperAdminDashboard() {
                                 event.preventDefault();
                                 loadRestaurants(query);
                             }}
-                            className="theme-input flex items-center gap-2 rounded-2xl px-3 py-2 md:w-80"
+                            className="theme-input flex items-center gap-2 rounded-xl px-3 py-1.5 md:w-80"
                         >
-                            <Search size={16} className="theme-muted" />
+                            <Search size={15} className="theme-muted" />
                             <input
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
@@ -527,16 +527,16 @@ export default function SuperAdminDashboard() {
                     </div>
 
                     {loading ? (
-                        <div className="theme-empty mt-5 rounded-2xl p-8 text-center">
+                        <div className="py-8 text-center text-sm theme-muted">
                             Loading restaurants...
                         </div>
                     ) : restaurants.length ? (
-                        <div className="mt-5 grid gap-4">
+                        <div className="mt-3 grid gap-3">
                             {restaurants.map((restaurant) => (
-                                <article key={restaurant.id} className="theme-card rounded-2xl p-4">
-                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                <article key={restaurant.id} className="border theme-border rounded-xl p-3.5 bg-transparent hover:bg-slate-500/5 transition">
+                                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                         <div className="flex gap-3">
-                                            <div className="theme-pill flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl">
+                                            <div className="theme-pill flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg">
                                                 {restaurant.logoUrl ? (
                                                     <img
                                                         src={resolveImageUrl(restaurant.logoUrl)}
@@ -544,31 +544,31 @@ export default function SuperAdminDashboard() {
                                                         className="h-full w-full object-cover"
                                                     />
                                                 ) : (
-                                                    <Store size={20} className="theme-muted" />
+                                                    <Store size={18} className="theme-muted" />
                                                 )}
                                             </div>
                                             <div>
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <h3 
                                                         onClick={() => navigate(`/super-admin/restaurant-profiles?q=${encodeURIComponent(restaurant.name)}`)}
-                                                        className="text-lg font-bold text-amber-400 hover:text-amber-300 hover:underline cursor-pointer flex items-center gap-1.5 transition-colors"
+                                                        className="text-base font-bold text-amber-400 hover:text-amber-300 hover:underline cursor-pointer flex items-center gap-1.5 transition-colors"
                                                         title={`Click to view ${restaurant.name} profile details in Super Admin`}
                                                     >
                                                         {restaurant.name}
-                                                        <ExternalLink size={15} className="opacity-70" />
+                                                        <ExternalLink size={14} className="opacity-70" />
                                                     </h3>
-                                                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${restaurant.isActive ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"}`}>
+                                                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${restaurant.isActive ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"}`}>
                                                         {restaurant.isActive ? "Active" : "Disabled"}
                                                     </span>
                                                 </div>
                                                 <p 
                                                     onClick={() => navigate(`/super-admin/restaurant-profiles?q=${encodeURIComponent(restaurant.name)}`)}
-                                                    className="theme-muted mt-1 text-sm cursor-pointer hover:text-amber-300 hover:underline"
+                                                    className="theme-muted mt-0.5 text-xs cursor-pointer hover:text-amber-300 hover:underline"
                                                     title={`Click to view ${restaurant.name} profile details in Super Admin`}
                                                 >
                                                     /{restaurant.slug} - {restaurant.city || "City not set"}
                                                 </p>
-                                                <div className="theme-muted-strong mt-3 grid gap-1 text-sm md:grid-cols-2">
+                                                <div className="theme-muted-strong mt-2 grid gap-x-4 gap-y-0.5 text-xs md:grid-cols-2">
                                                     <span>Owner: {restaurant.owner?.name || restaurant.ownerName || "Not set"}</span>
                                                     <span>Email: {restaurant.owner?.email || restaurant.email || "Not set"}</span>
                                                     <span>Phone: {restaurant.owner?.phone || restaurant.phone || "Not set"}</span>
@@ -577,7 +577,7 @@ export default function SuperAdminDashboard() {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4 lg:min-w-[320px]">
+                                        <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:min-w-[300px]">
                                             <MiniMetric label="Users" value={restaurant.counts?.users || 0} />
                                             <MiniMetric label="Menu" value={restaurant.counts?.menuItems || 0} />
                                             <MiniMetric label="Orders" value={restaurant.counts?.orders || 0} />
@@ -585,25 +585,25 @@ export default function SuperAdminDashboard() {
                                         </div>
                                     </div>
 
-                                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4 theme-border">
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <UserRound className="theme-accent-text" size={16} />
+                                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-2.5 theme-border">
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                            <UserRound className="theme-accent-text" size={14} />
                                             <span className="theme-muted">Owner can log in and manage this restaurant.</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button
                                                 type="button"
                                                 onClick={() => navigate(`/super-admin/restaurant-profiles?q=${encodeURIComponent(restaurant.name)}`)}
-                                                className="theme-button inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold shadow-md active:scale-95 transition-all"
+                                                className="theme-button inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow-sm active:scale-95 transition-all"
                                             >
-                                                <Utensils size={15} />
-                                                View Restaurant Profile
+                                                <Utensils size={14} />
+                                                View Profile
                                             </button>
                                             <button
                                                 onClick={() => toggleRestaurant(restaurant)}
-                                                className="theme-soft-button inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold"
+                                                className="theme-soft-button inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold"
                                             >
-                                                <Power size={15} />
+                                                <Power size={14} />
                                                 {restaurant.isActive ? "Disable" : "Activate"}
                                             </button>
                                         </div>
@@ -612,7 +612,7 @@ export default function SuperAdminDashboard() {
                             ))}
                         </div>
                     ) : (
-                        <div className="theme-empty mt-5 rounded-2xl p-8 text-center">
+                        <div className="py-8 text-center text-sm theme-muted border-t theme-border mt-3">
                             No restaurants found.
                         </div>
                     )}
@@ -624,9 +624,9 @@ export default function SuperAdminDashboard() {
 
 function MiniMetric({ label, value }) {
     return (
-        <div className="theme-pill rounded-xl px-3 py-2">
-            <p className="text-xs">{label}</p>
-            <p className="mt-1 text-lg font-bold">{value}</p>
+        <div className="rounded-lg p-2 border theme-border bg-slate-500/5">
+            <p className="text-[10px] theme-muted font-medium">{label}</p>
+            <p className="mt-0.5 text-base font-bold tracking-tight">{value}</p>
         </div>
     );
 }
@@ -641,7 +641,7 @@ function MetricCard({ title, icon, currentValue, unit, color, data }) {
     }, [data]);
 
     return (
-        <div className="theme-card rounded-2xl p-4 border theme-border flex flex-col justify-between">
+        <div className="border theme-border rounded-xl p-4 flex flex-col justify-between bg-transparent transition">
             <div>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -653,7 +653,7 @@ function MetricCard({ title, icon, currentValue, unit, color, data }) {
                     </span>
                 </div>
 
-                <div className="mt-3 flex items-baseline gap-1.5">
+                <div className="mt-2.5 flex items-baseline gap-1.5">
                     <span className="text-3xl font-black tracking-tight" style={{ color }}>
                         {currentValue.toFixed(1)}
                     </span>
@@ -662,15 +662,15 @@ function MetricCard({ title, icon, currentValue, unit, color, data }) {
             </div>
 
             {/* Historical Line Chart */}
-            <div className="mt-4 h-28 w-full">
+            <div className="mt-3 h-28 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 120, 92, 0.15)" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 120, 92, 0.12)" />
                         <XAxis dataKey="time" tick={{ fontSize: 9, fill: "#94a3b8" }} interval="preserveStartEnd" />
                         <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: "#94a3b8" }} />
                         <Tooltip
                             formatter={(val) => [`${val}${unit}`, title]}
-                            contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "0.75rem", fontSize: "11px", color: "#f8fafc" }}
+                            contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "0.5rem", fontSize: "11px", color: "#f8fafc" }}
                         />
                         <Line
                             type="monotone"
@@ -685,11 +685,11 @@ function MetricCard({ title, icon, currentValue, unit, color, data }) {
             </div>
 
             {/* Recent History Snippet */}
-            <div className="mt-3 pt-3 border-t theme-border">
+            <div className="mt-3 pt-2.5 border-t theme-border">
                 <p className="text-[10px] font-bold theme-muted uppercase tracking-wider mb-1.5">Recent Values</p>
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
                     {chartData.slice(-5).map((pt, idx) => (
-                        <div key={idx} className="theme-pill px-2 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap text-center flex-1">
+                        <div key={idx} className="border theme-border px-2 py-1 rounded-md text-[10px] font-semibold whitespace-nowrap text-center flex-1 bg-slate-500/5">
                             <span className="theme-muted block text-[9px]">{pt.time}</span>
                             <span className="font-bold">{pt.value}%</span>
                         </div>
