@@ -79,6 +79,12 @@ export default function SupplyChainSubNav() {
     // Determine current sub-nav items based on active route
     const currentPath = location.pathname;
 
+    const isDashboard = currentPath === "/owner/supply-chain" || currentPath === "/owner/supply-chain/" || currentPath === "/supply-chain" || currentPath === "/supply-chain/";
+    if (!isDashboard) {
+        return null;
+    }
+
+
     let activeSubNav = null;
     if (currentPath.startsWith("/owner/supply-chain/inventory")) {
         activeSubNav = INVENTORY_SUB_NAV;

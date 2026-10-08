@@ -1,5 +1,7 @@
+import OwnerMenuButton from "../../components/OwnerMenuButton";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
+import io from "socket.io-client";
 import {
     Truck,
     Package,
@@ -41,6 +43,9 @@ import {
     ArrowDownRight,
     Filter,
     Search,
+    Bell,
+    CheckCheck,
+    Calendar,
 } from "lucide-react";
 import {
     Area,
@@ -55,6 +60,7 @@ import { showToast } from "../../utils/toast";
 import BrandLogo from "../../components/BrandLogo";
 import { SUPPLY_CATEGORIES } from "../../utils/supplyCategories";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
+import { API_BASE_URL } from "../../config";
 
 const getSupplyProductImageUrl = (item) => {
     if (!item) return "";
@@ -212,6 +218,15 @@ export default function SupplierDashboard() {
         description: "Fresh premium quality raw supplies",
     });
 
+    // Supply Notifications State
+    const [notifications, setNotifications] = useState([]);
+    const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+    const [notifStatusFilter, setNotifStatusFilter] = useState("ALL");
+    const [notifCategoryFilter, setNotifCategoryFilter] = useState("ALL");
+    const [notifPriorityFilter, setNotifPriorityFilter] = useState("ALL");
+    const [notifDateFilter, setNotifDateFilter] = useState("ALL");
+    const [loadingNotifications, setLoadingNotifications] = useState(false);
+
     // Supply Marketplace Toolbar & Filtering State
     const [marketplaceSearch, setMarketplaceSearch] = useState("");
     const [marketplaceCategoryFilter, setMarketplaceCategoryFilter] = useState("ALL");
@@ -363,6 +378,53 @@ export default function SupplierDashboard() {
         loadData();
     }, []);
 
+    const fetchNotifications = async () => {
+        setLoadingNotifications(true);
+        try {
+            const [listRes, countRes] = await Promise.all([
+                api.get("/notifications?limit=50").catch(() => null),
+                api.get("/notifications/unread-count").catch(() => null),
+            ]);
+            if (listRes?.data?.notifications) {
+                setNotifications(listRes.data.notifications);
+            } else if (Array.isArray(listRes?.data)) {
+                setNotifications(listRes.data);
+            }
+            if (typeof countRes?.data?.count === "number") {
+                setUnreadNotifCount(countRes.data.count);
+            } else if (typeof countRes?.data?.unreadCount === "number") {
+                setUnreadNotifCount(countRes.data.unreadCount);
+            }
+        } catch (err) {
+            console.error("Failed to fetch notifications:", err);
+        } finally {
+            setLoadingNotifications(false);
+        }
+    };
+
+    const handleMarkAsRead = async (notifId) => {
+        try {
+            await api.patch(`/notifications/${notifId}/read`);
+            setNotifications((prev) =>
+                prev.map((n) => (n.id === notifId ? { ...n, isRead: true, readAt: new Date().toISOString() } : n))
+            );
+            setUnreadNotifCount((prev) => Math.max(0, prev - 1));
+        } catch (err) {
+            showToast("Failed to mark notification as read", { type: "error" });
+        }
+    };
+
+    const handleMarkAllAsRead = async () => {
+        try {
+            await api.patch("/notifications/read-all");
+            setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true, readAt: new Date().toISOString() })));
+            setUnreadNotifCount(0);
+            showToast("All notifications marked as read", { type: "success" });
+        } catch (err) {
+            showToast("Failed to mark all as read", { type: "error" });
+        }
+    };
+
     const loadData = async () => {
         const token = localStorage.getItem("token");
         if (!token) {
@@ -371,11 +433,13 @@ export default function SupplierDashboard() {
         }
         setLoading(true);
         try {
-            const [profileRes, productsRes, ordersRes, threadsRes] = await Promise.all([
+            const [profileRes, productsRes, ordersRes, threadsRes, notifsRes, unreadRes] = await Promise.all([
                 api.get("/suppliers/me").catch(() => null),
                 api.get("/supplier/products").catch(() => null),
                 api.get("/supplier/orders").catch(() => null),
                 api.get("/supply-chat/threads").catch(() => null),
+                api.get("/notifications?limit=50").catch(() => null),
+                api.get("/notifications/unread-count").catch(() => null),
             ]);
 
             if (profileRes?.data) {
@@ -421,12 +485,204 @@ export default function SupplierDashboard() {
                     setActiveThreadId(threadsRes.data.threads[0].id);
                 }
             }
+            if (notifsRes?.data?.notifications) {
+                setNotifications(notifsRes.data.notifications);
+            } else if (Array.isArray(notifsRes?.data)) {
+                setNotifications(notifsRes.data);
+            }
+            if (typeof unreadRes?.data?.count === "number") {
+                setUnreadNotifCount(unreadRes.data.count);
+            } else if (typeof unreadRes?.data?.unreadCount === "number") {
+                setUnreadNotifCount(unreadRes.data.unreadCount);
+            }
         } catch (err) {
             showToast("Failed to load supplier data", { type: "error" });
         } finally {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        const supplierId = profileData?.id || profileData?.supplier?.id;
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const socketUrl = API_BASE_URL || window.location.origin;
+        const socket = io(socketUrl, {
+            transports: ["websocket", "polling"],
+            auth: { token },
+        });
+
+        socket.on("connect", () => {
+            if (supplierId) {
+                socket.emit("join_supplier_room", { supplierId });
+                socket.emit("join_user_room", { recipientType: "SUPPLIER", recipientId: supplierId });
+            }
+        });
+
+        socket.on("notification:new", (newNotif) => {
+            if (!newNotif) return;
+            setNotifications((prev) => {
+                const exists = prev.some((n) => n.id === newNotif.id || (n.idempotencyKey && n.idempotencyKey === newNotif.idempotencyKey));
+                if (exists) return prev;
+                return [newNotif, ...prev];
+            });
+            setUnreadNotifCount((prev) => prev + 1);
+            showToast(newNotif.title || "New Supply Notification", { type: "info" });
+        });
+
+        return () => {
+            socket.disconnect();
+        };
+    }, [profileData]);
+
+    const formatRelativeTime = (dateStr) => {
+        if (!dateStr) return "";
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffMins < 1) return "Just now";
+        if (diffMins < 60) return `${diffMins} min ago`;
+        if (diffHours < 24) return `${diffHours} hr${diffHours > 1 ? "s" : ""} ago`;
+        if (diffDays === 1) return `Yesterday at ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+        if (diffDays < 7) return `${diffDays} days ago`;
+        return date.toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    };
+
+    const getNotificationIcon = (category, priority) => {
+        const cat = String(category || "").toUpperCase();
+        if (cat.includes("INVENTORY")) return <AlertTriangle size={18} />;
+        if (cat.includes("ORDER")) return <ShoppingBag size={18} />;
+        if (cat.includes("NEGOTIAT")) return <Handshake size={18} />;
+        if (cat.includes("SETTLEMENT") || cat.includes("PAYMENT")) return <CreditCard size={18} />;
+        if (cat.includes("RECEIV") || cat.includes("GRN") || cat.includes("SUPPLIER")) return <Truck size={18} />;
+        if (cat.includes("INTELLIGENCE") || cat.includes("WASTAGE")) return <Activity size={18} />;
+        if (priority === "HIGH") return <AlertTriangle size={18} />;
+        return <Bell size={18} />;
+    };
+
+    const getNotificationIconStyle = (category, priority) => {
+        const cat = String(category || "").toUpperCase();
+        if (priority === "HIGH" || cat.includes("INVENTORY")) return "bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-400 border border-red-200 dark:border-red-800";
+        if (cat.includes("ORDER")) return "bg-orange-100 text-orange-600 dark:bg-orange-950/60 dark:text-orange-400 border border-orange-200 dark:border-orange-800";
+        if (cat.includes("NEGOTIAT")) return "bg-purple-100 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-800";
+        if (cat.includes("SETTLEMENT") || cat.includes("PAYMENT")) return "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800";
+        return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700";
+    };
+
+    const getNotificationActionLabel = (n) => {
+        const cat = String(n.data?.category || n.notificationType || "").toUpperCase();
+        if (cat.includes("INVENTORY")) return "View Inventory";
+        if (cat.includes("ORDER")) return "View Order";
+        if (cat.includes("NEGOTIAT")) return "Open Chat";
+        if (cat.includes("SETTLEMENT") || cat.includes("PAYMENT")) return "View Settlement";
+        if (cat.includes("SUPPLIER")) return "View Suppliers";
+        return "View Item";
+    };
+
+    const handleNotificationActionClick = (n) => {
+        if (!n.isRead) {
+            handleMarkAsRead(n.id);
+        }
+        const cat = String(n.data?.category || n.notificationType || "").toUpperCase();
+        const actionUrl = n.data?.actionUrl;
+
+        if (actionUrl) {
+            if (actionUrl.includes("tab=products") || cat.includes("INVENTORY")) {
+                setActiveTab("products");
+                setSearchParams({ tab: "products" });
+            } else if (actionUrl.includes("tab=orders") || cat.includes("ORDER")) {
+                setActiveTab("orders");
+                setSearchParams({ tab: "orders" });
+            } else if (actionUrl.includes("tab=price-negotiations") || cat.includes("NEGOTIAT")) {
+                setActiveTab("price-negotiations");
+                setSearchParams({ tab: "price-negotiations" });
+            } else if (actionUrl.includes("tab=payments-settlement") || cat.includes("SETTLEMENT") || cat.includes("PAYMENT")) {
+                setActiveTab("payments-settlement");
+                setSearchParams({ tab: "payments-settlement" });
+            } else {
+                navigate(actionUrl);
+            }
+        } else {
+            if (cat.includes("INVENTORY")) {
+                setActiveTab("products");
+                setSearchParams({ tab: "products" });
+            } else if (cat.includes("ORDER")) {
+                setActiveTab("orders");
+                setSearchParams({ tab: "orders" });
+            } else if (cat.includes("NEGOTIAT")) {
+                setActiveTab("price-negotiations");
+                setSearchParams({ tab: "price-negotiations" });
+            } else if (cat.includes("SETTLEMENT") || cat.includes("PAYMENT")) {
+                setActiveTab("payments-settlement");
+                setSearchParams({ tab: "payments-settlement" });
+            }
+        }
+    };
+
+    const filteredNotifications = useMemo(() => {
+        let list = [...notifications];
+
+        if (notifStatusFilter === "UNREAD") {
+            list = list.filter((n) => !n.isRead);
+        } else if (notifStatusFilter === "READ") {
+            list = list.filter((n) => n.isRead);
+        }
+
+        if (notifCategoryFilter !== "ALL") {
+            list = list.filter((n) => {
+                const cat = String(n.data?.category || n.notificationType || "").toUpperCase();
+                return cat === notifCategoryFilter;
+            });
+        }
+
+        if (notifPriorityFilter !== "ALL") {
+            list = list.filter((n) => String(n.priority || "NORMAL").toUpperCase() === notifPriorityFilter);
+        }
+
+        if (notifDateFilter !== "ALL") {
+            const now = new Date();
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            const startOfYesterday = startOfToday - 86400000;
+
+            list = list.filter((n) => {
+                const itemDate = new Date(n.createdAt || Date.now()).getTime();
+                if (notifDateFilter === "TODAY") return itemDate >= startOfToday;
+                if (notifDateFilter === "YESTERDAY") return itemDate >= startOfYesterday && itemDate < startOfToday;
+                if (notifDateFilter === "EARLIER") return itemDate < startOfYesterday;
+                return true;
+            });
+        }
+
+        return list;
+    }, [notifications, notifStatusFilter, notifCategoryFilter, notifPriorityFilter, notifDateFilter]);
+
+    const groupedNotifications = useMemo(() => {
+        const today = [];
+        const yesterday = [];
+        const earlier = [];
+
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const startOfYesterday = startOfToday - 86400000;
+
+        filteredNotifications.forEach((item) => {
+            const itemDate = new Date(item.createdAt || Date.now()).getTime();
+            if (itemDate >= startOfToday) {
+                today.push(item);
+            } else if (itemDate >= startOfYesterday) {
+                yesterday.push(item);
+            } else {
+                earlier.push(item);
+            }
+        });
+
+        return { TODAY: today, YESTERDAY: yesterday, EARLIER: earlier };
+    }, [filteredNotifications]);
 
     const loadMessages = async (tId) => {
         if (!tId) return;
@@ -593,6 +849,7 @@ export default function SupplierDashboard() {
 
     const navTabs = [
         { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, locked: !isAccountActive },
+        { id: "notifications", label: "Notifications", icon: Bell, count: unreadNotifCount, locked: !isAccountActive },
         { id: "products", label: "Catalog Products", icon: Package, count: products.length, locked: !isAccountActive },
         { id: "orders", label: "B2B Orders", icon: ShoppingBag, count: orders.length, locked: !isAccountActive },
         { id: "sales", label: "Sales & Analytics", icon: BarChart3, locked: !isAccountActive },
@@ -687,7 +944,8 @@ export default function SupplierDashboard() {
 
     return (
         <div className="theme-page min-h-screen flex flex-col relative">
-            {/* TOP HEADER BAR */}
+            {/* TOP HEADER BAR — DASHBOARD PAGE ONLY */}
+            {activeTab === "dashboard" && (
             <header className="sticky top-0 z-40 px-4 sm:px-6 py-3 border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
                 <div className="w-full flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -719,8 +977,37 @@ export default function SupplierDashboard() {
                         </div>
                     </div>
 
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setActiveTab("notifications");
+                                setSearchParams({ tab: "notifications" });
+                            }}
+                            className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-50 hover:bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:hover:bg-orange-900/50 dark:text-orange-400 border border-orange-200/80 dark:border-orange-800/60 shadow-2xs transition active:scale-95 cursor-pointer"
+                            title="Notifications"
+                            aria-label="Notifications"
+                        >
+                            <Bell size={20} className="stroke-[2.2]" />
+                            {unreadNotifCount > 0 && (
+                                <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full bg-red-600 text-[10px] font-black text-white border-2 border-white dark:border-slate-900 shadow-xs animate-pulse">
+                                    {unreadNotifCount > 99 ? "99+" : unreadNotifCount}
+                                </span>
+                            )}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => navigate("/supplier/login")}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                        >
+                            <LogOut size={14} />
+                            <span className="hidden sm:inline">Logout</span>
+                        </button>
+                    </div>
                 </div>
             </header>
+            )}
 
             {/* COLLAPSIBLE SIDEBAR MENU DRAWER OVERLAY — EXACT OWNER PANEL DESIGN MATCH */}
             {sidebarOpen && (
@@ -1037,6 +1324,290 @@ export default function SupplierDashboard() {
                     </div>
                 )}
 
+                {/* TAB: NOTIFICATIONS */}
+                {isAccountActive && activeTab === "notifications" && (
+                    <div className="space-y-6">
+                        {/* Header bar */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-3">
+                                    <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                        <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                                        <Bell className="theme-accent-text" />
+                                        Notifications
+                                    </h2>
+                                    {unreadNotifCount > 0 && (
+                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-orange-500 text-white shadow-xs">
+                                            {unreadNotifCount} Unread
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="theme-muted text-xs mt-0.5">
+                                    Real-time operational alerts for B2B orders, inventory, price negotiations, settlements, and supply chain events.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2 self-start sm:self-auto">
+                                <button
+                                    type="button"
+                                    onClick={handleMarkAllAsRead}
+                                    disabled={unreadNotifCount === 0}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    <CheckCheck size={14} className="text-emerald-500" />
+                                    Mark all as read
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={fetchNotifications}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                                >
+                                    <RefreshCw size={14} className={loadingNotifications ? "animate-spin text-orange-500" : ""} />
+                                    Refresh
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Filter Toolbar */}
+                        <div className="theme-panel rounded-2xl p-4 border theme-border space-y-3">
+                            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                                {/* Status Tabs: All | Unread | Read */}
+                                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={() => setNotifStatusFilter("ALL")}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                                            notifStatusFilter === "ALL"
+                                                ? "bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs"
+                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                        }`}
+                                    >
+                                        All ({notifications.length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setNotifStatusFilter("UNREAD")}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                            notifStatusFilter === "UNREAD"
+                                                ? "bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs"
+                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                        }`}
+                                    >
+                                        Unread
+                                        {unreadNotifCount > 0 && (
+                                            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-orange-500 text-white">
+                                                {unreadNotifCount}
+                                            </span>
+                                        )}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setNotifStatusFilter("READ")}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                                            notifStatusFilter === "READ"
+                                                ? "bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs"
+                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                        }`}
+                                    >
+                                        Read
+                                    </button>
+                                </div>
+
+                                {/* Dropdown Filters: Category, Priority, Date */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {/* Category Filter */}
+                                    <div className="flex items-center gap-1">
+                                        <Filter size={14} className="theme-muted" />
+                                        <select
+                                            value={notifCategoryFilter}
+                                            onChange={(e) => setNotifCategoryFilter(e.target.value)}
+                                            className="theme-input rounded-xl px-3 py-1.5 text-xs font-semibold outline-none cursor-pointer"
+                                        >
+                                            <option value="ALL">All Categories ▼</option>
+                                            <option value="INVENTORY">Inventory</option>
+                                            <option value="PURCHASING">Purchasing</option>
+                                            <option value="ORDERS">B2B Orders</option>
+                                            <option value="NEGOTIATIONS">Negotiations</option>
+                                            <option value="RECEIVING">Receiving / GRN</option>
+                                            <option value="SUPPLIERS">Suppliers</option>
+                                            <option value="PAYMENTS">Payments</option>
+                                            <option value="SETTLEMENTS">Settlements</option>
+                                            <option value="WAREHOUSE">Warehouse</option>
+                                            <option value="WASTAGE">Wastage</option>
+                                            <option value="INTELLIGENCE">Intelligence</option>
+                                            <option value="SYSTEM">System</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Priority Filter */}
+                                    <select
+                                        value={notifPriorityFilter}
+                                        onChange={(e) => setNotifPriorityFilter(e.target.value)}
+                                        className="theme-input rounded-xl px-3 py-1.5 text-xs font-semibold outline-none cursor-pointer"
+                                    >
+                                        <option value="ALL">All Priorities ▼</option>
+                                        <option value="HIGH">High Priority</option>
+                                        <option value="NORMAL">Normal Priority</option>
+                                        <option value="LOW">Low Priority</option>
+                                    </select>
+
+                                    {/* Date Filter */}
+                                    <select
+                                        value={notifDateFilter}
+                                        onChange={(e) => setNotifDateFilter(e.target.value)}
+                                        className="theme-input rounded-xl px-3 py-1.5 text-xs font-semibold outline-none cursor-pointer"
+                                    >
+                                        <option value="ALL">All Time ▼</option>
+                                        <option value="TODAY">Today</option>
+                                        <option value="YESTERDAY">Yesterday</option>
+                                        <option value="EARLIER">Earlier</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Notification Grouped List */}
+                        {loadingNotifications ? (
+                            <div className="theme-panel rounded-2xl p-12 border text-center space-y-3">
+                                <RefreshCw size={28} className="animate-spin text-orange-500 mx-auto" />
+                                <p className="text-sm font-semibold theme-muted">Loading Supply Notifications...</p>
+                            </div>
+                        ) : Object.keys(groupedNotifications).every((key) => groupedNotifications[key].length === 0) ? (
+                            <div className="theme-panel rounded-2xl p-12 border text-center space-y-3">
+                                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-50 dark:bg-orange-950/40 text-orange-500 mx-auto border border-orange-200 dark:border-orange-800">
+                                    <Bell size={28} />
+                                </div>
+                                <h3 className="text-base font-bold tracking-tight">No notifications found</h3>
+                                <p className="theme-muted text-xs max-w-md mx-auto">
+                                    {notifStatusFilter !== "ALL" || notifCategoryFilter !== "ALL" || notifPriorityFilter !== "ALL"
+                                        ? "No notifications match your selected filter criteria. Try clearing filters."
+                                        : "You're all caught up! New low stock alerts, B2B order updates, price bargain offers, and payout settlements will appear here."}
+                                </p>
+                                {(notifStatusFilter !== "ALL" || notifCategoryFilter !== "ALL" || notifPriorityFilter !== "ALL") && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setNotifStatusFilter("ALL");
+                                            setNotifCategoryFilter("ALL");
+                                            setNotifPriorityFilter("ALL");
+                                            setNotifDateFilter("ALL");
+                                        }}
+                                        className="mt-2 text-xs font-bold text-orange-600 dark:text-orange-400 hover:underline cursor-pointer"
+                                    >
+                                        Reset all filters
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {["TODAY", "YESTERDAY", "EARLIER"].map((groupKey) => {
+                                    const groupItems = groupedNotifications[groupKey];
+                                    if (!groupItems || groupItems.length === 0) return null;
+
+                                    return (
+                                        <div key={groupKey} className="space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                                    {groupKey}
+                                                </span>
+                                                <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                                                <span className="text-[10px] font-bold text-slate-400">
+                                                    {groupItems.length} {groupItems.length === 1 ? "alert" : "alerts"}
+                                                </span>
+                                            </div>
+
+                                            <div className="space-y-2.5">
+                                                {groupItems.map((n) => {
+                                                    const category = n.data?.category || n.notificationType || "GENERAL";
+                                                    const priority = n.priority || "NORMAL";
+                                                    const isUnread = !n.isRead;
+
+                                                    return (
+                                                        <div
+                                                            key={n.id}
+                                                            onClick={() => {
+                                                                if (isUnread) handleMarkAsRead(n.id);
+                                                            }}
+                                                            className={`group relative rounded-2xl p-4 border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer ${
+                                                                isUnread
+                                                                    ? "bg-amber-50/60 dark:bg-amber-950/20 border-amber-200/90 dark:border-amber-800/60 shadow-2xs hover:border-amber-300"
+                                                                    : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 opacity-90"
+                                                            }`}
+                                                        >
+                                                            {/* Left Accent indicator for unread */}
+                                                            {isUnread && (
+                                                                <div className="absolute left-0 top-3 bottom-3 w-1 bg-orange-500 rounded-r-full" />
+                                                            )}
+
+                                                            <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                                                                {/* Category Icon */}
+                                                                <div className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${getNotificationIconStyle(category, priority)}`}>
+                                                                    {getNotificationIcon(category, priority)}
+                                                                </div>
+
+                                                                {/* Content */}
+                                                                <div className="space-y-1 flex-1 min-w-0">
+                                                                    <div className="flex flex-wrap items-center gap-2">
+                                                                        <h4 className={`text-sm tracking-tight ${isUnread ? "font-bold text-slate-900 dark:text-white" : "font-semibold text-slate-700 dark:text-slate-300"}`}>
+                                                                            {n.title}
+                                                                        </h4>
+                                                                        {/* Category Pill */}
+                                                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                                                            {category}
+                                                                        </span>
+                                                                        {/* Priority Badge */}
+                                                                        {priority === "HIGH" && (
+                                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-200 dark:border-red-800">
+                                                                                🔴 HIGH
+                                                                            </span>
+                                                                        )}
+                                                                        {priority === "NORMAL" && (
+                                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                                                                🟠 NORMAL
+                                                                            </span>
+                                                                        )}
+                                                                        {priority === "LOW" && (
+                                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                                                                                🔵 LOW
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed break-words">
+                                                                        {n.message}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Right Column: Relative timestamp & Action Button */}
+                                                            <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 dark:border-slate-800">
+                                                                <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap flex items-center gap-1">
+                                                                    <Clock size={12} />
+                                                                    {formatRelativeTime(n.createdAt)}
+                                                                </span>
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleNotificationActionClick(n);
+                                                                    }}
+                                                                    className="px-3 py-1.5 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap flex items-center gap-1"
+                                                                >
+                                                                    {getNotificationActionLabel(n)}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* IF ACCOUNT IS ACTIVE — RENDER FULL PORTAL TABS */}
                 {isAccountActive && activeTab === "dashboard" && (
                     <div className="space-y-6">
@@ -1195,7 +1766,10 @@ export default function SupplierDashboard() {
                 {isAccountActive && activeTab === "products" && (
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-bold tracking-tight">Catalog Products</h2>
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                            <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                            Catalog Products
+                        </h2>
                             <button
                                 type="button"
                                 onClick={() => setShowAddProductModal(true)}
@@ -1267,7 +1841,10 @@ export default function SupplierDashboard() {
                 {/* TAB 2: B2B ORDERS */}
                 {isAccountActive && activeTab === "orders" && (
                     <div className="space-y-4">
-                        <h2 className="text-xl font-bold tracking-tight">Live B2B Restaurant Orders</h2>
+                        <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                            <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                            Live B2B Restaurant Orders
+                        </h2>
                         {orders.length === 0 ? (
                             <div className="theme-panel rounded-3xl p-12 text-center border space-y-3">
                                 <ShoppingBag size={40} className="mx-auto theme-accent-text" />
@@ -1332,7 +1909,10 @@ export default function SupplierDashboard() {
                     <div className="space-y-6">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800 pb-3">
                             <div>
-                                <h2 className="text-xl font-bold tracking-tight">Sales Analytics & Revenue Overview</h2>
+                                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                    <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                                    Sales Analytics & Revenue Overview
+                                </h2>
                                 <p className="theme-muted text-xs mt-0.5">Monitor B2B restaurant sales, orders, customers, products and supplier payouts.</p>
                             </div>
                             <span className="inline-flex items-center rounded-lg bg-orange-500/10 px-2.5 py-1 text-xs font-extrabold text-orange-500 uppercase tracking-wider self-start md:self-auto">
@@ -1548,7 +2128,10 @@ export default function SupplierDashboard() {
                 {/* TAB 4: B2B RESTAURANT CUSTOMERS */}
                 {isAccountActive && activeTab === "customers" && (
                     <div className="space-y-4">
-                        <h2 className="text-xl font-bold tracking-tight">B2B Restaurant Customers</h2>
+                        <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                            <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                            B2B Restaurant Customers
+                        </h2>
                         <p className="theme-muted text-xs">Restaurants that have placed supply orders with your business</p>
 
                         {customers.length === 0 ? (
@@ -1589,7 +2172,8 @@ export default function SupplierDashboard() {
                         {/* HEADER SECTION */}
                         <div className="pb-3 border-b border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div>
-                                <h2 className="text-xl font-black tracking-tight flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                                <h2 className="text-xl font-black tracking-tight flex items-center gap-2.5 text-slate-900 dark:text-slate-100">
+                                    <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
                                     <Handshake size={22} className="text-orange-500" />
                                     B2B PRICE NEGOTIATIONS & CHAT
                                 </h2>
@@ -1971,7 +2555,8 @@ export default function SupplierDashboard() {
                         {/* HEADER SECTION WITH SUBTLE LINE DIVIDER */}
                         <div className="pb-3 border-b border-slate-200/80 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
                             <div>
-                                <h2 className="text-xl font-black tracking-tight flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                                <h2 className="text-xl font-black tracking-tight flex items-center gap-2.5 text-slate-900 dark:text-slate-100">
+                                    <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
                                     <CreditCard size={20} className="text-orange-500" />
                                     Vendor Payouts & Financial Settlement Ledger
                                 </h2>
@@ -2133,7 +2718,8 @@ export default function SupplierDashboard() {
                 {isAccountActive && activeTab === "supply-reports" && (
                     <div className="space-y-6">
                         <div>
-                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
                                 <BarChart3 className="theme-accent-text" />
                                 Supplier Performance & Revenue Analytics
                             </h2>
@@ -2167,7 +2753,8 @@ export default function SupplierDashboard() {
                         {/* Header & Add Button */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
-                                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                                <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                    <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
                                     <ShoppingBag className="theme-accent-text" />
                                     Tiffzy Wholesale Supply Marketplace Listings
                                 </h2>
@@ -2447,7 +3034,8 @@ export default function SupplierDashboard() {
                 {isAccountActive && activeTab === "consumption" && (
                     <div className="space-y-6">
                         <div>
-                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
                                 <Activity className="theme-accent-text" />
                                 Bulk Demand & Client Consumption Trends
                             </h2>
@@ -2475,7 +3063,8 @@ export default function SupplierDashboard() {
                 {isAccountActive && activeTab === "wastage" && (
                     <div className="space-y-6">
                         <div>
-                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
                                 <Trash2 className="theme-accent-text" />
                                 Transit Damage & Return Log
                             </h2>
@@ -2494,7 +3083,8 @@ export default function SupplierDashboard() {
                 {isAccountActive && activeTab === "stock-counts" && (
                     <div className="space-y-6">
                         <div>
-                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
                                 <ClipboardCheck className="theme-accent-text" />
                                 Supplier Warehouse Stock Audit
                             </h2>
@@ -2525,7 +3115,8 @@ export default function SupplierDashboard() {
                 {isAccountActive && activeTab === "stock-transfers" && (
                     <div className="space-y-6">
                         <div>
-                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                                <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
                                 <ArrowLeftRight className="theme-accent-text" />
                                 Dispatch & Logistics Transfers Log
                             </h2>
@@ -2558,7 +3149,10 @@ export default function SupplierDashboard() {
                 {/* TAB 6: ACTIVE PROFILE VIEW FOR VERIFIED SUPPLIERS */}
                 {isAccountActive && activeTab === "profile" && (
                     <div className="space-y-6">
-                        <h2 className="text-xl font-bold tracking-tight">Supplier Profile & Business KYC Compliance</h2>
+                        <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                            <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
+                            Supplier Profile & Business KYC Compliance
+                        </h2>
 
                         <form onSubmit={handleSaveProfile} className="theme-panel rounded-3xl p-6 border space-y-5">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
