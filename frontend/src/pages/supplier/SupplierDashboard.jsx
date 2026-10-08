@@ -1,3 +1,4 @@
+import SupplyChainPageHeader from "../../components/SupplyChainPageHeader";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
@@ -169,6 +170,7 @@ export default function SupplierDashboard() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [savingProfile, setSavingProfile] = useState(false);
 
+    const setActiveTab = (tabId) => changeTab(tabId);
     const changeTab = (tabId) => {
         setSearchParams({ tab: tabId });
         setSidebarOpen(false);
