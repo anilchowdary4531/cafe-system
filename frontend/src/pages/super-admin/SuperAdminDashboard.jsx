@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
     BarChart3,
     Building2,
@@ -21,6 +21,13 @@ import {
     ExternalLink,
     Utensils,
     Wallet,
+    Server,
+    Cpu,
+    HardDrive,
+    Activity,
+    Clock,
+    RefreshCw,
+    AlertTriangle,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -38,6 +45,8 @@ import {
     Tooltip,
     XAxis,
     YAxis,
+    Line,
+    LineChart,
 } from "recharts";
 
 import SuperAdminSidebar, { SUPER_ADMIN_MENU_ITEMS } from "../../components/super-admin/SuperAdminSidebar";
@@ -62,6 +71,28 @@ const HASH_TO_MENU_KEY = {
     "restaurants-section": "restaurants",
 };
 
+const formatTimeLabel = (ts) => {
+    if (!ts) return "";
+    try {
+        const d = new Date(ts);
+        return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch {
+        return String(ts);
+    }
+};
+
+const getLatestValue = (arr) => {
+    if (!Array.isArray(arr) || arr.length === 0) return 0;
+    return Number(arr[arr.length - 1]?.value || 0);
+};
+
+const getStatusBadge = (value) => {
+    const val = Number(value || 0);
+    if (val > 85) return { label: "CRITICAL", bg: "bg-red-500/20 text-red-400 border-red-500/30" };
+    if (val > 65) return { label: "ELEVATED", bg: "bg-amber-500/20 text-amber-400 border-amber-500/30" };
+    return { label: "HEALTHY", bg: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" };
+};
+
 export default function SuperAdminDashboard() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -73,6 +104,40 @@ export default function SuperAdminDashboard() {
     const [error, setError] = useState("");
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [activeMenuKey, setActiveMenuKey] = useState("dashboard");
+
+    // SERVER MONITORING STATE
+    const [serverMetrics, setServerMetrics] = useState(null);
+    const [metricsLoading, setMetricsLoading] = useState(true);
+    const [metricsError, setMetricsError] = useState("");
+    const [refreshingMetrics, setRefreshingMetrics] = useState(false);
+
+    const fetchServerMetrics = useCallback(async (isManual = false) => {
+        try {
+            if (isManual) setRefreshingMetrics(true);
+            const res = await api.get("/super-admin/server-metrics");
+            const data = res.data?.data || res.data;
+            if (data && (data.cpu || data.instanceId)) {
+                setServerMetrics(data);
+                setMetricsError("");
+            } else {
+                setMetricsError("Failed to parse server metrics");
+            }
+        } catch (err) {
+            console.error("Server metrics fetch error:", err);
+            setMetricsError(err.response?.data?.message || "Failed to load server metrics");
+        } finally {
+            setMetricsLoading(false);
+            setRefreshingMetrics(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchServerMetrics(false);
+        const interval = setInterval(() => {
+            fetchServerMetrics(false);
+        }, 60_000);
+        return () => clearInterval(interval);
+    }, [fetchServerMetrics]);
 
     const analytics = useMemo(() => {
         const normalized = (restaurants || []).map((item, index) => ({
@@ -191,12 +256,6 @@ export default function SuperAdminDashboard() {
         }
     };
 
-    const handleMenuClick = (item) => {
-        setActiveMenuKey(item.key);
-        setSidebarOpen(false);
-        navigate(item.to);
-    };
-
     return (
         <div className="theme-page min-h-screen" id="super-admin-top">
             <SuperAdminSidebar open={sidebarOpen} setOpen={setSidebarOpen} currentKey={activeMenuKey} />
@@ -240,6 +299,97 @@ export default function SuperAdminDashboard() {
                         {error}
                     </div>
                 )}
+
+                {/* SERVER MONITORING SECTION */}
+                <section className="theme-panel mb-6 rounded-3xl p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 theme-border">
+                        <div>
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                                <Server className="theme-accent-text" size={22} />
+                                <h2 className="text-xl font-bold">Server Monitoring</h2>
+                                {serverMetrics?.instanceId && (
+                                    <span className="font-mono text-xs px-2.5 py-1 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 font-bold">
+                                        EC2: {serverMetrics.instanceId}
+                                    </span>
+                                )}
+                            </div>
+                            <p className="theme-muted text-sm mt-1">
+                                Real-time AWS EC2 CloudWatch server metrics for CPU, Memory, and Disk utilization.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-3 self-start sm:self-auto">
+                            {serverMetrics?.lastUpdated && (
+                                <div className="text-xs theme-muted flex items-center gap-1.5">
+                                    <Clock size={13} />
+                                    <span>Updated {new Date(serverMetrics.lastUpdated).toLocaleTimeString()}</span>
+                                </div>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => fetchServerMetrics(true)}
+                                disabled={refreshingMetrics}
+                                className="theme-soft-button inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold cursor-pointer transition active:scale-95"
+                            >
+                                <RefreshCw size={13} className={refreshingMetrics ? "animate-spin text-orange-500" : ""} />
+                                <span>Refresh</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {metricsLoading ? (
+                        <div className="py-12 text-center text-sm theme-muted space-y-2">
+                            <RefreshCw size={24} className="animate-spin text-orange-500 mx-auto" />
+                            <p>Loading server metrics...</p>
+                        </div>
+                    ) : metricsError && !serverMetrics ? (
+                        <div className="my-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle size={18} />
+                                <span>{metricsError}</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => fetchServerMetrics(true)}
+                                className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-white rounded-lg text-xs font-bold cursor-pointer transition"
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="mt-5 grid gap-5 md:grid-cols-3">
+                            {/* CPU CARD */}
+                            <MetricCard
+                                title="CPU Usage"
+                                icon={<Cpu className="text-orange-500" size={18} />}
+                                currentValue={getLatestValue(serverMetrics?.cpu)}
+                                unit="%"
+                                color="#f97316"
+                                data={serverMetrics?.cpu || []}
+                            />
+
+                            {/* RAM CARD */}
+                            <MetricCard
+                                title="RAM Usage"
+                                icon={<Activity className="text-blue-500" size={18} />}
+                                currentValue={getLatestValue(serverMetrics?.memory)}
+                                unit="%"
+                                color="#3b82f6"
+                                data={serverMetrics?.memory || []}
+                            />
+
+                            {/* STORAGE CARD */}
+                            <MetricCard
+                                title="Storage Usage"
+                                icon={<HardDrive className="text-emerald-500" size={18} />}
+                                currentValue={getLatestValue(serverMetrics?.disk)}
+                                unit="%"
+                                color="#22c55e"
+                                data={serverMetrics?.disk || []}
+                            />
+                        </div>
+                    )}
+                </section>
 
                 {!loading && restaurants.length > 0 && (
                     <section className="mb-6 grid gap-4 xl:grid-cols-2">
@@ -397,7 +547,7 @@ export default function SuperAdminDashboard() {
                                                     <Store size={20} className="theme-muted" />
                                                 )}
                                             </div>
-                                             <div>
+                                            <div>
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <h3 
                                                         onClick={() => navigate(`/super-admin/restaurant-profiles?q=${encodeURIComponent(restaurant.name)}`)}
@@ -477,6 +627,75 @@ function MiniMetric({ label, value }) {
         <div className="theme-pill rounded-xl px-3 py-2">
             <p className="text-xs">{label}</p>
             <p className="mt-1 text-lg font-bold">{value}</p>
+        </div>
+    );
+}
+
+function MetricCard({ title, icon, currentValue, unit, color, data }) {
+    const status = getStatusBadge(currentValue);
+    const chartData = useMemo(() => {
+        return (data || []).map((item) => ({
+            time: formatTimeLabel(item.timestamp),
+            value: Number(Number(item.value || 0).toFixed(1)),
+        }));
+    }, [data]);
+
+    return (
+        <div className="theme-card rounded-2xl p-4 border theme-border flex flex-col justify-between">
+            <div>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        {icon}
+                        <h4 className="font-bold text-sm tracking-tight">{title}</h4>
+                    </div>
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${status.bg}`}>
+                        {status.label}
+                    </span>
+                </div>
+
+                <div className="mt-3 flex items-baseline gap-1.5">
+                    <span className="text-3xl font-black tracking-tight" style={{ color }}>
+                        {currentValue.toFixed(1)}
+                    </span>
+                    <span className="text-xs font-bold theme-muted">{unit}</span>
+                </div>
+            </div>
+
+            {/* Historical Line Chart */}
+            <div className="mt-4 h-28 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 120, 92, 0.15)" />
+                        <XAxis dataKey="time" tick={{ fontSize: 9, fill: "#94a3b8" }} interval="preserveStartEnd" />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: "#94a3b8" }} />
+                        <Tooltip
+                            formatter={(val) => [`${val}${unit}`, title]}
+                            contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "0.75rem", fontSize: "11px", color: "#f8fafc" }}
+                        />
+                        <Line
+                            type="monotone"
+                            dataKey="value"
+                            stroke={color}
+                            strokeWidth={2.5}
+                            dot={{ r: 2.5, fill: color }}
+                            activeDot={{ r: 4 }}
+                        />
+                    </LineChart>
+                </ResponsiveContainer>
+            </div>
+
+            {/* Recent History Snippet */}
+            <div className="mt-3 pt-3 border-t theme-border">
+                <p className="text-[10px] font-bold theme-muted uppercase tracking-wider mb-1.5">Recent Values</p>
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                    {chartData.slice(-5).map((pt, idx) => (
+                        <div key={idx} className="theme-pill px-2 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap text-center flex-1">
+                            <span className="theme-muted block text-[9px]">{pt.time}</span>
+                            <span className="font-bold">{pt.value}%</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }

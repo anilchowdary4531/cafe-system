@@ -332,3 +332,135 @@ export async function addSupplierProductStock(productId, supplierId, quantity, n
         message: `Successfully added ${qty} ${inventory.product.unit} stock`,
     };
 }
+
+/**
+ * Check and dispatch low-stock notification for a supplier product
+ */
+export async function checkAndDispatchLowStockNotification({ prismaInstance = prisma, realtime = null, productId, supplierId }) {
+    try {
+        const pId = Number(productId);
+        const sId = Number(supplierId);
+        if (!pId || !sId) return null;
+
+        const inventory = await (prismaInstance || prisma).supplyInventory.findUnique({
+            where: { productId: pId },
+            include: { product: true },
+        });
+
+        if (!inventory || !inventory.product) return null;
+
+        const available = Number(inventory.availableStock || 0);
+        const lowAlert = Number(inventory.lowStockAlert || 10);
+
+        if (available <= lowAlert) {
+            const isCritical = available <= (lowAlert / 2) || available <= 0;
+            const priority = isCritical ? "HIGH" : "NORMAL";
+            const unit = inventory.product.unit || "units";
+            const title = isCritical ? "Critical Low Stock Alert" : "Low Stock Alert";
+            const message = `Low stock: ${inventory.product.name} has ${available} ${unit} remaining. Minimum safety stock is ${lowAlert} ${unit}.`;
+
+            const idempotencyKey = `LOW_STOCK_SUPP:${sId}:${pId}:${Math.floor(available)}`;
+
+            return await createAndDispatchNotification({
+                prisma: prismaInstance || prisma,
+                realtime,
+                recipientType: "SUPPLIER",
+                recipientId: sId,
+                notificationType: "LOW_STOCK",
+                title,
+                message,
+                priority,
+                idempotencyKey,
+                data: {
+                    category: "INVENTORY",
+                    screen: "INVENTORY",
+                    actionUrl: "/supplier?tab=products",
+                    productId: pId,
+                    availableStock: available,
+                    lowStockAlert: lowAlert,
+                },
+            });
+        }
+    } catch (err) {
+        console.error("[LowStockNotification] Error dispatching alert:", err?.message || err);
+    }
+    return null;
+}
+
+/**
+ * Check and dispatch batch expiry notifications for a supplier's inventory batches
+ */
+export async function checkAndDispatchBatchExpiryNotifications({ prismaInstance = prisma, realtime = null, supplierId }) {
+    try {
+        const sId = Number(supplierId);
+        if (!sId) return [];
+
+        const batches = await (prismaInstance || prisma).supplyInventoryBatch.findMany({
+            where: {
+                quantity: { gt: 0 },
+                expiryDate: { not: null },
+                inventory: { product: { supplierId: sId } },
+            },
+            include: {
+                inventory: { include: { product: true } },
+            },
+        });
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const notifications = [];
+
+        for (const batch of batches) {
+            const expiry = new Date(batch.expiryDate).getTime();
+            const now = Date.now();
+            const daysRemaining = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+
+            if (daysRemaining <= 30) {
+                let notificationType = "BATCH_EXPIRING";
+                let priority = "LOW";
+                let title = "Batch Expiry Notice";
+
+                if (daysRemaining <= 3) {
+                    notificationType = "EXPIRY_CRITICAL";
+                    priority = "HIGH";
+                    title = "Critical Expiry Warning";
+                } else if (daysRemaining <= 7) {
+                    notificationType = "EXPIRY_WARNING";
+                    priority = "NORMAL";
+                    title = "Batch Expiry Warning";
+                }
+
+                const prodName = batch.inventory?.product?.name || "Product";
+                const message = daysRemaining <= 0
+                    ? `Critical: ${prodName} batch ${batch.batchNumber} has expired.`
+                    : `Expiry warning: ${prodName} batch ${batch.batchNumber} expires in ${daysRemaining} days.`;
+
+                const idempotencyKey = `EXPIRY_SUPP:${sId}:${batch.id}:${todayStr}`;
+
+                const notif = await createAndDispatchNotification({
+                    prisma: prismaInstance || prisma,
+                    realtime,
+                    recipientType: "SUPPLIER",
+                    recipientId: sId,
+                    notificationType,
+                    title,
+                    message,
+                    priority,
+                    idempotencyKey,
+                    data: {
+                        category: "INVENTORY",
+                        screen: "INVENTORY",
+                        actionUrl: "/supplier?tab=products",
+                        batchId: batch.id,
+                        daysRemaining,
+                    },
+                });
+
+                if (notif) notifications.push(notif);
+            }
+        }
+        return notifications;
+    } catch (err) {
+        console.error("[BatchExpiryNotification] Error dispatching alert:", err?.message || err);
+    }
+    return [];
+}

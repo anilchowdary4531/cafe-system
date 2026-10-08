@@ -1,5 +1,5 @@
 import prisma from "../prisma.js";
-import { calculateFinalPrice, getSupplierProductById } from "./supplierProductService.js";
+import { calculateFinalPrice, getSupplierProductById, checkAndDispatchLowStockNotification } from "./supplierProductService.js";
 import { ensureSupplyMarketplaceSeeded } from "./seedSupplyMarketplaceService.js";
 import { createAndDispatchNotification } from "./notificationService.js";
 
@@ -337,6 +337,18 @@ export async function placeSupplyOrder(restaurantId, { deliveryAddress, notes, p
             priority: "NORMAL",
             idempotencyKey: `B2B_ORDER_CREATED_REST:${order.id}`,
         }).catch(() => {});
+
+        // Check for low stock alert on each item in the order
+        for (const item of items) {
+            if (item.productId) {
+                checkAndDispatchLowStockNotification({
+                    prismaInstance: prisma,
+                    realtime: global.realtimeServer || null,
+                    productId: item.productId,
+                    supplierId,
+                }).catch(() => {});
+            }
+        }
 
         createdOrders.push(order);
     }

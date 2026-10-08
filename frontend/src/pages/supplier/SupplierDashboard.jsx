@@ -1326,160 +1326,147 @@ export default function SupplierDashboard() {
 
                 {/* TAB: NOTIFICATIONS */}
                 {isAccountActive && activeTab === "notifications" && (
-                    <div className="space-y-6">
-                        {/* Header bar */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div>
-                                <div className="flex items-center gap-3">
-                                    <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                                        <OwnerMenuButton onClick={() => setSidebarOpen(true)} />
-                                        <Bell className="theme-accent-text" />
-                                        Notifications
-                                    </h2>
+                    <div className="space-y-4">
+                        {/* Page Header */}
+                        <SupplyChainPageHeader
+                            title="Notifications"
+                            subtitle="Real-time operational alerts for B2B orders, inventory, price negotiations, settlements, and supply chain events."
+                            badge={unreadNotifCount > 0 ? `${unreadNotifCount} Unread` : null}
+                            onMenuClick={() => setSidebarOpen(true)}
+                            actions={
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleMarkAllAsRead}
+                                        disabled={unreadNotifCount === 0}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
+                                    >
+                                        <CheckCheck size={14} className="text-emerald-500" />
+                                        <span>Mark all as read</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={fetchNotifications}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer shadow-2xs"
+                                    >
+                                        <RefreshCw size={14} className={loadingNotifications ? "animate-spin text-orange-500" : ""} />
+                                        <span>Refresh</span>
+                                    </button>
+                                </div>
+                            }
+                        />
+
+                        {/* Compact Filter Toolbar */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-slate-800/80 mb-2">
+                            {/* Status Pills: All | Unread | Read */}
+                            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl shrink-0 self-start md:self-auto">
+                                <button
+                                    type="button"
+                                    onClick={() => setNotifStatusFilter("ALL")}
+                                    className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${notifStatusFilter === "ALL"
+                                            ? "bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-2xs"
+                                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                        }`}
+                                >
+                                    All ({notifications.length})
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setNotifStatusFilter("UNREAD")}
+                                    className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${notifStatusFilter === "UNREAD"
+                                            ? "bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-2xs"
+                                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                        }`}
+                                >
+                                    <span>Unread</span>
                                     {unreadNotifCount > 0 && (
-                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-orange-500 text-white shadow-xs">
-                                            {unreadNotifCount} Unread
+                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-orange-500 text-white">
+                                            {unreadNotifCount}
                                         </span>
                                     )}
-                                </div>
-                                <p className="theme-muted text-xs mt-0.5">
-                                    Real-time operational alerts for B2B orders, inventory, price negotiations, settlements, and supply chain events.
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2 self-start sm:self-auto">
-                                <button
-                                    type="button"
-                                    onClick={handleMarkAllAsRead}
-                                    disabled={unreadNotifCount === 0}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                                >
-                                    <CheckCheck size={14} className="text-emerald-500" />
-                                    Mark all as read
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={fetchNotifications}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                                    onClick={() => setNotifStatusFilter("READ")}
+                                    className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${notifStatusFilter === "READ"
+                                            ? "bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-2xs"
+                                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                        }`}
                                 >
-                                    <RefreshCw size={14} className={loadingNotifications ? "animate-spin text-orange-500" : ""} />
-                                    Refresh
+                                    Read
                                 </button>
                             </div>
-                        </div>
 
-                        {/* Filter Toolbar */}
-                        <div className="theme-panel rounded-2xl p-4 border theme-border space-y-3">
-                            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-                                {/* Status Tabs: All | Unread | Read */}
-                                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl shrink-0">
-                                    <button
-                                        type="button"
-                                        onClick={() => setNotifStatusFilter("ALL")}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${notifStatusFilter === "ALL"
-                                                ? "bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs"
-                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                            }`}
-                                    >
-                                        All ({notifications.length})
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setNotifStatusFilter("UNREAD")}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${notifStatusFilter === "UNREAD"
-                                                ? "bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs"
-                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                            }`}
-                                    >
-                                        Unread
-                                        {unreadNotifCount > 0 && (
-                                            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-orange-500 text-white">
-                                                {unreadNotifCount}
-                                            </span>
-                                        )}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setNotifStatusFilter("READ")}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${notifStatusFilter === "READ"
-                                                ? "bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs"
-                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                            }`}
-                                    >
-                                        Read
-                                    </button>
-                                </div>
-
-                                {/* Dropdown Filters: Category, Priority, Date */}
-                                <div className="flex flex-wrap items-center gap-2">
-                                    {/* Category Filter */}
-                                    <div className="flex items-center gap-1">
-                                        <Filter size={14} className="theme-muted" />
-                                        <select
-                                            value={notifCategoryFilter}
-                                            onChange={(e) => setNotifCategoryFilter(e.target.value)}
-                                            className="theme-input rounded-xl px-3 py-1.5 text-xs font-semibold outline-none cursor-pointer"
-                                        >
-                                            <option value="ALL">All Categories ▼</option>
-                                            <option value="INVENTORY">Inventory</option>
-                                            <option value="PURCHASING">Purchasing</option>
-                                            <option value="ORDERS">B2B Orders</option>
-                                            <option value="NEGOTIATIONS">Negotiations</option>
-                                            <option value="RECEIVING">Receiving / GRN</option>
-                                            <option value="SUPPLIERS">Suppliers</option>
-                                            <option value="PAYMENTS">Payments</option>
-                                            <option value="SETTLEMENTS">Settlements</option>
-                                            <option value="WAREHOUSE">Warehouse</option>
-                                            <option value="WASTAGE">Wastage</option>
-                                            <option value="INTELLIGENCE">Intelligence</option>
-                                            <option value="SYSTEM">System</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Priority Filter */}
+                            {/* Dropdown Filters: Category, Priority, Date */}
+                            <div className="flex flex-wrap items-center gap-2">
+                                {/* Category Filter */}
+                                <div className="flex items-center gap-1">
+                                    <Filter size={13} className="text-slate-400" />
                                     <select
-                                        value={notifPriorityFilter}
-                                        onChange={(e) => setNotifPriorityFilter(e.target.value)}
-                                        className="theme-input rounded-xl px-3 py-1.5 text-xs font-semibold outline-none cursor-pointer"
+                                        value={notifCategoryFilter}
+                                        onChange={(e) => setNotifCategoryFilter(e.target.value)}
+                                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-lg px-2.5 py-1 text-xs font-semibold outline-none cursor-pointer focus:border-orange-500"
                                     >
-                                        <option value="ALL">All Priorities ▼</option>
-                                        <option value="HIGH">High Priority</option>
-                                        <option value="NORMAL">Normal Priority</option>
-                                        <option value="LOW">Low Priority</option>
-                                    </select>
-
-                                    {/* Date Filter */}
-                                    <select
-                                        value={notifDateFilter}
-                                        onChange={(e) => setNotifDateFilter(e.target.value)}
-                                        className="theme-input rounded-xl px-3 py-1.5 text-xs font-semibold outline-none cursor-pointer"
-                                    >
-                                        <option value="ALL">All Time ▼</option>
-                                        <option value="TODAY">Today</option>
-                                        <option value="YESTERDAY">Yesterday</option>
-                                        <option value="EARLIER">Earlier</option>
+                                        <option value="ALL">All Categories</option>
+                                        <option value="INVENTORY">Inventory</option>
+                                        <option value="PURCHASING">Purchasing</option>
+                                        <option value="ORDERS">B2B Orders</option>
+                                        <option value="NEGOTIATIONS">Negotiations</option>
+                                        <option value="RECEIVING">Receiving / GRN</option>
+                                        <option value="SUPPLIERS">Suppliers</option>
+                                        <option value="PAYMENTS">Payments</option>
+                                        <option value="SETTLEMENTS">Settlements</option>
+                                        <option value="WAREHOUSE">Warehouse</option>
+                                        <option value="WASTAGE">Wastage</option>
+                                        <option value="INTELLIGENCE">Intelligence</option>
+                                        <option value="SYSTEM">System</option>
                                     </select>
                                 </div>
+
+                                {/* Priority Filter */}
+                                <select
+                                    value={notifPriorityFilter}
+                                    onChange={(e) => setNotifPriorityFilter(e.target.value)}
+                                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-lg px-2.5 py-1 text-xs font-semibold outline-none cursor-pointer focus:border-orange-500"
+                                >
+                                    <option value="ALL">All Priorities</option>
+                                    <option value="HIGH">High Priority</option>
+                                    <option value="NORMAL">Normal Priority</option>
+                                    <option value="LOW">Low Priority</option>
+                                </select>
+
+                                {/* Date Filter */}
+                                <select
+                                    value={notifDateFilter}
+                                    onChange={(e) => setNotifDateFilter(e.target.value)}
+                                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-lg px-2.5 py-1 text-xs font-semibold outline-none cursor-pointer focus:border-orange-500"
+                                >
+                                    <option value="ALL">All Time</option>
+                                    <option value="TODAY">Today</option>
+                                    <option value="YESTERDAY">Yesterday</option>
+                                    <option value="EARLIER">Earlier</option>
+                                </select>
                             </div>
                         </div>
 
                         {/* Notification Grouped List */}
                         {loadingNotifications ? (
-                            <div className="theme-panel rounded-2xl p-12 border text-center space-y-3">
-                                <RefreshCw size={28} className="animate-spin text-orange-500 mx-auto" />
-                                <p className="text-sm font-semibold theme-muted">Loading Supply Notifications...</p>
+                            <div className="py-12 border border-slate-200/80 dark:border-slate-800/80 rounded-xl text-center space-y-2 bg-white dark:bg-slate-900">
+                                <RefreshCw size={24} className="animate-spin text-orange-500 mx-auto" />
+                                <p className="text-xs font-semibold text-slate-500">Loading Supply Notifications...</p>
                             </div>
                         ) : Object.keys(groupedNotifications).every((key) => groupedNotifications[key].length === 0) ? (
-                            <div className="theme-panel rounded-2xl p-12 border text-center space-y-3">
-                                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-50 dark:bg-orange-950/40 text-orange-500 mx-auto border border-orange-200 dark:border-orange-800">
-                                    <Bell size={28} />
+                            <div className="py-10 px-4 text-center space-y-2.5 my-3 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 max-w-xl mx-auto">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400 mx-auto">
+                                    <Bell size={20} />
                                 </div>
-                                <h3 className="text-base font-bold tracking-tight">No notifications found</h3>
-                                <p className="theme-muted text-xs max-w-md mx-auto">
-                                    {notifStatusFilter !== "ALL" || notifCategoryFilter !== "ALL" || notifPriorityFilter !== "ALL"
-                                        ? "No notifications match your selected filter criteria. Try clearing filters."
-                                        : "You're all caught up! New low stock alerts, B2B order updates, price bargain offers, and payout settlements will appear here."}
+                                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">No notifications found</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
+                                    {notifStatusFilter !== "ALL" || notifCategoryFilter !== "ALL" || notifPriorityFilter !== "ALL" || notifDateFilter !== "ALL"
+                                        ? "No notifications match your selected filter criteria."
+                                        : "You're all caught up. New alerts will appear here."}
                                 </p>
-                                {(notifStatusFilter !== "ALL" || notifCategoryFilter !== "ALL" || notifPriorityFilter !== "ALL") && (
+                                {(notifStatusFilter !== "ALL" || notifCategoryFilter !== "ALL" || notifPriorityFilter !== "ALL" || notifDateFilter !== "ALL") && (
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -1488,31 +1475,31 @@ export default function SupplierDashboard() {
                                             setNotifPriorityFilter("ALL");
                                             setNotifDateFilter("ALL");
                                         }}
-                                        className="mt-2 text-xs font-bold text-orange-600 dark:text-orange-400 hover:underline cursor-pointer"
+                                        className="mt-1 text-xs font-bold text-orange-600 dark:text-orange-400 hover:underline cursor-pointer"
                                     >
                                         Reset all filters
                                     </button>
                                 )}
                             </div>
                         ) : (
-                            <div className="space-y-6">
+                            <div className="space-y-4">
                                 {["TODAY", "YESTERDAY", "EARLIER"].map((groupKey) => {
                                     const groupItems = groupedNotifications[groupKey];
                                     if (!groupItems || groupItems.length === 0) return null;
 
                                     return (
-                                        <div key={groupKey} className="space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                        <div key={groupKey} className="space-y-2">
+                                            <div className="flex items-center gap-2 pt-1 pb-0.5">
+                                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
                                                     {groupKey}
                                                 </span>
-                                                <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                                                <div className="flex-1 h-px bg-slate-200/70 dark:bg-slate-800" />
                                                 <span className="text-[10px] font-bold text-slate-400">
                                                     {groupItems.length} {groupItems.length === 1 ? "alert" : "alerts"}
                                                 </span>
                                             </div>
 
-                                            <div className="space-y-2.5">
+                                            <div className="space-y-1.5">
                                                 {groupItems.map((n) => {
                                                     const category = n.data?.category || n.notificationType || "GENERAL";
                                                     const priority = n.priority || "NORMAL";
@@ -1524,59 +1511,45 @@ export default function SupplierDashboard() {
                                                             onClick={() => {
                                                                 if (isUnread) handleMarkAsRead(n.id);
                                                             }}
-                                                            className={`group relative rounded-2xl p-4 border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer ${isUnread
-                                                                    ? "bg-amber-50/60 dark:bg-amber-950/20 border-amber-200/90 dark:border-amber-800/60 shadow-2xs hover:border-amber-300"
-                                                                    : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 opacity-90"
+                                                            className={`group relative rounded-xl px-3.5 py-2.5 border transition-all duration-150 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer ${isUnread
+                                                                    ? "bg-amber-50/70 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/60 shadow-2xs hover:border-amber-300 border-l-4 border-l-orange-500"
+                                                                    : "bg-white dark:bg-slate-900/80 border-slate-200/70 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 opacity-90"
                                                                 }`}
                                                         >
-                                                            {/* Left Accent indicator for unread */}
-                                                            {isUnread && (
-                                                                <div className="absolute left-0 top-3 bottom-3 w-1 bg-orange-500 rounded-r-full" />
-                                                            )}
-
-                                                            <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                                                            <div className="flex items-start gap-3 flex-1 min-w-0">
                                                                 {/* Category Icon */}
-                                                                <div className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${getNotificationIconStyle(category, priority)}`}>
+                                                                <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${getNotificationIconStyle(category, priority)}`}>
                                                                     {getNotificationIcon(category, priority)}
                                                                 </div>
 
                                                                 {/* Content */}
-                                                                <div className="space-y-1 flex-1 min-w-0">
+                                                                <div className="space-y-0.5 flex-1 min-w-0">
                                                                     <div className="flex flex-wrap items-center gap-2">
-                                                                        <h4 className={`text-sm tracking-tight ${isUnread ? "font-bold text-slate-900 dark:text-white" : "font-semibold text-slate-700 dark:text-slate-300"}`}>
+                                                                        {isUnread && (
+                                                                            <span className="h-2 w-2 rounded-full bg-orange-500 inline-block shrink-0" />
+                                                                        )}
+                                                                        <h4 className={`text-xs sm:text-sm tracking-tight ${isUnread ? "font-bold text-slate-900 dark:text-white" : "font-semibold text-slate-700 dark:text-slate-300"}`}>
                                                                             {n.title}
                                                                         </h4>
-                                                                        {/* Category Pill */}
-                                                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-extrabold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                                                                             {category}
                                                                         </span>
-                                                                        {/* Priority Badge */}
                                                                         {priority === "HIGH" && (
-                                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-200 dark:border-red-800">
-                                                                                🔴 HIGH
-                                                                            </span>
-                                                                        )}
-                                                                        {priority === "NORMAL" && (
-                                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-                                                                                🟠 NORMAL
-                                                                            </span>
-                                                                        )}
-                                                                        {priority === "LOW" && (
-                                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-                                                                                🔵 LOW
+                                                                            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black uppercase bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-200 dark:border-red-800">
+                                                                                HIGH
                                                                             </span>
                                                                         )}
                                                                     </div>
 
-                                                                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed break-words">
+                                                                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug break-words">
                                                                         {n.message}
                                                                     </p>
                                                                 </div>
                                                             </div>
 
                                                             {/* Right Column: Relative timestamp & Action Button */}
-                                                            <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 dark:border-slate-800">
-                                                                <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap flex items-center gap-1">
+                                                            <div className="flex sm:flex-row items-center sm:items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 dark:border-slate-800">
+                                                                <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap flex items-center gap-1">
                                                                     <Clock size={12} />
                                                                     {formatRelativeTime(n.createdAt)}
                                                                 </span>
@@ -1587,9 +1560,10 @@ export default function SupplierDashboard() {
                                                                         e.stopPropagation();
                                                                         handleNotificationActionClick(n);
                                                                     }}
-                                                                    className="px-3 py-1.5 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap flex items-center gap-1"
+                                                                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-2xs transition active:scale-95 cursor-pointer whitespace-nowrap flex items-center gap-1"
                                                                 >
-                                                                    {getNotificationActionLabel(n)}
+                                                                    <span>{getNotificationActionLabel(n)}</span>
+                                                                    <span>→</span>
                                                                 </button>
                                                             </div>
                                                         </div>

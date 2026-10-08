@@ -9,6 +9,7 @@ import authorizeRoles from "../middleware/rbacGuard.js";
 import prisma from "../prisma.js";
 import { upsertRecipe } from "../services/recipeService.js";
 import { recordWastage } from "../services/inventoryService.js";
+import { createAndDispatchNotification } from "../services/notificationService.js";
 
 export default async function supplyMarketplaceRoutes(app) {
     const authUser = authorizeRoles("OWNER", "MANAGER", "SUPER_ADMIN", "SUPPLIER", "ADMIN", "STAFF", "USER", "CUSTOMER");
@@ -741,6 +742,49 @@ export default async function supplyMarketplaceRoutes(app) {
                 });
             }
 
+            // Dispatch GRN notification to supplier if supplierId exists
+            if (grn.supplierId) {
+                try {
+                    let notifType = "GRN_COMPLETED";
+                    let notifPriority = "NORMAL";
+                    let notifTitle = "GRN Receiving Completed";
+                    let notifMsg = `GRN completed: Goods Receipt ${grn.grnNumber} successfully received for ${grn.totalReceivedQty} units.`;
+
+                    if (grn.status === "REJECTED" || grn.totalRejectedQty > 0) {
+                        notifType = "GRN_REJECTED";
+                        notifPriority = "HIGH";
+                        notifTitle = "GRN Rejected";
+                        notifMsg = `GRN rejected: Goods Receipt ${grn.grnNumber} rejected ${grn.totalRejectedQty} units.`;
+                    } else if (grn.differenceQty > 0 || grn.totalDamagedQty > 0 || grn.status === "PARTIALLY_RECEIVED") {
+                        notifType = "GRN_DISCREPANCY";
+                        notifPriority = "HIGH";
+                        notifTitle = "GRN Discrepancy Alert";
+                        notifMsg = `GRN discrepancy: Purchase Order expected ${grn.totalExpectedQty} units but ${grn.totalReceivedQty} received, ${grn.totalDamagedQty} damaged, ${grn.totalRejectedQty} rejected.`;
+                    }
+
+                    await createAndDispatchNotification({
+                        prisma,
+                        realtime: req.server?.realtime || global.realtimeServer || null,
+                        recipientType: "SUPPLIER",
+                        recipientId: grn.supplierId,
+                        notificationType: notifType,
+                        title: notifTitle,
+                        message: notifMsg,
+                        priority: notifPriority,
+                        idempotencyKey: `GRN_STATUS_SUPP:${grn.supplierId}:${grn.id}:${grn.status}`,
+                        data: {
+                            category: "RECEIVING",
+                            screen: "RECEIVING",
+                            actionUrl: "/supplier?tab=receiving",
+                            grnNumber: grn.grnNumber,
+                            grnId: grn.id,
+                        },
+                    });
+                } catch (notifErr) {
+                    console.error("[GRNNotification] Failed to dispatch GRN notification:", notifErr?.message || notifErr);
+                }
+            }
+
             return reply.code(201).send({
                 message: `Auditable Goods Receipt Note ${grnNumber} created successfully! Inventory updated.`,
                 grn,
@@ -842,6 +886,33 @@ export default async function supplyMarketplaceRoutes(app) {
                     createdBy: { select: { id: true, name: true, role: true } },
                 },
             });
+
+            // Dispatch Wastage / Return Notification to Supplier
+            if (newReturn.supplierId) {
+                try {
+                    const isHighVal = newReturn.totalValue > 5000 || newReturn.reason === "Damaged";
+                    await createAndDispatchNotification({
+                        prisma,
+                        realtime: req.server?.realtime || global.realtimeServer || null,
+                        recipientType: "SUPPLIER",
+                        recipientId: newReturn.supplierId,
+                        notificationType: "WASTAGE_RECORDED",
+                        title: "Purchase Return / Wastage Filed",
+                        message: `Wastage recorded: ${newReturn.quantity} ${newReturn.unit} of ${newReturn.itemName} returned due to ${newReturn.reason}. Total value: ₹${newReturn.totalValue}.`,
+                        priority: isHighVal ? "HIGH" : "NORMAL",
+                        idempotencyKey: `PURCHASE_RETURN_SUPP:${newReturn.supplierId}:${newReturn.id}:${newReturn.status}`,
+                        data: {
+                            category: "WASTAGE",
+                            screen: "WASTAGE",
+                            actionUrl: "/supplier?tab=products",
+                            returnId: newReturn.id,
+                            returnCode: newReturn.returnCode,
+                        },
+                    });
+                } catch (notifErr) {
+                    console.error("[PurchaseReturnNotification] Error dispatching notification:", notifErr?.message || notifErr);
+                }
+            }
 
             return reply.code(201).send({
                 message: "Purchase Return initiated! Stock will be deducted upon confirmation.",

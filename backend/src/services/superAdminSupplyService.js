@@ -1,4 +1,5 @@
 import prisma from "../prisma.js";
+import { createAndDispatchNotification } from "./notificationService.js";
 
 export async function getSuperAdminSupplyDashboard() {
     const [
@@ -156,6 +157,31 @@ export async function processSupplierSettlement(supplierId, { commissionPercent 
 
         return createdSettlement;
     });
+
+    // Dispatch Settlement Notification to Supplier
+    try {
+        await createAndDispatchNotification({
+            prisma,
+            realtime: global.realtimeServer || null,
+            recipientType: "SUPPLIER",
+            recipientId: sId,
+            notificationType: "PAYOUT_COMPLETED",
+            title: "Payout Settlement Completed",
+            message: `Payout completed: ₹${settlement.netPayable.toLocaleString()} has been successfully settled. Settlement No: ${settlement.settlementNo}.`,
+            priority: "NORMAL",
+            idempotencyKey: `PAYOUT_STATUS:${settlement.id}:${settlement.status}`,
+            data: {
+                category: "SETTLEMENTS",
+                screen: "SETTLEMENTS",
+                actionUrl: "/supplier?tab=payments-settlement",
+                settlementId: settlement.id,
+                settlementNo: settlement.settlementNo,
+                netPayable: settlement.netPayable,
+            },
+        });
+    } catch (notifErr) {
+        console.error("[SettlementNotification] Error dispatching settlement notification:", notifErr?.message || notifErr);
+    }
 
     return settlement;
 }
