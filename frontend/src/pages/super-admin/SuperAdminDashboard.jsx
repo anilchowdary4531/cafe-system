@@ -310,24 +310,24 @@ export default function SuperAdminDashboard() {
         <div className="theme-page min-h-screen" id="super-admin-top">
             <SuperAdminSidebar open={sidebarOpen} setOpen={setSidebarOpen} currentKey={activeMenuKey} />
 
-            <header className="theme-nav border-b px-4 py-3 md:px-6">
-                <div className="w-full flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center gap-3" id="profile-section">
+            <header className="theme-nav border-b px-2 py-2 md:px-3">
+                <div className="w-full flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-2.5" id="profile-section">
                         <button
                             type="button"
                             onClick={() => setSidebarOpen(true)}
-                            className="theme-soft-button inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
+                            className="theme-soft-button inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
                         >
-                            <Menu size={16} />
+                            <Menu size={15} />
                             Tiffzy
                         </button>
-                        <div className="flex h-12 w-12 -rotate-2 items-center justify-center overflow-hidden rounded-md border border-[#d9c8af] bg-transparent p-0.5 shadow-[0_3px_8px_rgba(88,61,36,0.14)]">
+                        <div className="flex h-10 w-10 -rotate-2 items-center justify-center overflow-hidden rounded-md border border-[#d9c8af] bg-transparent p-0.5 shadow-[0_3px_8px_rgba(88,61,36,0.14)]">
                             <img src={tiffzyLogo} alt="Tiffzy logo" className="h-full w-full object-contain mix-blend-multiply" />
                         </div>
                         <div>
-                            <p className="theme-muted text-xs uppercase tracking-[0.28em]">Super Admin</p>
-                            <h1 className="text-2xl font-bold">Tiffzy</h1>
-                            <p className="theme-muted text-sm">{user?.email || "admin@tiffzy.com"}</p>
+                            <p className="theme-muted text-[10px] uppercase tracking-[0.25em]">Super Admin</p>
+                            <h1 className="text-xl font-bold leading-tight">Tiffzy</h1>
+                            <p className="theme-muted text-xs">{user?.email || "admin@tiffzy.com"}</p>
                         </div>
                     </div>
 
@@ -335,7 +335,7 @@ export default function SuperAdminDashboard() {
                         <button
                             type="button"
                             onClick={logout}
-                            className="rounded-full bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/20"
+                            className="rounded-full bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-300 hover:bg-red-500/20"
                         >
                             Logout
                         </button>
@@ -343,7 +343,7 @@ export default function SuperAdminDashboard() {
                 </div>
             </header>
 
-            <main className="w-full px-4 py-4 md:px-6 space-y-6">
+            <main className="w-full px-2 py-2 md:px-3 space-y-4">
                 {error && (
                     <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
                         {error}
@@ -969,30 +969,30 @@ function MetricCard({ title, icon, currentValue, unit, color, data }) {
     }, [data]);
 
     return (
-        <div className="border theme-border rounded-xl p-4 flex flex-col justify-between bg-transparent transition">
+        <div className="border theme-border rounded-lg p-2.5 flex flex-col justify-between bg-transparent transition">
             <div>
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                         {icon}
-                        <h4 className="font-bold text-sm tracking-tight">{title}</h4>
+                        <h4 className="font-bold text-xs tracking-tight">{title}</h4>
                     </div>
-                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${status.bg}`}>
+                    <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full border ${status.bg}`}>
                         {status.label}
                     </span>
                 </div>
 
-                <div className="mt-2.5 flex items-baseline gap-1.5">
-                    <span className="text-3xl font-black tracking-tight" style={{ color }}>
+                <div className="mt-1.5 flex items-baseline gap-1">
+                    <span className="text-2xl font-black tracking-tight" style={{ color }}>
                         {currentValue.toFixed(1)}
                     </span>
-                    <span className="text-xs font-bold theme-muted">{unit}</span>
+                    <span className="text-[11px] font-bold theme-muted">{unit}</span>
                 </div>
             </div>
 
             {/* Historical Line Chart */}
-            <div className="mt-3 h-28 w-full">
+            <div className="mt-2 h-20 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                    <LineChart data={chartData} margin={{ top: 2, right: 2, left: -25, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 120, 92, 0.12)" />
                         <XAxis dataKey="time" tick={{ fontSize: 9, fill: "#94a3b8" }} interval="preserveStartEnd" />
                         <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: "#94a3b8" }} />
@@ -1004,21 +1004,21 @@ function MetricCard({ title, icon, currentValue, unit, color, data }) {
                             type="monotone"
                             dataKey="value"
                             stroke={color}
-                            strokeWidth={2.5}
-                            dot={{ r: 2.5, fill: color }}
-                            activeDot={{ r: 4 }}
+                            strokeWidth={2}
+                            dot={{ r: 2, fill: color }}
+                            activeDot={{ r: 3.5 }}
                         />
                     </LineChart>
                 </ResponsiveContainer>
             </div>
 
             {/* Recent History Snippet */}
-            <div className="mt-3 pt-2.5 border-t theme-border">
-                <p className="text-[10px] font-bold theme-muted uppercase tracking-wider mb-1.5">Recent Values</p>
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+            <div className="mt-2 pt-1.5 border-t theme-border">
+                <p className="text-[9px] font-bold theme-muted uppercase tracking-wider mb-1">Recent Values</p>
+                <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
                     {chartData.slice(-5).map((pt, idx) => (
-                        <div key={idx} className="border theme-border px-2 py-1 rounded-md text-[10px] font-semibold whitespace-nowrap text-center flex-1 bg-slate-500/5">
-                            <span className="theme-muted block text-[9px]">{pt.time}</span>
+                        <div key={idx} className="border theme-border px-1.5 py-0.5 rounded text-[9px] font-semibold whitespace-nowrap text-center flex-1 bg-slate-500/5">
+                            <span className="theme-muted block text-[8px]">{pt.time}</span>
                             <span className="font-bold">{pt.value}%</span>
                         </div>
                     ))}
