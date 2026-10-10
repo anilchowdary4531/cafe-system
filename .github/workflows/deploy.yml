@@ -20,63 +20,10 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          timeout: 120s
-          command_timeout: 10m
           script: |
-            set -e
-
-            echo "Starting backend deployment..."
-
-            echo "=== Step 1: Updating Repository ==="
             cd ~/cafe-system
-            git fetch origin main
-            git checkout main
-            echo "=== Step 1.5: Ensuring Swap Space for EC2 RAM ==="
-            if ! sudo swapon --show | grep -q "/swapfile"; then
-              echo "Creating 1GB swapfile to prevent RAM OOM kills..."
-              sudo fallocate -l 1G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=1024
-              sudo chmod 600 /swapfile
-              sudo mkswap /swapfile
-              sudo swapon /swapfile
-            fi
-
-            echo "=== Step 2: Installing Dependencies ==="
-            cd ~/cafe-system/backend
-            export NODE_OPTIONS="--max-old-space-size=512"
-            npm ci --prefer-offline --no-audit
-
-            echo "=== Step 3: Generating Prisma Client & Syncing DB Schema ==="
+            git pull origin main
+            cd backend
+            npm install
             npx prisma generate
-            npx prisma db push --accept-data-loss
-
-            echo "=== Step 4: Restarting Production Service ==="
-            sudo systemctl restart tiffzy
-
-            echo "=== Step 5: Verifying Service Status ==="
-            if sudo systemctl is-active --quiet tiffzy; then
-              echo "SUCCESS: tiffzy.service is active and running."
-            else
-              echo "ERROR: tiffzy.service is not active."
-              sudo journalctl -u tiffzy --no-pager -n 40
-              exit 1
-            fi
-
-            echo "=== Step 6: Verifying Port 3000 ==="
-            PORT_BOUND=0
-            for i in {1..30}; do
-              if sudo ss -ltnp | grep -q ':3000'; then
-                echo "SUCCESS: Backend process is listening on port 3000."
-                PORT_BOUND=1
-                break
-              fi
-              echo "Waiting for backend to listen on port 3000... ($i/30)"
-              sleep 1
-            done
-
-            if [ "$PORT_BOUND" -ne 1 ]; then
-              echo "ERROR: Port 3000 is not listening. Fetching backend logs:"
-              sudo journalctl -u tiffzy --no-pager -n 40
-              exit 1
-            fi
-
-            echo "Deployment completed successfully!"
+            pm2 restart cafe-backend

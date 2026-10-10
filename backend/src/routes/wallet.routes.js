@@ -94,11 +94,9 @@ export default async function walletRoutes(app, deps) {
   app.post("/api/wallet/topup/create", { preHandler: requireCustomer }, async (req, reply) => {
     try {
       const { amount, returnUrl, idempotencyKey } = req.body || {};
-      const session = await createTopupSession(prisma, req.customerAccount.id, {
+      const session = await createTopupSession(prisma, {
+        customerAccountId: req.customerAccount.id,
         amount,
-        customerName: req.customerAccount.name,
-        customerEmail: req.customerAccount.email,
-        customerPhone: req.customerAccount.phone,
         returnUrl,
         idempotencyKey,
       });

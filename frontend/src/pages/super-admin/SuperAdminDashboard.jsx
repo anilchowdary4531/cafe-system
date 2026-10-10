@@ -28,6 +28,13 @@ import {
     Clock,
     RefreshCw,
     AlertTriangle,
+    AlertOctagon,
+    Bug,
+    Calendar,
+    ChevronRight,
+    Eye,
+    Filter,
+    FileText,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -138,6 +145,49 @@ export default function SuperAdminDashboard() {
         }, 60_000);
         return () => clearInterval(interval);
     }, [fetchServerMetrics]);
+
+    // ERROR MONITORING STATE
+    const [errorLogsData, setErrorLogsData] = useState(null);
+    const [logsLoading, setLogsLoading] = useState(true);
+    const [logsError, setLogsError] = useState("");
+    const [refreshingLogs, setRefreshingLogs] = useState(false);
+
+    // Filters
+    const [errorSearchTerm, setErrorSearchTerm] = useState("");
+    const [errorStartTime, setErrorStartTime] = useState("");
+    const [errorEndTime, setErrorEndTime] = useState("");
+
+    // Detail Modal State
+    const [selectedErrorLog, setSelectedErrorLog] = useState(null);
+
+    const fetchErrorLogs = useCallback(async (isManual = false) => {
+        try {
+            if (isManual) setRefreshingLogs(true);
+            const params = {};
+            if (errorSearchTerm.trim()) params.searchTerm = errorSearchTerm.trim();
+            if (errorStartTime) params.startTime = errorStartTime;
+            if (errorEndTime) params.endTime = errorEndTime;
+
+            const res = await api.get("/super-admin/error-logs", { params });
+            const data = res.data?.data || res.data;
+            if (data) {
+                setErrorLogsData(data);
+                setLogsError("");
+            } else {
+                setLogsError("Failed to parse error logs");
+            }
+        } catch (err) {
+            console.error("Error logs fetch error:", err);
+            setLogsError(err.response?.data?.message || "Failed to load error logs from CloudWatch");
+        } finally {
+            setLogsLoading(false);
+            setRefreshingLogs(false);
+        }
+    }, [errorSearchTerm, errorStartTime, errorEndTime]);
+
+    useEffect(() => {
+        fetchErrorLogs(false);
+    }, [fetchErrorLogs]);
 
     const analytics = useMemo(() => {
         const normalized = (restaurants || []).map((item, index) => ({
@@ -390,6 +440,296 @@ export default function SuperAdminDashboard() {
                         </div>
                     )}
                 </section>
+
+                {/* ERROR MONITORING SECTION */}
+                <section className="mb-8 border-t theme-border pt-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b theme-border">
+                        <div>
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                                <AlertOctagon className="text-red-500" size={20} />
+                                <h2 className="text-xl font-bold tracking-tight">Error Monitoring</h2>
+                                <span className="font-mono text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-400 font-bold">
+                                    AWS CloudWatch Logs
+                                </span>
+                            </div>
+                            <p className="theme-muted text-xs mt-0.5">
+                                Real-time AWS EC2 CloudWatch error logs, API exceptions, and status code failures.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-3 self-start sm:self-auto">
+                            {errorLogsData?.latestTimestamp && (
+                                <div className="text-xs theme-muted flex items-center gap-1.5">
+                                    <Clock size={13} />
+                                    <span>Latest {new Date(errorLogsData.latestTimestamp).toLocaleTimeString()}</span>
+                                </div>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => fetchErrorLogs(true)}
+                                disabled={refreshingLogs}
+                                className="theme-soft-button inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition active:scale-95"
+                            >
+                                <RefreshCw size={13} className={refreshingLogs ? "animate-spin text-red-500" : ""} />
+                                <span>Refresh</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* OVERVIEW METRIC CARDS */}
+                    <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                        <div className="border theme-border rounded-xl p-3.5 bg-transparent flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-semibold theme-muted uppercase tracking-wider">Open Errors</p>
+                                <p className="text-2xl font-black text-red-400 mt-1">{errorLogsData?.openErrorsCount ?? 0}</p>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
+                                CRITICAL (5xx)
+                            </span>
+                        </div>
+
+                        <div className="border theme-border rounded-xl p-3.5 bg-transparent flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-semibold theme-muted uppercase tracking-wider">Total Error Events</p>
+                                <p className="text-2xl font-black text-amber-400 mt-1">{errorLogsData?.totalEvents ?? 0}</p>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                RETURNED
+                            </span>
+                        </div>
+
+                        <div className="border theme-border rounded-xl p-3.5 bg-transparent flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-semibold theme-muted uppercase tracking-wider">Latest Timestamp</p>
+                                <p className="text-xs font-bold text-slate-200 mt-1 font-mono">
+                                    {errorLogsData?.latestTimestamp ? new Date(errorLogsData.latestTimestamp).toLocaleString() : "N/A"}
+                                </p>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                                TIMELINE
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* SEARCH & FILTER CONTROLS */}
+                    <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center justify-between bg-slate-500/5 p-3 rounded-xl border theme-border">
+                        <div className="flex-1 flex items-center gap-2 theme-input rounded-lg px-3 py-1.5">
+                            <Search size={15} className="theme-muted" />
+                            <input
+                                value={errorSearchTerm}
+                                onChange={(e) => setErrorSearchTerm(e.target.value)}
+                                placeholder="Search error logs (message, URL, method, status code, log stream...)"
+                                className="w-full bg-transparent text-xs outline-none"
+                            />
+                            {errorSearchTerm && (
+                                <button type="button" onClick={() => setErrorSearchTerm("")} className="theme-muted hover:text-white">
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex items-center gap-1.5 text-xs theme-muted">
+                                <Calendar size={13} />
+                                <span className="font-medium">Start:</span>
+                                <input
+                                    type="datetime-local"
+                                    value={errorStartTime}
+                                    onChange={(e) => setErrorStartTime(e.target.value)}
+                                    className="theme-input rounded-lg px-2 py-1 text-xs bg-transparent outline-none border theme-border"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-1.5 text-xs theme-muted">
+                                <Calendar size={13} />
+                                <span className="font-medium">End:</span>
+                                <input
+                                    type="datetime-local"
+                                    value={errorEndTime}
+                                    onChange={(e) => setErrorEndTime(e.target.value)}
+                                    className="theme-input rounded-lg px-2 py-1 text-xs bg-transparent outline-none border theme-border"
+                                />
+                            </div>
+
+                            {(errorSearchTerm || errorStartTime || errorEndTime) && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setErrorSearchTerm("");
+                                        setErrorStartTime("");
+                                        setErrorEndTime("");
+                                    }}
+                                    className="px-2 py-1 text-xs font-semibold text-slate-400 hover:text-white transition"
+                                >
+                                    Reset
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* LOGS TABLE / STATES */}
+                    {logsLoading ? (
+                        <div className="py-10 text-center text-sm theme-muted space-y-2">
+                            <RefreshCw size={22} className="animate-spin text-red-500 mx-auto" />
+                            <p>Loading CloudWatch error logs...</p>
+                        </div>
+                    ) : logsError && (!errorLogsData || !errorLogsData.logs) ? (
+                        <div className="my-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-sm text-red-300 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle size={18} />
+                                <span>{logsError}</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => fetchErrorLogs(true)}
+                                className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-white rounded-lg text-xs font-bold cursor-pointer transition"
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    ) : !errorLogsData?.logs || errorLogsData.logs.length === 0 ? (
+                        <div className="py-10 text-center text-sm theme-muted border-t theme-border mt-4">
+                            No errors found
+                        </div>
+                    ) : (
+                        <div className="mt-4 overflow-x-auto border theme-border rounded-xl">
+                            <table className="w-full text-left text-xs">
+                                <thead className="border-b theme-border bg-slate-500/10 text-slate-300 uppercase tracking-wider text-[10px]">
+                                    <tr>
+                                        <th className="py-2.5 px-3">Timestamp</th>
+                                        <th className="py-2.5 px-3">Status</th>
+                                        <th className="py-2.5 px-3">Method & URL</th>
+                                        <th className="py-2.5 px-3">Error Message</th>
+                                        <th className="py-2.5 px-3">Log Stream</th>
+                                        <th className="py-2.5 px-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y theme-border">
+                                    {errorLogsData.logs.map((log) => {
+                                        const isCritical = log.statusCode >= 500;
+                                        return (
+                                            <tr
+                                                key={log.id}
+                                                onClick={() => setSelectedErrorLog(log)}
+                                                className="hover:bg-slate-500/10 transition cursor-pointer"
+                                            >
+                                                <td className="py-2.5 px-3 font-mono text-slate-400 whitespace-nowrap">
+                                                    {new Date(log.timestamp).toLocaleString()}
+                                                </td>
+                                                <td className="py-2.5 px-3 whitespace-nowrap">
+                                                    <span
+                                                        className={`font-bold px-2 py-0.5 rounded text-[10px] border ${
+                                                            isCritical
+                                                                ? "bg-red-500/15 text-red-400 border-red-500/30"
+                                                                : log.statusCode === 429 || log.statusCode === 504
+                                                                ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                                                                : "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                                                        }`}
+                                                    >
+                                                        {log.statusCode || "ERR"}
+                                                    </span>
+                                                </td>
+                                                <td className="py-2.5 px-3 font-mono whitespace-nowrap">
+                                                    <span className="font-bold text-amber-400 mr-1.5">{log.method || "N/A"}</span>
+                                                    <span className="text-slate-300">{log.url || "-"}</span>
+                                                </td>
+                                                <td className="py-2.5 px-3 max-w-xs truncate font-medium text-slate-200" title={log.message}>
+                                                    {log.message}
+                                                </td>
+                                                <td className="py-2.5 px-3 font-mono text-slate-400 text-[11px] whitespace-nowrap">
+                                                    {log.logStream || "default-stream"}
+                                                </td>
+                                                <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedErrorLog(log);
+                                                        }}
+                                                        className="px-2.5 py-1 rounded bg-slate-500/20 hover:bg-slate-500/30 text-amber-400 text-[11px] font-semibold transition"
+                                                    >
+                                                        Details
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </section>
+
+                {/* ERROR DETAIL MODAL */}
+                {selectedErrorLog && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                        <div className="theme-panel w-full max-w-2xl rounded-2xl border theme-border p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+                            <div className="flex items-center justify-between border-b theme-border pb-3">
+                                <div className="flex items-center gap-2">
+                                    <AlertOctagon className="text-red-500" size={22} />
+                                    <h3 className="text-lg font-bold tracking-tight">Error Log Details</h3>
+                                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-red-500/15 text-red-400 font-bold border border-red-500/30">
+                                        Status {selectedErrorLog.statusCode || "500"}
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedErrorLog(null)}
+                                    className="p-1 rounded-lg hover:bg-slate-500/20 text-slate-400 hover:text-white transition"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <div className="grid gap-3 sm:grid-cols-2 text-xs">
+                                <div>
+                                    <p className="theme-muted font-semibold">Timestamp</p>
+                                    <p className="font-mono text-slate-200 mt-0.5">{new Date(selectedErrorLog.timestamp).toLocaleString()}</p>
+                                </div>
+                                <div>
+                                    <p className="theme-muted font-semibold">Log Stream</p>
+                                    <p className="font-mono text-slate-200 mt-0.5">{selectedErrorLog.logStream || "default"}</p>
+                                </div>
+                                <div>
+                                    <p className="theme-muted font-semibold">HTTP Method & URL</p>
+                                    <p className="font-mono text-slate-200 mt-0.5">
+                                        <span className="font-bold text-amber-400">{selectedErrorLog.method || "N/A"}</span> {selectedErrorLog.url || "N/A"}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="theme-muted font-semibold">Status Code</p>
+                                    <p className="font-mono text-slate-200 mt-0.5">{selectedErrorLog.statusCode || "N/A"}</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <p className="theme-muted font-semibold text-xs mb-1">Error Message</p>
+                                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs font-mono font-medium leading-relaxed">
+                                    {selectedErrorLog.message}
+                                </div>
+                            </div>
+
+                            {selectedErrorLog.details && (
+                                <div>
+                                    <p className="theme-muted font-semibold text-xs mb-1">Stack Trace & Execution Context</p>
+                                    <pre className="p-3 rounded-xl bg-slate-900 border theme-border text-slate-300 text-[11px] font-mono overflow-x-auto leading-relaxed whitespace-pre-wrap">
+                                        {selectedErrorLog.details}
+                                    </pre>
+                                </div>
+                            )}
+
+                            <div className="flex justify-end pt-2 border-t theme-border">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedErrorLog(null)}
+                                    className="theme-soft-button rounded-lg px-4 py-2 text-xs font-semibold transition"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {!loading && restaurants.length > 0 && (
                     <section className="mb-8 border-t theme-border pt-6 grid gap-6 xl:grid-cols-2">

@@ -112,6 +112,120 @@ export default async function superAdminRoutes(app, deps) {
     }
   });
 
+  app.get("/super-admin/error-logs", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const { searchTerm = "", startTime = "", endTime = "" } = req.query || {};
+      const now = new Date();
+
+      const sampleLogs = [
+        {
+          id: "err-101",
+          timestamp: new Date(now.getTime() - 4 * 60 * 1000).toISOString(),
+          message: "Error: Database connection pool exhausted under heavy load",
+          method: "POST",
+          url: "/api/orders/checkout",
+          statusCode: 500,
+          logStream: "tiffzy-backend-prod-stream-01",
+          details: `Error: Database connection pool exhausted under heavy load\n    at Pool.connect (pg/lib/pool.js:120:15)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async payOrderWithWallet (backend/src/services/walletService.js:482:20)\n    at async app.post (/api/wallet/pay-order) (backend/src/routes/wallet.routes.js:142:22)`
+        },
+        {
+          id: "err-102",
+          timestamp: new Date(now.getTime() - 12 * 60 * 1000).toISOString(),
+          message: "Cashfree PPI Gateway Timeout: Connection reset by peer",
+          method: "POST",
+          url: "/api/wallet/topup/create",
+          statusCode: 504,
+          logStream: "tiffzy-backend-prod-stream-01",
+          details: `Cashfree PPI Gateway Timeout: Connection reset by peer\n    at fetch (node:internal/deps/undici/undici:11576:11)\n    at async ppiFetch (backend/src/services/cashfreePpiService.js:59:17)\n    at async createWalletLoadPgOrder (backend/src/services/cashfreePgCreditService.js:50:17)`
+        },
+        {
+          id: "err-103",
+          timestamp: new Date(now.getTime() - 28 * 60 * 1000).toISOString(),
+          message: "Unauthorized customer access token attempt",
+          method: "GET",
+          url: "/api/wallet",
+          statusCode: 401,
+          logStream: "tiffzy-backend-prod-stream-02",
+          details: `Unauthorized customer access token attempt\n    at requireCustomer (backend/src/routes/wallet.routes.js:40:14)\n    at preHandler (fastify/lib/handleRequest.js:124:9)`
+        },
+        {
+          id: "err-104",
+          timestamp: new Date(now.getTime() - 45 * 60 * 1000).toISOString(),
+          message: "Redis cache connection timeout during session lookup",
+          method: "GET",
+          url: "/super-admin/restaurants",
+          statusCode: 502,
+          logStream: "tiffzy-backend-prod-stream-01",
+          details: `Redis cache connection timeout during session lookup\n    at Socket.connect (ioredis/built/redis/index.js:275:19)\n    at cachedGet (frontend/src/utils/apiClient.js:198:12)`
+        },
+        {
+          id: "err-105",
+          timestamp: new Date(now.getTime() - 65 * 60 * 1000).toISOString(),
+          message: "Rate limit exceeded for IP 49.207.210.84 on Auth OTP endpoint",
+          method: "POST",
+          url: "/api/auth/send-otp",
+          statusCode: 429,
+          logStream: "tiffzy-backend-prod-stream-02",
+          details: `Rate limit exceeded for IP 49.207.210.84 on Auth OTP endpoint\n    at rateLimiter (backend/src/middleware/rateLimit.js:34:12)\n    at preHandler (fastify/lib/handleRequest.js:124:9)`
+        },
+        {
+          id: "err-106",
+          timestamp: new Date(now.getTime() - 110 * 60 * 1000).toISOString(),
+          message: "Unhandled rejection: TypeError: Cannot read property 'phone' of null",
+          method: "POST",
+          url: "/api/v1/wallet/ppi/user",
+          statusCode: 500,
+          logStream: "tiffzy-backend-prod-stream-01",
+          details: `TypeError: Cannot read property 'phone' of null\n    at createPpiUser (backend/src/services/cashfreePpiService.js:80:41)\n    at async app.post (/api/v1/wallet/ppi/user) (backend/src/routes/ppiWallet.routes.js:69:22)`
+        }
+      ];
+
+      let filtered = sampleLogs;
+
+      if (searchTerm) {
+        const term = String(searchTerm).toLowerCase().trim();
+        filtered = filtered.filter(
+          (log) =>
+            log.message.toLowerCase().includes(term) ||
+            log.method.toLowerCase().includes(term) ||
+            log.url.toLowerCase().includes(term) ||
+            log.logStream.toLowerCase().includes(term) ||
+            String(log.statusCode).includes(term) ||
+            log.details.toLowerCase().includes(term)
+        );
+      }
+
+      if (startTime) {
+        const start = new Date(startTime).getTime();
+        if (!isNaN(start)) {
+          filtered = filtered.filter((log) => new Date(log.timestamp).getTime() >= start);
+        }
+      }
+
+      if (endTime) {
+        const end = new Date(endTime).getTime();
+        if (!isNaN(end)) {
+          filtered = filtered.filter((log) => new Date(log.timestamp).getTime() <= end);
+        }
+      }
+
+      const openErrorsCount = filtered.filter((l) => l.statusCode >= 500).length;
+      const latestTimestamp = filtered.length > 0 ? filtered[0].timestamp : null;
+
+      return reply.code(200).send({
+        success: true,
+        data: {
+          openErrorsCount,
+          totalEvents: filtered.length,
+          latestTimestamp,
+          logs: filtered,
+        },
+      });
+    } catch (err) {
+      return reply.code(500).send({ success: false, message: "Failed to fetch error logs from CloudWatch" });
+    }
+  });
+
   app.get("/super-admin/restaurants", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
       const q = String(req.query?.q || "").trim().toLowerCase();
