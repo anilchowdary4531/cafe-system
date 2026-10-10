@@ -310,8 +310,8 @@ export default function SuperAdminDashboard() {
         <div className="theme-page min-h-screen" id="super-admin-top">
             <SuperAdminSidebar open={sidebarOpen} setOpen={setSidebarOpen} currentKey={activeMenuKey} />
 
-            <header className="theme-nav border-b px-4 py-4 md:px-8">
-                <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <header className="theme-nav border-b px-4 py-3 md:px-6">
+                <div className="w-full flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center gap-3" id="profile-section">
                         <button
                             type="button"
@@ -343,7 +343,7 @@ export default function SuperAdminDashboard() {
                 </div>
             </header>
 
-            <main className="mx-auto max-w-7xl px-4 py-4 md:px-8">
+            <main className="w-full px-4 py-4 md:px-6 space-y-6">
                 {error && (
                     <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
                         {error}
@@ -442,7 +442,7 @@ export default function SuperAdminDashboard() {
                 </section>
 
                 {/* ERROR MONITORING SECTION */}
-                <section className="mb-8 border-t theme-border pt-6">
+                <section className="space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b theme-border">
                         <div>
                             <div className="flex items-center gap-2.5 flex-wrap">
@@ -476,43 +476,31 @@ export default function SuperAdminDashboard() {
                         </div>
                     </div>
 
-                    {/* OVERVIEW METRIC CARDS */}
-                    <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                        <div className="border theme-border rounded-xl p-3.5 bg-transparent flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-semibold theme-muted uppercase tracking-wider">Open Errors</p>
-                                <p className="text-2xl font-black text-red-400 mt-1">{errorLogsData?.openErrorsCount ?? 0}</p>
-                            </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
-                                CRITICAL (5xx)
-                            </span>
+                    {/* OVERVIEW METRICS - CLEAN STRIP */}
+                    <div className="grid gap-4 sm:grid-cols-3 py-2 border-b theme-border">
+                        <div className="flex flex-col justify-between">
+                            <p className="text-xs font-bold theme-muted uppercase tracking-wider">OPEN ERRORS</p>
+                            <p className="text-3xl font-black text-red-400 mt-1">{errorLogsData?.openErrorsCount ?? 0}</p>
+                            <p className="text-[11px] font-semibold text-red-400/90 mt-0.5">CRITICAL (5xx failures)</p>
                         </div>
 
-                        <div className="border theme-border rounded-xl p-3.5 bg-transparent flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-semibold theme-muted uppercase tracking-wider">Total Error Events</p>
-                                <p className="text-2xl font-black text-amber-400 mt-1">{errorLogsData?.totalEvents ?? 0}</p>
-                            </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                                RETURNED
-                            </span>
+                        <div className="flex flex-col justify-between">
+                            <p className="text-xs font-bold theme-muted uppercase tracking-wider">TOTAL ERROR EVENTS</p>
+                            <p className="text-3xl font-black text-amber-400 mt-1">{errorLogsData?.totalEvents ?? 0}</p>
+                            <p className="text-[11px] font-semibold text-amber-400/90 mt-0.5">RETURNED IN WINDOW</p>
                         </div>
 
-                        <div className="border theme-border rounded-xl p-3.5 bg-transparent flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-semibold theme-muted uppercase tracking-wider">Latest Timestamp</p>
-                                <p className="text-xs font-bold text-slate-200 mt-1 font-mono">
-                                    {errorLogsData?.latestTimestamp ? new Date(errorLogsData.latestTimestamp).toLocaleString() : "N/A"}
-                                </p>
-                            </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                                TIMELINE
-                            </span>
+                        <div className="flex flex-col justify-between">
+                            <p className="text-xs font-bold theme-muted uppercase tracking-wider">LATEST TIMESTAMP</p>
+                            <p className="text-xl font-bold font-mono text-slate-200 mt-1">
+                                {errorLogsData?.latestTimestamp ? new Date(errorLogsData.latestTimestamp).toLocaleString() : "N/A"}
+                            </p>
+                            <p className="text-[11px] font-semibold text-blue-400/90 mt-0.5">TIMELINE RECENT</p>
                         </div>
                     </div>
 
                     {/* SEARCH & FILTER CONTROLS */}
-                    <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center justify-between bg-slate-500/5 p-3 rounded-xl border theme-border">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center justify-between py-2 border-b theme-border">
                         <div className="flex-1 flex items-center gap-2 theme-input rounded-lg px-3 py-1.5">
                             <Search size={15} className="theme-muted" />
                             <input
@@ -588,13 +576,13 @@ export default function SuperAdminDashboard() {
                             </button>
                         </div>
                     ) : !errorLogsData?.logs || errorLogsData.logs.length === 0 ? (
-                        <div className="py-10 text-center text-sm theme-muted border-t theme-border mt-4">
+                        <div className="py-10 text-center text-sm theme-muted">
                             No errors found
                         </div>
                     ) : (
-                        <div className="mt-4 overflow-x-auto border theme-border rounded-xl">
+                        <div className="overflow-x-auto w-full">
                             <table className="w-full text-left text-xs">
-                                <thead className="border-b theme-border bg-slate-500/10 text-slate-300 uppercase tracking-wider text-[10px]">
+                                <thead className="border-b theme-border bg-slate-500/5 text-slate-300 uppercase tracking-wider text-[10px]">
                                     <tr>
                                         <th className="py-2.5 px-3">Timestamp</th>
                                         <th className="py-2.5 px-3">Status</th>
@@ -732,7 +720,7 @@ export default function SuperAdminDashboard() {
                 )}
 
                 {!loading && restaurants.length > 0 && (
-                    <section className="mb-8 border-t theme-border pt-6 grid gap-6 xl:grid-cols-2">
+                    <section className="space-y-4 grid gap-6 xl:grid-cols-2">
                         <article className="py-2">
                             <div className="flex items-center justify-between gap-3">
                                 <h3 className="text-base font-bold">Users by Restaurant</h3>
@@ -839,7 +827,7 @@ export default function SuperAdminDashboard() {
                     </section>
                 )}
 
-                <section id="restaurants-section" className="border-t theme-border pt-6">
+                <section id="restaurants-section" className="space-y-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pb-3">
                         <div>
                             <div className="flex items-center gap-2">
