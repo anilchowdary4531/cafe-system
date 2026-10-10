@@ -113,7 +113,7 @@ export default function SuperAdminSettlements() {
   ];
 
   return (
-    <div className="space-y-6 p-6 max-w-7xl mx-auto text-slate-100">
+    <div className="space-y-4 px-2 py-3 md:px-3 w-full text-slate-100">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>

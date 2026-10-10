@@ -107,13 +107,13 @@ export default function SuperAdminWalletManagement() {
             <SuperAdminSidebar open={sidebarOpen} setOpen={setSidebarOpen} currentKey="wallets" />
 
             {/* Header */}
-            <header className="theme-nav border-b px-4 py-4 md:px-8">
-                <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+            <header className="theme-nav border-b px-2 py-2 md:px-3">
+                <div className="w-full flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => setSidebarOpen(true)} className="theme-soft-button p-2.5 rounded-xl"><Menu size={20} /></button>
+                        <button onClick={() => setSidebarOpen(true)} className="theme-soft-button p-2 rounded-xl"><Menu size={18} /></button>
                         <div>
                             <p className="theme-muted text-xs uppercase tracking-widest font-bold">Super Admin</p>
-                            <h1 className="text-2xl font-bold text-white">Customer Wallet Management & Financial Ledger</h1>
+                            <h1 className="text-xl font-bold text-white">Customer Wallet Management & Financial Ledger</h1>
                         </div>
                     </div>
                     <button onClick={logout} className="rounded-full bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/20">
@@ -123,7 +123,7 @@ export default function SuperAdminWalletManagement() {
             </header>
 
             {/* Main Content */}
-            <main className="mx-auto max-w-7xl px-4 py-8 md:px-8 space-y-8">
+            <main className="w-full px-2 py-3 md:px-3 space-y-4">
                 {error && <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-300 text-sm">{error}</div>}
                 {success && <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4 text-emerald-300 text-sm">{success}</div>}
 

@@ -92,8 +92,8 @@ export default function SuperAdminBanners() {
         <div className="theme-page min-h-screen">
             <SuperAdminSidebar open={sidebarOpen} setOpen={setSidebarOpen} currentKey="banners" />
 
-            <header className="theme-nav border-b px-4 py-4 md:px-8">
-                <div className="mx-auto flex max-w-7xl items-center justify-between">
+            <header className="theme-nav border-b px-2 py-2 md:px-3">
+                <div className="w-full flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <button onClick={() => setSidebarOpen(true)} className="theme-soft-button p-2 rounded-full"><Menu size={20} /></button>
                         <h1 className="text-2xl font-bold">App Banners</h1>
@@ -104,7 +104,7 @@ export default function SuperAdminBanners() {
                 </div>
             </header>
 
-            <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+            <main className="w-full px-2 py-3 md:px-3">
                 {error && <div className="mb-6 rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-300 text-sm">{error}</div>}
 
                 {showForm && (

@@ -55,8 +55,8 @@ export default function SuperAdminSettings() {
         <div className="theme-page min-h-screen">
             <SuperAdminSidebar open={sidebarOpen} setOpen={setSidebarOpen} currentKey="settings" />
 
-            <header className="theme-nav border-b px-4 py-4 md:px-8">
-                <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <header className="theme-nav border-b px-2 py-2 md:px-3">
+                <div className="w-full flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
@@ -88,7 +88,7 @@ export default function SuperAdminSettings() {
                 </div>
             </header>
 
-            <main className="mx-auto max-w-7xl px-4 py-6 md:px-8">
+            <main className="w-full px-2 py-3 md:px-3">
                 <section className="theme-panel rounded-3xl p-5">
                     <div className="flex items-center gap-2">
                         <Settings className="theme-accent-text" size={20} />

@@ -201,7 +201,7 @@ export default function SuperAdminCategories() {
 
             {/* Header Console Bar */}
             <header className="sticky top-0 z-30 bg-white border-b border-slate-200/80 shadow-2xs">
-                <div className="mx-auto max-w-7xl px-4 py-3.5 sm:px-6 lg:px-8">
+                <div className="w-full px-2 py-2 md:px-3">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-3">
                             <button 
@@ -321,7 +321,7 @@ export default function SuperAdminCategories() {
                 </div>
             </header>
 
-            <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+            <main className="w-full px-2 py-3 md:px-3 space-y-4">
                 {/* Alert Notification */}
                 {error && (
                     <div className="rounded-2xl bg-red-50 border border-red-200 p-3.5 text-xs font-semibold text-red-800 flex items-center justify-between">

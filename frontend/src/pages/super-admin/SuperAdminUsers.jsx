@@ -268,8 +268,8 @@ export default function SuperAdminUsers() {
             <SuperAdminSidebar open={sidebarOpen} setOpen={setSidebarOpen} currentKey="users" />
 
             {/* HEADER */}
-            <header className="theme-nav border-b px-4 py-4 md:px-8">
-                <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <header className="theme-nav border-b px-2 py-2 md:px-3">
+                <div className="w-full flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
@@ -318,7 +318,7 @@ export default function SuperAdminUsers() {
             </header>
 
             {/* MAIN CONTENT */}
-            <main className="mx-auto max-w-7xl px-4 py-6 md:px-8 space-y-6">
+            <main className="w-full px-2 py-3 md:px-3 space-y-4">
                 {error && (
                     <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                         {error}

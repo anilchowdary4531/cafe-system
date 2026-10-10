@@ -143,13 +143,13 @@ export default function SuperAdminRestaurantProfiles() {
             <SuperAdminSidebar open={sidebarOpen} setOpen={setSidebarOpen} currentKey="restaurant-profile" />
 
             {/* Header */}
-            <header className="theme-nav border-b px-4 py-4 md:px-8">
-                <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+            <header className="theme-nav border-b px-2 py-2 md:px-3">
+                <div className="w-full flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => setSidebarOpen(true)} className="theme-soft-button p-2.5 rounded-xl"><Menu size={20} /></button>
+                        <button onClick={() => setSidebarOpen(true)} className="theme-soft-button p-2 rounded-xl"><Menu size={18} /></button>
                         <div>
                             <p className="theme-muted text-xs uppercase tracking-widest font-bold">Super Admin</p>
-                            <h1 className="text-2xl font-bold text-white">Restaurant Profiles & Directory</h1>
+                            <h1 className="text-xl font-bold text-white">Restaurant Profiles & Directory</h1>
                         </div>
                     </div>
                     <button onClick={logout} className="rounded-full bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/20">
@@ -159,7 +159,7 @@ export default function SuperAdminRestaurantProfiles() {
             </header>
 
             {/* Main Content */}
-            <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+            <main className="w-full px-2 py-3 md:px-3">
                 {error && <div className="mb-6 rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-300 text-sm">{error}</div>}
 
                 {/* Controls Bar */}
