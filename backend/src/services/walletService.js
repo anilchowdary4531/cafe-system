@@ -189,6 +189,155 @@ export const getWalletTransactions = async (
 };
 
 /**
+ * Get Wallet Analytics & Balance Trend
+ * Computes summary aggregations and chronological time-series points.
+ */
+export const getWalletAnalytics = async (
+  passedPrisma,
+  customerAccountId,
+  { period = "30d" } = {}
+) => {
+  const prisma = getDb(passedPrisma);
+  if (!customerAccountId) {
+    const err = new Error("customerAccountId is required");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const ALLOWED_PERIODS = ["7d", "30d", "6m", "all"];
+  const cleanPeriod = String(period || "30d").trim().toLowerCase();
+  if (!ALLOWED_PERIODS.includes(cleanPeriod)) {
+    const err = new Error("Invalid period. Allowed periods: 7d, 30d, 6m, all");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const wallet = await getOrCreateWallet(prisma, customerAccountId);
+  const currentBalance = round2(wallet.balance);
+
+  const now = new Date();
+  let startDate = null;
+  if (cleanPeriod === "7d") {
+    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  } else if (cleanPeriod === "30d") {
+    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  } else if (cleanPeriod === "6m") {
+    startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+  }
+
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+
+  const periodWhere = {
+    walletId: wallet.id,
+    status: "SUCCESS",
+    ...(startDate ? { createdAt: { gte: startDate } } : {}),
+  };
+
+  const [periodGroups, monthTopups, monthSpent, ledgerItems] = await Promise.all([
+    prisma.walletLedger.groupBy({
+      by: ["type", "direction"],
+      where: periodWhere,
+      _sum: { amount: true },
+      _count: true,
+    }),
+    prisma.walletLedger.aggregate({
+      where: {
+        walletId: wallet.id,
+        type: "WALLET_TOPUP",
+        direction: "CREDIT",
+        status: "SUCCESS",
+        createdAt: { gte: startOfMonth },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.walletLedger.aggregate({
+      where: {
+        walletId: wallet.id,
+        type: "ORDER_PAYMENT",
+        direction: "DEBIT",
+        status: "SUCCESS",
+        createdAt: { gte: startOfMonth },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.walletLedger.findMany({
+      where: periodWhere,
+      select: {
+        amount: true,
+        direction: true,
+        balanceAfter: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "asc" },
+      take: 500,
+    }),
+  ]);
+
+  let totalDeposited = 0;
+  let totalSpent = 0;
+  let totalRefunded = 0;
+  let totalTransactions = 0;
+
+  for (const group of periodGroups) {
+    const sumAmount = round2(group._sum?.amount || 0);
+    totalTransactions += group._count || 0;
+
+    if (group.type === "WALLET_TOPUP" && group.direction === "CREDIT") {
+      totalDeposited = round2(totalDeposited + sumAmount);
+    } else if (group.type === "ORDER_PAYMENT" && group.direction === "DEBIT") {
+      totalSpent = round2(totalSpent + sumAmount);
+    } else if (group.type === "REFUND" && group.direction === "CREDIT") {
+      totalRefunded = round2(totalRefunded + sumAmount);
+    }
+  }
+
+  const monthDepositsVal = round2(monthTopups?._sum?.amount || 0);
+  const monthSpentVal = round2(monthSpent?._sum?.amount || 0);
+
+  // Group trend into chronological time-series buckets
+  const isMonthlyBucket = cleanPeriod === "6m" || (cleanPeriod === "all" && ledgerItems.length > 0 && (ledgerItems[ledgerItems.length - 1].createdAt - ledgerItems[0].createdAt > 90 * 24 * 60 * 60 * 1000));
+  const trendMap = new Map();
+
+  for (const item of ledgerItems) {
+    const dateKey = isMonthlyBucket
+      ? item.createdAt.toISOString().slice(0, 7)
+      : item.createdAt.toISOString().slice(0, 10);
+
+    if (!trendMap.has(dateKey)) {
+      trendMap.set(dateKey, {
+        date: dateKey,
+        balance: round2(item.balanceAfter),
+        credits: 0,
+        debits: 0,
+      });
+    }
+
+    const point = trendMap.get(dateKey);
+    if (item.direction === "CREDIT") {
+      point.credits = round2(point.credits + item.amount);
+    } else if (item.direction === "DEBIT") {
+      point.debits = round2(point.debits + item.amount);
+    }
+    point.balance = round2(item.balanceAfter);
+  }
+
+  const trend = Array.from(trendMap.values());
+
+  return {
+    summary: {
+      currentBalance,
+      totalDeposited,
+      totalSpent,
+      totalRefunded,
+      totalTransactions,
+      monthDeposits: monthDepositsVal,
+      monthSpent: monthSpentVal,
+    },
+    trend,
+  };
+};
+
+/**
  * Initiate Wallet Top-Up Session
  */
 export const initiateTopup = async (

@@ -1,21 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-    IndianRupee,
-    PlusCircle,
-    History,
-    Sparkles,
-    CheckCircle2,
-    AlertCircle,
-    ArrowUpRight,
-    ArrowDownLeft,
     RefreshCw,
-    Shield,
-    CreditCard
+    AlertCircle,
+    CheckCircle2,
+    Info,
 } from "lucide-react";
 import { api } from "../../../utils/apiClient";
 
-const QUICK_AMOUNTS = [100, 250, 500, 1000, 2000];
+// Modular Subcomponents
+import WalletBalanceHero from "./wallet/WalletBalanceHero";
+import WalletAnalyticsRow from "./wallet/WalletAnalyticsRow";
+import WalletActivityChart from "./wallet/WalletActivityChart";
+import WalletTransactionTable from "./wallet/WalletTransactionTable";
+import WalletTransactionDetailModal from "./wallet/WalletTransactionDetailModal";
 
 const loadCashfreeSdk = () => {
     return new Promise((resolve) => {
@@ -39,56 +37,155 @@ const loadCashfreeSdk = () => {
 
 export default function WalletSection({ customerToken }) {
     const [searchParams, setSearchParams] = useSearchParams();
+
+    // Data States
     const [wallet, setWallet] = useState(null);
+    const [analytics, setAnalytics] = useState(null);
+    const [selectedPeriod, setSelectedPeriod] = useState("30d");
     const [transactions, setTransactions] = useState([]);
+    const [activeFilter, setActiveFilter] = useState("");
+    const [pagination, setPagination] = useState({
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 1,
+    });
+    const [selectedTransaction, setSelectedTransaction] = useState(null);
+
+    // Loading & Status States
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
-    const [successMsg, setSuccessMsg] = useState("");
-    
-    // Top-up modal state
-    const [topupAmount, setTopupAmount] = useState(500);
+    const [refreshing, setRefreshing] = useState(false);
+    const [analyticsLoading, setAnalyticsLoading] = useState(false);
+    const [transactionsLoading, setTransactionsLoading] = useState(false);
     const [topupLoading, setTopupLoading] = useState(false);
 
-    const getAuthConfig = () => {
+    // Message & Error States
+    const [error, setError] = useState("");
+    const [analyticsError, setAnalyticsError] = useState("");
+    const [successMsg, setSuccessMsg] = useState("");
+
+    const getAuthConfig = useCallback(() => {
         const token = customerToken || localStorage.getItem("customerToken");
         return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-    };
+    }, [customerToken]);
 
-    const loadWalletData = async () => {
+    // Fetch Authoritative Wallet Data
+    const fetchWallet = useCallback(async () => {
         try {
-            setLoading(true);
-            setError("");
-            
             const config = getAuthConfig();
-            const [wRes, tRes] = await Promise.all([
-                api.get("/api/wallet", config),
-                api.get("/api/wallet/transactions?limit=30", config),
-            ]);
-
-            const wData = wRes?.data || wRes;
-            const tData = tRes?.data || tRes;
-
-            setWallet(wData?.wallet || null);
-            setTransactions(tData?.transactions || []);
+            const res = await api.get("/api/wallet", config);
+            const data = res?.data || res;
+            setWallet(data?.wallet || null);
+            return data?.wallet || null;
         } catch (err) {
-            console.error("[WalletSection] Failed to load wallet:", err);
+            console.error("[WalletSection] fetchWallet error:", err);
             setError(err.response?.data?.message || "Failed to load wallet balance");
+            return null;
+        }
+    }, [getAuthConfig]);
+
+    // Fetch Wallet Analytics (Period-Scoped)
+    const fetchAnalytics = useCallback(async (periodToFetch = selectedPeriod) => {
+        try {
+            setAnalyticsLoading(true);
+            setAnalyticsError("");
+            const config = getAuthConfig();
+            const res = await api.get(`/api/wallet/analytics?period=${periodToFetch}`, config);
+            const data = res?.data || res;
+            if (data?.data) {
+                setAnalytics(data.data);
+            } else if (data?.summary) {
+                setAnalytics(data);
+            }
+        } catch (err) {
+            console.warn("[WalletSection] fetchAnalytics non-blocking warning:", err);
+            // Non-blocking: Do not block wallet balance or add money if analytics fails
+            setAnalyticsError(err.response?.data?.message || "Analytics data is temporarily unavailable");
         } finally {
-            setLoading(false);
+            setAnalyticsLoading(false);
+        }
+    }, [getAuthConfig, selectedPeriod]);
+
+    // Fetch Wallet Transactions (Paged & Filtered)
+    const fetchTransactions = useCallback(async (targetPage = 1, typeFilter = activeFilter) => {
+        try {
+            setTransactionsLoading(true);
+            const config = getAuthConfig();
+            const queryParams = new URLSearchParams({
+                page: String(targetPage),
+                limit: "10",
+            });
+            if (typeFilter) {
+                queryParams.append("type", typeFilter);
+            }
+
+            const res = await api.get(`/api/wallet/transactions?${queryParams.toString()}`, config);
+            const data = res?.data || res;
+
+            setTransactions(data?.transactions || []);
+            setPagination({
+                page: data?.page || targetPage,
+                limit: data?.limit || 10,
+                total: data?.total || 0,
+                totalPages: data?.totalPages || 1,
+            });
+        } catch (err) {
+            console.error("[WalletSection] fetchTransactions error:", err);
+        } finally {
+            setTransactionsLoading(false);
+        }
+    }, [getAuthConfig, activeFilter]);
+
+    // Unified Refresh Handler
+    const handleRefreshAll = async () => {
+        setRefreshing(true);
+        setError("");
+        try {
+            await Promise.allSettled([
+                fetchWallet(),
+                fetchAnalytics(selectedPeriod),
+                fetchTransactions(pagination.page, activeFilter),
+            ]);
+        } finally {
+            setRefreshing(false);
         }
     };
 
+    // Period Change Handler
+    const handlePeriodChange = (newPeriod) => {
+        setSelectedPeriod(newPeriod);
+        fetchAnalytics(newPeriod);
+    };
+
+    // Filter Change Handler
+    const handleFilterChange = (newFilter) => {
+        setActiveFilter(newFilter);
+        fetchTransactions(1, newFilter);
+    };
+
+    // Page Change Handler
+    const handlePageChange = (newPage) => {
+        fetchTransactions(newPage, activeFilter);
+    };
+
+    // Initial Load & Cashfree Redirect Verification
     useEffect(() => {
-        const checkRedirectAndLoad = async () => {
+        const checkRedirectAndInitialize = async () => {
+            setLoading(true);
             const redirectOrderId = searchParams.get("order_id") || searchParams.get("topup_id");
+
             if (redirectOrderId && redirectOrderId.startsWith("TOPUP_")) {
                 try {
                     const config = getAuthConfig();
-                    const verifyRes = await api.post("/api/wallet/topup/verify", {
-                        topupTxnId: redirectOrderId,
-                        gatewayOrderId: redirectOrderId,
-                        gatewayPaymentId: `PAY_REDIRECT_${Date.now()}`,
-                    }, config);
+                    const verifyRes = await api.post(
+                        "/api/wallet/topup/verify",
+                        {
+                            topupTxnId: redirectOrderId,
+                            gatewayOrderId: redirectOrderId,
+                            gatewayPaymentId: `PAY_REDIRECT_${Date.now()}`,
+                        },
+                        config
+                    );
                     const vData = verifyRes?.data || verifyRes;
                     if (vData?.success) {
                         setSuccessMsg(`Success! ${vData.message || "Payment verified and credited to your wallet."}`);
@@ -100,17 +197,26 @@ export default function WalletSection({ customerToken }) {
                     newParams.delete("order_id");
                     newParams.delete("topup_id");
                     setSearchParams(newParams, { replace: true });
-                    await loadWalletData();
                 }
-            } else {
-                await loadWalletData();
+            }
+
+            try {
+                await Promise.allSettled([
+                    fetchWallet(),
+                    fetchAnalytics(selectedPeriod),
+                    fetchTransactions(1, activeFilter),
+                ]);
+            } finally {
+                setLoading(false);
             }
         };
-        checkRedirectAndLoad();
+
+        checkRedirectAndInitialize();
     }, []);
 
+    // Add Money Flow (Preserving Complete Working Cashfree Drop-in / SDK)
     const handleAddMoney = async (amountToAdd) => {
-        const amt = Number(amountToAdd || topupAmount);
+        const amt = Number(amountToAdd);
         if (Number.isNaN(amt) || amt < 10) {
             setError("Minimum top-up amount is ₹10");
             return;
@@ -125,33 +231,46 @@ export default function WalletSection({ customerToken }) {
             const returnUrl = `${window.location.origin}/profile/wallet?order_id={order_id}`;
 
             // Step 1: Create top-up session
-            const res = await api.post("/api/wallet/topup/create", {
-                amount: amt,
-                returnUrl,
-            }, config);
+            const res = await api.post(
+                "/api/wallet/topup/create",
+                {
+                    amount: amt,
+                    returnUrl,
+                },
+                config
+            );
 
             const data = res?.data || res;
             const session = data?.session || data;
 
-            const sessionId = session?.paymentSessionId || session?.payment_session_id || data?.paymentSessionId || data?.payment_session_id;
+            const sessionId =
+                session?.paymentSessionId ||
+                session?.payment_session_id ||
+                data?.paymentSessionId ||
+                data?.payment_session_id;
             const topupTxnId = session?.topupTxnId || data?.topupTxnId;
 
             if (!session || !topupTxnId) {
                 throw new Error("Invalid top-up session generated");
             }
 
-            // Step 2: Open Cashfree Drop-in / SDK or Simulate/Verify Cashfree Payment
+            // Step 2: Open Cashfree Drop-in / SDK Checkout
             const CashfreeSdk = await loadCashfreeSdk();
             if (CashfreeSdk && sessionId) {
-                const isProdSession = session.isProduction !== undefined
-                    ? Boolean(session.isProduction)
-                    : session.is_production !== undefined
-                    ? Boolean(session.is_production)
-                    : String(session.cfEnv || session.cf_env || "").toUpperCase() === "PRODUCTION";
+                const isProdSession =
+                    session.isProduction !== undefined
+                        ? Boolean(session.isProduction)
+                        : session.is_production !== undefined
+                        ? Boolean(session.is_production)
+                        : String(session.cfEnv || session.cf_env || "").toUpperCase() === "PRODUCTION";
 
                 const envSetting = (import.meta.env.VITE_CASHFREE_ENV || "").toUpperCase();
-                const isProdHostname = typeof window !== "undefined" && window.location.hostname.includes("tiffzy.com");
-                const mode = isProdSession || envSetting === "PRODUCTION" || (isProdHostname && envSetting !== "TEST") ? "production" : "sandbox";
+                const isProdHostname =
+                    typeof window !== "undefined" && window.location.hostname.includes("tiffzy.com");
+                const mode =
+                    isProdSession || envSetting === "PRODUCTION" || (isProdHostname && envSetting !== "TEST")
+                        ? "production"
+                        : "sandbox";
 
                 const cashfree = CashfreeSdk({ mode });
                 const cfResult = await cashfree.checkout({
@@ -168,32 +287,41 @@ export default function WalletSection({ customerToken }) {
                 }
 
                 // Modal completed: verify on backend
-                const gatewayOrderId = session.gatewayOrderId || session.cfOrderId || session.cf_order_id || topupTxnId;
-                const verifyRes = await api.post("/api/wallet/topup/verify", {
-                    topupTxnId,
-                    gatewayOrderId,
-                    gatewayPaymentId: `PAY_CF_${Date.now()}`,
-                }, config);
+                const gatewayOrderId =
+                    session.gatewayOrderId || session.cfOrderId || session.cf_order_id || topupTxnId;
+                const verifyRes = await api.post(
+                    "/api/wallet/topup/verify",
+                    {
+                        topupTxnId,
+                        gatewayOrderId,
+                        gatewayPaymentId: `PAY_CF_${Date.now()}`,
+                    },
+                    config
+                );
 
                 const vData = verifyRes?.data || verifyRes;
                 if (vData?.success) {
-                    setSuccessMsg(`Success! ₹${amt} added to your Tiffzy Wallet.`);
-                    await loadWalletData();
+                    setSuccessMsg(`Success! ₹${amt.toLocaleString("en-IN")} added to your Tiffzy Wallet.`);
+                    await handleRefreshAll();
                 } else {
                     throw new Error(vData?.message || "Payment verification failed");
                 }
             } else {
                 // Fallback verification when SDK is not loaded
-                const verifyRes = await api.post("/api/wallet/topup/verify", {
-                    topupTxnId,
-                    gatewayOrderId: session.gatewayOrderId || session.cfOrderId || topupTxnId,
-                    gatewayPaymentId: `PAY_${Date.now()}`,
-                }, config);
+                const verifyRes = await api.post(
+                    "/api/wallet/topup/verify",
+                    {
+                        topupTxnId,
+                        gatewayOrderId: session.gatewayOrderId || session.cfOrderId || topupTxnId,
+                        gatewayPaymentId: `PAY_${Date.now()}`,
+                    },
+                    config
+                );
 
                 const vData = verifyRes?.data || verifyRes;
                 if (vData?.success) {
-                    setSuccessMsg(`Success! ₹${amt} added to your Tiffzy Wallet.`);
-                    await loadWalletData();
+                    setSuccessMsg(`Success! ₹${amt.toLocaleString("en-IN")} added to your Tiffzy Wallet.`);
+                    await handleRefreshAll();
                 } else {
                     throw new Error(vData?.message || "Payment verification failed");
                 }
@@ -207,149 +335,113 @@ export default function WalletSection({ customerToken }) {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-12 animate-fadeIn">
+            {/* SECTION 1: WALLET HEADER */}
             <div className="flex items-center justify-between px-1">
                 <div>
-                    <p className="theme-accent-text text-[11px] font-semibold uppercase tracking-[0.28em]">Prepaid Balance</p>
-                    <h1 className="text-2xl font-bold tracking-tight md:text-[2rem]">Tiffzy Wallet</h1>
+                    <p className="theme-accent-text text-[11px] font-semibold uppercase tracking-[0.28em]">
+                        Prepaid Balance
+                    </p>
+                    <h1 className="text-2xl font-bold tracking-tight md:text-[2rem] text-white">
+                        Tiffzy Wallet
+                    </h1>
                 </div>
+
+                {/* Refresh Action */}
                 <button
-                    onClick={loadWalletData}
-                    className="theme-soft-button p-2.5 rounded-xl text-gray-300 hover:text-white"
-                    title="Refresh Balance"
+                    type="button"
+                    onClick={handleRefreshAll}
+                    disabled={refreshing}
+                    className="theme-soft-button min-h-[44px] min-w-[44px] p-2.5 rounded-2xl text-stone-300 hover:text-white transition-all flex items-center justify-center border border-white/10 hover:border-white/20"
+                    title="Refresh Wallet & Analytics"
                 >
-                    <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+                    <RefreshCw size={18} className={refreshing ? "animate-spin text-amber-400" : ""} />
                 </button>
             </div>
 
+            {/* Error & Success Messages */}
             {error && (
-                <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-300 text-sm flex items-center gap-2">
-                    <AlertCircle size={18} /> {error}
+                <div className="rounded-2xl bg-rose-500/10 border border-rose-500/20 p-4 text-rose-300 text-sm flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                        <AlertCircle size={18} className="shrink-0" />
+                        <span>{error}</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setError("")}
+                        className="text-rose-400 hover:text-rose-200 text-xs font-bold"
+                    >
+                        Dismiss
+                    </button>
                 </div>
             )}
 
             {successMsg && (
-                <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4 text-emerald-300 text-sm flex items-center gap-2">
-                    <CheckCircle2 size={18} /> {successMsg}
+                <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4 text-emerald-300 text-sm flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                        <CheckCircle2 size={18} className="shrink-0" />
+                        <span>{successMsg}</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setSuccessMsg("")}
+                        className="text-emerald-400 hover:text-emerald-200 text-xs font-bold"
+                    >
+                        Dismiss
+                    </button>
                 </div>
             )}
 
-            {/* Main Balance Card */}
-            <div className="theme-panel rounded-3xl border border-[var(--app-border)] p-6 md:p-8 bg-gradient-to-br from-amber-500/15 via-orange-600/10 to-transparent relative overflow-hidden shadow-2xl">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-                    <div>
-                        <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-widest">
-                            <CreditCard size={16} /> Current Wallet Balance
-                        </div>
-                        <div className="mt-2 flex items-baseline gap-2">
-                            <span className="text-4xl md:text-5xl font-black text-white tracking-tight">
-                                ₹{wallet ? wallet.balance.toFixed(2) : "0.00"}
-                            </span>
-                            <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400">
-                                {wallet?.status || "ACTIVE"}
-                            </span>
-                        </div>
-                        <p className="text-xs text-gray-400 mt-2">
-                            Use your wallet balance for instant 1-click checkout on all food orders.
-                        </p>
-                    </div>
-
-                    {/* Quick Add Money Controls */}
-                    <div className="theme-card p-5 rounded-2xl border border-white/10 max-w-md w-full space-y-4">
-                        <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">Top-up Wallet</p>
-                        <div className="flex flex-wrap gap-2">
-                            {QUICK_AMOUNTS.map((amt) => (
-                                <button
-                                    key={amt}
-                                    onClick={() => {
-                                        setTopupAmount(amt);
-                                        handleAddMoney(amt);
-                                    }}
-                                    disabled={topupLoading}
-                                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold border border-white/15 bg-white/5 hover:bg-amber-500 hover:text-black transition-all"
-                                >
-                                    +₹{amt}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="flex gap-2">
-                            <div className="relative flex-1">
-                                <span className="absolute left-3 top-2.5 text-gray-400 text-sm font-bold">₹</span>
-                                <input
-                                    type="number"
-                                    min="10"
-                                    max="50000"
-                                    value={topupAmount}
-                                    onChange={(e) => setTopupAmount(e.target.value)}
-                                    placeholder="Enter amount"
-                                    className="theme-input rounded-xl pl-8 pr-3 py-2 text-sm w-full outline-none"
-                                />
-                            </div>
-                            <button
-                                onClick={() => handleAddMoney(topupAmount)}
-                                disabled={topupLoading}
-                                className="theme-button px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 shadow-lg"
-                            >
-                                <PlusCircle size={16} />
-                                {topupLoading ? "Processing..." : "Add Money"}
-                            </button>
-                        </div>
-                    </div>
+            {analyticsError && (
+                <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-3 text-amber-300 text-xs flex items-center gap-2">
+                    <Info size={16} className="shrink-0" />
+                    <span>{analyticsError}</span>
                 </div>
-            </div>
+            )}
 
-            {/* Ledger Transaction History */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-2 px-1 text-sm font-bold text-gray-200">
-                    <History size={18} className="text-amber-400" /> Transaction Ledger
-                </div>
+            {/* SECTION 2: HERO AREA (Two-column: Balance Card + Add Money Card) */}
+            <WalletBalanceHero
+                wallet={wallet}
+                loadingWallet={loading}
+                onAddMoney={handleAddMoney}
+                topupLoading={topupLoading}
+            />
 
-                {loading ? (
-                    <div className="text-center py-10 text-gray-400 text-sm">Loading transaction history...</div>
-                ) : transactions.length === 0 ? (
-                    <div className="theme-card rounded-2xl p-8 text-center text-gray-400 border theme-border">
-                        No wallet transactions yet. Top-up money or place food orders to see your history!
-                    </div>
-                ) : (
-                    <div className="space-y-2">
-                        {transactions.map((txn) => {
-                            const isCredit = txn.direction === "CREDIT";
-                            return (
-                                <div
-                                    key={txn.id}
-                                    className="theme-card rounded-2xl p-4 border theme-border flex items-center justify-between gap-4 transition hover:bg-white/[0.03]"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2.5 rounded-xl border ${isCredit ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-red-500/10 border-red-500/20 text-red-400"}`}>
-                                            {isCredit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-white">{txn.description}</p>
-                                            <p className="text-xs text-gray-400">
-                                                {new Date(txn.createdAt).toLocaleString("en-IN", {
-                                                    dateStyle: "medium",
-                                                    timeStyle: "short",
-                                                })}
-                                                {txn.orderId && ` • Order #${txn.orderId}`}
-                                            </p>
-                                        </div>
-                                    </div>
+            {/* SECTION 3: ANALYTICS CARDS (Total Top-ups, Total Food Spend, Total Transactions) */}
+            <WalletAnalyticsRow
+                summary={analytics?.summary}
+                loading={loading || analyticsLoading}
+            />
 
-                                    <div className="text-right">
-                                        <p className={`text-base font-black ${isCredit ? "text-emerald-400" : "text-red-400"}`}>
-                                            {isCredit ? "+" : "-"}₹{txn.amount.toFixed(2)}
-                                        </p>
-                                        <p className="text-[11px] text-gray-400">
-                                            Balance: ₹{txn.balanceAfter.toFixed(2)}
-                                        </p>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
+            {/* SECTION 4: WALLET ACTIVITY CHART (Recharts AreaChart + Period Selector) */}
+            <WalletActivityChart
+                trend={analytics?.trend || []}
+                selectedPeriod={selectedPeriod}
+                onPeriodChange={handlePeriodChange}
+                loading={analyticsLoading}
+            />
+
+            {/* SECTION 5, 6, 8, 9: LATEST TRANSACTIONS TABLE & CARDS WITH FILTERS, SEARCH & PAGINATION */}
+            <WalletTransactionTable
+                transactions={transactions}
+                total={pagination.total}
+                page={pagination.page}
+                totalPages={pagination.totalPages}
+                limit={pagination.limit}
+                loading={transactionsLoading}
+                activeType={activeFilter}
+                onTypeChange={handleFilterChange}
+                onPageChange={handlePageChange}
+                onSelectTransaction={(txn) => setSelectedTransaction(txn)}
+            />
+
+            {/* SECTION 7: TRANSACTION DETAILS MODAL */}
+            {selectedTransaction && (
+                <WalletTransactionDetailModal
+                    transaction={selectedTransaction}
+                    onClose={() => setSelectedTransaction(null)}
+                />
+            )}
         </div>
     );
 }

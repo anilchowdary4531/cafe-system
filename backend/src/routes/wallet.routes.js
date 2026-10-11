@@ -2,6 +2,7 @@ import defaultPrisma from "../prisma.js";
 import {
   getWalletSummary,
   getWalletTransactions,
+  getWalletAnalytics,
   createTopupSession,
   verifyAndCreditTopup,
   payOrderWithWallet,
@@ -87,6 +88,26 @@ export default async function walletRoutes(app, deps) {
     } catch (err) {
       console.error("[Wallet] GET /api/wallet/transactions error:", err);
       return reply.code(500).send({ message: err.message || "Failed to fetch transaction history" });
+    }
+  });
+
+  // GET /api/wallet/analytics -> Get Aggregated Wallet Analytics & Trend
+  app.get("/api/wallet/analytics", { preHandler: requireCustomer }, async (req, reply) => {
+    try {
+      const { period } = req.query || {};
+      const analytics = await getWalletAnalytics(prisma, req.customerAccount.id, {
+        period,
+      });
+      return {
+        success: true,
+        data: analytics,
+      };
+    } catch (err) {
+      if (err.statusCode === 400) {
+        return reply.code(400).send({ success: false, message: err.message });
+      }
+      console.error("[Wallet] GET /api/wallet/analytics error:", err);
+      return reply.code(500).send({ success: false, message: err.message || "Failed to fetch wallet analytics" });
     }
   });
 
