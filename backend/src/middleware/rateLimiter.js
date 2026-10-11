@@ -3,7 +3,8 @@ import config from "../core/config.js";
 const hits = new Map();
 
 export async function rateLimiter(req, reply) {
-    const ip = req.ip || req.headers["x-forwarded-for"] || "127.0.0.1";
+    const rawIp = req.headers["x-forwarded-for"] || req.ip || "127.0.0.1";
+    const ip = (typeof rawIp === "string" ? rawIp.split(",")[0] : rawIp).trim();
     const now = Date.now();
     const windowMs = config.rateLimit.windowMs;
     const maxRequests = config.rateLimit.maxRequests;

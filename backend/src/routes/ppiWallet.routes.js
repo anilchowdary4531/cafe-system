@@ -66,10 +66,14 @@ export default async function ppiWalletRoutes(app, deps) {
   app.post("/api/v1/wallet/ppi/user", { preHandler: requireCustomer }, async (req, reply) => {
     if (!isPpiConfigured()) return respondPpiUnconfigured(reply);
     try {
+      const customer = req.customerAccount;
+      if (!customer || !customer.phone) {
+        return reply.code(400).send({ success: false, message: "Customer account or phone number is missing" });
+      }
       const result = await createPpiUser({
-        phone: req.customerAccount.phone,
-        name: req.customerAccount.name,
-        email: req.customerAccount.email,
+        phone: customer.phone,
+        name: customer.name,
+        email: customer.email,
       });
       return { success: true, ...result };
     } catch (err) {

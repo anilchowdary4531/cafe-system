@@ -51,6 +51,7 @@ export const createWalletLoadPgOrder = async ({
       method: "POST",
       headers,
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000),
     });
 
     const data = await res.json().catch(() => ({}));
@@ -72,6 +73,11 @@ export const createWalletLoadPgOrder = async ({
     };
   } catch (err) {
     console.error("[CashfreePgCreditService] Error creating wallet load PG order:", err.message);
+    if (err.name === "TimeoutError" || err.name === "AbortError" || err.code === "ECONNRESET") {
+      const gatewayErr = new Error("Cashfree PPI Gateway Timeout: Connection reset by peer");
+      gatewayErr.status = 504;
+      throw gatewayErr;
+    }
     throw err;
   }
 };
