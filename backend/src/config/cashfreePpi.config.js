@@ -3,7 +3,7 @@
  */
 
 export const DEFAULT_PROGRAM_ID = "19222";
-export const CASHFREE_API_VERSION = "2025-11-01";
+export const CASHFREE_API_VERSION = "2023-08-01";
 
 export const BASE_URLS = {
   PPI_SANDBOX: "https://sandbox.cashfree.com/ppi",

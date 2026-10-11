@@ -253,17 +253,25 @@ export const initiateTopup = async (
         returnUrl,
       });
 
+      const ppiGatewayOrderId = ppiLoadRes.cfOrderId || ppiLoadRes.cf_order_id || topupTxnId;
       await prisma.walletTopup.update({
         where: { id: topupRecord.id },
-        data: { gatewayOrderId: ppiLoadRes.cfOrderId || topupTxnId },
+        data: { gatewayOrderId: ppiGatewayOrderId },
       });
 
       return {
         topupTxnId,
         amount: numAmount,
         paymentSessionId: ppiLoadRes.paymentSessionId,
+        payment_session_id: ppiLoadRes.payment_session_id || ppiLoadRes.paymentSessionId,
+        gatewayOrderId: ppiGatewayOrderId,
         cfOrderId: ppiLoadRes.cfOrderId,
+        cf_order_id: ppiLoadRes.cf_order_id || ppiLoadRes.cfOrderId,
         gateway: "CASHFREE_PPI_CREDIT",
+        isProduction: Boolean(ppiLoadRes.isProduction),
+        is_production: Boolean(ppiLoadRes.is_production),
+        cfEnv: ppiLoadRes.cfEnv,
+        cf_env: ppiLoadRes.cf_env,
       };
     } catch (err) {
       console.warn("[initiateTopup] PG Credit MID fallback to standard PG:", err.message);
@@ -281,17 +289,29 @@ export const initiateTopup = async (
     returnUrl,
   });
 
+  const gatewayOrderId = cfSession.cf_order_id || cfSession.cfOrderId || cfSession.order_id || topupTxnId;
   await prisma.walletTopup.update({
     where: { id: topupRecord.id },
-    data: { gatewayOrderId: cfSession.cfOrderId || topupTxnId },
+    data: { gatewayOrderId },
   });
+
+  const paymentSessionId = cfSession.payment_session_id || cfSession.paymentSessionId;
+  const isProd = cfSession.is_production !== undefined ? Boolean(cfSession.is_production) : Boolean(cfSession.isProduction);
+  const cfEnv = cfSession.cf_env || cfSession.cfEnv || (isProd ? "PRODUCTION" : "SANDBOX");
 
   return {
     topupTxnId,
     amount: numAmount,
-    paymentSessionId: cfSession.payment_session_id || cfSession.paymentSessionId,
+    paymentSessionId,
+    payment_session_id: paymentSessionId,
+    gatewayOrderId,
     cfOrderId: cfSession.cf_order_id || cfSession.cfOrderId,
+    cf_order_id: cfSession.cf_order_id || cfSession.cfOrderId,
     gateway: "CASHFREE",
+    isProduction: isProd,
+    is_production: isProd,
+    cfEnv,
+    cf_env: cfEnv,
   };
 };
 

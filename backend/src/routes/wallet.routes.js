@@ -100,7 +100,14 @@ export default async function walletRoutes(app, deps) {
         returnUrl,
         idempotencyKey,
       });
-      return { success: true, session };
+      return {
+        success: true,
+        session,
+        paymentSessionId: session.paymentSessionId,
+        payment_session_id: session.payment_session_id,
+        topupTxnId: session.topupTxnId,
+        gatewayOrderId: session.gatewayOrderId,
+      };
     } catch (err) {
       console.error("[Wallet] Top-up create error:", err);
       return reply.code(400).send({ message: err.message || "Failed to create top-up session" });

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
     IndianRupee,
     PlusCircle,
@@ -16,7 +17,28 @@ import { api } from "../../../utils/apiClient";
 
 const QUICK_AMOUNTS = [100, 250, 500, 1000, 2000];
 
+const loadCashfreeSdk = () => {
+    return new Promise((resolve) => {
+        if (typeof window !== "undefined" && typeof window.Cashfree === "function") {
+            resolve(window.Cashfree);
+            return;
+        }
+        const existingScript = document.getElementById("cashfree-js-sdk");
+        if (existingScript) {
+            existingScript.addEventListener("load", () => resolve(window.Cashfree));
+            return;
+        }
+        const script = document.createElement("script");
+        script.id = "cashfree-js-sdk";
+        script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
+        script.onload = () => resolve(window.Cashfree);
+        script.onerror = () => resolve(null);
+        document.head.appendChild(script);
+    });
+};
+
 export default function WalletSection({ customerToken }) {
+    const [searchParams, setSearchParams] = useSearchParams();
     const [wallet, setWallet] = useState(null);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -57,7 +79,34 @@ export default function WalletSection({ customerToken }) {
     };
 
     useEffect(() => {
-        loadWalletData();
+        const checkRedirectAndLoad = async () => {
+            const redirectOrderId = searchParams.get("order_id") || searchParams.get("topup_id");
+            if (redirectOrderId && redirectOrderId.startsWith("TOPUP_")) {
+                try {
+                    const config = getAuthConfig();
+                    const verifyRes = await api.post("/api/wallet/topup/verify", {
+                        topupTxnId: redirectOrderId,
+                        gatewayOrderId: redirectOrderId,
+                        gatewayPaymentId: `PAY_REDIRECT_${Date.now()}`,
+                    }, config);
+                    const vData = verifyRes?.data || verifyRes;
+                    if (vData?.success) {
+                        setSuccessMsg(`Success! ${vData.message || "Payment verified and credited to your wallet."}`);
+                    }
+                } catch (err) {
+                    console.error("[WalletSection] Redirect verify error:", err);
+                } finally {
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.delete("order_id");
+                    newParams.delete("topup_id");
+                    setSearchParams(newParams, { replace: true });
+                    await loadWalletData();
+                }
+            } else {
+                await loadWalletData();
+            }
+        };
+        checkRedirectAndLoad();
     }, []);
 
     const handleAddMoney = async (amountToAdd) => {
@@ -73,32 +122,71 @@ export default function WalletSection({ customerToken }) {
             setSuccessMsg("");
 
             const config = getAuthConfig();
+            const returnUrl = `${window.location.origin}/profile/wallet?order_id={order_id}`;
 
             // Step 1: Create top-up session
             const res = await api.post("/api/wallet/topup/create", {
                 amount: amt,
-                returnUrl: window.location.href,
+                returnUrl,
             }, config);
 
             const data = res?.data || res;
-            const session = data?.session;
+            const session = data?.session || data;
 
-            if (!session || !session.topupTxnId) {
+            const sessionId = session?.paymentSessionId || session?.payment_session_id || data?.paymentSessionId || data?.payment_session_id;
+            const topupTxnId = session?.topupTxnId || data?.topupTxnId;
+
+            if (!session || !topupTxnId) {
                 throw new Error("Invalid top-up session generated");
             }
 
             // Step 2: Open Cashfree Drop-in / SDK or Simulate/Verify Cashfree Payment
-            if (window.Cashfree && session.paymentSessionId) {
-                const cashfree = window.Cashfree({ mode: "sandbox" });
-                cashfree.checkout({
-                    paymentSessionId: session.paymentSessionId,
-                    redirectTarget: "_self"
+            const CashfreeSdk = await loadCashfreeSdk();
+            if (CashfreeSdk && sessionId) {
+                const isProdSession = session.isProduction !== undefined
+                    ? Boolean(session.isProduction)
+                    : session.is_production !== undefined
+                    ? Boolean(session.is_production)
+                    : String(session.cfEnv || session.cf_env || "").toUpperCase() === "PRODUCTION";
+
+                const envSetting = (import.meta.env.VITE_CASHFREE_ENV || "").toUpperCase();
+                const isProdHostname = typeof window !== "undefined" && window.location.hostname.includes("tiffzy.com");
+                const mode = isProdSession || envSetting === "PRODUCTION" || (isProdHostname && envSetting !== "TEST") ? "production" : "sandbox";
+
+                const cashfree = CashfreeSdk({ mode });
+                const cfResult = await cashfree.checkout({
+                    paymentSessionId: sessionId,
                 });
-            } else {
-                // Cashfree SDK fallback / simulation verification for immediate testing
+
+                if (cfResult?.error) {
+                    setError(cfResult.error.message || "Payment cancelled or failed. Please try again.");
+                    return;
+                }
+
+                if (cfResult?.redirect) {
+                    return;
+                }
+
+                // Modal completed: verify on backend
+                const gatewayOrderId = session.gatewayOrderId || session.cfOrderId || session.cf_order_id || topupTxnId;
                 const verifyRes = await api.post("/api/wallet/topup/verify", {
-                    topupTxnId: session.topupTxnId,
-                    gatewayOrderId: session.paymentSessionId || session.topupTxnId,
+                    topupTxnId,
+                    gatewayOrderId,
+                    gatewayPaymentId: `PAY_CF_${Date.now()}`,
+                }, config);
+
+                const vData = verifyRes?.data || verifyRes;
+                if (vData?.success) {
+                    setSuccessMsg(`Success! ₹${amt} added to your Tiffzy Wallet.`);
+                    await loadWalletData();
+                } else {
+                    throw new Error(vData?.message || "Payment verification failed");
+                }
+            } else {
+                // Fallback verification when SDK is not loaded
+                const verifyRes = await api.post("/api/wallet/topup/verify", {
+                    topupTxnId,
+                    gatewayOrderId: session.gatewayOrderId || session.cfOrderId || topupTxnId,
                     gatewayPaymentId: `PAY_${Date.now()}`,
                 }, config);
 

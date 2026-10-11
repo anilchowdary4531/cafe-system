@@ -3,7 +3,7 @@
  * Used specifically for Wallet Top-Up (LOAD operation)
  */
 
-import { getPgBaseUrl, getPgCreditHeaders, getProgramId } from "../config/cashfreePpi.config.js";
+import { getPgBaseUrl, getPgCreditHeaders, getProgramId, getEnvironment } from "../config/cashfreePpi.config.js";
 
 const round2 = (num) => Math.round((Number(num) + Number.EPSILON) * 100) / 100;
 
@@ -63,12 +63,20 @@ export const createWalletLoadPgOrder = async ({
       throw err;
     }
 
+    const env = getEnvironment();
     return {
       cfOrderId: data.cf_order_id,
+      cf_order_id: data.cf_order_id,
       paymentSessionId: data.payment_session_id,
+      payment_session_id: data.payment_session_id,
       orderId: data.order_id || topupId,
+      order_id: data.order_id || topupId,
       orderAmount: round2(data.order_amount || numAmount),
       orderStatus: data.order_status || "ACTIVE",
+      isProduction: env === "PRODUCTION",
+      is_production: env === "PRODUCTION",
+      cfEnv: env,
+      cf_env: env,
       raw: data,
     };
   } catch (err) {
