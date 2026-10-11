@@ -189,13 +189,70 @@ export default function SuperAdminDashboard() {
         fetchErrorLogs(false);
     }, [fetchErrorLogs]);
 
+    // Derived groups: Prefer backend groups, or compute fallback from raw logs/events if backend hasn't provided them
+    const allGroups = useMemo(() => {
+        if (!errorLogsData) return [];
+        if (Array.isArray(errorLogsData.groups) && errorLogsData.groups.length > 0) {
+            return errorLogsData.groups;
+        }
+        const rawLogs = errorLogsData.logs || errorLogsData.events || [];
+        if (!Array.isArray(rawLogs) || rawLogs.length === 0) return [];
+
+        const groupsMap = new Map();
+        for (const event of rawLogs) {
+            const method = String(event.method || event.httpMethod || "UNKNOWN").toUpperCase();
+            const rawPath = String(event.url || event.path || "/");
+            let normPath = rawPath.split("?")[0].trim();
+            normPath = normPath.replace(/\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?=\/|$)/g, "/:uuid");
+            normPath = normPath.replace(/\/\d{10,}(?=\/|$)/g, "/:id");
+            normPath = normPath.replace(/\/\d+(?=\/|$)/g, "/:id");
+            normPath = normPath || "/";
+
+            const statusCode = Number(event.statusCode || event.status || 500);
+            const message = (event.message || "Unknown Error").trim();
+
+            const fingerprint = `${method}|${normPath}|${statusCode}|${message}`;
+            const eventTs = event.timestamp || new Date().toISOString();
+
+            if (!groupsMap.has(fingerprint)) {
+                groupsMap.set(fingerprint, {
+                    fingerprint,
+                    status: event.status || "OPEN",
+                    occurrences: 1,
+                    firstSeen: eventTs,
+                    lastSeen: eventTs,
+                    method,
+                    path: normPath,
+                    statusCode,
+                    message,
+                    events: [event],
+                });
+            } else {
+                const group = groupsMap.get(fingerprint);
+                group.occurrences += 1;
+                group.events.push(event);
+
+                const groupFirst = new Date(group.firstSeen).getTime();
+                const groupLast = new Date(group.lastSeen).getTime();
+                const currentTs = new Date(eventTs).getTime();
+
+                if (currentTs < groupFirst) group.firstSeen = eventTs;
+                if (currentTs > groupLast) group.lastSeen = eventTs;
+            }
+        }
+
+        return Array.from(groupsMap.values()).sort(
+            (a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
+        );
+    }, [errorLogsData]);
+
     // Client-side search filter over grouped errors
     const filteredGroups = useMemo(() => {
-        if (!errorLogsData?.groups) return [];
-        if (!errorSearchTerm.trim()) return errorLogsData.groups;
+        if (!allGroups || allGroups.length === 0) return [];
+        if (!errorSearchTerm.trim()) return allGroups;
 
         const term = errorSearchTerm.toLowerCase().trim();
-        return errorLogsData.groups.filter((group) => {
+        return allGroups.filter((group) => {
             const methodMatch = (group.method || "").toLowerCase().includes(term);
             const pathMatch = (group.path || "").toLowerCase().includes(term);
             const statusMatch = String(group.statusCode || "").includes(term);
@@ -205,7 +262,7 @@ export default function SuperAdminDashboard() {
             );
             return methodMatch || pathMatch || statusMatch || messageMatch || eventsMatch;
         });
-    }, [errorLogsData, errorSearchTerm]);
+    }, [allGroups, errorSearchTerm]);
 
     const analytics = useMemo(() => {
         const normalized = (restaurants || []).map((item, index) => ({
