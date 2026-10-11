@@ -9,6 +9,7 @@ import {
   deleteGlobalCategoryStore,
   createGlobalCategoryStore,
 } from "../utils/globalCategoryStore.js";
+import { groupErrorEvents } from "../services/errorGroupingService.js";
 
 const slugify = (value) =>
   String(value || "")
@@ -211,13 +212,17 @@ export default async function superAdminRoutes(app, deps) {
 
       const openErrorsCount = filtered.filter((l) => l.statusCode >= 500).length;
       const latestTimestamp = filtered.length > 0 ? filtered[0].timestamp : null;
+      const groups = groupErrorEvents(filtered);
 
       return reply.code(200).send({
         success: true,
         data: {
+          logGroup: "/tiffzy/errors",
           openErrorsCount,
           totalEvents: filtered.length,
           latestTimestamp,
+          groups,
+          events: filtered,
           logs: filtered,
         },
       });

@@ -158,7 +158,7 @@ export default function SuperAdminDashboard() {
     const [errorEndTime, setErrorEndTime] = useState("");
 
     // Detail Modal State
-    const [selectedErrorLog, setSelectedErrorLog] = useState(null);
+    const [selectedGroup, setSelectedGroup] = useState(null);
 
     const fetchErrorLogs = useCallback(async (isManual = false) => {
         try {
@@ -188,6 +188,24 @@ export default function SuperAdminDashboard() {
     useEffect(() => {
         fetchErrorLogs(false);
     }, [fetchErrorLogs]);
+
+    // Client-side search filter over grouped errors
+    const filteredGroups = useMemo(() => {
+        if (!errorLogsData?.groups) return [];
+        if (!errorSearchTerm.trim()) return errorLogsData.groups;
+
+        const term = errorSearchTerm.toLowerCase().trim();
+        return errorLogsData.groups.filter((group) => {
+            const methodMatch = (group.method || "").toLowerCase().includes(term);
+            const pathMatch = (group.path || "").toLowerCase().includes(term);
+            const statusMatch = String(group.statusCode || "").includes(term);
+            const messageMatch = (group.message || "").toLowerCase().includes(term);
+            const eventsMatch = Array.isArray(group.events) && group.events.some(
+                (evt) => (evt.logStream || "").toLowerCase().includes(term) || (evt.message || "").toLowerCase().includes(term)
+            );
+            return methodMatch || pathMatch || statusMatch || messageMatch || eventsMatch;
+        });
+    }, [errorLogsData, errorSearchTerm]);
 
     const analytics = useMemo(() => {
         const normalized = (restaurants || []).map((item, index) => ({
@@ -448,7 +466,7 @@ export default function SuperAdminDashboard() {
                             <div className="flex items-center gap-2.5 flex-wrap">
                                 <AlertOctagon className="text-red-500" size={20} />
                                 <h2 className="text-xl font-bold tracking-tight">Error Monitoring</h2>
-                                <span className="font-mono text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-400 font-bold">
+                                <span className="font-mono text-xs px-2 py-0.5 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold border border-orange-500/20">
                                     AWS CloudWatch Logs
                                 </span>
                             </div>
@@ -470,7 +488,7 @@ export default function SuperAdminDashboard() {
                                 disabled={refreshingLogs}
                                 className="theme-soft-button inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition active:scale-95"
                             >
-                                <RefreshCw size={13} className={refreshingLogs ? "animate-spin text-red-500" : ""} />
+                                <RefreshCw size={13} className={refreshingLogs ? "animate-spin text-orange-500" : ""} />
                                 <span>Refresh</span>
                             </button>
                         </div>
@@ -480,22 +498,22 @@ export default function SuperAdminDashboard() {
                     <div className="grid gap-4 sm:grid-cols-3 py-2 border-b theme-border">
                         <div className="flex flex-col justify-between">
                             <p className="text-xs font-bold theme-muted uppercase tracking-wider">OPEN ERRORS</p>
-                            <p className="text-3xl font-black text-red-400 mt-1">{errorLogsData?.openErrorsCount ?? 0}</p>
-                            <p className="text-[11px] font-semibold text-red-400/90 mt-0.5">CRITICAL (5xx failures)</p>
+                            <p className="text-3xl font-black text-red-500 mt-1">{errorLogsData?.openErrorsCount ?? 0}</p>
+                            <p className="text-[11px] font-semibold text-red-500/80 mt-0.5">ACTIVE ERROR GROUPS</p>
                         </div>
 
                         <div className="flex flex-col justify-between">
                             <p className="text-xs font-bold theme-muted uppercase tracking-wider">TOTAL ERROR EVENTS</p>
-                            <p className="text-3xl font-black text-amber-400 mt-1">{errorLogsData?.totalEvents ?? 0}</p>
-                            <p className="text-[11px] font-semibold text-amber-400/90 mt-0.5">RETURNED IN WINDOW</p>
+                            <p className="text-3xl font-black text-orange-500 mt-1">{errorLogsData?.totalEvents ?? 0}</p>
+                            <p className="text-[11px] font-semibold text-orange-500/80 mt-0.5">CLOUDWATCH EVENTS</p>
                         </div>
 
                         <div className="flex flex-col justify-between">
                             <p className="text-xs font-bold theme-muted uppercase tracking-wider">LATEST TIMESTAMP</p>
-                            <p className="text-xl font-bold font-mono text-slate-200 mt-1">
+                            <p className="text-xl font-bold font-mono theme-text mt-1">
                                 {errorLogsData?.latestTimestamp ? new Date(errorLogsData.latestTimestamp).toLocaleString() : "N/A"}
                             </p>
-                            <p className="text-[11px] font-semibold text-blue-400/90 mt-0.5">TIMELINE RECENT</p>
+                            <p className="text-[11px] font-semibold theme-muted mt-0.5">MOST RECENT</p>
                         </div>
                     </div>
 
@@ -510,7 +528,7 @@ export default function SuperAdminDashboard() {
                                 className="w-full bg-transparent text-xs outline-none"
                             />
                             {errorSearchTerm && (
-                                <button type="button" onClick={() => setErrorSearchTerm("")} className="theme-muted hover:text-white">
+                                <button type="button" onClick={() => setErrorSearchTerm("")} className="theme-muted hover:text-orange-500">
                                     <X size={14} />
                                 </button>
                             )}
@@ -547,7 +565,7 @@ export default function SuperAdminDashboard() {
                                         setErrorStartTime("");
                                         setErrorEndTime("");
                                     }}
-                                    className="px-2 py-1 text-xs font-semibold text-slate-400 hover:text-white transition"
+                                    className="px-2 py-1 text-xs font-semibold theme-muted hover:text-orange-500 transition"
                                 >
                                     Reset
                                 </button>
@@ -558,11 +576,11 @@ export default function SuperAdminDashboard() {
                     {/* LOGS TABLE / STATES */}
                     {logsLoading ? (
                         <div className="py-10 text-center text-sm theme-muted space-y-2">
-                            <RefreshCw size={22} className="animate-spin text-red-500 mx-auto" />
+                            <RefreshCw size={22} className="animate-spin text-orange-500 mx-auto" />
                             <p>Loading CloudWatch error logs...</p>
                         </div>
-                    ) : logsError && (!errorLogsData || !errorLogsData.logs) ? (
-                        <div className="my-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-sm text-red-300 flex items-center justify-between gap-4">
+                    ) : logsError && (!errorLogsData || (!errorLogsData.groups && !errorLogsData.logs)) ? (
+                        <div className="my-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-sm text-red-500 dark:text-red-300 flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2">
                                 <AlertTriangle size={18} />
                                 <span>{logsError}</span>
@@ -570,71 +588,73 @@ export default function SuperAdminDashboard() {
                             <button
                                 type="button"
                                 onClick={() => fetchErrorLogs(true)}
-                                className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-white rounded-lg text-xs font-bold cursor-pointer transition"
+                                className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-700 dark:text-white rounded-lg text-xs font-bold cursor-pointer transition"
                             >
                                 Retry
                             </button>
                         </div>
-                    ) : !errorLogsData?.logs || errorLogsData.logs.length === 0 ? (
+                    ) : !filteredGroups || filteredGroups.length === 0 ? (
                         <div className="py-10 text-center text-sm theme-muted">
-                            No errors found
+                            No error groups found
                         </div>
                     ) : (
                         <div className="overflow-x-auto w-full">
                             <table className="w-full text-left text-xs">
-                                <thead className="border-b theme-border bg-slate-500/5 text-slate-300 uppercase tracking-wider text-[10px]">
+                                <thead className="border-b theme-border bg-orange-500/5 theme-text uppercase tracking-wider text-[10px] font-bold">
                                     <tr>
-                                        <th className="py-2.5 px-3">Timestamp</th>
                                         <th className="py-2.5 px-3">Status</th>
+                                        <th className="py-2.5 px-3">Occurrences</th>
                                         <th className="py-2.5 px-3">Method & URL</th>
                                         <th className="py-2.5 px-3">Error Message</th>
-                                        <th className="py-2.5 px-3">Log Stream</th>
+                                        <th className="py-2.5 px-3">First Seen</th>
+                                        <th className="py-2.5 px-3">Last Seen</th>
                                         <th className="py-2.5 px-3 text-right">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y theme-border">
-                                    {errorLogsData.logs.map((log) => {
-                                        const isCritical = log.statusCode >= 500;
+                                    {filteredGroups.map((group) => {
                                         return (
                                             <tr
-                                                key={log.id}
-                                                onClick={() => setSelectedErrorLog(log)}
-                                                className="hover:bg-slate-500/10 transition cursor-pointer"
+                                                key={group.fingerprint}
+                                                onClick={() => setSelectedGroup(group)}
+                                                className="hover:bg-orange-500/5 transition cursor-pointer"
                                             >
-                                                <td className="py-2.5 px-3 font-mono text-slate-400 whitespace-nowrap">
-                                                    {new Date(log.timestamp).toLocaleString()}
-                                                </td>
                                                 <td className="py-2.5 px-3 whitespace-nowrap">
-                                                    <span
-                                                        className={`font-bold px-2 py-0.5 rounded text-[10px] border ${
-                                                            isCritical
-                                                                ? "bg-red-500/15 text-red-400 border-red-500/30"
-                                                                : log.statusCode === 429 || log.statusCode === 504
-                                                                ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-                                                                : "bg-blue-500/15 text-blue-400 border-blue-500/30"
-                                                        }`}
-                                                    >
-                                                        {log.statusCode || "ERR"}
+                                                    <span className="font-bold px-2 py-0.5 rounded text-[10px] border bg-red-500/10 text-red-600 border-red-500/20 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30">
+                                                        {group.status || "OPEN"}
+                                                    </span>
+                                                </td>
+                                                <td className="py-2.5 px-3 whitespace-nowrap font-mono">
+                                                    <span className="font-bold px-2.5 py-0.5 rounded bg-orange-500/10 text-orange-600 border border-orange-500/20 dark:bg-orange-500/20 dark:text-orange-400 text-xs inline-flex items-center gap-1">
+                                                        ×{group.occurrences}
                                                     </span>
                                                 </td>
                                                 <td className="py-2.5 px-3 font-mono whitespace-nowrap">
-                                                    <span className="font-bold text-amber-400 mr-1.5">{log.method || "N/A"}</span>
-                                                    <span className="text-slate-300">{log.url || "-"}</span>
+                                                    <span className="font-bold text-orange-500 mr-1.5">{group.method || "N/A"}</span>
+                                                    <span className="theme-text">{group.path || "-"}</span>
+                                                    {group.statusCode && (
+                                                        <span className="ml-2 font-mono text-[10px] px-1.5 py-0.5 rounded bg-orange-500/10 theme-muted">
+                                                            [{group.statusCode}]
+                                                        </span>
+                                                    )}
                                                 </td>
-                                                <td className="py-2.5 px-3 max-w-xs truncate font-medium text-slate-200" title={log.message}>
-                                                    {log.message}
+                                                <td className="py-2.5 px-3 max-w-xs truncate font-medium theme-text" title={group.message}>
+                                                    {group.message}
                                                 </td>
-                                                <td className="py-2.5 px-3 font-mono text-slate-400 text-[11px] whitespace-nowrap">
-                                                    {log.logStream || "default-stream"}
+                                                <td className="py-2.5 px-3 font-mono theme-muted whitespace-nowrap">
+                                                    {group.firstSeen ? new Date(group.firstSeen).toLocaleString() : "N/A"}
+                                                </td>
+                                                <td className="py-2.5 px-3 font-mono theme-muted whitespace-nowrap">
+                                                    {group.lastSeen ? new Date(group.lastSeen).toLocaleString() : "N/A"}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-right whitespace-nowrap">
                                                     <button
                                                         type="button"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setSelectedErrorLog(log);
+                                                            setSelectedGroup(group);
                                                         }}
-                                                        className="px-2.5 py-1 rounded bg-slate-500/20 hover:bg-slate-500/30 text-amber-400 text-[11px] font-semibold transition"
+                                                        className="px-2.5 py-1 rounded border border-orange-500/30 text-orange-500 hover:bg-orange-500/10 text-[11px] font-semibold transition"
                                                     >
                                                         Details
                                                     </button>
@@ -649,21 +669,24 @@ export default function SuperAdminDashboard() {
                 </section>
 
                 {/* ERROR DETAIL MODAL */}
-                {selectedErrorLog && (
+                {selectedGroup && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                        <div className="theme-panel w-full max-w-2xl rounded-2xl border theme-border p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+                        <div className="theme-panel w-full max-w-3xl rounded-2xl border theme-border p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
                             <div className="flex items-center justify-between border-b theme-border pb-3">
                                 <div className="flex items-center gap-2">
                                     <AlertOctagon className="text-red-500" size={22} />
-                                    <h3 className="text-lg font-bold tracking-tight">Error Log Details</h3>
-                                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-red-500/15 text-red-400 font-bold border border-red-500/30">
-                                        Status {selectedErrorLog.statusCode || "500"}
+                                    <h3 className="text-lg font-bold tracking-tight theme-text">Error Group Details</h3>
+                                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-600 font-bold border border-red-500/20 dark:bg-red-500/20 dark:text-red-400">
+                                        Status: {selectedGroup.status || "OPEN"}
+                                    </span>
+                                    <span className="font-mono text-xs px-2.5 py-0.5 rounded bg-orange-500/10 text-orange-600 font-bold border border-orange-500/20 dark:bg-orange-500/20 dark:text-orange-400">
+                                        Occurrences: {selectedGroup.occurrences}
                                     </span>
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => setSelectedErrorLog(null)}
-                                    className="p-1 rounded-lg hover:bg-slate-500/20 text-slate-400 hover:text-white transition"
+                                    onClick={() => setSelectedGroup(null)}
+                                    className="p-1 rounded-lg hover:bg-orange-500/10 theme-muted hover:text-orange-500 transition"
                                 >
                                     <X size={18} />
                                 </button>
@@ -671,45 +694,77 @@ export default function SuperAdminDashboard() {
 
                             <div className="grid gap-3 sm:grid-cols-2 text-xs">
                                 <div>
-                                    <p className="theme-muted font-semibold">Timestamp</p>
-                                    <p className="font-mono text-slate-200 mt-0.5">{new Date(selectedErrorLog.timestamp).toLocaleString()}</p>
+                                    <p className="theme-muted font-semibold">HTTP Method</p>
+                                    <p className="font-mono text-orange-500 font-bold mt-0.5">{selectedGroup.method || "N/A"}</p>
                                 </div>
                                 <div>
-                                    <p className="theme-muted font-semibold">Log Stream</p>
-                                    <p className="font-mono text-slate-200 mt-0.5">{selectedErrorLog.logStream || "default"}</p>
-                                </div>
-                                <div>
-                                    <p className="theme-muted font-semibold">HTTP Method & URL</p>
-                                    <p className="font-mono text-slate-200 mt-0.5">
-                                        <span className="font-bold text-amber-400">{selectedErrorLog.method || "N/A"}</span> {selectedErrorLog.url || "N/A"}
-                                    </p>
+                                    <p className="theme-muted font-semibold">URL Path</p>
+                                    <p className="font-mono theme-text mt-0.5">{selectedGroup.path || "N/A"}</p>
                                 </div>
                                 <div>
                                     <p className="theme-muted font-semibold">Status Code</p>
-                                    <p className="font-mono text-slate-200 mt-0.5">{selectedErrorLog.statusCode || "N/A"}</p>
+                                    <p className="font-mono theme-text mt-0.5">{selectedGroup.statusCode || "N/A"}</p>
+                                </div>
+                                <div>
+                                    <p className="theme-muted font-semibold">Status</p>
+                                    <p className="font-mono text-red-500 font-bold mt-0.5">{selectedGroup.status || "OPEN"}</p>
+                                </div>
+                                <div>
+                                    <p className="theme-muted font-semibold">First Seen</p>
+                                    <p className="font-mono theme-text mt-0.5">
+                                        {selectedGroup.firstSeen ? new Date(selectedGroup.firstSeen).toLocaleString() : "N/A"}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="theme-muted font-semibold">Last Seen</p>
+                                    <p className="font-mono theme-text mt-0.5">
+                                        {selectedGroup.lastSeen ? new Date(selectedGroup.lastSeen).toLocaleString() : "N/A"}
+                                    </p>
                                 </div>
                             </div>
 
                             <div>
                                 <p className="theme-muted font-semibold text-xs mb-1">Error Message</p>
-                                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs font-mono font-medium leading-relaxed">
-                                    {selectedErrorLog.message}
+                                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-300 text-xs font-mono font-medium leading-relaxed">
+                                    {selectedGroup.message}
                                 </div>
                             </div>
 
-                            {selectedErrorLog.details && (
-                                <div>
-                                    <p className="theme-muted font-semibold text-xs mb-1">Stack Trace & Execution Context</p>
-                                    <pre className="p-3 rounded-xl bg-slate-900 border theme-border text-slate-300 text-[11px] font-mono overflow-x-auto leading-relaxed whitespace-pre-wrap">
-                                        {selectedErrorLog.details}
-                                    </pre>
+                            {/* RAW EVENTS SECTION */}
+                            <div className="pt-2 border-t theme-border space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-bold tracking-tight theme-text flex items-center gap-2">
+                                        <FileText size={16} className="text-orange-500" />
+                                        Raw Events ({selectedGroup.events?.length || 0})
+                                    </h4>
                                 </div>
-                            )}
+
+                                <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                                    {selectedGroup.events && selectedGroup.events.length > 0 ? (
+                                        selectedGroup.events.map((evt, idx) => (
+                                            <div key={evt.id || idx} className="p-3 rounded-xl bg-black/40 border theme-border space-y-2 text-xs">
+                                                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono theme-muted border-b theme-border pb-1.5">
+                                                    <span className="theme-text font-semibold">{new Date(evt.timestamp).toLocaleString()}</span>
+                                                    <span className="text-orange-500/90 font-mono">{evt.logStream || "default-stream"}</span>
+                                                </div>
+                                                <p className="theme-text font-mono text-[11px] leading-relaxed">{evt.message}</p>
+                                                {evt.details && (
+                                                    <pre className="mt-1 p-2 rounded bg-black/60 border border-orange-500/20 text-slate-300 text-[10px] font-mono overflow-x-auto whitespace-pre-wrap">
+                                                        {evt.details}
+                                                    </pre>
+                                                )}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-xs theme-muted italic">No raw events available for this group.</p>
+                                    )}
+                                </div>
+                            </div>
 
                             <div className="flex justify-end pt-2 border-t theme-border">
                                 <button
                                     type="button"
-                                    onClick={() => setSelectedErrorLog(null)}
+                                    onClick={() => setSelectedGroup(null)}
                                     className="theme-soft-button rounded-lg px-4 py-2 text-xs font-semibold transition"
                                 >
                                     Close
