@@ -27,9 +27,18 @@ api.interceptors.request.use((config) => {
 
     config.headers = config.headers || {};
     if (!config.headers.Authorization) {
-        // Customer endpoints should prefer customer token, even if staff token exists.
-        if ((url.startsWith("/customer") || url.startsWith("/api/wallet") || url.includes("/wallet")) && customerToken) {
-            config.headers.Authorization = `Bearer ${customerToken}`;
+        const isCustomerEndpoint =
+            url.startsWith("/customer") ||
+            url.startsWith("/api/wallet") ||
+            url.includes("/wallet") ||
+            url.includes("scope=customer") ||
+            String(config.params?.scope || "").toLowerCase() === "customer" ||
+            String(config.headers?.["X-Scope"] || config.headers?.["x-scope"] || "").toLowerCase() === "customer";
+
+        if (isCustomerEndpoint) {
+            if (customerToken) {
+                config.headers.Authorization = `Bearer ${customerToken}`;
+            }
         } else if (staffToken) {
             config.headers.Authorization = `Bearer ${staffToken}`;
         } else if (customerToken) {

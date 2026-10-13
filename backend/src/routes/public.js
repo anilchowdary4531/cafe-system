@@ -46,6 +46,28 @@ export default async function publicRoutes(app, deps) {
     { category: { contains: query, mode: "insensitive" } },
   ];
 
+  const parseItemImages = (imgVal) => {
+    if (!imgVal) return [];
+    if (Array.isArray(imgVal)) return imgVal.map(String).filter(Boolean);
+    if (typeof imgVal === "string") {
+      const trimmed = imgVal.trim();
+      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(String).filter(Boolean);
+        } catch {}
+      }
+      if (trimmed.includes(",")) {
+        const parts = trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+        if (parts.length > 1 && parts.every((p) => p.startsWith("http") || p.startsWith("/"))) {
+          return parts;
+        }
+      }
+      return [trimmed];
+    }
+    return [];
+  };
+
   app.get("/", async () => {
     return {
       status: "ok",
@@ -258,26 +280,32 @@ export default async function publicRoutes(app, deps) {
       const restaurantLimit = parsePositiveInt(req.query?.restaurantLimit, 24, 60);
       const itemLimit = parsePositiveInt(req.query?.itemLimit, 12, 50);
 
-      const mapItem = (item) => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        category: item.category,
-        image: item.image,
-        price: item.price,
-        rating: item.rating,
-        reviewCount: item.reviewCount,
-        orderCount: item.orderCount,
-        isFeatured: item.isFeatured,
-        restaurant: {
-          id: item.restaurant?.id || null,
-          name: item.restaurant?.name || "",
-          slug: item.restaurant?.slug || "",
-          city: item.restaurant?.city || "",
-          state: item.restaurant?.state || "",
-          logo: item.restaurant?.logoUrl || "",
-        },
-      });
+
+      const mapItem = (item) => {
+        const imagesList = parseItemImages(item.image);
+        return {
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          category: item.category,
+          image: imagesList[0] || item.image || null,
+          images: imagesList.length > 0 ? imagesList : (item.image ? [item.image] : []),
+          imageUrls: imagesList.length > 0 ? imagesList : (item.image ? [item.image] : []),
+          price: item.price,
+          rating: item.rating,
+          reviewCount: item.reviewCount,
+          orderCount: item.orderCount,
+          isFeatured: item.isFeatured,
+          restaurant: {
+            id: item.restaurant?.id || null,
+            name: item.restaurant?.name || "",
+            slug: item.restaurant?.slug || "",
+            city: item.restaurant?.city || "",
+            state: item.restaurant?.state || "",
+            logo: item.restaurant?.logoUrl || "",
+          },
+        };
+      };
 
       if (query.length < 2) {
         const [rawItems, itemTotal] = await Promise.all([
@@ -759,7 +787,15 @@ export default async function publicRoutes(app, deps) {
           phone: restaurant.phone,
           email: restaurant.email,
         },
-        menu: restaurant.menuItems,
+        menu: (restaurant.menuItems || []).map((item) => {
+          const imagesList = parseItemImages(item.image);
+          return {
+            ...item,
+            image: imagesList[0] || item.image || null,
+            images: imagesList.length > 0 ? imagesList : (item.image ? [item.image] : []),
+            imageUrls: imagesList.length > 0 ? imagesList : (item.image ? [item.image] : []),
+          };
+        }),
       };
     } catch (err) {
       console.log(err);

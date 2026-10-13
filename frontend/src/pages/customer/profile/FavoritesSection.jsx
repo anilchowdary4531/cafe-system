@@ -36,20 +36,28 @@ export default function FavoritesSection() {
     };
 
     return (
-        <div className="space-y-4">
-            <div className="space-y-2 px-1">
-                <p className="theme-accent-text text-[11px] font-semibold uppercase tracking-[0.28em]">Favorites</p>
-                <h1 className="text-2xl font-bold tracking-tight md:text-[2rem]">Saved dishes</h1>
-                <p className="theme-muted text-xs md:text-sm">Your most-loved items across restaurants.</p>
+        <div className="w-full space-y-5 text-left">
+            <div className="space-y-1">
+                <div className="text-xs font-bold uppercase tracking-wider text-[var(--app-primary)]">
+                    FAVORITES
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[color:var(--app-text)]">
+                    Saved dishes
+                </h1>
+                <p className="theme-muted text-xs sm:text-sm">
+                    Your most-loved items across restaurants.
+                </p>
             </div>
 
             {favorites.length === 0 ? (
-                <div className="px-1 py-6 text-center">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-black/10">
-                        <Heart className="theme-accent-text" size={22} />
+                <div className="rounded-xl border border-[color:var(--app-border)]/40 bg-white/40 dark:bg-slate-900/40 p-6 sm:p-8 text-center space-y-2">
+                    <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-lg bg-orange-500/10 text-[var(--app-primary)]">
+                        <Heart size={22} />
                     </div>
-                    <h2 className="mt-3 text-xl font-semibold">No favorites yet</h2>
-                    <p className="theme-muted mt-1 text-sm">Open a restaurant menu and tap the heart icon.</p>
+                    <h2 className="text-base font-bold text-[color:var(--app-text)]">No favorites yet</h2>
+                    <p className="theme-muted text-xs max-w-sm mx-auto leading-relaxed">
+                        Open a restaurant menu and tap the heart icon.
+                    </p>
                 </div>
             ) : (
                 <div className="space-y-4 px-1">

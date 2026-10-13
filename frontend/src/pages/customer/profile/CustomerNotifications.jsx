@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
-import { api } from "../../../utils/apiClient";
-import { showToast } from "../../../utils/toast";
-import { Check, Calendar } from "lucide-react";
+import { Check, CheckCheck, Calendar, Bell, Loader2 } from "lucide-react";
+import { useCustomerNotifications } from "../../../context/CustomerNotificationContext";
 
 const formatDate = (dateStr) => {
   const d = new Date(dateStr);
@@ -16,62 +14,76 @@ const formatDate = (dateStr) => {
 };
 
 export default function CustomerNotifications() {
-  const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState([]);
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    markAsRead,
+    markAllAsRead,
+  } = useCustomerNotifications();
 
-  const fetchNotifications = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get("/customer/notifications");
-      setNotifications(res.data?.notifications || []);
-    } catch (err) {
-      showToast({
-        title: "Error",
-        message: err.response?.data?.message || "Failed to load notifications",
-        variant: "error"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
-
-  const handleMarkAsRead = async (id) => {
-    try {
-      await api.post(`/customer/notifications/${id}/read`);
-      // Update local state to mark read
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true, isRead: true } : n))
-      );
-    } catch {
-      // ignore
-    }
-  };
-
-  if (loading) {
-    return <div className="py-12 text-center text-[color:var(--app-muted)] text-sm">Loading notifications...</div>;
+  if (loading && notifications.length === 0) {
+    return (
+      <div className="py-12 flex flex-col items-center justify-center gap-2 text-[color:var(--app-muted)] text-sm">
+        <Loader2 size={24} className="animate-spin text-orange-500" />
+        <span>Loading notifications...</span>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4 text-left">
+    <div className="w-full space-y-4 text-left">
+      {/* Header with Unread Count & Mark All Read action */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-3">
+        <div className="flex items-center gap-2.5">
+          <h2 className="text-base sm:text-lg font-bold text-[color:var(--app-text)]">
+            Notifications
+          </h2>
+          {unreadCount > 0 && (
+            <span
+              id="customer-notifications-unread-pill"
+              className="inline-flex items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs px-2.5 py-0.5 border border-emerald-500/20"
+            >
+              {unreadCount} unread
+            </span>
+          )}
+        </div>
+
+        {unreadCount > 0 && (
+          <button
+            type="button"
+            id="mark-all-notifications-read-btn"
+            onClick={markAllAsRead}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)]/70 bg-white/60 dark:bg-slate-900/60 px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500/30"
+          >
+            <CheckCheck size={14} />
+            <span>Mark all as read</span>
+          </button>
+        )}
+      </div>
+
       {notifications.length === 0 ? (
-        <div className="theme-card rounded-[24px] border border-[var(--app-border)] p-10 text-center shadow-sm">
+        <div
+          id="customer-notifications-empty"
+          className="rounded-xl border border-[color:var(--app-border)]/40 bg-white/40 dark:bg-slate-900/40 p-6 sm:p-8 text-center space-y-2"
+        >
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-lg bg-orange-500/10 text-[var(--app-primary)]">
+            <Bell size={22} />
+          </div>
           <p className="text-base font-bold text-[color:var(--app-text)]">No notifications yet</p>
-          <p className="text-[color:var(--app-muted)] mt-1.5 text-xs">
+          <p className="theme-muted text-xs max-w-sm mx-auto leading-relaxed">
             We will notify you here when you earn points, receive balance reminders, or get order updates.
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div id="customer-notifications-list" className="space-y-3">
           {notifications.map((item) => {
             const isRead = Boolean(item.read || item.isRead);
             return (
               <div
                 key={item.id}
-                onClick={() => !isRead && handleMarkAsRead(item.id)}
+                id={`notification-card-${item.id}`}
+                onClick={() => !isRead && markAsRead(item.id)}
                 className={`group relative flex items-center justify-between gap-4 rounded-2xl border p-4 transition duration-150 ${
                   isRead
                     ? "border-[var(--app-border)]/60 bg-black/5 opacity-75 dark:bg-white/5"
@@ -79,7 +91,10 @@ export default function CustomerNotifications() {
                 }`}
               >
                 {!isRead && (
-                  <span className="absolute top-4 left-3.5 h-2 w-2 rounded-full bg-emerald-500 shadow-sm" />
+                  <span
+                    title="Unread"
+                    className="absolute top-4 left-3.5 h-2 w-2 rounded-full bg-emerald-500 shadow-sm"
+                  />
                 )}
                 <div className="flex-1 min-w-0 pl-3.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -108,7 +123,7 @@ export default function CustomerNotifications() {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleMarkAsRead(item.id);
+                      markAsRead(item.id);
                     }}
                     className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-black/5 text-[color:var(--app-text)] transition hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500/30"
                     title="Mark as read"
@@ -117,7 +132,10 @@ export default function CustomerNotifications() {
                     <Check size={14} />
                   </button>
                 ) : (
-                  <div className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-emerald-600/60">
+                  <div
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-emerald-600/60"
+                    title="Read"
+                  >
                     <Check size={14} />
                   </div>
                 )}

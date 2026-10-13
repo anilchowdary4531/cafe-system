@@ -36,7 +36,31 @@ export async function getRestaurantMenu(req, reply) {
             taxEnabled: restaurant.taxEnabled,
             defaultTaxPercent: restaurant.defaultTaxPercent,
         },
-        menu: restaurant.menuItems,
+        menu: (restaurant.menuItems || []).map((item) => {
+            let images = [];
+            if (typeof item.image === "string" && item.image.trim()) {
+                const trimmed = item.image.trim();
+                if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                    try {
+                        const parsed = JSON.parse(trimmed);
+                        if (Array.isArray(parsed) && parsed.length > 0) images = parsed.map(String).filter(Boolean);
+                    } catch {}
+                } else if (trimmed.includes(",")) {
+                    const parts = trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+                    if (parts.length > 1 && parts.every((p) => p.startsWith("http") || p.startsWith("/"))) {
+                        images = parts;
+                    }
+                } else {
+                    images = [trimmed];
+                }
+            }
+            return {
+                ...item,
+                image: images[0] || item.image || null,
+                images: images.length > 0 ? images : (item.image ? [item.image] : []),
+                imageUrls: images.length > 0 ? images : (item.image ? [item.image] : []),
+            };
+        }),
     };
 }
 

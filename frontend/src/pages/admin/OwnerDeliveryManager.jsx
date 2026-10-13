@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { Truck, Search, Plus, MapPin, User, Clock, Phone, AlertCircle, RefreshCw, CheckCircle2, ShieldAlert, Loader2, Navigation } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
-import { loadGoogleMaps, getGoogleMapsApiKey } from "../../utils/googleMapsLoader";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { MAP_CONFIG } from "../../utils/mapConfig";
 import OwnerMenuButton from "../../components/OwnerMenuButton";
 
@@ -429,68 +430,82 @@ function DeliveryLiveMapModal({ delivery, onClose }) {
   const [mapError, setMapError] = useState(null);
 
   useEffect(() => {
-    let isSubscribed = true;
+    if (!mapContainerRef.current) return;
 
-    if (!getGoogleMapsApiKey()) {
-      setMapError("Google Maps API Key is not configured.");
-      return;
-    }
+    const restLat = Number(delivery.restaurant?.latitude || MAP_CONFIG.defaultCenter.lat);
+    const restLng = Number(delivery.restaurant?.longitude || MAP_CONFIG.defaultCenter.lng);
+    const destLat = Number(delivery.deliveryLatitude || restLat + 0.015);
+    const destLng = Number(delivery.deliveryLongitude || restLng + 0.015);
 
-    loadGoogleMaps(["maps", "marker"])
-      .then((google) => {
-        if (!isSubscribed || !mapContainerRef.current) return;
-
-        const restLat = Number(delivery.restaurant?.latitude || MAP_CONFIG.defaultCenter.lat);
-        const restLng = Number(delivery.restaurant?.longitude || MAP_CONFIG.defaultCenter.lng);
-        const destLat = Number(delivery.deliveryLatitude || restLat + 0.015);
-        const destLng = Number(delivery.deliveryLongitude || restLng + 0.015);
-
-        const map = new google.maps.Map(mapContainerRef.current, {
-          center: { lat: restLat, lng: restLng },
-          zoom: 13,
-          mapTypeId: google.maps.MapTypeId.ROADMAP,
-        });
-
-        mapRef.current = map;
-
-        // Restaurant Marker 🏪
-        new google.maps.Marker({
-          position: { lat: restLat, lng: restLng },
-          map,
-          title: "Restaurant Outlet",
-          icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
-        });
-
-        // Customer Destination Marker 📍
-        new google.maps.Marker({
-          position: { lat: destLat, lng: destLng },
-          map,
-          title: "Customer Address",
-          icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
-        });
-
-        // Driver Marker (if present) 🚗
-        if (delivery.currentDriverLatitude && delivery.currentDriverLongitude) {
-          new google.maps.Marker({
-            position: {
-              lat: Number(delivery.currentDriverLatitude),
-              lng: Number(delivery.currentDriverLongitude),
-            },
-            map,
-            title: `Driver: ${delivery.deliveryPartner?.name || "Rider"}`,
-            icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-          });
-        }
-      })
-      .catch((err) => {
-        if (!isSubscribed) return;
-        setMapError(err?.message || "Failed to load Google Maps.");
+    try {
+      const map = new maplibregl.Map({
+        container: mapContainerRef.current,
+        style: MAP_CONFIG.styleUrl,
+        center: [restLng, restLat],
+        zoom: 13,
       });
 
-    return () => {
-      isSubscribed = false;
-      mapRef.current = null;
-    };
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+
+      // Restaurant Marker 🏪
+      const restEl = document.createElement("div");
+      restEl.className = "flex items-center justify-center w-8 h-8 rounded-full bg-red-600 text-white shadow-lg text-sm border-2 border-white";
+      restEl.innerHTML = "🏪";
+      new maplibregl.Marker({ element: restEl })
+        .setLngLat([restLng, restLat])
+        .setPopup(new maplibregl.Popup({ offset: 25 }).setText("Restaurant Outlet"))
+        .addTo(map);
+
+      // Customer Destination Marker 📍
+      const destEl = document.createElement("div");
+      destEl.className = "flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white shadow-lg text-sm border-2 border-white";
+      destEl.innerHTML = "📍";
+      new maplibregl.Marker({ element: destEl })
+        .setLngLat([destLng, destLat])
+        .setPopup(new maplibregl.Popup({ offset: 25 }).setText("Customer Address"))
+        .addTo(map);
+
+      // Driver Marker (if present) 🚗
+      if (delivery.currentDriverLatitude && delivery.currentDriverLongitude) {
+        const driverLat = Number(delivery.currentDriverLatitude);
+        const driverLng = Number(delivery.currentDriverLongitude);
+        const driverEl = document.createElement("div");
+        driverEl.className = "flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white shadow-lg text-sm border-2 border-white animate-bounce";
+        driverEl.innerHTML = "🚗";
+        new maplibregl.Marker({ element: driverEl })
+          .setLngLat([driverLng, driverLat])
+          .setPopup(new maplibregl.Popup({ offset: 25 }).setText(`Driver: ${delivery.deliveryPartner?.name || "Rider"}`))
+          .addTo(map);
+      }
+
+      // Fit bounds
+      const bounds = new maplibregl.LngLatBounds();
+      bounds.extend([restLng, restLat]);
+      bounds.extend([destLng, destLat]);
+      if (delivery.currentDriverLatitude && delivery.currentDriverLongitude) {
+        bounds.extend([Number(delivery.currentDriverLongitude), Number(delivery.currentDriverLatitude)]);
+      }
+      map.fitBounds(bounds, { padding: 50, maxZoom: 15 });
+
+      map.on("load", () => {
+        map.resize();
+      });
+
+      const timer = setTimeout(() => {
+        map.resize();
+      }, 200);
+
+      mapRef.current = map;
+
+      return () => {
+        clearTimeout(timer);
+        map.remove();
+        mapRef.current = null;
+      };
+    } catch (err) {
+      console.error("MapLibre initialization error:", err);
+      setMapError("Failed to load map: " + (err?.message || "Unknown error"));
+    }
   }, [delivery]);
 
   return (

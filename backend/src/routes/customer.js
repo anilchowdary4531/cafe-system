@@ -1,4 +1,4 @@
-import { normalizePhone, isValidPhone } from "../services/phoneService.js";
+import { normalizePhone, isValidPhone, getPhoneVariants } from "../services/phoneService.js";
 import { buildReadableOrderNo } from "../services/orderService.js";
 import { requireCustomerPhoneFromJwt } from "../services/customerProfileService.js";
 import { buildCustomerOtpController } from "../controllers/customerOtpController.js";
@@ -619,18 +619,44 @@ export default async function customerRoutes(app, deps) {
   app.get("/customer/notifications", payLaterController.getNotifications);
   app.patch("/customer/notifications/:notificationId/read", payLaterController.readNotification);
   app.post("/customer/notifications/:notificationId/read", payLaterController.readNotification);
+  app.patch("/customer/notifications/read-all", payLaterController.readAllNotifications);
+  app.post("/customer/notifications/read-all", payLaterController.readAllNotifications);
   app.delete("/customer/notifications/:notificationId", async (req, reply) => {
     try {
       const notificationId = Number(req.params.notificationId);
       const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Authentication required" });
 
+      const variants = getPhoneVariants(phone);
+      const [customerAccount, customerRecords] = await Promise.all([
+        prisma.customerAccount.findFirst({
+          where: {
+            OR: [
+              { phone: { in: variants } },
+              ...(phone.includes("@") ? [{ email: phone.toLowerCase() }] : []),
+            ],
+          },
+        }),
+        prisma.customer.findMany({ where: { phone: { in: variants } } }),
+      ]);
+
+      const recipientIds = new Set();
+      if (customerAccount?.id) recipientIds.add(Number(customerAccount.id));
+      customerRecords.forEach((c) => recipientIds.add(Number(c.id)));
+
+      await prisma.notification.deleteMany({
+        where: {
+          id: notificationId,
+          recipientType: "CUSTOMER",
+          recipientId: { in: Array.from(recipientIds) },
+        },
+      });
       await prisma.customerNotification.deleteMany({
         where: {
           id: notificationId,
-          customer: { phone },
+          customer: { phone: { in: variants } },
         },
-      });
+      }).catch(() => {});
       return { message: "Notification deleted" };
     } catch (err) {
       console.log(err);

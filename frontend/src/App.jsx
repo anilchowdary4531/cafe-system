@@ -45,6 +45,7 @@ import AuthProvider from "./context/AuthContext";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import SupplierProtectedRoute from "./routes/SupplierProtectedRoute";
 import { StaffSocketProvider } from "./context/StaffSocketContext.jsx";
+import { CustomerNotificationProvider } from "./context/CustomerNotificationContext.jsx";
 
 // ============================
 // OWNER / RESTAURANT PAGES
@@ -134,8 +135,9 @@ export default function App() {
     return (
         <AuthProvider>
             <StaffSocketProvider>
-                <div className="theme-adaptive min-h-screen">
-                    <Routes>
+                <CustomerNotificationProvider>
+                    <div className="theme-adaptive min-h-screen">
+                        <Routes>
 
                     {/* ================================= */}
                     {/* LEGAL & PUBLIC INFO (High Priority) */}
@@ -716,6 +718,7 @@ export default function App() {
 
                     </Routes>
                 </div>
+                </CustomerNotificationProvider>
             </StaffSocketProvider>
         </AuthProvider>
     );

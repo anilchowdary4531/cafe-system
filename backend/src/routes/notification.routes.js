@@ -8,6 +8,7 @@ import {
   updateNotificationPreferences,
 } from "../services/notificationService.js";
 import { requireCustomerPhoneFromJwt } from "../services/customerProfileService.js";
+import { getPhoneVariants, normalizePhone } from "../services/phoneService.js";
 import { RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 
 export default async function notificationRoutes(app, deps) {
@@ -15,18 +16,85 @@ export default async function notificationRoutes(app, deps) {
 
   // Helper to extract authenticated entity (Customer or Staff/User) from JWT request
   const resolveActor = async (req) => {
+    const scope = String(req.query?.scope || req.headers?.["x-scope"] || "").toLowerCase();
+
+    // 1. Try Customer JWT first
     let customer = null;
+    let customerRecords = [];
     try {
-      const phone = await requireCustomerPhoneFromJwt(req, prisma);
-      if (phone) {
-        customer = await prisma.customerAccount.findUnique({ where: { phone } });
+      const authHeader = req.headers?.authorization || "";
+      if (authHeader.startsWith("Bearer ")) {
+        const token = authHeader.split(" ")[1];
+        const decoded = app.jwt.verify(token);
+        if (decoded?.type === "customer") {
+          const phone = decoded.phone ? normalizePhone(decoded.phone) : "";
+          if (decoded.customerAccountId) {
+            customer = await prisma.customerAccount.findUnique({ where: { id: Number(decoded.customerAccountId) } });
+          }
+          if (!customer && phone) {
+            const variants = getPhoneVariants(phone);
+            customer = await prisma.customerAccount.findFirst({
+              where: {
+                OR: [
+                  { phone: { in: variants } },
+                  ...(phone.includes("@") ? [{ email: phone.toLowerCase() }] : []),
+                ],
+              },
+            });
+          }
+          const lookupPhone = customer?.phone || phone;
+          if (lookupPhone) {
+            const variants = getPhoneVariants(lookupPhone);
+            customerRecords = await prisma.customer.findMany({
+              where: { phone: { in: variants } },
+            });
+          }
+        }
       }
     } catch {
-      // Not a customer JWT
+      // Not a direct customer token
     }
 
-    if (customer) {
-      return { recipientType: RECIPIENT_TYPES.CUSTOMER, recipientId: customer.id, customer };
+    // Fallback: If no direct decoded.type === "customer", try requireCustomerPhoneFromJwt
+    if (!customer && scope === "customer") {
+      try {
+        const phone = await requireCustomerPhoneFromJwt(req, prisma);
+        if (phone) {
+          const variants = getPhoneVariants(phone);
+          customer = await prisma.customerAccount.findFirst({
+            where: {
+              OR: [
+                { phone: { in: variants } },
+                ...(phone.includes("@") ? [{ email: phone.toLowerCase() }] : []),
+              ],
+            },
+          });
+          customerRecords = await prisma.customer.findMany({
+            where: { phone: { in: variants } },
+          });
+        }
+      } catch {
+        // Not a customer JWT
+      }
+    }
+
+    if (customer || customerRecords.length > 0) {
+      const recipientIds = new Set();
+      if (customer?.id) recipientIds.add(Number(customer.id));
+      customerRecords.forEach((c) => recipientIds.add(Number(c.id)));
+
+      return {
+        recipientType: RECIPIENT_TYPES.CUSTOMER,
+        recipientId: Array.from(recipientIds),
+        customer,
+        customerRecords,
+      };
+    }
+
+    // If scope is explicitly "customer" and no customer was authenticated,
+    // NEVER fall through to staff/restaurant!
+    if (scope === "customer") {
+      return null;
     }
 
     // Try Staff / User JWT
@@ -96,10 +164,14 @@ export default async function notificationRoutes(app, deps) {
         },
       });
     } else {
+      const recipientCondition = Array.isArray(actor.recipientId)
+        ? { in: actor.recipientId.map(Number) }
+        : Number(actor.recipientId);
       count = await prisma.notification.count({
         where: {
           recipientType: actor.recipientType,
-          recipientId: actor.recipientId,
+          recipientId: recipientCondition,
+          ...(actor.restaurantId ? { restaurantId: Number(actor.restaurantId) } : {}),
           isRead: false,
         },
       });

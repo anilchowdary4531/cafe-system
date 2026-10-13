@@ -31,7 +31,8 @@ import useCachedGet from "../../hooks/useCachedGet";
 import { useAuth } from "../../context/AuthContext";
 import { getCustomerFavorites, toggleFavoriteMenuItem } from "../../utils/customerFavorites";
 import { showToast } from "../../utils/toast";
-import { resolveImageUrl } from "../../utils/resolveImageUrl";
+import { resolveImageUrl, getItemImageUrl } from "../../utils/resolveImageUrl";
+import ItemImageCarousel from "../../components/ItemImageCarousel";
 
 import {
     TOBACCO_KEYWORDS,
@@ -796,7 +797,8 @@ function MenuSection({ section, items, slug, favoriteKeySet, onToggleFavorite, o
 }
 
 function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, onIncrease, onDecrease, onOpenDetail, quantity = 0 }) {
-    const imageSrc = resolveImageUrl(item?.image) || FALLBACK_IMAGE;
+    const rawImage = getItemImageUrl(item);
+    const imageSrc = rawImage || FALLBACK_IMAGE;
     const dietBadge = getDietBadge(item);
     const itemPrice = Number(item?.price || 0);
     const originalPrice = Number(item?.originalPrice || 0);
@@ -821,22 +823,21 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, onIncrease, o
                     handleCardClick();
                 }
             }}
-            className={`group relative flex w-full cursor-pointer flex-row items-start gap-3 rounded-2xl p-2.5 sm:p-3 text-left transition duration-300 border ${
+            className={`group relative flex w-full cursor-pointer flex-row items-start gap-3 rounded-2xl p-2.5 sm:p-3 text-left transition duration-200 border ${
                 quantity > 0
-                    ? "bg-emerald-500/10 border-emerald-500/50 shadow-[0_4px_16px_rgba(16,185,129,0.12)]"
-                    : "bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20"
+                    ? "bg-emerald-500/10 border-emerald-500/30 shadow-none"
+                    : "bg-white/40 border-[color:var(--app-border)]/35 hover:bg-white/70 hover:border-[#ff8a1f]/30 shadow-none"
             }`}
         >
-            <div className="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-black/10">
-                <img
-                    src={imageSrc}
-                    className="h-full w-full object-cover"
-                    alt={String(item?.name || "Menu item")}
-                    loading="lazy"
-                />
+            <ItemImageCarousel
+                item={item}
+                alt={String(item?.name || "Menu item")}
+                aspectRatio=""
+                className="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-2xl border border-white/10"
+            >
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/60 to-transparent" />
 
-                <div className="absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5">
+                <div className="absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 z-10">
                     <span className="inline-flex items-center gap-0.5 rounded-md bg-black/60 px-1 py-0.5 text-[9px] sm:text-[10px] font-bold text-[#fff8e6] backdrop-blur-xs">
                         <Star size={9} className="text-[#ffd24d] fill-[#ffd24d]" />
                         {Number(item?.rating || 4.5).toFixed(1)}
@@ -847,18 +848,24 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, onIncrease, o
                     type="button"
                     onClick={(e) => {
                         e.stopPropagation();
+                        e.preventDefault();
                         onToggleFavorite && onToggleFavorite(item);
                     }}
-                    className={`absolute right-1 top-1 sm:right-1.5 sm:top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border transition ${
+                    className={`absolute right-1 top-1 sm:right-1.5 sm:top-1.5 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full border shadow-xs transition duration-200 active:scale-90 ${
                         isFavorite
-                            ? "border-red-500/40 bg-red-500/20 text-red-400"
-                            : "border-white/20 bg-black/40 text-white/90 hover:bg-black/60"
+                            ? "border-[#ff8a1f]/60 bg-white text-[#ff8a1f] hover:bg-orange-50 shadow-orange-500/20"
+                            : "border-black/10 bg-white/90 text-[#2c160c] backdrop-blur-xs hover:border-[#ff8a1f]/40 hover:bg-white hover:text-[#ff8a1f]"
                     }`}
                     aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                    title={isFavorite ? "Remove from favorites" : "Add to favorites"}
                 >
-                    <Heart size={11} fill={isFavorite ? "currentColor" : "none"} />
+                    <Heart
+                        size={12}
+                        className={isFavorite ? "fill-[#ff8a1f] text-[#ff8a1f]" : "fill-none text-current"}
+                        strokeWidth={2.2}
+                    />
                 </button>
-            </div>
+            </ItemImageCarousel>
 
             <div className="min-w-0 flex-1 flex flex-col justify-between self-stretch">
                 <div>
@@ -878,8 +885,18 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, onIncrease, o
                                 ) : null}
                             </div>
 
+                            {item?.description?.trim() ? (
+                                <p className="mt-1 line-clamp-2 text-[10.5px] sm:text-[11.5px] text-[color:var(--app-muted)] leading-snug">
+                                    {item.description.trim()}
+                                </p>
+                            ) : (
+                                <p className="mt-1 text-[10px] sm:text-[11px] italic text-[color:var(--app-muted)]/60">
+                                    No description available
+                                </p>
+                            )}
+
                             {hasDiscount ? (
-                                <div className="mt-0.5 flex flex-wrap items-center gap-1 sm:gap-1.5">
+                                <div className="mt-1 flex flex-wrap items-center gap-1 sm:gap-1.5">
                                     <p className="text-[10px] text-[color:var(--app-muted)] line-through sm:text-xs">
                                         {formatPrice(originalPrice)}
                                     </p>
@@ -891,7 +908,7 @@ function MenuItemCard({ item, isFavorite, onToggleFavorite, onAdd, onIncrease, o
                                     </span>
                                 </div>
                             ) : (
-                                <p className="mt-0.5 text-xs font-bold text-[color:var(--app-accent)] sm:text-sm">
+                                <p className="mt-1 text-xs font-bold text-[color:var(--app-accent)] sm:text-sm">
                                     {formatPrice(itemPrice)}
                                 </p>
                             )}

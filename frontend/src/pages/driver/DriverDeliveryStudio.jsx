@@ -274,7 +274,7 @@ export default function DriverDeliveryStudio() {
                     className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white py-3 text-xs font-bold transition shadow-md"
                   >
                     <Navigation size={16} />
-                    Navigate in Google Maps
+                    Open Navigation
                   </a>
 
                   {delivery.status === "ASSIGNED" && (

@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { Truck, MapPin, Phone, Clock, ArrowLeft, Navigation, ShieldCheck, AlertCircle, RefreshCw, CheckCircle2, Loader2 } from "lucide-react";
 import { api } from "../../utils/apiClient";
-import { loadGoogleMaps, getGoogleMapsApiKey } from "../../utils/googleMapsLoader";
+import * as maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { MAP_CONFIG } from "../../utils/mapConfig";
 import io from "socket.io-client";
 import { API_BASE_URL } from "../../config";
@@ -103,70 +104,110 @@ export default function TrackOrderPage() {
     };
   }, [orderId, tracking?.delivery?.id]);
 
-  // Initialize Google Maps
+  // Initialize MapLibre GL JS Map
   useEffect(() => {
     if (!tracking || !mapContainerRef.current) return;
 
-    let isSubscribed = true;
-    const apiKey = getGoogleMapsApiKey();
-    if (!apiKey) return;
+    const restLat = Number(tracking.restaurant?.latitude || MAP_CONFIG.defaultCenter.lat);
+    const restLng = Number(tracking.restaurant?.longitude || MAP_CONFIG.defaultCenter.lng);
+    const destLat = Number(tracking.destination?.latitude || restLat + 0.015);
+    const destLng = Number(tracking.destination?.longitude || restLng + 0.015);
 
-    loadGoogleMaps(["maps", "marker"])
-      .then((google) => {
-        if (!isSubscribed || !mapContainerRef.current) return;
+    let map = null;
+    let resizeObserver = null;
 
-        const restLat = Number(tracking.restaurant?.latitude || MAP_CONFIG.defaultCenter.lat);
-        const restLng = Number(tracking.restaurant?.longitude || MAP_CONFIG.defaultCenter.lng);
-        const destLat = Number(tracking.destination?.latitude || restLat + 0.015);
-        const destLng = Number(tracking.destination?.longitude || restLng + 0.015);
+    try {
+      map = new maplibregl.Map({
+        container: mapContainerRef.current,
+        style: MAP_CONFIG.styleUrl,
+        center: [restLng, restLat],
+        zoom: 13,
+        attributionControl: true,
+      });
 
-        const map = new google.maps.Map(mapContainerRef.current, {
-          center: { lat: restLat, lng: restLng },
-          zoom: 13,
-          mapTypeId: google.maps.MapTypeId.ROADMAP,
-          zoomControl: true,
-          streetViewControl: false,
-          fullscreenControl: false,
-        });
+      mapRef.current = map;
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
-        mapRef.current = map;
+      map.on("load", () => {
+        map.resize();
 
         // Restaurant Marker 🏪
-        new google.maps.Marker({
-          position: { lat: restLat, lng: restLng },
-          map,
-          title: tracking.restaurant?.name || "Restaurant Outlet",
-          icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
-        });
+        const restEl = document.createElement("div");
+        restEl.innerHTML = `<div style="background:#fe5102;color:white;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.3);border:2px solid white;font-size:16px;cursor:pointer;" title="${tracking.restaurant?.name || 'Restaurant Outlet'}">🏪</div>`;
+        new maplibregl.Marker({ element: restEl })
+          .setLngLat([restLng, restLat])
+          .addTo(map);
 
-        // Customer Marker 📍
-        new google.maps.Marker({
-          position: { lat: destLat, lng: destLng },
-          map,
-          title: "Your Delivery Address",
-          icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
-        });
+        // Customer Destination Marker 📍
+        const destEl = document.createElement("div");
+        destEl.innerHTML = `<div style="background:#10b981;color:white;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.3);border:2px solid white;font-size:16px;cursor:pointer;" title="Delivery Address">📍</div>`;
+        new maplibregl.Marker({ element: destEl })
+          .setLngLat([destLng, destLat])
+          .addTo(map);
 
         // Driver Marker (if active) 🚗
         const initialDriver = driverPos || tracking.delivery?.driverLocation;
         if (initialDriver?.latitude && initialDriver?.longitude) {
-          const marker = new google.maps.Marker({
-            position: { lat: Number(initialDriver.latitude), lng: Number(initialDriver.longitude) },
-            map,
-            title: `Rider: ${tracking.delivery?.partner?.name || "Delivery Partner"}`,
-            icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-          });
+          const dLat = Number(initialDriver.latitude);
+          const dLng = Number(initialDriver.longitude);
+          const driverEl = document.createElement("div");
+          driverEl.innerHTML = `<div style="background:#0ea5e9;color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(14,165,233,0.5);border:2px solid white;font-size:18px;cursor:pointer;" title="Driver: ${tracking.delivery?.partner?.name || 'Delivery Partner'}">🚗</div>`;
+          const marker = new maplibregl.Marker({ element: driverEl })
+            .setLngLat([dLng, dLat])
+            .addTo(map);
           driverMarkerRef.current = marker;
         }
-      })
-      .catch(() => {});
+
+        // Fit bounds to show both restaurant and destination
+        const bounds = new maplibregl.LngLatBounds();
+        bounds.extend([restLng, restLat]);
+        bounds.extend([destLng, destLat]);
+        if (initialDriver?.latitude && initialDriver?.longitude) {
+          bounds.extend([Number(initialDriver.longitude), Number(initialDriver.latitude)]);
+        }
+        map.fitBounds(bounds, { padding: 40, maxZoom: 15 });
+      });
+
+      requestAnimationFrame(() => map.resize());
+      setTimeout(() => map.resize(), 100);
+
+      if (window.ResizeObserver && mapContainerRef.current) {
+        resizeObserver = new ResizeObserver(() => {
+          map.resize();
+        });
+        resizeObserver.observe(mapContainerRef.current);
+      }
+    } catch (err) {
+      console.warn("[TrackOrderPage] MapLibre initialization error:", err?.message || err);
+    }
 
     return () => {
-      isSubscribed = false;
-      mapRef.current = null;
+      if (resizeObserver) resizeObserver.disconnect();
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
       driverMarkerRef.current = null;
     };
-  }, [tracking]);
+  }, [tracking?.orderId, tracking?.delivery?.id]);
+
+  // Update Driver live location when driverPos changes
+  useEffect(() => {
+    if (!driverPos?.latitude || !driverPos?.longitude) return;
+    const lat = Number(driverPos.latitude);
+    const lng = Number(driverPos.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    if (driverMarkerRef.current) {
+      driverMarkerRef.current.setLngLat([lng, lat]);
+    } else if (mapRef.current) {
+      const driverEl = document.createElement("div");
+      driverEl.innerHTML = `<div style="background:#0ea5e9;color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(14,165,233,0.5);border:2px solid white;font-size:18px;cursor:pointer;" title="Driver">🚗</div>`;
+      driverMarkerRef.current = new maplibregl.Marker({ element: driverEl })
+        .setLngLat([lng, lat])
+        .addTo(mapRef.current);
+    }
+  }, [driverPos]);
 
   const currentStep = getStepIndex(tracking?.delivery?.status || tracking?.orderStatus);
 
@@ -271,13 +312,9 @@ export default function TrackOrderPage() {
 
               <div
                 ref={mapContainerRef}
-                style={{ height: "360px" }}
-                className="relative overflow-hidden rounded-3xl border border-white/10 bg-gray-900 flex items-center justify-center shadow-inner"
-              >
-                {!getGoogleMapsApiKey() && (
-                  <p className="text-amber-400 text-xs p-4 font-semibold">Google Maps API key is not configured.</p>
-                )}
-              </div>
+                style={{ height: "360px", width: "100%" }}
+                className="relative overflow-hidden rounded-3xl border border-white/10 bg-gray-900 shadow-inner"
+              />
             </div>
 
             {/* Driver Profile Box */}

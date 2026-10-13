@@ -110,6 +110,7 @@ export const createAndDispatchNotification = async ({
 
       if (recipientType === RECIPIENT_TYPES.CUSTOMER) {
         realtime.io.to(`customer:${recipientId}`).emit("notification:new", payload);
+        realtime.io.to(`customer_${recipientId}`).emit("notification:new", payload);
       } else if (recipientType === "SUPPLIER") {
         realtime.io.to(`supplier:${recipientId}`).emit("notification:new", payload);
         realtime.io.to(`supplier_${recipientId}`).emit("notification:new", payload);
@@ -303,12 +304,21 @@ export const getUserNotifications = async ({
       isRead: false,
     };
   } else {
+    const recipientCondition = Array.isArray(recipientId)
+      ? { in: recipientId.map(Number) }
+      : Number(recipientId);
     where = {
       recipientType,
-      recipientId: Number(recipientId),
+      recipientId: recipientCondition,
+      ...(restaurantId ? { restaurantId: Number(restaurantId) } : {}),
       ...(isRead !== null ? { isRead: Boolean(isRead) } : {}),
     };
-    unreadWhere = { recipientType, recipientId: Number(recipientId), isRead: false };
+    unreadWhere = {
+      recipientType,
+      recipientId: recipientCondition,
+      ...(restaurantId ? { restaurantId: Number(restaurantId) } : {}),
+      isRead: false,
+    };
   }
 
   const [notifications, total, unreadCount] = await Promise.all([
@@ -347,10 +357,13 @@ export const markNotificationRead = async ({ prisma, notificationId, recipientTy
       ],
     };
   } else {
+    const recipientCondition = Array.isArray(recipientId)
+      ? { in: recipientId.map(Number) }
+      : Number(recipientId);
     where = {
       id: Number(notificationId),
       recipientType,
-      recipientId: Number(recipientId),
+      recipientId: recipientCondition,
     };
   }
 
@@ -378,9 +391,12 @@ export const markAllNotificationsRead = async ({ prisma, recipientType, recipien
       isRead: false,
     };
   } else {
+    const recipientCondition = Array.isArray(recipientId)
+      ? { in: recipientId.map(Number) }
+      : Number(recipientId);
     where = {
       recipientType,
-      recipientId: Number(recipientId),
+      recipientId: recipientCondition,
       isRead: false,
     };
   }

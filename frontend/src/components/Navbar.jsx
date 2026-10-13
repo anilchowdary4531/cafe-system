@@ -1,8 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import { ChevronLeft, ChefHat, ShoppingCart, UserCircle2, UtensilsCrossed, LayoutGrid } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useCart } from "../context/CartContext";
 import ThemeSelector from "./ThemeSelector";
-import LanguageSelector from "./LanguageSelector";
 import RestaurantSelector from "./RestaurantSelector";
 import { useRestaurantContext } from "../context/RestaurantContext";
 import BrandLogo from "./BrandLogo";
@@ -13,6 +13,7 @@ export default function Navbar() {
     const location = useLocation();
     const { user, customer, staffToken, logout } = useAuth();
     const { restaurantContext } = useRestaurantContext();
+    const { cart } = useCart();
     const isCustomerProfileScope = new URLSearchParams(location.search).get("scope") === "customer";
     const hasStaffSession = Boolean(user && staffToken);
     const isStaff = hasStaffSession && !isCustomerProfileScope;
@@ -21,6 +22,8 @@ export default function Navbar() {
     const isProfilePage =
         String(location.pathname || "").startsWith("/profile") ||
         String(location.pathname || "").startsWith("/staff/profile");
+    const isCustomerProfilePage = !isStaff && isProfilePage;
+    const cartCount = Array.isArray(cart) ? cart.reduce((sum, item) => sum + (Number(item?.quantity) || 1), 0) : 0;
 
     const loginPath = (() => {
         const path = String(location.pathname || "");
@@ -80,6 +83,55 @@ export default function Navbar() {
         return links.filter((l) => l.allow);
     })();
 
+    if (isCustomerProfilePage) {
+        return (
+            <header className="theme-nav flex h-16 sm:h-[70px] w-full items-center justify-between border-b px-4 sm:px-6 md:px-8 lg:px-10">
+                {/* Left navigation: [ ← ] [ Tiffzy logo ] Tiffzy */}
+                <div className="flex items-center gap-2 sm:gap-3">
+                    <Link
+                        to={customerMenuPath || "/"}
+                        className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg text-[color:var(--app-text)] hover:bg-orange-500/10 hover:text-[var(--app-primary)] transition-colors"
+                        aria-label="Return"
+                        title="Return"
+                    >
+                        <ChevronLeft size={22} className="stroke-[2.2]" />
+                    </Link>
+
+                    <Link
+                        to="/"
+                        className="flex items-center gap-2 sm:gap-2.5 focus:outline-none"
+                        aria-label="Tiffzy Home"
+                        title="Tiffzy Home"
+                    >
+                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center">
+                            <BrandLogo className="theme-brand-logo h-full w-full object-contain" title="Tiffzy logo" />
+                        </div>
+                        <span className="theme-brand-text text-xl sm:text-2xl font-semibold tracking-tight text-[var(--app-primary)]">
+                            Tiffzy
+                        </span>
+                    </Link>
+                </div>
+
+                {/* Right actions: Cart */}
+                <div className="flex items-center">
+                    <Link
+                        to="/cart"
+                        className="theme-icon-button theme-icon-button-primary relative inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg p-2 transition-all"
+                        aria-label="Cart"
+                        title="Cart"
+                    >
+                        <ShoppingCart size={19} />
+                        {cartCount > 0 && (
+                            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                                {cartCount}
+                            </span>
+                        )}
+                    </Link>
+                </div>
+            </header>
+        );
+    }
+
     return (
         <div className="theme-nav flex w-full flex-col gap-4 border-b px-4 py-4 md:flex-row md:items-center md:justify-between md:px-8">
             {!isProfilePage && (
@@ -105,7 +157,6 @@ export default function Navbar() {
             <div className="flex w-full flex-wrap items-center justify-between gap-2 md:w-auto md:justify-end md:gap-4">
                 {!isStaff && !isProfilePage && <RestaurantSelector variant="compact" />}
                 {isStaff && <ThemeSelector />}
-                <LanguageSelector />
 
                 {staffLinks.map((link) => (
                     <Link

@@ -134,107 +134,103 @@ export default function EditProfileSection({ profile, loading, saving, error, up
     };
 
     return (
-        <div className="space-y-4">
-            <div className="space-y-2 px-1">
-                <p className="theme-accent-text text-[11px] font-semibold uppercase tracking-[0.28em]">Profile</p>
-                <h1 className="text-2xl font-bold tracking-tight md:text-[2rem]">Edit profile</h1>
-                <p className="theme-muted text-xs md:text-sm">Update profile photo, name, phone, email, and nickname.</p>
+        <div className="w-full space-y-5 text-left">
+            <div className="space-y-1">
+                <div className="text-xs font-bold uppercase tracking-wider text-[var(--app-primary)]">
+                    PROFILE
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[color:var(--app-text)]">
+                    Edit profile
+                </h1>
+                <p className="theme-muted text-xs sm:text-sm">
+                    Update profile photo, name, phone, email, and nickname.
+                </p>
             </div>
 
             {(error || localError) && (
-                <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-xs text-red-500">
                     {error || localError}
                 </div>
             )}
 
-            <section className="rounded-3xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] p-4 md:p-5">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-black/20">
-                            {avatarDataUrl ? (
-                                <img src={avatarDataUrl} alt="Profile avatar" className="h-full w-full object-cover" />
-                            ) : (
-                                <div className="flex h-full w-full items-center justify-center">
-                                    <UserCircle2 size={30} className="theme-muted" />
-                                </div>
-                            )}
-                        </div>
-                        <div className="space-y-2">
-                            <p className="text-sm font-semibold">Profile photo</p>
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => fileRef.current?.click()}
-                                    className="theme-soft-button inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold"
-                                >
-                                    <Camera size={14} />
-                                    Upload
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={async () => {
-                                        setAvatarDataUrl("");
-                                        persistExtras({ avatarDataUrl: "" });
-                                        await updateProfile({ name, email, avatarUrl: "" });
-                                    }}
-                                    className="theme-soft-button inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold"
-                                >
-                                    <X size={14} />
-                                    Remove
-                                </button>
-                                <input
-                                    ref={fileRef}
-                                    type="file"
-                                    accept="image/png,image/jpeg,image/jpg,image/webp"
-                                    onChange={onPickAvatar}
-                                    className="hidden"
-                                />
+            <section className="rounded-xl border border-[color:var(--app-border)]/40 bg-white/40 dark:bg-slate-900/40 p-5 sm:p-6 space-y-6">
+                {/* Profile photo section */}
+                <div className="flex items-center gap-4 pb-5 border-b border-[color:var(--app-border)]/30">
+                    <div className="relative h-16 w-16 overflow-hidden rounded-xl border border-orange-500/25 bg-orange-500/10 text-[var(--app-primary)] shrink-0">
+                        {avatarDataUrl ? (
+                            <img src={avatarDataUrl} alt="Profile avatar" className="h-full w-full object-cover" />
+                        ) : (
+                            <div className="flex h-full w-full items-center justify-center">
+                                <UserCircle2 size={32} />
                             </div>
+                        )}
+                    </div>
+                    <div className="space-y-1.5">
+                        <p className="text-xs font-bold uppercase tracking-wider text-[var(--app-primary)]">Profile photo</p>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={() => fileRef.current?.click()}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--app-border)]/40 bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-orange-500/10 hover:text-[var(--app-primary)] transition-all dark:bg-slate-800"
+                            >
+                                <Camera size={13} />
+                                Upload
+                            </button>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    setAvatarDataUrl("");
+                                    persistExtras({ avatarDataUrl: "" });
+                                    await updateProfile({ name, email, avatarUrl: "" });
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--app-border)]/40 bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-red-500/10 hover:text-red-500 transition-all dark:bg-slate-800"
+                            >
+                                <X size={13} />
+                                Remove
+                            </button>
+                            <input
+                                ref={fileRef}
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/webp"
+                                onChange={onPickAvatar}
+                                className="hidden"
+                            />
                         </div>
                     </div>
-
-                    <button
-                        type="button"
-                        onClick={saveProfile}
-                        disabled={saving || loading}
-                        className="theme-button inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                        <Save size={15} />
-                        {saving ? "Saving..." : "Save profile"}
-                    </button>
                 </div>
 
-                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {/* Form fields in clean 2-column desktop layout */}
+                <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                        <label className="theme-muted mb-1 block text-xs">Name</label>
+                        <label className="theme-muted mb-1 block text-xs font-semibold">Name</label>
                         <div className="relative">
-                            <UserCircle2 size={16} className="theme-muted absolute left-3 top-2.5" />
+                            <UserCircle2 size={16} className="theme-muted absolute left-3 top-3" />
                             <input
                                 value={name}
                                 onChange={(e) => {
                                     setError("");
                                     setName(e.target.value);
                                 }}
-                                className="theme-input w-full rounded-xl px-9 py-2.5 text-sm outline-none"
+                                className="w-full rounded-lg border border-[color:var(--app-border)]/40 bg-transparent pl-9 pr-3.5 py-2.5 text-sm text-[color:var(--app-text)] outline-none transition focus:border-[var(--app-primary)] focus:ring-1 focus:ring-[var(--app-primary)]"
                                 placeholder="Your name"
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label className="theme-muted mb-1 block text-xs">Nick name</label>
+                        <label className="theme-muted mb-1 block text-xs font-semibold">Nick name</label>
                         <input
                             value={nickname}
                             onChange={(e) => setNickname(e.target.value)}
-                            className="theme-input w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                            className="w-full rounded-lg border border-[color:var(--app-border)]/40 bg-transparent px-3.5 py-2.5 text-sm text-[color:var(--app-text)] outline-none transition focus:border-[var(--app-primary)] focus:ring-1 focus:ring-[var(--app-primary)]"
                             placeholder="How friends call you"
                         />
                     </div>
 
                     <div>
-                        <label className="theme-muted mb-1 block text-xs">Email</label>
+                        <label className="theme-muted mb-1 block text-xs font-semibold">Email</label>
                         <div className="relative">
-                            <Mail size={16} className="theme-muted absolute left-3 top-2.5" />
+                            <Mail size={16} className="theme-muted absolute left-3 top-3" />
                             <input
                                 type="email"
                                 value={email}
@@ -242,23 +238,36 @@ export default function EditProfileSection({ profile, loading, saving, error, up
                                     setError("");
                                     setEmail(e.target.value);
                                 }}
-                                className="theme-input w-full rounded-xl px-9 py-2.5 text-sm outline-none"
+                                className="w-full rounded-lg border border-[color:var(--app-border)]/40 bg-transparent pl-9 pr-3.5 py-2.5 text-sm text-[color:var(--app-text)] outline-none transition focus:border-[var(--app-primary)] focus:ring-1 focus:ring-[var(--app-primary)]"
                                 placeholder="you@example.com"
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label className="theme-muted mb-1 block text-xs">Phone number</label>
+                        <label className="theme-muted mb-1 block text-xs font-semibold">Phone number</label>
                         <div className="relative">
-                            <Phone size={16} className="theme-muted absolute left-3 top-2.5" />
+                            <Phone size={16} className="theme-muted absolute left-3 top-3" />
                             <input
                                 value={phone}
                                 readOnly
-                                className="theme-input w-full cursor-not-allowed rounded-xl px-9 py-2.5 text-sm outline-none opacity-80"
+                                className="w-full cursor-not-allowed rounded-lg border border-[color:var(--app-border)]/30 bg-black/[0.03] pl-9 pr-3.5 py-2.5 text-sm text-[color:var(--app-text)] outline-none opacity-70 dark:bg-white/[0.03]"
                             />
                         </div>
                     </div>
+                </div>
+
+                {/* Save Profile button aligned to the right */}
+                <div className="flex justify-end pt-2">
+                    <button
+                        type="button"
+                        onClick={saveProfile}
+                        disabled={saving || loading}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--app-primary)] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-95 transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <Save size={14} />
+                        {saving ? "Saving..." : "Save Profile"}
+                    </button>
                 </div>
             </section>
         </div>

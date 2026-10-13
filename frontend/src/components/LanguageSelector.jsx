@@ -20,18 +20,20 @@ export default function LanguageSelector({ variant = "button", className = "" })
           className={`flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-black/5 dark:hover:bg-white/5 ${className}`}
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 text-[var(--app-primary)] shrink-0">
               <Globe size={18} />
             </div>
             <div>
-              <p className="text-sm font-semibold">{t("appLanguage")}</p>
-              <p className="text-xs theme-muted">
-                {currentLanguageObj.flag} {currentLanguageObj.nativeName} ({currentLanguageObj.name})
+              <p className="text-sm font-bold text-[color:var(--app-text)] leading-tight">Language</p>
+              <p className="text-xs theme-muted leading-normal mt-0.5">
+                Choose your preferred language
               </p>
             </div>
           </div>
-          <span className="rounded-full bg-black/5 px-2.5 py-1 text-xs font-semibold dark:bg-white/10">
-            {currentLanguageObj.flag} {currentLanguageObj.code.toUpperCase()}
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white/90 px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-md dark:border-white/15 dark:bg-slate-800/90 text-[color:var(--app-text)] shrink-0">
+            <Globe size={13} className="text-[var(--app-primary)]" />
+            <span>{currentLanguageObj.flag} {currentLanguageObj.name}</span>
+            <span className="text-[10px] opacity-60">▼</span>
           </span>
         </button>
       ) : (

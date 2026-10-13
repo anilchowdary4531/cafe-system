@@ -152,140 +152,150 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
 
     if (isOverviewPage) {
         return (
-            <div className="theme-page profile-overview-flat min-h-screen px-4 py-10 md:px-8">
-                <div className="mx-auto w-full max-w-6xl space-y-6">
-                    <header className="theme-panel rounded-[32px] p-6">
-                        <div className="flex items-start gap-4">
-                            <div className="theme-button flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl">
+            <div className="theme-page min-h-screen px-4 sm:px-6 md:px-8 lg:px-10 py-6 sm:py-8 font-sans text-sm text-[color:var(--app-text)]">
+                <div className="w-full max-w-[1440px] mx-auto space-y-6 sm:space-y-7">
+                    {/* PROFILE HEADER - Compact, aligned, enterprise dashboard style */}
+                    <header className="pb-5 border-b border-[color:var(--app-border)]/40">
+                        <div className="flex items-center gap-4">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-orange-500/10 text-[var(--app-primary)] border border-orange-500/20">
                                 {avatarDataUrl ? (
                                     <img src={avatarDataUrl} alt="Profile avatar" className="h-full w-full object-cover" />
                                 ) : (
-                                    <UserCircle2 size={26} />
+                                    <UserCircle2 size={32} />
                                 )}
                             </div>
                             <div className="min-w-0">
-                                <p className="truncate text-lg font-semibold">{sidebarMeta.title}</p>
-                                <p className="theme-muted mt-1 truncate text-sm">{sidebarMeta.subtitle}</p>
+                                <h1 className="truncate text-2xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-[1.75rem]">
+                                    {sidebarMeta.title}
+                                </h1>
+                                <p className="theme-muted mt-0.5 truncate text-sm font-medium">
+                                    {sidebarMeta.subtitle}
+                                </p>
                             </div>
                         </div>
-
-                        <nav className="mt-4 flex flex-wrap items-center gap-2.5">
-                            <OverviewActionCard
-                                to={buildProfilePath("/profile/wallet")}
-                                icon={<Wallet size={19} />}
-                                label="Wallet"
-                                caption="Prepaid balance & top-up"
-                            />
-                            <OverviewActionCard
-                                to={buildProfilePath("/profile/edit")}
-                                icon={<UserCircle2 size={19} />}
-                                label="Edit profile"
-                                caption="Photo, name, number"
-                            />
-                            <OverviewActionCard
-                                to={buildProfilePath("/profile/addresses")}
-                                icon={<MapPin size={19} />}
-                                label="Address"
-                                caption="Saved delivery locations"
-                            />
-                            <OverviewActionCard
-                                to={buildProfilePath("/profile/favorites")}
-                                icon={<Heart size={19} />}
-                                label="Favorites"
-                                caption="Your liked dishes"
-                            />
-                            <OverviewActionCard
-                                to={buildProfilePath("/profile/pay-later")}
-                                icon={<IndianRupee size={19} />}
-                                label="Pay Later"
-                                caption="Manage restaurant credits"
-                            />
-                            <OverviewActionCard
-                                to={buildProfilePath("/profile/notifications")}
-                                icon={<Bell size={19} />}
-                                label="Notifications"
-                                caption="View updates & alerts"
-                            />
-                            <OverviewActionCard
-                                to={buildProfilePath("/profile/settings")}
-                                icon={<Settings size={19} />}
-                                label="Settings"
-                                caption="Profile preferences"
-                            />
-                        </nav>
-
-                        <RecentOrdersSection profile={profile} customerToken={customerToken} buildProfilePath={buildProfilePath} />
-
-                        <section className="mt-4 rounded-3xl p-1">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <p className="theme-accent-text text-[11px] font-semibold uppercase tracking-[0.26em]">
-                                        Wallet preview
-                                    </p>
-                                    <h2 className="mt-1 text-lg font-semibold">Rewards & Wallet</h2>
-                                </div>
-                                <NavLink
-                                    to={buildProfilePath("/profile/wallet")}
-                                    reloadDocument
-                                    className="theme-button inline-flex items-center gap-1 rounded-xl px-3.5 py-1.5 text-xs font-bold shadow-md"
-                                >
-                                    <Wallet size={14} />
-                                    Manage Wallet
-                                </NavLink>
-                            </div>
-
-                            <div className="mt-3 grid grid-cols-3 gap-2 sm:mt-4 sm:gap-3">
-                                <Link to={buildProfilePath("/profile/wallet")}>
-                                    <ProfileValueCard
-                                        icon={<Wallet size={18} />}
-                                        label="Wallet balance"
-                                        hint="Click to top-up"
-                                        value={walletBalance}
-                                        toneClass="from-orange-500/18 to-amber-500/8 hover:ring-1 hover:ring-amber-500/50 transition-all"
-                                    />
-                                </Link>
-                                <ProfileValueCard
-                                    icon={<Star size={18} />}
-                                    label="Reward points"
-                                    hint="1 point per Rs 10"
-                                    value={profile?.rewardPoints !== undefined ? String(profile.rewardPoints) : "0"}
-                                    toneClass="from-yellow-500/18 to-lime-500/8"
-                                />
-                                <ProfileValueCard
-                                    icon={<Gift size={18} />}
-                                    label="Offers"
-                                    hint="Coming soon"
-                                    value="Coming soon"
-                                    toneClass="from-fuchsia-500/14 to-rose-500/8"
-                                />
-                            </div>
-                        </section>
-
-                        {error && (
-                            <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                                {error}
-                            </div>
-                        )}
                     </header>
+
+                    {/* PROFILE NAVIGATION - Borderless compact grid, subtle orange hover */}
+                    <nav className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3.5 pb-6 border-b border-[color:var(--app-border)]/40">
+                        <OverviewActionCard
+                            to={buildProfilePath("/profile/wallet")}
+                            icon={<Wallet size={18} />}
+                            label="Wallet"
+                            caption="Prepaid balance & top-up"
+                        />
+                        <OverviewActionCard
+                            to={buildProfilePath("/profile/edit")}
+                            icon={<UserCircle2 size={18} />}
+                            label="Edit profile"
+                            caption="Photo, name, number"
+                        />
+                        <OverviewActionCard
+                            to={buildProfilePath("/profile/addresses")}
+                            icon={<MapPin size={18} />}
+                            label="Address"
+                            caption="Saved delivery locations"
+                        />
+                        <OverviewActionCard
+                            to={buildProfilePath("/profile/favorites")}
+                            icon={<Heart size={18} />}
+                            label="Favorites"
+                            caption="Your liked dishes"
+                        />
+                        <OverviewActionCard
+                            to={buildProfilePath("/profile/pay-later")}
+                            icon={<IndianRupee size={18} />}
+                            label="Pay Later"
+                            caption="Manage restaurant credits"
+                        />
+                        <OverviewActionCard
+                            to={buildProfilePath("/profile/notifications")}
+                            icon={<Bell size={18} />}
+                            label="Notifications"
+                            caption="View updates & alerts"
+                        />
+                        <OverviewActionCard
+                            to={buildProfilePath("/profile/settings")}
+                            icon={<Settings size={18} />}
+                            label="Settings"
+                            caption="Profile preferences"
+                        />
+                    </nav>
+
+                    {/* RECENT ORDERS SECTION */}
+                    <RecentOrdersSection profile={profile} customerToken={customerToken} buildProfilePath={buildProfilePath} />
+
+                    {/* WALLET PREVIEW SECTION - Horizontal 3-column KPI metrics */}
+                    <section className="pt-1 space-y-3.5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <div className="text-xs font-bold uppercase tracking-wider text-[var(--app-primary)]">
+                                    WALLET PREVIEW
+                                </div>
+                                <h2 className="text-base sm:text-lg font-bold text-[color:var(--app-text)] mt-0.5">
+                                    Rewards & Wallet
+                                </h2>
+                            </div>
+                            <NavLink
+                                to={buildProfilePath("/profile/wallet")}
+                                reloadDocument
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--app-primary)] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95 transition-all"
+                            >
+                                <Wallet size={14} />
+                                Manage Wallet
+                            </NavLink>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6 pt-1">
+                            <Link to={buildProfilePath("/profile/wallet")} className="block group">
+                                <ProfileValueCard
+                                    icon={<Wallet size={18} />}
+                                    label="Wallet balance"
+                                    hint="Click to top-up"
+                                    value={walletBalance}
+                                    isHighlighted
+                                />
+                            </Link>
+                            <ProfileValueCard
+                                icon={<Star size={18} />}
+                                label="Reward points"
+                                hint="1 point per Rs 10"
+                                value={profile?.rewardPoints !== undefined ? String(profile.rewardPoints) : "0"}
+                            />
+                            <ProfileValueCard
+                                icon={<Gift size={18} />}
+                                label="Offers"
+                                hint="Special member discounts"
+                                value="Coming soon"
+                            />
+                        </div>
+                    </section>
+
+                    {error && (
+                        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-500">
+                            {error}
+                        </div>
+                    )}
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="theme-page min-h-screen px-3 py-6 sm:px-6 md:px-10 lg:px-12">
-            <div className="mx-auto w-full max-w-7xl space-y-6">
-                <header className="flex items-center gap-3 px-1">
+        <div className="theme-page min-h-screen px-4 sm:px-6 md:px-8 lg:px-10 py-6 sm:py-8 font-sans text-sm text-[color:var(--app-text)]">
+            <div className="w-full max-w-[1440px] mx-auto space-y-6 sm:space-y-7">
+                <header className="flex items-center gap-3 pb-4 border-b border-[color:var(--app-border)]/40">
                     <NavLink
                         to={buildProfilePath("/profile/overview")}
                         reloadDocument
                         aria-label="Back to overview"
                         title="Back to overview"
-                        className="theme-soft-button inline-flex h-10 w-10 items-center justify-center rounded-2xl hover:opacity-95"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[color:var(--app-text)] hover:bg-orange-500/10 hover:text-[var(--app-primary)] transition-all"
                     >
                         <ArrowLeft size={18} />
                     </NavLink>
-                    <p className="theme-muted text-sm font-semibold">{sectionLabel}</p>
+                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--app-text)]">
+                        {sectionLabel}
+                    </h1>
                 </header>
 
                 <main className="min-w-0">{sectionNode}</main>
@@ -301,27 +311,56 @@ const OverviewActionCard = memo(function OverviewActionCard({ to, icon, label, c
             reloadDocument
             end={Boolean(end)}
             className={({ isActive }) =>
-                `theme-soft-button profile-no-shadow-card inline-flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition hover:-translate-y-0.5 ${
-                    isActive ? "ring-1 ring-[var(--app-border-strong)]" : "opacity-95 hover:opacity-100"
+                `group flex items-start gap-3 rounded-lg p-2 text-left transition-all hover:bg-orange-500/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-primary)] ${
+                    isActive ? "bg-orange-500/[0.08]" : ""
                 }`
             }
         >
-            <span className="theme-soft-button inline-flex h-8 w-8 items-center justify-center rounded-lg">{icon}</span>
+            <span className="mt-0.5 text-[var(--app-primary)] group-hover:scale-110 transition-transform shrink-0">
+                {icon}
+            </span>
             <span className="min-w-0">
-                <p className="text-sm font-semibold leading-tight">{label}</p>
-                <p className="theme-muted text-[11px] leading-tight">{caption}</p>
+                <p className="text-sm font-bold text-[color:var(--app-text)] leading-tight group-hover:text-[var(--app-primary)] transition-colors">
+                    {label}
+                </p>
+                <p className="theme-muted text-xs leading-normal mt-0.5">
+                    {caption}
+                </p>
             </span>
         </NavLink>
     );
 });
 
-function ProfileValueCard({ icon, label, hint, value, toneClass }) {
+function ProfileValueCard({ icon, label, hint, value, isHighlighted }) {
+    if (isHighlighted) {
+        return (
+            <article className="rounded-xl p-3.5 bg-orange-500/[0.05] hover:bg-orange-500/[0.09] transition-all border border-orange-500/25">
+                <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--app-primary)]">
+                        {label}
+                    </span>
+                    <span className="text-[var(--app-primary)]">{icon}</span>
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold tracking-tight text-[color:var(--app-text)] mt-1.5">
+                    {value}
+                </div>
+                <div className="theme-muted text-xs mt-1">{hint}</div>
+            </article>
+        );
+    }
+
     return (
-        <article className={`profile-no-shadow-card rounded-2xl bg-gradient-to-br ${toneClass} px-3 py-3 backdrop-blur-sm`}>
-            <div className="theme-soft-button inline-flex h-7 w-7 items-center justify-center rounded-lg">{icon}</div>
-            <p className="theme-muted mt-2 text-[10px] font-semibold uppercase tracking-[0.2em]">{label}</p>
-            <p className="theme-muted mt-1 text-[11px]">{hint}</p>
-            <p className="mt-2 text-base font-semibold tabular-nums md:text-lg">{value}</p>
+        <article className="rounded-xl p-3.5 border border-[color:var(--app-border)]/30 bg-transparent sm:border-0 sm:border-l sm:border-[color:var(--app-border)]/40 sm:rounded-none sm:pl-6 transition-all">
+            <div className="flex items-center justify-between">
+                <span className="theme-muted text-xs font-medium uppercase tracking-wide">
+                    {label}
+                </span>
+                <span className="theme-muted text-stone-400">{icon}</span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-[color:var(--app-text)] mt-1.5">
+                {value}
+            </div>
+            <div className="theme-muted text-xs mt-1">{hint}</div>
         </article>
     );
 }
@@ -352,51 +391,67 @@ function RecentOrdersSection({ profile, customerToken, buildProfilePath }) {
     }, [data?.groups]);
 
     return (
-        <section className="mt-5 rounded-2xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+        <section className="pb-6 border-b border-[color:var(--app-border)]/40 space-y-3">
+            <div className="flex items-center justify-between">
                 <div>
-                    <p className="theme-accent-text text-[11px] font-semibold uppercase tracking-[0.22em]">Recent orders</p>
-                    <h2 className="mt-1 text-lg font-semibold">Latest activity</h2>
+                    <div className="text-xs font-bold uppercase tracking-wider text-[var(--app-primary)]">
+                        RECENT ORDERS
+                    </div>
+                    <h2 className="text-base sm:text-lg font-bold text-[color:var(--app-text)] mt-0.5">
+                        Latest activity
+                    </h2>
                 </div>
                 <NavLink
                     to={buildProfilePath("/profile/order-history")}
                     reloadDocument
-                    className="theme-soft-button inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold theme-muted hover:text-[color:var(--app-text)] hover:bg-[color:var(--app-border)]/30 transition-all shadow-sm"
                 >
-                    <span className="inline-block h-2 w-2 rounded-full bg-[var(--app-accent)]" />
+                    <span className="h-2 w-2 rounded-full bg-[var(--app-primary)]" />
                     Order History
                 </NavLink>
             </div>
 
-            {!enabled && <p className="theme-muted mt-3 text-xs">Login session required to load recent orders.</p>}
-            {enabled && loading && <p className="theme-muted mt-3 text-xs">Loading recent orders...</p>}
+            {!enabled && <p className="theme-muted text-xs py-2">Login session required to load recent orders.</p>}
+            {enabled && loading && <p className="theme-muted text-xs py-2">Loading recent orders...</p>}
             {enabled && error && (
-                <div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>
+                <div className="rounded-md border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-600 dark:text-rose-400">{error}</div>
             )}
 
             {enabled && !loading && !error && (
                 <>
                     {!recentOrders.length ? (
-                        <p className="theme-muted mt-3 text-xs">No recent orders found.</p>
+                        <p className="theme-muted text-xs py-2">No recent orders found.</p>
                     ) : (
-                        <div className="mt-3 grid gap-2 md:grid-cols-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 pt-1">
                             {recentOrders.map(({ order, restaurant }) => {
                                 const createdAt = new Date(order?.createdAt);
-                                const createdLabel = Number.isNaN(createdAt.getTime()) ? "Unknown date" : createdAt.toLocaleString();
+                                const createdLabel = Number.isNaN(createdAt.getTime()) ? "Unknown date" : createdAt.toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" });
                                 const restaurantName = String(restaurant?.name || restaurant?.slug || "Restaurant");
                                 const table = String(order?.tableNo || "").trim() || "Takeaway";
                                 const orderId = String(order?.id || "").trim();
                                 const cardNode = (
-                                    <>
-                                        <p className="theme-muted text-[10px] font-semibold uppercase tracking-[0.18em]">{restaurantName}</p>
-                                        <p className="mt-1 text-sm font-semibold">Order #{order?.orderNo || order?.id}</p>
-                                        <p className="theme-muted mt-1 text-[11px]">{createdLabel}</p>
-                                        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-                                            <span className="theme-pill rounded-full px-2 py-1">{formatStatus(order?.status)}</span>
-                                            <span className="theme-pill rounded-full px-2 py-1">{table}</span>
-                                            <span className="theme-pill rounded-full px-2 py-1">{formatMoney(order?.total)}</span>
+                                    <div className="rounded-xl border border-[color:var(--app-border)]/40 p-3.5 hover:border-orange-500/40 hover:bg-orange-500/[0.03] transition-all">
+                                        <div className="text-xs font-bold uppercase tracking-wider text-[var(--app-primary)] truncate">
+                                            {restaurantName}
                                         </div>
-                                    </>
+                                        <div className="text-sm font-bold text-[color:var(--app-text)] mt-1">
+                                            Order #{order?.orderNo || order?.id}
+                                        </div>
+                                        <div className="theme-muted text-xs mt-0.5">
+                                            {createdLabel}
+                                        </div>
+                                        <div className="mt-3 pt-2.5 border-t border-[color:var(--app-border)]/30 flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="inline-flex items-center rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-semibold text-[var(--app-primary)]">
+                                                    {formatStatus(order?.status)}
+                                                </span>
+                                                <span className="theme-muted text-[11px] font-medium">{table}</span>
+                                            </div>
+                                            <span className="font-bold text-[color:var(--app-text)] text-sm">
+                                                {formatMoney(order?.total)}
+                                            </span>
+                                        </div>
+                                    </div>
                                 );
 
                                 return (
@@ -411,12 +466,12 @@ function RecentOrdersSection({ profile, customerToken, buildProfilePath }) {
                                                     slug: String(restaurant?.slug || ""),
                                                 },
                                             }}
-                                            className="block rounded-xl bg-white/[0.03] px-3 py-3 transition hover:-translate-y-0.5 hover:bg-white/[0.05]"
+                                            className="block group"
                                         >
                                             {cardNode}
                                         </Link>
                                     ) : (
-                                        <article key={String(`${restaurantName}-${createdLabel}`)} className="rounded-xl bg-white/[0.03] px-3 py-3">
+                                        <article key={String(`${restaurantName}-${createdLabel}`)}>
                                             {cardNode}
                                         </article>
                                     )

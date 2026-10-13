@@ -25,16 +25,20 @@ export default function useCachedGet(
     });
     const [loading, setLoading] = useState(Boolean(enabled && data === null));
     const [error, setError] = useState("");
+    const [errorStatus, setErrorStatus] = useState(null);
 
     const refresh = useCallback(async ({ force = false } = {}) => {
         if (!enabled) return null;
         try {
             setLoading(true);
             setError("");
+            setErrorStatus(null);
             const next = await cachedGet(url, { params, ttlMs, staleMs, scope, cacheKey: key, force });
             setData(next);
             return next;
         } catch (err) {
+            const status = err?.response?.status ?? (err?.code === "ERR_NETWORK" || !err?.response ? 0 : null);
+            setErrorStatus(status);
             setError(err?.response?.data?.message || err?.message || "Request failed");
             return null;
         } finally {
@@ -60,5 +64,5 @@ export default function useCachedGet(
         refresh();
     }, [enabled, key, refresh]);
 
-    return { data, loading, error, refresh, cacheKey: key };
+    return { data, loading, error, errorStatus, refresh, cacheKey: key };
 }

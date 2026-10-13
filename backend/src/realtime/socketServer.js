@@ -3,6 +3,7 @@ import { createOrderByStaff, updateOrderStatus } from "../services/orderService.
 import { createAndDispatchNotification } from "../services/notificationService.js";
 import { RECIPIENT_TYPES, NOTIFICATION_TYPES } from "../constants/notificationTypes.js";
 import { dispatchKotPrint } from "../services/kotService.js";
+import { getPhoneVariants } from "../services/phoneService.js";
 
 const restaurantRoom = (restaurantId) => `restaurant:${Number(restaurantId || 0)}`;
 const branchRoom = (restaurantId, branchId) => `branch:${Number(restaurantId || 0)}:${Number(branchId || 0)}`;
@@ -132,6 +133,48 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
       if (sid) socket.join(`session_${sid}`);
       if (tid) socket.join(`table_${tid}`);
       if (rid) socket.join(`restaurant_${rid}`);
+    });
+
+    socket.on("join_customer_room", async (payload) => {
+      const cid = payload?.customerId || payload?.id;
+      const ids = Array.isArray(payload?.customerIds) ? payload.customerIds : (cid ? [cid] : []);
+      ids.forEach((id) => {
+        if (id) {
+          socket.join(`customer_${id}`);
+          socket.join(`customer:${id}`);
+        }
+      });
+      const phone = payload?.phone;
+      if (phone && prisma) {
+        try {
+          const variants = getPhoneVariants(phone);
+          const [account, custs] = await Promise.all([
+            prisma.customerAccount.findFirst({ where: { phone: { in: variants } }, select: { id: true } }),
+            prisma.customer.findMany({ where: { phone: { in: variants } }, select: { id: true } }),
+          ]);
+          if (account?.id) {
+            socket.join(`customer_${account.id}`);
+            socket.join(`customer:${account.id}`);
+          }
+          custs.forEach((c) => {
+            socket.join(`customer_${c.id}`);
+            socket.join(`customer:${c.id}`);
+          });
+        } catch {
+          // ignore
+        }
+      }
+    });
+
+    socket.on("leave_customer_room", (payload) => {
+      const cid = payload?.customerId || payload?.id;
+      const ids = Array.isArray(payload?.customerIds) ? payload.customerIds : (cid ? [cid] : []);
+      ids.forEach((id) => {
+        if (id) {
+          socket.leave(`customer_${id}`);
+          socket.leave(`customer:${id}`);
+        }
+      });
     });
   });
 

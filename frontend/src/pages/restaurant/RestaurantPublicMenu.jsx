@@ -39,11 +39,30 @@ export default function RestaurantPublicMenu() {
     const tableFromUrl = String(searchParams.get("table") || "").trim();
     const searchFromUrl = String(searchParams.get("search") || "").trim();
 
-    const { data, loading } = useCachedGet(`/r/${slug}/menu`, {
+    const { data, loading, error, errorStatus, refresh } = useCachedGet(`/r/${slug}/menu`, {
         ttlMs: 5_000,
         staleMs: 15_000,
         scope: `restaurant:${slug}`,
     });
+
+    const isNotFound =
+        errorStatus === 404 ||
+        (!data && Boolean(error) && (errorStatus === 404 || error.toLowerCase().includes("not found"))) ||
+        (!loading && Boolean(data) && !data.restaurant);
+
+    const isNetworkError =
+        !isNotFound &&
+        (errorStatus === 0 ||
+            (!data &&
+                Boolean(error) &&
+                (error.toLowerCase().includes("network") ||
+                    error.toLowerCase().includes("err_network") ||
+                    error.toLowerCase().includes("timeout"))));
+
+    const isServerError =
+        !isNotFound &&
+        !isNetworkError &&
+        (Boolean(errorStatus && errorStatus >= 500) || (!data && Boolean(error)));
     const restaurant = data?.restaurant || null;
     const menu = Array.isArray(data?.menu) ? data.menu : EMPTY_MENU;
     const restaurantName = String(restaurant?.name || slug || "Restaurant").trim();
@@ -313,8 +332,163 @@ export default function RestaurantPublicMenu() {
 
     if (loading) {
         return (
-            <div className="theme-page flex min-h-screen items-center justify-center">
+            <div className="theme-page flex min-h-screen items-center justify-center text-sm font-medium theme-muted">
                 Loading Menu...
+            </div>
+        );
+    }
+
+    if (isNotFound) {
+        return (
+            <div className="theme-page min-h-screen">
+                <div className="theme-nav sticky top-0 z-30 border-b px-3 py-3 sm:px-6">
+                    <div className="flex items-center justify-between">
+                        <Link to="/" className="flex items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1.5 shadow-[0_4px_14px_rgba(104,70,37,0.12)] sm:h-12 sm:w-12">
+                                <BrandLogo className="h-full w-full" title="Tiffzy logo" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]">
+                                    Tiffzy
+                                </p>
+                            </div>
+                        </Link>
+                        <Link
+                            to="/"
+                            className="theme-soft-button inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold sm:text-sm"
+                        >
+                            <span>Back to Restaurants</span>
+                        </Link>
+                    </div>
+                </div>
+
+                <div className="mx-auto flex max-w-md flex-col items-center justify-center px-4 py-24 text-center">
+                    <div className="theme-card flex flex-col items-center rounded-3xl p-8 sm:p-10 shadow-lg border border-[var(--app-border)]/40">
+                        <h2 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl">
+                            Restaurant Not Found
+                        </h2>
+                        <p className="theme-muted mt-3 text-sm">
+                            This restaurant is no longer available or the link is invalid.
+                        </p>
+                        <div className="mt-6">
+                            <Link
+                                to="/"
+                                className="theme-button inline-flex items-center rounded-2xl px-6 py-3 text-sm font-semibold shadow-md"
+                            >
+                                Back to Restaurants
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+                <Footer />
+            </div>
+        );
+    }
+
+    if (isNetworkError) {
+        return (
+            <div className="theme-page min-h-screen">
+                <div className="theme-nav sticky top-0 z-30 border-b px-3 py-3 sm:px-6">
+                    <div className="flex items-center justify-between">
+                        <Link to="/" className="flex items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1.5 shadow-[0_4px_14px_rgba(104,70,37,0.12)] sm:h-12 sm:w-12">
+                                <BrandLogo className="h-full w-full" title="Tiffzy logo" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]">
+                                    Tiffzy
+                                </p>
+                            </div>
+                        </Link>
+                        <Link
+                            to="/"
+                            className="theme-soft-button inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold sm:text-sm"
+                        >
+                            <span>Back Home</span>
+                        </Link>
+                    </div>
+                </div>
+
+                <div className="mx-auto flex max-w-md flex-col items-center justify-center px-4 py-24 text-center">
+                    <div className="theme-card flex flex-col items-center rounded-3xl p-8 sm:p-10 shadow-lg border border-[var(--app-border)]/40">
+                        <h2 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl">
+                            Connection Problem
+                        </h2>
+                        <p className="theme-muted mt-3 text-sm">
+                            Unable to connect to the server. Please check your connection.
+                        </p>
+                        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => refresh({ force: true })}
+                                className="theme-button inline-flex items-center rounded-2xl px-6 py-3 text-sm font-semibold shadow-md"
+                            >
+                                Try Again
+                            </button>
+                            <Link
+                                to="/"
+                                className="theme-soft-button inline-flex items-center rounded-2xl px-5 py-3 text-sm font-semibold"
+                            >
+                                Back to Restaurants
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+                <Footer />
+            </div>
+        );
+    }
+
+    if (isServerError) {
+        return (
+            <div className="theme-page min-h-screen">
+                <div className="theme-nav sticky top-0 z-30 border-b px-3 py-3 sm:px-6">
+                    <div className="flex items-center justify-between">
+                        <Link to="/" className="flex items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1.5 shadow-[0_4px_14px_rgba(104,70,37,0.12)] sm:h-12 sm:w-12">
+                                <BrandLogo className="h-full w-full" title="Tiffzy logo" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[color:var(--app-accent)]">
+                                    Tiffzy
+                                </p>
+                            </div>
+                        </Link>
+                        <Link
+                            to="/"
+                            className="theme-soft-button inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold sm:text-sm"
+                        >
+                            <span>Back Home</span>
+                        </Link>
+                    </div>
+                </div>
+
+                <div className="mx-auto flex max-w-md flex-col items-center justify-center px-4 py-24 text-center">
+                    <div className="theme-card flex flex-col items-center rounded-3xl p-8 sm:p-10 shadow-lg border border-[var(--app-border)]/40">
+                        <h2 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-2xl">
+                            Unable to Load Menu
+                        </h2>
+                        <p className="theme-muted mt-3 text-sm">
+                            We couldn't load this restaurant's menu right now.
+                        </p>
+                        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => refresh({ force: true })}
+                                className="theme-button inline-flex items-center rounded-2xl px-6 py-3 text-sm font-semibold shadow-md"
+                            >
+                                Try Again
+                            </button>
+                            <Link
+                                to="/"
+                                className="theme-soft-button inline-flex items-center rounded-2xl px-5 py-3 text-sm font-semibold"
+                            >
+                                Back to Restaurants
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+                <Footer />
             </div>
         );
     }
@@ -384,26 +558,28 @@ export default function RestaurantPublicMenu() {
                             </div>
                         </div>
 
-                        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                            {navigationSections.map((section) => (
-                                <button
-                                    key={section.key}
-                                    type="button"
-                                    onClick={() => scrollToSection(section.key)}
-                                    className={[
-                                        "theme-chip inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition sm:px-4 sm:py-2 sm:text-sm",
-                                        resolvedActiveSection === section.key ? "theme-chip-active" : "",
-                                    ]
-                                        .filter(Boolean)
-                                        .join(" ")}
-                                >
-                                    <span>{section.label}</span>
-                                    <span className="theme-pill rounded-full px-2 py-0.5 text-[11px] tabular-nums">
-                                        {section.count}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
+                        {menu.length > 0 && (
+                            <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                {navigationSections.map((section) => (
+                                    <button
+                                        key={section.key}
+                                        type="button"
+                                        onClick={() => scrollToSection(section.key)}
+                                        className={[
+                                            "theme-chip inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition sm:px-4 sm:py-2 sm:text-sm",
+                                            resolvedActiveSection === section.key ? "theme-chip-active" : "",
+                                        ]
+                                            .filter(Boolean)
+                                            .join(" ")}
+                                    >
+                                        <span>{section.label}</span>
+                                        <span className="theme-pill rounded-full px-2 py-0.5 text-[11px] tabular-nums">
+                                            {section.count}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -432,12 +608,18 @@ export default function RestaurantPublicMenu() {
                     {!hasResults && (
                         <div className="py-12 text-center">
                             <h3 className="text-lg font-bold">
-                                {vegModeEnabled ? "No veg items found" : "No items found"}
+                                {vegModeEnabled
+                                    ? "No veg items found"
+                                    : search.trim()
+                                    ? "No items found"
+                                    : "No menu items available"}
                             </h3>
                             <p className="theme-muted mt-2 text-sm">
                                 {vegModeEnabled
                                     ? "Veg mode is on. Turn it off to browse the full menu."
-                                    : "Try a different search term or clear the search to browse the full menu."}
+                                    : search.trim()
+                                    ? "Try a different search term or clear the search to browse the full menu."
+                                    : "This restaurant currently has no items listed on the menu."}
                             </p>
                             <div className="mt-4 flex flex-wrap justify-center gap-3">
                                 {search.trim() ? (

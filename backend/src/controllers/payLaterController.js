@@ -1,5 +1,7 @@
 import * as payLaterService from "../services/payLaterService.js";
 import { requireCustomerPhoneFromJwt } from "../services/customerProfileService.js";
+import { getUserNotifications, markNotificationRead, markAllNotificationsRead } from "../services/notificationService.js";
+import { getPhoneVariants, normalizePhone } from "../services/phoneService.js";
 
 const mapError = (err, reply) => {
   const code = err.code || "";
@@ -203,8 +205,36 @@ export const buildPayLaterController = ({ prisma }) => {
       const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Authentication required" });
 
-      const notifications = await payLaterService.getCustomerNotifications({ prisma, phone });
-      return { notifications };
+      const variants = getPhoneVariants(phone);
+      const [customerAccount, customerRecords] = await Promise.all([
+        prisma.customerAccount.findFirst({
+          where: {
+            OR: [
+              { phone: { in: variants } },
+              ...(phone.includes("@") ? [{ email: phone.toLowerCase() }] : []),
+            ],
+          },
+        }),
+        prisma.customer.findMany({ where: { phone: { in: variants } } }),
+      ]);
+
+      const recipientIds = new Set();
+      if (customerAccount?.id) recipientIds.add(Number(customerAccount.id));
+      customerRecords.forEach((c) => recipientIds.add(Number(c.id)));
+
+      const result = await getUserNotifications({
+        prisma,
+        recipientType: "CUSTOMER",
+        recipientId: Array.from(recipientIds),
+        page: 1,
+        limit: 100,
+      });
+
+      return {
+        notifications: result.notifications,
+        unreadCount: result.unreadCount,
+        total: result.total,
+      };
     } catch (err) {
       return mapError(err, reply);
     }
@@ -216,8 +246,65 @@ export const buildPayLaterController = ({ prisma }) => {
       const phone = await requireCustomerPhoneFromJwt(req, prisma);
       if (!phone) return reply.code(401).send({ message: "Authentication required" });
 
-      const notification = await payLaterService.markNotificationRead({ prisma, notificationId, phone });
-      return { message: "Notification marked read", notification };
+      const variants = getPhoneVariants(phone);
+      const [customerAccount, customerRecords] = await Promise.all([
+        prisma.customerAccount.findFirst({
+          where: {
+            OR: [
+              { phone: { in: variants } },
+              ...(phone.includes("@") ? [{ email: phone.toLowerCase() }] : []),
+            ],
+          },
+        }),
+        prisma.customer.findMany({ where: { phone: { in: variants } } }),
+      ]);
+
+      const recipientIds = new Set();
+      if (customerAccount?.id) recipientIds.add(Number(customerAccount.id));
+      customerRecords.forEach((c) => recipientIds.add(Number(c.id)));
+
+      await markNotificationRead({
+        prisma,
+        notificationId,
+        recipientType: "CUSTOMER",
+        recipientId: Array.from(recipientIds),
+      });
+
+      return { message: "Notification marked read" };
+    } catch (err) {
+      return mapError(err, reply);
+    }
+  };
+
+  const readAllNotifications = async (req, reply) => {
+    try {
+      const phone = await requireCustomerPhoneFromJwt(req, prisma);
+      if (!phone) return reply.code(401).send({ message: "Authentication required" });
+
+      const variants = getPhoneVariants(phone);
+      const [customerAccount, customerRecords] = await Promise.all([
+        prisma.customerAccount.findFirst({
+          where: {
+            OR: [
+              { phone: { in: variants } },
+              ...(phone.includes("@") ? [{ email: phone.toLowerCase() }] : []),
+            ],
+          },
+        }),
+        prisma.customer.findMany({ where: { phone: { in: variants } } }),
+      ]);
+
+      const recipientIds = new Set();
+      if (customerAccount?.id) recipientIds.add(Number(customerAccount.id));
+      customerRecords.forEach((c) => recipientIds.add(Number(c.id)));
+
+      await markAllNotificationsRead({
+        prisma,
+        recipientType: "CUSTOMER",
+        recipientId: Array.from(recipientIds),
+      });
+
+      return { message: "All notifications marked read" };
     } catch (err) {
       return mapError(err, reply);
     }
@@ -269,6 +356,7 @@ export const buildPayLaterController = ({ prisma }) => {
     sendReminder,
     getNotifications,
     readNotification,
+    readAllNotifications,
     getWalletHistory,
   };
 };

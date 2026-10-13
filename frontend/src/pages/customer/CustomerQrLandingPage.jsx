@@ -26,10 +26,12 @@ import {
   Layers,
   ArrowRight,
   RotateCcw,
+  Heart,
 } from "lucide-react";
 import { API, API_BASE_URL } from "../../config";
 import { showToast } from "../../utils/toast";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
+import { getCustomerFavorites, toggleFavoriteMenuItem } from "../../utils/customerFavorites";
 import ItemCustomizationModal from "../../components/ItemCustomizationModal";
 import VegModeToggle from "../../components/VegModeToggle";
 
@@ -86,6 +88,41 @@ export default function CustomerQrLandingPage() {
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
+
+  // Favorites state
+  const [favorites, setFavorites] = useState(() => getCustomerFavorites());
+
+  useEffect(() => {
+    const syncFavorites = () => {
+      setFavorites(getCustomerFavorites());
+    };
+    window.addEventListener("storage", syncFavorites);
+    window.addEventListener("focus", syncFavorites);
+    return () => {
+      window.removeEventListener("storage", syncFavorites);
+      window.removeEventListener("focus", syncFavorites);
+    };
+  }, []);
+
+  const favoriteKeySet = useMemo(() => {
+    return new Set((Array.isArray(favorites) ? favorites : []).map((fav) => String(fav?.key || "")));
+  }, [favorites]);
+
+  const handleToggleFavorite = (item) => {
+    const slug = String(restaurant?.slug || "").trim();
+    const name = String(restaurant?.name || slug).trim();
+    const { next, added } = toggleFavoriteMenuItem({
+      restaurantSlug: slug,
+      restaurantName: name,
+      item,
+    });
+    setFavorites(next);
+    showToast({
+      title: added ? "Saved to favorites" : "Removed from favorites",
+      message: added ? "You can find it in Profile -> Favorites." : "Removed from your favorites list.",
+      variant: added ? "success" : "default",
+    });
+  };
   const [paymentMethod, setPaymentMethod] = useState("PAY_AT_COUNTER");
 
   const [placingOrder, setPlacingOrder] = useState(false);
@@ -750,6 +787,40 @@ export default function CustomerQrLandingPage() {
                         <Sparkles size={9} /> Best
                       </span>
                     )}
+                    {/* Favorite Heart Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleToggleFavorite(item);
+                      }}
+                      aria-label={
+                        favoriteKeySet.has(`${String(restaurant?.slug || "").trim()}:${Number(item.id)}`)
+                          ? "Remove from favorites"
+                          : "Add to favorites"
+                      }
+                      title={
+                        favoriteKeySet.has(`${String(restaurant?.slug || "").trim()}:${Number(item.id)}`)
+                          ? "Remove from favorites"
+                          : "Add to favorites"
+                      }
+                      className={`absolute right-1 top-1 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full border shadow-xs transition duration-200 active:scale-90 ${
+                        favoriteKeySet.has(`${String(restaurant?.slug || "").trim()}:${Number(item.id)}`)
+                          ? "border-[#ff8a1f]/60 bg-white text-[#ff8a1f] hover:bg-orange-50 shadow-orange-500/20"
+                          : "border-black/10 bg-white/90 text-[#2c160c] backdrop-blur-xs hover:border-[#ff8a1f]/40 hover:bg-white hover:text-[#ff8a1f]"
+                      }`}
+                    >
+                      <Heart
+                        size={12}
+                        className={
+                          favoriteKeySet.has(`${String(restaurant?.slug || "").trim()}:${Number(item.id)}`)
+                            ? "fill-[#ff8a1f] text-[#ff8a1f]"
+                            : "fill-none text-current"
+                        }
+                        strokeWidth={2.2}
+                      />
+                    </button>
                     {/* Sold Out Overlay */}
                     {!item.isAvailable && (
                       <div className="absolute inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center">

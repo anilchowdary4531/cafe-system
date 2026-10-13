@@ -419,7 +419,7 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                             </div>
 
                             <div>
-                                <label className="theme-muted mb-2 block text-xs font-semibold uppercase tracking-wider">App Language</label>
+                                <label className="theme-muted mb-2 block text-xs font-semibold uppercase tracking-wider">Language</label>
                                 <div className="rounded-2xl border border-black/5 bg-black/5 overflow-hidden dark:border-white/5 dark:bg-white/5">
                                     <LanguageSelector variant="menu-item" />
                                 </div>

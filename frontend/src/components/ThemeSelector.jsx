@@ -13,11 +13,11 @@ export default function ThemeSelector({ variant = "default" }) {
             </span>
 
             <select
-                value={activeTheme.id}
+                value={activeTheme?.id || "classic-amber"}
                 onChange={(event) => setThemeId(event.target.value)}
                 aria-label="Select UI theme"
             >
-                {themes.map((theme) => (
+                {(themes || []).map((theme) => (
                     <option key={theme.id} value={theme.id}>
                         {theme.number}. {theme.name}
                     </option>
@@ -26,7 +26,7 @@ export default function ThemeSelector({ variant = "default" }) {
 
             <span
                 className="theme-dropdown-swatch"
-                style={{ backgroundColor: activeTheme.preview.primary }}
+                style={{ backgroundColor: activeTheme?.preview?.primary || "#f97316" }}
                 aria-hidden="true"
             />
         </label>

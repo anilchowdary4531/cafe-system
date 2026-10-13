@@ -57,6 +57,10 @@ async function runCustomerOrderingTests() {
         name: "Super Burger",
         category: "Burgers",
         price: 250.0,
+        image: JSON.stringify([
+          "https://images.unsplash.com/photo-1568901346375-23c9450c58cd",
+          "https://images.unsplash.com/photo-1550547660-d9450f859349",
+        ]),
         isAvailable: true,
       },
     });
