@@ -4,6 +4,8 @@ import {
   issueStaffSession,
 } from "../services/staffSessionService.js";
 import { resolveMenuPricing } from "../services/menuPricingService.js";
+import { staffLoginRateLimiter } from "../middleware/rateLimiter.js";
+import { getLoginLockoutConfig } from "../services/staffAuthService.js";
 
 export default async function publicRoutes(app, deps) {
   const { prisma, normalizeDbPermissions, buildQrTargetUrl, STAFF_ACCESS_MODULES } = deps;
@@ -537,7 +539,9 @@ export default async function publicRoutes(app, deps) {
   app.get("/api/tobacco/items", handleTobaccoItems);
   app.get("/api/v1/tobacco/items", handleTobaccoItems);
 
-  app.post("/login", async (req, reply) => {
+  const DUMMY_BCRYPT_HASH = "$2a$10$wT0vV274Lz58sF8x8y0ncuX8e9V3eF6.oI9xT5tK4T2Fk7Z1y6ZGi";
+
+  const handleStaffLogin = async (req, reply) => {
     try {
       const body = req.body || {};
       const { email, password } = body;
@@ -560,29 +564,96 @@ export default async function publicRoutes(app, deps) {
       });
 
       if (!user) {
+        bcrypt.compareSync(String(password), DUMMY_BCRYPT_HASH);
         return reply.code(401).send({
-          message: "Invalid email",
+          message: "Invalid email or password",
         });
       }
 
-      const valid = user.password === password || bcrypt.compareSync(password, user.password);
-      if (!valid) {
+      const now = new Date();
+      const isLocked = Boolean(user.lockedUntil && new Date(user.lockedUntil) > now);
+      if (isLocked) {
+        bcrypt.compareSync(String(password), DUMMY_BCRYPT_HASH);
         return reply.code(401).send({
-          message: "Invalid password",
+          message: "Invalid email or password",
         });
       }
+
+      const valid = Boolean(user.password && bcrypt.compareSync(String(password), user.password));
+      if (!valid) {
+        const { threshold, durationMinutes } = getLoginLockoutConfig();
+        const wasExpired = Boolean(user.lockedUntil && new Date(user.lockedUntil) <= now);
+
+        await prisma.$transaction(async (tx) => {
+          const current = await tx.user.findUnique({
+            where: { id: user.id },
+            select: { failedLoginAttempts: true, lockedUntil: true },
+          });
+          const isCurrentExpired = Boolean(current?.lockedUntil && new Date(current.lockedUntil) <= now);
+          const newCount = (wasExpired || isCurrentExpired) ? 1 : ((current?.failedLoginAttempts || 0) + 1);
+          const lockTime = newCount >= threshold ? new Date(now.getTime() + durationMinutes * 60 * 1000) : null;
+          await tx.user.update({
+            where: { id: user.id },
+            data: {
+              failedLoginAttempts: newCount,
+              lastFailedLoginAt: now,
+              lockedUntil: lockTime,
+            },
+          });
+        });
+
+        return reply.code(401).send({
+          message: "Invalid email or password",
+        });
+      }
+
       if (user.isActive === false) {
         return reply.code(403).send({
           message: "Account is disabled. Contact owner/admin.",
         });
       }
 
+      const isTempExpired =
+        Boolean(user.mustChangePassword) &&
+        Boolean(user.temporaryPasswordExpiresAt) &&
+        new Date(user.temporaryPasswordExpiresAt).getTime() < Date.now();
+
+      if (isTempExpired) {
+        return reply.code(401).send({
+          message: "Invalid email or password",
+        });
+      }
+
+      // Reset lockout state on successful authentication
+      if ((user.failedLoginAttempts || 0) > 0 || user.lastFailedLoginAt || user.lockedUntil) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            failedLoginAttempts: 0,
+            lastFailedLoginAt: null,
+            lockedUntil: null,
+          },
+        });
+      }
+
+      const mustChangePassword = Boolean(user.mustChangePassword);
       const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
       const { token, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
       userPayload.sessionVersion = sessionVersion;
 
+      if (mustChangePassword) {
+        return {
+          message: "Password change required",
+          mustChangePassword: true,
+          token,
+          user: userPayload,
+          offlineMode: false,
+        };
+      }
+
       return {
         message: "Login success",
+        mustChangePassword: false,
         token,
         user: userPayload,
         offlineMode: false,
@@ -596,7 +667,10 @@ export default async function publicRoutes(app, deps) {
             : "Login failed",
       });
     }
-  });
+  };
+
+  app.post("/login", { preHandler: [staffLoginRateLimiter] }, handleStaffLogin);
+  app.post("/api/login", { preHandler: [staffLoginRateLimiter] }, handleStaffLogin);
 
   app.get("/menu", async () => {
     return await prisma.menuItem.findMany({

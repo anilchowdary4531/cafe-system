@@ -32,7 +32,11 @@ export default async function staffManagementRoutes(app, deps) {
     const { prisma, realtime, STAFF_ALLOWED_ROLES } = deps;
 
     const requireStaffActor = async (req, reply) => {
-        const actor = await requireStaffJwt(req, reply, { prisma, allowedRoles: STAFF_ALLOWED_ROLES });
+        const actor = await requireStaffJwt(req, reply, {
+            prisma,
+            allowedRoles: STAFF_ALLOWED_ROLES,
+            matchRestaurantParam: "restaurantId",
+        });
         if (!actor) return reply;
         req.staffActor = actor;
         return null;
@@ -53,7 +57,7 @@ export default async function staffManagementRoutes(app, deps) {
     app.post("/api/v1/owner/:restaurantId/schedules", { preHandler: requireStaffActor }, async (req, reply) => {
         try {
             const restaurantId = Number(req.params.restaurantId || req.staffActor?.restaurantId || 0);
-            const shift = await saveStaffShift({ prisma, restaurantId, ...req.body });
+            const shift = await saveStaffShift({ prisma, ...req.body, restaurantId });
             return reply.send({ shift, message: "Shift saved successfully." });
         } catch (err) {
             return reply.code(err.statusCode || 500).send({ message: err.message });
@@ -73,7 +77,7 @@ export default async function staffManagementRoutes(app, deps) {
     app.post("/api/v1/owner/:restaurantId/schedules/publish", { preHandler: requireStaffActor }, async (req, reply) => {
         try {
             const restaurantId = Number(req.params.restaurantId || req.staffActor?.restaurantId || 0);
-            const result = await publishStaffShifts({ prisma, realtime, restaurantId, ...req.body });
+            const result = await publishStaffShifts({ prisma, realtime, ...req.body, restaurantId });
             return reply.send({ ...result, message: `${result.count} shifts published successfully.` });
         } catch (err) {
             return reply.code(err.statusCode || 500).send({ message: err.message });
@@ -83,7 +87,7 @@ export default async function staffManagementRoutes(app, deps) {
     app.post("/api/v1/owner/:restaurantId/schedules/copy-week", { preHandler: requireStaffActor }, async (req, reply) => {
         try {
             const restaurantId = Number(req.params.restaurantId || req.staffActor?.restaurantId || 0);
-            const result = await copyPreviousWeekShifts({ prisma, restaurantId, ...req.body });
+            const result = await copyPreviousWeekShifts({ prisma, ...req.body, restaurantId });
             return reply.send({ ...result, message: `${result.count} shifts copied.` });
         } catch (err) {
             return reply.code(err.statusCode || 500).send({ message: err.message });

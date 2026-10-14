@@ -26,7 +26,7 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId }) 
         name: "",
         phone: "",
         email: "",
-        password: "staff123",
+        password: "",
         role: "WAITER",
         designation: "",
     });
@@ -81,21 +81,26 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId }) 
         if (!restaurantId) return;
         setSubmitting(true);
         try {
-            await axios.post(`${API}/owner/${restaurantId}/staff`, {
+            const res = await axios.post(`${API}/owner/${restaurantId}/staff`, {
                 name: addForm.name,
                 email: addForm.email,
                 phone: addForm.phone,
-                password: addForm.password || "staff123",
+                password: addForm.password || undefined,
                 role: addForm.role,
                 designation: addForm.designation || undefined,
             });
-            showToast(`Added ${addForm.name} to staff directory!`, "success");
+            const tempPassword = res.data?.temporaryPassword;
+            if (tempPassword) {
+                showToast(`Added ${addForm.name}! Temp Password: ${tempPassword}`, "success");
+            } else {
+                showToast(`Added ${addForm.name} to staff directory!`, "success");
+            }
             setShowAddForm(false);
             setAddForm({
                 name: "",
                 phone: "",
                 email: "",
-                password: "staff123",
+                password: "",
                 role: "WAITER",
                 designation: "",
             });

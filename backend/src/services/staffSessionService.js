@@ -34,35 +34,47 @@ const getEffectiveStaffRole = (user) => {
 
 export const buildStaffLoginPayload = ({ user, normalizeDbPermissions }) => {
   const effectiveRole = getEffectiveStaffRole(user);
+  const mustChangePassword = Boolean(user?.mustChangePassword);
 
   let access = null;
-  if (effectiveRole !== "SUPER_ADMIN") {
+  if (effectiveRole !== "SUPER_ADMIN" && !mustChangePassword) {
     access = normalizeDbPermissions(user?.staffAccess?.permissions, effectiveRole);
   }
 
-  const userPayload = { ...user, role: effectiveRole, access };
+  const userPayload = { ...user, role: effectiveRole, access, mustChangePassword };
   delete userPayload.password;
+  delete userPayload.failedLoginAttempts;
+  delete userPayload.lastFailedLoginAt;
+  delete userPayload.lockedUntil;
   if (userPayload.staffAccess !== undefined) delete userPayload.staffAccess;
 
   return { userPayload, effectiveRole };
 };
 
+export const DEFAULT_STAFF_JWT_EXPIRES_IN = "12h";
+
 export const issueStaffSession = async ({ prisma, app, user, effectiveRole }) => {
   const updated = await prisma.user.update({
     where: { id: user.id },
     data: { sessionVersion: { increment: 1 } },
-    select: { sessionVersion: true },
+    select: { sessionVersion: true, mustChangePassword: true },
   });
 
   const sessionVersion = Number(updated.sessionVersion || 0);
-  const token = app.jwt.sign({
-    id: user.id,
-    phone: user.phone || "",
-    role: effectiveRole,
-    restaurantId: user.restaurantId || null,
-    branchId: user.branchId || null,
-    sessionVersion,
-  });
+  const mustChangePassword = Boolean(user?.mustChangePassword ?? updated.mustChangePassword);
+  const expiresIn = process.env.STAFF_JWT_EXPIRES_IN || DEFAULT_STAFF_JWT_EXPIRES_IN;
+  const token = app.jwt.sign(
+    {
+      id: user.id,
+      phone: user.phone || "",
+      role: effectiveRole,
+      restaurantId: user.restaurantId || null,
+      branchId: user.branchId || null,
+      sessionVersion,
+      mustChangePassword,
+    },
+    { expiresIn }
+  );
 
   return { token, sessionVersion };
 };
@@ -84,70 +96,8 @@ export const buildStaffMagicLinkUrl = ({ frontendUrl, token }) => {
   return base ? `${base}${path}` : path;
 };
 
-export const consumeStaffMagicLink = async ({ app, prisma, token, normalizeDbPermissions }) => {
-  let decoded;
-  try {
-    decoded = await app.jwt.verify(token);
-  } catch {
-    const err = new Error("Invalid or expired staff login link");
-    err.statusCode = 401;
-    throw err;
-  }
-
-  const purpose = String(decoded?.purpose || "");
-  if (purpose !== STAFF_MAGIC_LINK_PURPOSE) {
-    const err = new Error("Invalid staff login link");
-    err.statusCode = 401;
-    throw err;
-  }
-
-  const staffUserId = Number(decoded?.staffUserId || 0);
-  if (!staffUserId) {
-    const err = new Error("Invalid staff login link");
-    err.statusCode = 401;
-    throw err;
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: staffUserId },
-    include: {
-      restaurant: true,
-      staffAccess: {
-        select: { permissions: true, role: true },
-      },
-    },
-  });
-
-  if (!user) {
-    const err = new Error("Account not found or inactive");
-    err.statusCode = 404;
-    throw err;
-  }
-
-  if (user.isActive === false) {
-    const err = new Error("Account is disabled. Contact owner/admin.");
-    err.statusCode = 403;
-    throw err;
-  }
-
-  const tokenRestaurantId = Number(decoded?.restaurantId || 0) || null;
-  const userRestaurantId = Number(user.restaurantId || 0) || null;
-  if (tokenRestaurantId && userRestaurantId && tokenRestaurantId !== userRestaurantId) {
-    const err = new Error("Staff login link is not valid for this restaurant");
-    err.statusCode = 403;
-    throw err;
-  }
-
-  const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
-  const { token: sessionToken, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
-
-  userPayload.sessionVersion = sessionVersion;
-
-  return {
-    message: "Login success",
-    actorType: "STAFF",
-    token: sessionToken,
-    user: userPayload,
-    offlineMode: false,
-  };
+export const consumeStaffMagicLink = async () => {
+  const err = new Error("Passwordless login is disabled. Please log in with your email and password.");
+  err.statusCode = 403;
+  throw err;
 };

@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { normalizePhone } from "../services/phoneService.js";
 import { requestAuthOtp, verifyAuthOtp } from "../services/authOtpService.js";
 import { sendSmsOtp } from "../services/smsService.js";
@@ -35,7 +36,7 @@ const resolveStaffUser = async ({ prisma, phone, actorType, restaurantId }) => {
   });
 };
 
-export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions }) => {
+export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions, onOtpGenerated }) => {
   const sendOtp = async (req, reply) => {
     try {
       const body = req.body || {};
@@ -182,27 +183,219 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions }) 
   };
 
   const consumeStaffLink = async (req, reply) => {
+    return reply.code(403).send({
+      message: "Passwordless magic link login has been discontinued. Please log in with your email and password.",
+    });
+  };
+
+  const forgotPassword = async (req, reply) => {
     try {
       const body = req.body || {};
-      const token = String(body.token || body.staffLink || body.link || "").trim();
-      if (!token) return reply.code(400).send({ message: "Staff login link is required" });
+      const email = String(body.email || "").trim().toLowerCase();
+      const phone = body.phone ? normalizePhone(body.phone) : "";
+      const restaurantId = Number(body.restaurantId || 0) || null;
 
-      const payload = await consumeStaffMagicLink({
-        app,
+      if (!email && !phone) {
+        return reply.code(400).send({ message: "Email or phone number is required" });
+      }
+
+      const GENERIC_RESPONSE = {
+        message: "If an account exists, recovery instructions have been sent.",
+      };
+
+      let user = null;
+      if (email) {
+        user = await prisma.user.findUnique({
+          where: { email },
+          include: { restaurant: true },
+        });
+      } else if (phone) {
+        const users = await prisma.user.findMany({
+          where: { phone },
+          include: { restaurant: true },
+        });
+        if (restaurantId) {
+          user = users.find((u) => u.restaurantId === restaurantId) || null;
+        } else if (users.length === 1) {
+          user = users[0];
+        }
+      }
+
+      const isEligibleRole =
+        user &&
+        (user.role === "SUPER_ADMIN" ||
+          ["OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STAFF"].includes(String(user.role || "").toUpperCase()));
+      const isTenantMatch = !restaurantId || user?.restaurantId === restaurantId || user?.role === "SUPER_ADMIN";
+
+      if (!user || user.isActive === false || !isEligibleRole || !isTenantMatch) {
+        // Prevent account enumeration: return identical generic response
+        return reply.code(200).send(GENERIC_RESPONSE);
+      }
+
+      const recoveryIdentifier = user.email.toLowerCase();
+      const otpRes = await requestAuthOtp({
         prisma,
-        token,
-        normalizeDbPermissions,
+        phone: recoveryIdentifier,
+        actorType: "STAFF_PASSWORD_RESET",
       });
 
-      return payload;
+      if (!otpRes.ok) {
+        if (otpRes.status === 429) {
+          return reply.code(429).send(otpRes.payload);
+        }
+        return reply.code(200).send(GENERIC_RESPONSE);
+      }
+
+      const otpCode = otpRes.code;
+
+      const deliveryPromises = [
+        sendEmailOtp({ email: user.email, otp: otpCode, expiresAt: otpRes.expiresAt }),
+      ];
+      if (user.phone) {
+        deliveryPromises.push(sendWhatsAppOtp({ phone: user.phone, otp: otpCode, expiresAt: otpRes.expiresAt }));
+        deliveryPromises.push(sendSmsOtp({ phone: user.phone, otp: otpCode, expiresAt: otpRes.expiresAt }));
+      }
+      await Promise.allSettled(deliveryPromises);
+
+      if (typeof onOtpGenerated === "function") {
+        onOtpGenerated({ email: user.email, phone: user.phone, otp: otpCode, expiresAt: otpRes.expiresAt });
+      }
+
+      return reply.code(200).send(GENERIC_RESPONSE);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.log(err);
-      return reply.code(err?.statusCode || 500).send({
-        message: err?.message || "Failed to open staff login link",
-      });
+      return reply.code(500).send({ message: "Failed to process forgot password request" });
     }
   };
 
-  return { sendOtp, verifyOtp: verifyOtpHandler, consumeStaffLink };
+  const verifyForgotPasswordOtp = async (req, reply) => {
+    try {
+      const body = req.body || {};
+      const email = String(body.email || "").trim().toLowerCase();
+      const otp = String(body.otp || "").trim();
+
+      if (!email || !otp) {
+        return reply.code(400).send({ message: "Email and verification code are required." });
+      }
+
+      const verifyRes = await verifyAuthOtp({
+        prisma,
+        phone: email,
+        actorType: "STAFF_PASSWORD_RESET",
+        otp,
+      });
+
+      if (!verifyRes.ok) {
+        return reply.code(verifyRes.status || 400).send({
+          message: verifyRes.payload?.message || "Invalid or expired verification code.",
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true, email: true, restaurantId: true, sessionVersion: true, isActive: true },
+      });
+
+      if (!user || user.isActive === false) {
+        return reply.code(400).send({ message: "Invalid or expired verification code." });
+      }
+
+      const resetToken = app.jwt.sign(
+        {
+          purpose: "STAFF_PASSWORD_RESET",
+          userId: user.id,
+          email: user.email,
+          restaurantId: user.restaurantId,
+          sessionVersion: user.sessionVersion,
+        },
+        { expiresIn: "15m" }
+      );
+
+      return reply.code(200).send({
+        message: "Verification code accepted.",
+        resetToken,
+      });
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to verify verification code" });
+    }
+  };
+
+  const resetPasswordWithToken = async (req, reply) => {
+    try {
+      const body = req.body || {};
+      const rawToken =
+        body.resetToken ||
+        (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, "") : null);
+      const newPassword = String(body.newPassword || "").trim();
+      const restaurantId = body.restaurantId ? Number(body.restaurantId) : null;
+
+      if (!rawToken || !newPassword) {
+        return reply.code(400).send({ message: "Reset token and new password are required." });
+      }
+
+      let decoded;
+      try {
+        decoded = app.jwt.verify(rawToken);
+      } catch (err) {
+        return reply.code(401).send({ message: "Reset token has expired or is invalid." });
+      }
+
+      if (decoded?.purpose !== "STAFF_PASSWORD_RESET" || !decoded?.userId) {
+        return reply.code(401).send({ message: "Invalid reset token." });
+      }
+
+      if (newPassword.length < 6) {
+        return reply.code(400).send({ message: "New password must be at least 6 characters long." });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: Number(decoded.userId) },
+        select: { id: true, restaurantId: true, sessionVersion: true, isActive: true },
+      });
+
+      if (!user || user.isActive === false) {
+        return reply.code(401).send({ message: "Account is inactive or not found." });
+      }
+
+      if (restaurantId && user.restaurantId && restaurantId !== user.restaurantId) {
+        return reply.code(403).send({ message: "Tenant mismatch. Password reset denied." });
+      }
+
+      if (Number(user.sessionVersion) !== Number(decoded.sessionVersion)) {
+        return reply.code(401).send({ message: "Reset token has already been used or session expired." });
+      }
+
+      const hashedPassword = bcrypt.hashSync(newPassword, 10);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          password: hashedPassword,
+          mustChangePassword: false,
+          temporaryPasswordExpiresAt: null,
+          sessionVersion: { increment: 1 },
+          failedLoginAttempts: 0,
+          lastFailedLoginAt: null,
+          lockedUntil: null,
+        },
+      });
+
+      return reply.code(200).send({
+        success: true,
+        message: "Password has been successfully reset. Please log in with your new password.",
+      });
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to reset password" });
+    }
+  };
+
+  return {
+    sendOtp,
+    verifyOtp: verifyOtpHandler,
+    consumeStaffLink,
+    forgotPassword,
+    verifyForgotPasswordOtp,
+    resetPasswordWithToken,
+  };
 };

@@ -158,6 +158,11 @@ model User {
   role String @default("OWNER")
   designation String?
   sessionVersion Int @default(0) @map("session_version")
+  mustChangePassword Boolean @default(false) @map("must_change_password")
+  temporaryPasswordExpiresAt DateTime? @map("temporary_password_expires_at")
+  failedLoginAttempts Int @default(0) @map("failed_login_attempts")
+  lastFailedLoginAt DateTime? @map("last_failed_login_at")
+  lockedUntil DateTime? @map("locked_until")
 
   restaurantId Int?         @map("restaurant_id")
   restaurant   Restaurant?  @relation(fields: [restaurantId], references: [id], onDelete: SetNull)

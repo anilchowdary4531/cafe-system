@@ -318,10 +318,47 @@ await app.register(fastifyStatic, {
   decorateReply: false,
 });
 
+const OWNER_MANAGEMENT_ROLES = ["OWNER", "MANAGER", "SUPER_ADMIN"];
+
+const isSensitiveOwnerRoute = (url, method) => {
+  const normalizedUrl = String(url || "").toLowerCase();
+  const normalizedMethod = String(method || "GET").toUpperCase();
+
+  // Staff creation, modification, status, deletion, access
+  if (normalizedUrl.includes("/staff")) {
+    if (normalizedMethod !== "GET") return true;
+  }
+
+  // Finance, expenses, settlements
+  if (
+    normalizedUrl.includes("/finance") ||
+    normalizedUrl.includes("/settlements")
+  ) {
+    return true;
+  }
+
+  // Settings mutations
+  if (normalizedUrl.includes("/settings") && normalizedMethod !== "GET") {
+    return true;
+  }
+
+  // Asset deletion or uploads
+  if (normalizedUrl.includes("/assets") && (normalizedMethod === "DELETE" || normalizedMethod === "POST")) {
+    return true;
+  }
+
+  return false;
+};
+
 const requireOwnerRouteAuth = async (req, reply) => {
+  const routeUrl = String(req.routeOptions?.url || req.raw?.url || req.url || "");
+  const method = String(req.method || "GET").toUpperCase();
+  const isSensitive = isSensitiveOwnerRoute(routeUrl, method);
+  const allowedRoles = isSensitive ? OWNER_MANAGEMENT_ROLES : STAFF_ALLOWED_ROLES;
+
   const actor = await requireStaffJwt(req, reply, {
     prisma,
-    allowedRoles: STAFF_ALLOWED_ROLES,
+    allowedRoles,
     matchRestaurantParam: "restaurantId",
   });
   if (!actor) return reply;

@@ -3,9 +3,8 @@ import crypto from "crypto";
 import { buildReadableOrderNo, createOrderByStaff, updateOrderStatus } from "../services/orderService.js";
 import { buildUploadController } from "../controllers/uploadController.js";
 import { deleteAssetByKey, uploadRestaurantAsset } from "../services/storageService.js";
+import { requireStaffJwt } from "../services/staffAuthService.js";
 import {
-  buildStaffMagicLinkToken,
-  buildStaffMagicLinkUrl,
   inferRoleFromDesignation,
 } from "../services/staffSessionService.js";
 import { resolveMenuPricing } from "../services/menuPricingService.js";
@@ -105,15 +104,33 @@ export default async function ownerRoutes(app, deps) {
     if (normalizedRole && normalizedRole !== "STAFF") return normalizedRole;
     return inferRoleFromDesignation(designation) || normalizedRole || "STAFF";
   };
-  const buildStaffLoginLink = (user) =>
-    buildStaffMagicLinkUrl({
-      frontendUrl: FRONTEND_URL,
-      token: buildStaffMagicLinkToken({
-        app,
-        user,
-        expiresIn: STAFF_LOGIN_LINK_EXPIRES_IN,
-      }),
+  const OWNER_MANAGEMENT_ROLES = ["OWNER", "MANAGER", "SUPER_ADMIN"];
+
+  const requireOwnerManagementActor = async (req, reply, allowedRoles = OWNER_MANAGEMENT_ROLES) => {
+    let actor = req.staffActor;
+    if (!actor) {
+      actor = await requireStaffJwt(req, reply, {
+        prisma,
+        allowedRoles,
+        matchRestaurantParam: "restaurantId",
       });
+      if (!actor) return null;
+      req.staffActor = actor;
+    }
+    const role = String(actor.role || "").toUpperCase();
+    if (!allowedRoles.includes(role)) {
+      reply.code(403).send({ message: "Forbidden: Insufficient permissions for owner management" });
+      return null;
+    }
+    return actor;
+  };
+
+  const buildStaffLoginLink = (user) => {
+    const email = String(user?.email || "").trim().toLowerCase();
+    const base = String(FRONTEND_URL || "").trim().replace(/\/+$/, "");
+    const path = `/login?mode=staff&email=${encodeURIComponent(email)}`;
+    return base ? `${base}${path}` : path;
+  };
   const buildStaffUserResponse = (user, access) => ({
     id: user.id,
     name: user.name,
@@ -127,6 +144,8 @@ export default async function ownerRoutes(app, deps) {
     updatedAt: user.updatedAt,
     access:
       access ?? normalizeDbPermissions(user?.staffAccess?.permissions, resolveStaffRole(user.role, user.designation)),
+    mustChangePassword: Boolean(user.mustChangePassword),
+    temporaryPasswordExpiresAt: user.temporaryPasswordExpiresAt || null,
     loginLink: buildStaffLoginLink(user),
   });
 
@@ -231,6 +250,8 @@ export default async function ownerRoutes(app, deps) {
 
   app.delete("/owner/:restaurantId/assets", async (req, reply) => {
     try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
       const restaurantId = Number(req.params.restaurantId);
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
       const body = req.body || {};
@@ -1292,6 +1313,8 @@ export default async function ownerRoutes(app, deps) {
   // Update Restaurant Shift Timings
   app.put("/owner/:restaurantId/settings/shifts", async (req, reply) => {
     try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
       const restaurantId = Number(req.params.restaurantId);
       const {
         breakfastStart, breakfastEnd,
@@ -2171,6 +2194,8 @@ export default async function ownerRoutes(app, deps) {
 
   const getFinanceAnalyticsHandler = async (req, reply) => {
     try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
       const restaurantId = Number(req.params.restaurantId);
       const range = String(req.query?.range || "7d").toLowerCase();
       const validRanges = ["24h", "7d", "30d"];
@@ -2419,6 +2444,8 @@ export default async function ownerRoutes(app, deps) {
 
   app.put("/owner/:restaurantId/settings", async (req, reply) => {
     try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
       const restaurantId = Number(req.params.restaurantId);
       const body = req.body || {};
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
@@ -2538,6 +2565,11 @@ export default async function ownerRoutes(app, deps) {
       const mapped = users
         .map((user) => buildStaffUserResponse(user))
         .filter((user) => {
+          const roleFilter = String(req.query?.role || "").trim().toUpperCase();
+          const statusFilter = String(req.query?.status || "").trim().toLowerCase();
+          if (roleFilter && roleFilter !== "ALL" && user.role !== roleFilter) return false;
+          if (statusFilter === "active" && !user.isActive) return false;
+          if (statusFilter === "inactive" && user.isActive) return false;
           if (!q) return true;
           return (
             String(user.name || "").toLowerCase().includes(q) ||
@@ -2559,6 +2591,8 @@ export default async function ownerRoutes(app, deps) {
 
   app.post("/owner/:restaurantId/staff", async (req, reply) => {
     try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
       const restaurantId = Number(req.params.restaurantId);
       const {
         name,
@@ -2571,8 +2605,8 @@ export default async function ownerRoutes(app, deps) {
         access,
       } = req.body || {};
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
-      if (!name || !email || !phone || !password) {
-        return reply.code(400).send({ message: "Name, email, phone, and password are required" });
+      if (!name || !email || !phone) {
+        return reply.code(400).send({ message: "Name, email, and phone are required" });
       }
 
       const normalizedRole = String(role || "STAFF").toUpperCase();
@@ -2592,7 +2626,20 @@ export default async function ownerRoutes(app, deps) {
       const existing = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } });
       if (existing) return reply.code(400).send({ message: "Email already exists" });
 
-      const hashedPassword = bcrypt.hashSync(String(password), 10);
+      let rawPassword = String(password || "").trim();
+      let temporaryPassword = null;
+      let isTemporary = false;
+      if (!rawPassword) {
+        const randomHex = crypto.randomBytes(4).toString("hex");
+        rawPassword = `Staff#${randomHex}`;
+        temporaryPassword = rawPassword;
+        isTemporary = true;
+      } else if (req.body?.isTemporaryPassword === true) {
+        isTemporary = true;
+      }
+
+      const tempExpiryDays = Number(process.env.TEMP_PASSWORD_EXPIRY_DAYS || 7);
+      const hashedPassword = bcrypt.hashSync(rawPassword, 10);
       const createData = {
         name: String(name).trim(),
         email: normalizedEmail,
@@ -2601,6 +2648,8 @@ export default async function ownerRoutes(app, deps) {
         role: effectiveRole,
         isActive: Boolean(isActive),
         restaurantId,
+        mustChangePassword: isTemporary,
+        temporaryPasswordExpiresAt: isTemporary ? new Date(Date.now() + tempExpiryDays * 86400000) : null,
       };
       if (designation !== undefined) {
         createData.designation = normalizedDesignation || null;
@@ -2628,6 +2677,7 @@ export default async function ownerRoutes(app, deps) {
       return {
         message: "Staff user created",
         user: buildStaffUserResponse(user, normalizedAccess),
+        ...(temporaryPassword ? { temporaryPassword } : {}),
       };
     } catch (err) {
       console.log(err);
@@ -2637,6 +2687,8 @@ export default async function ownerRoutes(app, deps) {
 
   app.put("/owner/:restaurantId/staff/:staffId", async (req, reply) => {
     try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
       const restaurantId = Number(req.params.restaurantId);
       const staffId = Number(req.params.staffId);
       const { name, email, phone, role, designation, password, isActive } = req.body || {};
@@ -2667,6 +2719,12 @@ export default async function ownerRoutes(app, deps) {
 
       const nextDesignation = designation === undefined ? staff.designation : normalizeDesignation(designation) || null;
       const nextRole = resolveStaffRole(role ? String(role).toUpperCase() : staff.role, nextDesignation);
+      const isSecuritySensitiveChange =
+        Boolean(password) ||
+        nextRole !== staff.role ||
+        nextDesignation !== staff.designation ||
+        (isActive !== undefined && Boolean(isActive) !== staff.isActive);
+
       const data = {
         name: name ?? staff.name,
         email: email ? String(email).trim().toLowerCase() : staff.email,
@@ -2677,7 +2735,21 @@ export default async function ownerRoutes(app, deps) {
       if (designation !== undefined) {
         data.designation = nextDesignation;
       }
-      if (password) data.password = bcrypt.hashSync(String(password), 10);
+      if (password) {
+        data.password = bcrypt.hashSync(String(password), 10);
+        const isTemporary = req.body?.isTemporaryPassword !== undefined ? Boolean(req.body.isTemporaryPassword) : false;
+        if (isTemporary) {
+          data.mustChangePassword = true;
+          const tempExpiryDays = Number(process.env.TEMP_PASSWORD_EXPIRY_DAYS || 7);
+          data.temporaryPasswordExpiresAt = new Date(Date.now() + tempExpiryDays * 86400000);
+        } else {
+          data.mustChangePassword = false;
+          data.temporaryPasswordExpiresAt = null;
+        }
+      }
+      if (isSecuritySensitiveChange) {
+        data.sessionVersion = { increment: 1 };
+      }
 
       let updated;
       try {
@@ -2712,6 +2784,8 @@ export default async function ownerRoutes(app, deps) {
 
   app.patch("/owner/:restaurantId/staff/:staffId/status", async (req, reply) => {
     try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
       const restaurantId = Number(req.params.restaurantId);
       const staffId = Number(req.params.staffId);
       const { isActive } = req.body || {};
@@ -2746,6 +2820,8 @@ export default async function ownerRoutes(app, deps) {
 
   app.put("/owner/:restaurantId/staff/:staffId/access", async (req, reply) => {
     try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
       const restaurantId = Number(req.params.restaurantId);
       const staffId = Number(req.params.staffId);
       const { access } = req.body || {};
@@ -2764,6 +2840,11 @@ export default async function ownerRoutes(app, deps) {
         update: { restaurantId, permissions: serializeAccess(normalizedAccess, staff.role) },
       });
 
+      await prisma.user.update({
+        where: { id: staffId },
+        data: { sessionVersion: { increment: 1 } },
+      });
+
       return {
         message: "Staff access updated",
         access: normalizedAccess,
@@ -2777,6 +2858,8 @@ export default async function ownerRoutes(app, deps) {
 
   app.delete("/owner/:restaurantId/staff/:staffId", async (req, reply) => {
     try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
       const restaurantId = Number(req.params.restaurantId);
       const staffId = Number(req.params.staffId);
       if (!restaurantId || !staffId) return reply.code(400).send({ message: "Invalid id values" });
@@ -2788,8 +2871,17 @@ export default async function ownerRoutes(app, deps) {
       if (!staff || staff.restaurantId !== restaurantId) return reply.code(404).send({ message: "Staff user not found" });
       if (staff.role === "OWNER") return reply.code(400).send({ message: "Owner account cannot be deleted" });
 
-      await prisma.user.delete({ where: { id: staffId } });
-      return { message: "Staff user deleted" };
+      try {
+        await prisma.user.delete({ where: { id: staffId } });
+        return { message: "Staff user deleted" };
+      } catch (err) {
+        if (err?.code === "P2003") {
+          return reply.code(400).send({
+            message: "Cannot delete staff member with historical records (orders, shifts, or transactions). Please deactivate the account instead.",
+          });
+        }
+        throw err;
+      }
     } catch (err) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to delete staff user" });
@@ -2798,6 +2890,8 @@ export default async function ownerRoutes(app, deps) {
 
   app.get("/owner/:restaurantId/finance/expenses", async (req, reply) => {
     try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
       const restaurantId = Number(req.params.restaurantId);
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
       return await prisma.expense.findMany({
@@ -2812,6 +2906,8 @@ export default async function ownerRoutes(app, deps) {
 
   app.post("/owner/:restaurantId/finance/expenses", async (req, reply) => {
     try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
       const restaurantId = Number(req.params.restaurantId);
       const { title, category, amount, notes, spentAt } = req.body || {};
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
@@ -2836,6 +2932,8 @@ export default async function ownerRoutes(app, deps) {
 
   app.delete("/owner/:restaurantId/finance/expenses/:expenseId", async (req, reply) => {
     try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
       const restaurantId = Number(req.params.restaurantId);
       const expenseId = Number(req.params.expenseId);
       if (!restaurantId || !expenseId) return reply.code(400).send({ message: "Invalid id values" });

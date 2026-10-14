@@ -62,6 +62,28 @@ export default function Login() {
     const [registerLoading, setRegisterLoading] = useState(false);
     const [registerError, setRegisterError] = useState("");
 
+    // Forced password change states for temporary password lifecycle
+    const [pendingChangeSession, setPendingChangeSession] = useState(null);
+    const [forcedCurrentPassword, setForcedCurrentPassword] = useState("");
+    const [forcedNewPassword, setForcedNewPassword] = useState("");
+    const [forcedConfirmPassword, setForcedConfirmPassword] = useState("");
+    const [forcedPasswordError, setForcedPasswordError] = useState("");
+    const [forcedPasswordLoading, setForcedPasswordLoading] = useState(false);
+    const [showForcedPasswordModal, setShowForcedPasswordModal] = useState(false);
+
+    // Staff/Owner Forgot Password recovery states
+    const [showForgotModal, setShowForgotModal] = useState(false);
+    const [forgotStep, setForgotStep] = useState("email"); // "email" -> "otp" -> "password" -> "success"
+    const [forgotEmail, setForgotEmail] = useState("");
+    const [forgotOtp, setForgotOtp] = useState("");
+    const [forgotResetToken, setForgotResetToken] = useState("");
+    const [forgotNewPassword, setForgotNewPassword] = useState("");
+    const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+    const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+    const [forgotLoading, setForgotLoading] = useState(false);
+    const [forgotError, setForgotError] = useState("");
+    const [forgotResendTimer, setForgotResendTimer] = useState(0);
+
     // Helper functions for masking
     const maskPhone = (phoneStr) => {
         const str = String(phoneStr || "").trim();
@@ -90,7 +112,6 @@ export default function Login() {
         return "OTP sent to your mobile phone.";
     };
 
-    // Countdown Timer Effect
     useEffect(() => {
         if (resendTimer <= 0) return;
         const interval = setInterval(() => {
@@ -98,6 +119,14 @@ export default function Login() {
         }, 1000);
         return () => clearInterval(interval);
     }, [resendTimer]);
+
+    useEffect(() => {
+        if (forgotResendTimer <= 0) return;
+        const interval = setInterval(() => {
+            setForgotResendTimer((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [forgotResendTimer]);
 
     const customerMenuPath = useMemo(() => {
         const slug = String(restaurantContext?.slug || "").trim();
@@ -315,6 +344,19 @@ export default function Login() {
                 password,
             });
 
+            if (res.data?.mustChangePassword) {
+                setPendingChangeSession({
+                    token: res.data.token,
+                    user: res.data.user,
+                });
+                setForcedCurrentPassword(password);
+                setForcedNewPassword("");
+                setForcedConfirmPassword("");
+                setForcedPasswordError("");
+                setShowForcedPasswordModal(true);
+                return;
+            }
+
             handleSuccessfulStaffLogin(res.data);
         } catch (err) {
             setError(
@@ -325,6 +367,142 @@ export default function Login() {
             );
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleForcedPasswordSubmit = async (e) => {
+        if (e) e.preventDefault();
+        const trimmedNew = String(forcedNewPassword || "").trim();
+        const trimmedConfirm = String(forcedConfirmPassword || "").trim();
+        const curPwd = String(forcedCurrentPassword || password || "").trim();
+
+        if (!trimmedNew || trimmedNew.length < 6) {
+            setForcedPasswordError("New password must be at least 6 characters long.");
+            return;
+        }
+        if (trimmedNew !== trimmedConfirm) {
+            setForcedPasswordError("New passwords do not match.");
+            return;
+        }
+
+        try {
+            setForcedPasswordLoading(true);
+            setForcedPasswordError("");
+
+            const res = await api.post(
+                "/api/auth/change-password",
+                {
+                    currentPassword: curPwd,
+                    newPassword: trimmedNew,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${pendingChangeSession?.token}`,
+                    },
+                }
+            );
+
+            setShowForcedPasswordModal(false);
+            setPendingChangeSession(null);
+            handleSuccessfulStaffLogin(res.data);
+        } catch (err) {
+            setForcedPasswordError(
+                err.response?.data?.message || err.message || "Failed to update password. Please try again."
+            );
+        } finally {
+            setForcedPasswordLoading(false);
+        }
+    };
+
+    const closeForgotModal = () => {
+        setShowForgotModal(false);
+        setForgotStep("email");
+        setForgotEmail("");
+        setForgotOtp("");
+        setForgotResetToken("");
+        setForgotNewPassword("");
+        setForgotConfirmPassword("");
+        setShowForgotNewPassword(false);
+        setForgotError("");
+        setForgotLoading(false);
+        setForgotResendTimer(0);
+    };
+
+    const handleForgotRequestOtp = async (e) => {
+        if (e) e.preventDefault();
+        const trimmed = String(forgotEmail || email || "").trim().toLowerCase();
+        if (!trimmed) {
+            setForgotError("Email address is required.");
+            return;
+        }
+        try {
+            setForgotLoading(true);
+            setForgotError("");
+            await api.post("/api/auth/forgot-password", { email: trimmed });
+            setForgotEmail(trimmed);
+            setForgotStep("otp");
+            setForgotResendTimer(30);
+        } catch (err) {
+            setForgotError(err.response?.data?.message || err.message || "Failed to send verification code");
+        } finally {
+            setForgotLoading(false);
+        }
+    };
+
+    const handleForgotVerifyOtp = async (e) => {
+        if (e) e.preventDefault();
+        const trimmedEmail = String(forgotEmail || email || "").trim().toLowerCase();
+        const trimmedOtp = String(forgotOtp || "").trim();
+        if (!trimmedOtp) {
+            setForgotError("Please enter the verification code.");
+            return;
+        }
+        try {
+            setForgotLoading(true);
+            setForgotError("");
+            const res = await api.post("/api/auth/forgot-password/verify-otp", {
+                email: trimmedEmail,
+                otp: trimmedOtp,
+            });
+            if (res.data?.resetToken) {
+                setForgotResetToken(res.data.resetToken);
+                setForgotStep("password");
+            } else {
+                setForgotError("Failed to verify code. Please try again.");
+            }
+        } catch (err) {
+            setForgotError(err.response?.data?.message || err.message || "Invalid or expired verification code.");
+        } finally {
+            setForgotLoading(false);
+        }
+    };
+
+    const handleForgotResetPassword = async (e) => {
+        if (e) e.preventDefault();
+        const trimmedNew = String(forgotNewPassword || "").trim();
+        const trimmedConfirm = String(forgotConfirmPassword || "").trim();
+        if (!trimmedNew || trimmedNew.length < 6) {
+            setForgotError("New password must be at least 6 characters long.");
+            return;
+        }
+        if (trimmedNew !== trimmedConfirm) {
+            setForgotError("New passwords do not match.");
+            return;
+        }
+        try {
+            setForgotLoading(true);
+            setForgotError("");
+            await api.post("/api/auth/forgot-password/reset", {
+                resetToken: forgotResetToken,
+                newPassword: trimmedNew,
+            });
+            setForgotStep("success");
+            setForgotResetToken("");
+            setForgotOtp("");
+        } catch (err) {
+            setForgotError(err.response?.data?.message || err.message || "Failed to reset password.");
+        } finally {
+            setForgotLoading(false);
         }
     };
 
@@ -513,7 +691,25 @@ export default function Login() {
                                 </div>
 
                                 <div>
-                                    <label className="theme-muted mb-2 block text-sm">Password</label>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="theme-muted text-sm">Password</label>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowForgotModal(true);
+                                                setForgotStep("email");
+                                                setForgotEmail(email || "");
+                                                setForgotOtp("");
+                                                setForgotResetToken("");
+                                                setForgotNewPassword("");
+                                                setForgotConfirmPassword("");
+                                                setForgotError("");
+                                            }}
+                                            className="text-xs font-semibold theme-accent-text hover:underline"
+                                        >
+                                            Forgot Password?
+                                        </button>
+                                    </div>
                                     <div className="relative">
                                         <input
                                             type={showPassword ? "text" : "password"}
@@ -776,6 +972,292 @@ export default function Login() {
                                 )}
                             </div>
                         </>
+                    )}
+
+                    {/* FORCED TEMPORARY PASSWORD CHANGE MODAL */}
+                    {showForcedPasswordModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                            <div className="theme-card max-w-md w-full rounded-2xl p-6 shadow-2xl border border-white/10 relative">
+                                <h3 className="text-xl font-bold mb-2">Change Temporary Password</h3>
+                                <p className="theme-muted text-sm mb-4">
+                                    Your account was created with a temporary password. For security, please set a new permanent password to continue.
+                                </p>
+
+                                {forcedPasswordError && (
+                                    <div className="mb-4 bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-2.5 rounded-xl text-sm">
+                                        {forcedPasswordError}
+                                    </div>
+                                )}
+
+                                <form onSubmit={handleForcedPasswordSubmit} className="space-y-4">
+                                    <div>
+                                        <label className="theme-muted mb-1 block text-sm">Current (Temporary) Password</label>
+                                        <input
+                                            type="password"
+                                            value={forcedCurrentPassword}
+                                            onChange={(e) => setForcedCurrentPassword(e.target.value)}
+                                            placeholder="Enter temporary password"
+                                            required
+                                            className="theme-input w-full rounded-xl px-4 py-2.5 outline-none transition text-sm"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="theme-muted mb-1 block text-sm">New Password (min 6 characters)</label>
+                                        <input
+                                            type="password"
+                                            value={forcedNewPassword}
+                                            onChange={(e) => setForcedNewPassword(e.target.value)}
+                                            placeholder="Enter new permanent password"
+                                            required
+                                            minLength={6}
+                                            className="theme-input w-full rounded-xl px-4 py-2.5 outline-none transition text-sm"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="theme-muted mb-1 block text-sm">Confirm New Password</label>
+                                        <input
+                                            type="password"
+                                            value={forcedConfirmPassword}
+                                            onChange={(e) => setForcedConfirmPassword(e.target.value)}
+                                            placeholder="Confirm new permanent password"
+                                            required
+                                            minLength={6}
+                                            className="theme-input w-full rounded-xl px-4 py-2.5 outline-none transition text-sm"
+                                        />
+                                    </div>
+
+                                    <div className="pt-2 flex gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowForcedPasswordModal(false);
+                                                setPendingChangeSession(null);
+                                            }}
+                                            className="flex-1 py-2.5 rounded-xl border border-white/20 text-sm font-semibold hover:bg-white/5 transition"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={forcedPasswordLoading}
+                                            className="theme-button flex-1 py-2.5 rounded-xl text-sm font-semibold transition disabled:opacity-50"
+                                        >
+                                            {forcedPasswordLoading ? "Saving..." : "Set Password"}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* STAFF / OWNER FORGOT PASSWORD RECOVERY MODAL */}
+                    {showForgotModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                            <div className="theme-card max-w-md w-full rounded-2xl p-6 shadow-2xl border border-white/10 relative">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-xl font-bold">Password Recovery</h3>
+                                    <button
+                                        type="button"
+                                        onClick={closeForgotModal}
+                                        className="theme-muted hover:opacity-80 text-lg leading-none"
+                                        aria-label="Close"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+
+                                {forgotError && (
+                                    <div className="mb-4 bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-2.5 rounded-xl text-sm">
+                                        {forgotError}
+                                    </div>
+                                )}
+
+                                {forgotStep === "email" && (
+                                    <form onSubmit={handleForgotRequestOtp} className="space-y-4">
+                                        <p className="theme-muted text-sm">
+                                            Enter your staff or owner account email. If the account is eligible, a 6-digit verification code will be sent.
+                                        </p>
+
+                                        <div>
+                                            <label className="theme-muted mb-1 block text-sm">Email Address</label>
+                                            <input
+                                                type="email"
+                                                value={forgotEmail}
+                                                onChange={(e) => setForgotEmail(e.target.value)}
+                                                placeholder="you@restaurant.com"
+                                                required
+                                                className="theme-input w-full rounded-xl px-4 py-2.5 outline-none transition text-sm"
+                                            />
+                                        </div>
+
+                                        <div className="pt-2 flex gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={closeForgotModal}
+                                                className="flex-1 py-2.5 rounded-xl border border-white/20 text-sm font-semibold hover:bg-white/5 transition"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                disabled={forgotLoading}
+                                                className="theme-button flex-1 py-2.5 rounded-xl text-sm font-semibold transition disabled:opacity-50"
+                                            >
+                                                {forgotLoading ? "Sending..." : "Send Code"}
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {forgotStep === "otp" && (
+                                    <form onSubmit={handleForgotVerifyOtp} className="space-y-4">
+                                        <p className="theme-muted text-sm">
+                                            If an account exists for <span className="font-semibold text-white">{forgotEmail}</span>, a verification code has been sent. Please enter the 6-digit code below.
+                                        </p>
+
+                                        <div>
+                                            <label className="theme-muted mb-1 block text-sm">6-Digit Verification Code</label>
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                maxLength={6}
+                                                value={forgotOtp}
+                                                onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ""))}
+                                                placeholder="123456"
+                                                required
+                                                className="theme-input w-full rounded-xl px-4 py-2.5 outline-none transition text-sm tracking-widest text-center font-bold text-lg"
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center justify-between text-xs pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={handleForgotRequestOtp}
+                                                disabled={forgotLoading || forgotResendTimer > 0}
+                                                className="theme-accent-text font-semibold hover:underline disabled:opacity-50 disabled:no-underline"
+                                            >
+                                                {forgotResendTimer > 0 ? `Resend code in ${forgotResendTimer}s` : "Resend code"}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setForgotStep("email");
+                                                    setForgotOtp("");
+                                                    setForgotError("");
+                                                }}
+                                                className="theme-muted hover:underline"
+                                            >
+                                                Change email
+                                            </button>
+                                        </div>
+
+                                        <div className="pt-2 flex gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={closeForgotModal}
+                                                className="flex-1 py-2.5 rounded-xl border border-white/20 text-sm font-semibold hover:bg-white/5 transition"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                disabled={forgotLoading || forgotOtp.length < 6}
+                                                className="theme-button flex-1 py-2.5 rounded-xl text-sm font-semibold transition disabled:opacity-50"
+                                            >
+                                                {forgotLoading ? "Verifying..." : "Verify Code"}
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {forgotStep === "password" && (
+                                    <form onSubmit={handleForgotResetPassword} className="space-y-4">
+                                        <p className="theme-muted text-sm">
+                                            Verification code accepted. Please set your new permanent password.
+                                        </p>
+
+                                        <div>
+                                            <label className="theme-muted mb-1 block text-sm">New Password (min 6 characters)</label>
+                                            <div className="relative">
+                                                <input
+                                                    type={showForgotNewPassword ? "text" : "password"}
+                                                    value={forgotNewPassword}
+                                                    onChange={(e) => setForgotNewPassword(e.target.value)}
+                                                    placeholder="Enter new permanent password"
+                                                    required
+                                                    minLength={6}
+                                                    className="theme-input w-full rounded-xl px-4 py-2.5 pr-10 outline-none transition text-sm"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
+                                                    className="theme-muted absolute right-3 top-2.5 hover:opacity-80"
+                                                >
+                                                    {showForgotNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="theme-muted mb-1 block text-sm">Confirm New Password</label>
+                                            <input
+                                                type={showForgotNewPassword ? "text" : "password"}
+                                                value={forgotConfirmPassword}
+                                                onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                                                placeholder="Confirm new permanent password"
+                                                required
+                                                minLength={6}
+                                                className="theme-input w-full rounded-xl px-4 py-2.5 outline-none transition text-sm"
+                                            />
+                                        </div>
+
+                                        <div className="pt-2 flex gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={closeForgotModal}
+                                                className="flex-1 py-2.5 rounded-xl border border-white/20 text-sm font-semibold hover:bg-white/5 transition"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                disabled={forgotLoading}
+                                                className="theme-button flex-1 py-2.5 rounded-xl text-sm font-semibold transition disabled:opacity-50"
+                                            >
+                                                {forgotLoading ? "Resetting..." : "Reset Password"}
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {forgotStep === "success" && (
+                                    <div className="space-y-4 text-center py-2">
+                                        <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-2xl font-bold">
+                                            ✓
+                                        </div>
+                                        <h4 className="text-lg font-bold text-white">Password Reset Complete</h4>
+                                        <p className="theme-muted text-sm">
+                                            Your password has been successfully updated. You can now log in using your new password.
+                                        </p>
+                                        <div className="pt-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    closeForgotModal();
+                                                    setPassword("");
+                                                }}
+                                                className="theme-button w-full py-2.5 rounded-xl text-sm font-semibold transition"
+                                            >
+                                                Return to Login
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     )}
 
                     {/* FOOTER */}

@@ -1,4 +1,5 @@
 import { requireStaffJwt } from "../services/staffAuthService.js";
+import { buildStaffLoginPayload, issueStaffSession } from "../services/staffSessionService.js";
 import { buildStaffOrderController } from "../controllers/staffOrderController.js";
 import { buildPaymentController } from "../controllers/paymentController.js";
 import { buildAiController } from "../controllers/aiController.js";
@@ -7,7 +8,7 @@ import { normalizeOrderStatus } from "../services/orderService.js";
 import { normalizePhone } from "../services/phoneService.js";
 
 export default async function staffRoutes(app, deps) {
-  const { prisma, realtime, STAFF_ALLOWED_ROLES } = deps;
+  const { prisma, realtime, STAFF_ALLOWED_ROLES, normalizeDbPermissions } = deps;
 
   const orderController = buildStaffOrderController({ prisma, realtime });
   const paymentController = buildPaymentController({ prisma });
@@ -16,6 +17,20 @@ export default async function staffRoutes(app, deps) {
 
   const requireStaff = async (req, reply) => {
     const actor = await requireStaffJwt(req, reply, { prisma, allowedRoles: STAFF_ALLOWED_ROLES });
+    if (!actor) return reply;
+    req.staffActor = actor;
+    return null;
+  };
+
+  const requireStaffPasswordChange = async (req, reply) => {
+    const actor = await requireStaffJwt(req, reply, { prisma, allowedRoles: STAFF_ALLOWED_ROLES, allowPasswordChangeOnly: true });
+    if (!actor) return reply;
+    req.staffActor = actor;
+    return null;
+  };
+
+  const requireStaffProfile = async (req, reply) => {
+    const actor = await requireStaffJwt(req, reply, { prisma, allowedRoles: STAFF_ALLOWED_ROLES, allowPasswordChangeOnly: true });
     if (!actor) return reply;
     req.staffActor = actor;
     return null;
@@ -124,7 +139,7 @@ export default async function staffRoutes(app, deps) {
 
       if (!user) return reply.code(404).send({ message: "User profile not found" });
 
-      const { password, ...safeUser } = user;
+      const { password, failedLoginAttempts, lastFailedLoginAt, lockedUntil, ...safeUser } = user;
       return { success: true, user: safeUser };
     } catch (err) {
       return reply.code(500).send({ message: err.message || "Failed to fetch profile" });
@@ -167,7 +182,7 @@ export default async function staffRoutes(app, deps) {
 
   const changePasswordHandler = async (req, reply) => {
     try {
-      const staffId = req.staffActor?.id || req.actor?.id || req.user?.id;
+      const staffId = req.staffActor?.id || req.staffActor?.userId || req.actor?.id || req.actor?.userId || req.user?.id;
       if (!staffId) return reply.code(401).send({ message: "Authentication required" });
 
       const { currentPassword, newPassword } = req.body || {};
@@ -181,6 +196,11 @@ export default async function staffRoutes(app, deps) {
 
       const user = await prisma.user.findUnique({
         where: { id: Number(staffId) },
+        include: {
+          restaurant: { select: { id: true, name: true, logoUrl: true, slug: true } },
+          branch: { select: { id: true, name: true } },
+          staffAccess: { select: { permissions: true } },
+        },
       });
 
       if (!user) return reply.code(404).send({ message: "User not found" });
@@ -192,21 +212,44 @@ export default async function staffRoutes(app, deps) {
       }
 
       const hashedPassword = bcrypt.hashSync(String(newPassword), 10);
-      await prisma.user.update({
+      const updatedUser = await prisma.user.update({
         where: { id: Number(staffId) },
-        data: { password: hashedPassword },
+        data: {
+          password: hashedPassword,
+          mustChangePassword: false,
+          temporaryPasswordExpiresAt: null,
+          failedLoginAttempts: 0,
+          lastFailedLoginAt: null,
+          lockedUntil: null,
+        },
+        include: {
+          restaurant: { select: { id: true, name: true, logoUrl: true, slug: true } },
+          branch: { select: { id: true, name: true } },
+          staffAccess: { select: { permissions: true } },
+        },
       });
 
-      return { success: true, message: "Password updated successfully" };
+      const { userPayload, effectiveRole } = buildStaffLoginPayload({ user: updatedUser, normalizeDbPermissions });
+      const { token, sessionVersion } = await issueStaffSession({ prisma, app, user: updatedUser, effectiveRole });
+      userPayload.sessionVersion = sessionVersion;
+
+      return {
+        success: true,
+        message: "Password updated successfully",
+        mustChangePassword: false,
+        token,
+        sessionVersion,
+        user: userPayload,
+      };
     } catch (err) {
       return reply.code(500).send({ message: err.message || "Failed to change password" });
     }
   };
 
-  app.get("/api/staff/profile/me", { preHandler: requireStaff }, getSelfProfileHandler);
-  app.get("/staff/profile/me", { preHandler: requireStaff }, getSelfProfileHandler);
+  app.get("/api/staff/profile/me", { preHandler: requireStaffProfile }, getSelfProfileHandler);
+  app.get("/staff/profile/me", { preHandler: requireStaffProfile }, getSelfProfileHandler);
   app.put("/api/staff/profile/me", { preHandler: requireStaff }, updateSelfProfileHandler);
   app.put("/staff/profile/me", { preHandler: requireStaff }, updateSelfProfileHandler);
-  app.post("/api/auth/change-password", { preHandler: requireStaff }, changePasswordHandler);
-  app.post("/auth/change-password", { preHandler: requireStaff }, changePasswordHandler);
+  app.post("/api/auth/change-password", { preHandler: requireStaffPasswordChange }, changePasswordHandler);
+  app.post("/auth/change-password", { preHandler: requireStaffPasswordChange }, changePasswordHandler);
 }

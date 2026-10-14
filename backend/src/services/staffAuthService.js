@@ -1,6 +1,16 @@
 import { inferRoleFromDesignation } from "./staffSessionService.js";
 
-export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestaurantParam, prisma } = {}) => {
+export const getLoginLockoutConfig = () => {
+  const rawThreshold = process.env.LOGIN_LOCKOUT_THRESHOLD;
+  const rawDuration = process.env.LOGIN_LOCKOUT_DURATION_MINUTES;
+  const parsedThreshold = Number(rawThreshold);
+  const parsedDuration = Number(rawDuration);
+  const threshold = !Number.isNaN(parsedThreshold) && parsedThreshold > 0 ? parsedThreshold : 5;
+  const durationMinutes = !Number.isNaN(parsedDuration) && parsedDuration > 0 ? parsedDuration : 15;
+  return { threshold, durationMinutes };
+};
+
+export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestaurantParam, prisma, allowPasswordChangeOnly } = {}) => {
   try {
     await req.jwtVerify();
   } catch {
@@ -10,6 +20,11 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
 
   if (String(req.user?.type || "") === "customer") {
     reply.code(403).send({ message: "Staff access required" });
+    return null;
+  }
+
+  if (req.user?.purpose === "STAFF_PASSWORD_RESET" || req.user?.purpose) {
+    reply.code(403).send({ message: "Reset token cannot be used for operational access" });
     return null;
   }
 
@@ -28,6 +43,7 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
         restaurantId: true,
         branchId: true,
         sessionVersion: true,
+        mustChangePassword: true,
       },
     });
 
@@ -52,6 +68,15 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
       return null;
     }
 
+    if (Boolean(user.mustChangePassword) && !allowPasswordChangeOnly) {
+      reply.code(403).send({
+        message: "Password change required before accessing operational features",
+        code: "PASSWORD_CHANGE_REQUIRED",
+        mustChangePassword: true,
+      });
+      return null;
+    }
+
     if (allowedRoles?.length && currentRole && !allowedRoles.includes(currentRole)) {
       reply.code(403).send({ message: "Insufficient role" });
       return null;
@@ -65,7 +90,16 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
       }
     }
 
-    return { userId, role: currentRole, restaurantId: currentRestaurantId, branchId: currentBranchId };
+    return { id: userId, userId, role: currentRole, restaurantId: currentRestaurantId, branchId: currentBranchId, mustChangePassword: Boolean(user.mustChangePassword) };
+  }
+
+  if (Boolean(req.user?.mustChangePassword) && !allowPasswordChangeOnly) {
+    reply.code(403).send({
+      message: "Password change required before accessing operational features",
+      code: "PASSWORD_CHANGE_REQUIRED",
+      mustChangePassword: true,
+    });
+    return null;
   }
 
   if (allowedRoles?.length && role && !allowedRoles.includes(role)) {
@@ -81,5 +115,5 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
     }
   }
 
-  return { userId, role, restaurantId, branchId };
+  return { id: userId, userId, role, restaurantId, branchId, mustChangePassword: Boolean(req.user?.mustChangePassword) };
 };
