@@ -26,4 +26,6 @@ jobs:
             cd backend
             npm install
             npx prisma generate
-            pm2 restart cafe-backend
+            sudo systemctl restart tiffzy
+            sudo systemctl is-active --quiet tiffzy
+            echo "Tiffzy backend restarted successfully"
