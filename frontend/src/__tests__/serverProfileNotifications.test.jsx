@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import React from "react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import React, { useState } from "react";
 import ServerProfileView from "../components/ServerProfileView";
 import ServerNotificationsView from "../components/ServerNotificationsView";
 import { BrowserRouter } from "react-router-dom";
@@ -35,12 +35,16 @@ vi.mock("axios", () => ({
     },
 }));
 
+const { mockSocket } = vi.hoisted(() => ({
+    mockSocket: {
+        on: vi.fn(),
+        off: vi.fn(),
+    },
+}));
+
 vi.mock("../context/StaffSocketContext", () => ({
     useStaffSocket: () => ({
-        socket: {
-            on: vi.fn(),
-            off: vi.fn(),
-        },
+        socket: mockSocket,
     }),
 }));
 
@@ -289,5 +293,207 @@ describe("ServerNotificationsView Unit Tests", () => {
                 expect.any(Object)
             );
         });
+    });
+
+    it("performs initial notification load exactly once on mount", async () => {
+        renderWithProviders(<ServerNotificationsView onBackToFloorPlan={vi.fn()} />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        });
+
+        const notificationGetCalls = axios.get.mock.calls.filter(([url]) => url.includes("/notifications"));
+        expect(notificationGetCalls).toHaveLength(1);
+    });
+
+    it("parent re-render with new callback reference does NOT re-fetch or re-bind socket listeners", async () => {
+        const onCountChange = vi.fn();
+        const { rerender } = renderWithProviders(
+            <ServerNotificationsView onUnreadCountChange={onCountChange} />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        });
+
+        const initialGetCount = axios.get.mock.calls.filter(([url]) => url.includes("/notifications")).length;
+        expect(initialGetCount).toBe(1);
+
+        const initialOnCallCount = mockSocket.on.mock.calls.length;
+        expect(initialOnCallCount).toBe(6);
+        expect(mockSocket.off).not.toHaveBeenCalled();
+
+        // Simulate parent clock tick re-rendering with new anonymous callback
+        rerender(
+            <BrowserRouter>
+                <ServerNotificationsView onUnreadCountChange={(count) => onCountChange(count)} />
+            </BrowserRouter>
+        );
+
+        // Wait to ensure no reactive effects fired
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        const getCountAfterRerender = axios.get.mock.calls.filter(([url]) => url.includes("/notifications")).length;
+        expect(getCountAfterRerender).toBe(1);
+
+        // Socket listeners should NOT have been detached or re-attached
+        expect(mockSocket.off).not.toHaveBeenCalled();
+        expect(mockSocket.on.mock.calls.length).toBe(6);
+    });
+
+    it("waiting 15 seconds on the page produces no periodic notification REST requests (no polling)", async () => {
+        renderWithProviders(<ServerNotificationsView onBackToFloorPlan={vi.fn()} />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        });
+
+        const initialCalls = axios.get.mock.calls.filter(([url]) => url.includes("/notifications")).length;
+        expect(initialCalls).toBe(1);
+
+        vi.useFakeTimers();
+        try {
+            // Fast forward 15 seconds as specified in requirement
+            await act(async () => {
+                vi.advanceTimersByTime(15000);
+            });
+
+            const callsAfter15s = axios.get.mock.calls.filter(([url]) => url.includes("/notifications")).length;
+            expect(callsAfter15s).toBe(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("existing notifications remain visible during refetch without full-page spinner", async () => {
+        let resolveRefetch;
+        renderWithProviders(<ServerNotificationsView onBackToFloorPlan={vi.fn()} />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        });
+
+        // Set up pending promise for second request
+        axios.get.mockImplementationOnce((url) => {
+            if (url.includes("/notifications")) {
+                return new Promise((resolve) => {
+                    resolveRefetch = resolve;
+                });
+            }
+            return Promise.reject(new Error("Not found"));
+        });
+
+        // Click manual refresh
+        const refreshBtn = screen.getByTitle("Refresh Notifications");
+        fireEvent.click(refreshBtn);
+
+        // During fetch, notification list must remain in DOM!
+        expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        expect(screen.getByText("New Order Placed")).toBeInTheDocument();
+
+        // Resolve fetch
+        act(() => {
+            resolveRefetch({
+                data: {
+                    success: true,
+                    notifications: mockNotifications,
+                    total: 2,
+                    unreadCount: 1,
+                    hasMore: false,
+                },
+            });
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        });
+    });
+
+    it("manual refresh executes and spins icon without showing full-page loader", async () => {
+        renderWithProviders(<ServerNotificationsView onBackToFloorPlan={vi.fn()} />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        });
+
+        const refreshBtn = screen.getByTitle("Refresh Notifications");
+        fireEvent.click(refreshBtn);
+
+        await waitFor(() => {
+            const getCalls = axios.get.mock.calls.filter(([url]) => url.includes("/notifications"));
+            expect(getCalls.length).toBe(2);
+        });
+
+        // List stayed visible
+        expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+    });
+
+    it("notification:new adds notification immediately and updates unread count", async () => {
+        const onCountChange = vi.fn();
+        renderWithProviders(<ServerNotificationsView onUnreadCountChange={onCountChange} />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        });
+
+        const newNotifCall = mockSocket.on.mock.calls.find(([event]) => event === "notification:new");
+        expect(newNotifCall).toBeDefined();
+        const handleNewNotification = newNotifCall[1];
+
+        act(() => {
+            handleNewNotification({
+                id: 301,
+                title: "Table 8 Calling Waiter",
+                message: "Customer pressed call button",
+                type: "ALERT",
+                isRead: false,
+                createdAt: new Date().toISOString(),
+                data: { tableNo: "8" },
+            });
+        });
+
+        expect(screen.getByText("Table 8 Calling Waiter")).toBeInTheDocument();
+        expect(screen.getByText("Table 8")).toBeInTheDocument();
+        expect(onCountChange).toHaveBeenLastCalledWith(2);
+    });
+
+    it("table:waiter_assigned triggers silent refetch", async () => {
+        renderWithProviders(<ServerNotificationsView onBackToFloorPlan={vi.fn()} />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        });
+
+        const assignedCall = mockSocket.on.mock.calls.find(([event]) => event === "table:waiter_assigned");
+        expect(assignedCall).toBeDefined();
+        const handleRefetch = assignedCall[1];
+
+        act(() => {
+            handleRefetch();
+        });
+
+        await waitFor(() => {
+            const getCalls = axios.get.mock.calls.filter(([url]) => url.includes("/notifications"));
+            expect(getCalls.length).toBe(2);
+        });
+    });
+
+    it("unmount removes all 6 registered socket listeners", async () => {
+        const { unmount } = renderWithProviders(<ServerNotificationsView onBackToFloorPlan={vi.fn()} />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Food Ready at Pass")).toBeInTheDocument();
+        });
+
+        expect(mockSocket.off).not.toHaveBeenCalled();
+
+        unmount();
+
+        expect(mockSocket.off).toHaveBeenCalledWith("notification:new", expect.any(Function));
+        expect(mockSocket.off).toHaveBeenCalledWith("table:waiter_assigned", expect.any(Function));
+        expect(mockSocket.off).toHaveBeenCalledWith("order:created", expect.any(Function));
+        expect(mockSocket.off).toHaveBeenCalledWith("kot:status_updated", expect.any(Function));
+        expect(mockSocket.off).toHaveBeenCalledWith("bill:requested", expect.any(Function));
+        expect(mockSocket.off).toHaveBeenCalledWith("waiter:called", expect.any(Function));
     });
 });

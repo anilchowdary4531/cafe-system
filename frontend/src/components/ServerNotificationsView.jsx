@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import {
     ArrowLeft,
     Bell,
@@ -55,6 +55,12 @@ export default function ServerNotificationsView({
     const [showSoundSettings, setShowSoundSettings] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
 
+    const onUnreadCountChangeRef = useRef(onUnreadCountChange);
+
+    useEffect(() => {
+        onUnreadCountChangeRef.current = onUnreadCountChange;
+    }, [onUnreadCountChange]);
+
     const handleSelectTable = onNavigateToTable || onSelectTable;
 
     const authHeaders = useMemo(() => {
@@ -95,7 +101,9 @@ export default function ServerNotificationsView({
                     const totalCount = res.data.total ?? list.length;
                     const serverUnread = res.data.unreadCount ?? list.filter((it) => !it.isRead && !it.read).length;
                     setUnreadCount(serverUnread);
-                    if (onUnreadCountChange) onUnreadCountChange(serverUnread);
+                    if (onUnreadCountChangeRef.current) {
+                        onUnreadCountChangeRef.current(serverUnread);
+                    }
 
                     setHasMore(res.data.hasMore ?? pageNum * 20 < totalCount);
                     setPage(pageNum);
@@ -108,12 +116,18 @@ export default function ServerNotificationsView({
                 setLoadingMore(false);
             }
         },
-        [authHeaders, onUnreadCountChange]
+        [authHeaders]
     );
+
+    const fetchNotificationsRef = useRef(fetchNotifications);
+    useEffect(() => {
+        fetchNotificationsRef.current = fetchNotifications;
+    }, [fetchNotifications]);
 
     useEffect(() => {
         fetchNotifications(1);
-    }, [fetchNotifications]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token]);
 
     // Real-time Socket.IO Listener
     useEffect(() => {
@@ -128,12 +142,18 @@ export default function ServerNotificationsView({
             });
             setUnreadCount((prev) => {
                 const nextCount = prev + 1;
-                if (onUnreadCountChange) onUnreadCountChange(nextCount);
+                if (onUnreadCountChangeRef.current) {
+                    onUnreadCountChangeRef.current(nextCount);
+                }
                 return nextCount;
             });
         };
 
-        const handleRefetch = () => fetchNotifications(1, true);
+        const handleRefetch = () => {
+            if (fetchNotificationsRef.current) {
+                fetchNotificationsRef.current(1, true);
+            }
+        };
 
         socket.on("notification:new", handleNewNotification);
         socket.on("table:waiter_assigned", handleRefetch);
@@ -150,7 +170,7 @@ export default function ServerNotificationsView({
             socket.off("bill:requested", handleRefetch);
             socket.off("waiter:called", handleRefetch);
         };
-    }, [socket, fetchNotifications, onUnreadCountChange]);
+    }, [socket]);
 
     // Mark Single Notification Read
     const handleMarkSingleRead = async (notificationId) => {
@@ -162,7 +182,9 @@ export default function ServerNotificationsView({
             );
             setUnreadCount((prev) => {
                 const nextCount = Math.max(0, prev - 1);
-                if (onUnreadCountChange) onUnreadCountChange(nextCount);
+                if (onUnreadCountChangeRef.current) {
+                    onUnreadCountChangeRef.current(nextCount);
+                }
                 return nextCount;
             });
 
@@ -184,7 +206,9 @@ export default function ServerNotificationsView({
         try {
             setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true, read: true })));
             setUnreadCount(0);
-            if (onUnreadCountChange) onUnreadCountChange(0);
+            if (onUnreadCountChangeRef.current) {
+                onUnreadCountChangeRef.current(0);
+            }
 
             await axios.patch(
                 `${API}/api/notifications/read-all`,
@@ -344,7 +368,7 @@ export default function ServerNotificationsView({
             </div>
 
             {/* Notifications List */}
-            {loading ? (
+            {loading && notifications.length === 0 ? (
                 <div className="flex justify-center p-12">
                     <LoaderCircle className="h-8 w-8 animate-spin text-orange-500" />
                 </div>

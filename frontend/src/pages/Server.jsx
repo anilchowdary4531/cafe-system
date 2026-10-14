@@ -881,7 +881,7 @@ export default function Server() {
             ) : viewMode === "NOTIFICATIONS" ? (
                 <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full">
                     <ServerNotificationsView
-                        onUnreadCountChange={(count) => setUnreadNotificationCount(count)}
+                        onUnreadCountChange={setUnreadNotificationCount}
                         onNavigateToTable={(tableNo) => {
                             setViewMode("FLOOR_PLAN");
                             navigate(`/server?table=${encodeURIComponent(tableNo)}`);
