@@ -1049,4 +1049,138 @@ test("PHASE P0 — Financial & Table-State Integrity Regression Test Suite", asy
     const tableEvents = emittedEvents.filter((e) => e.event === "table:updated");
     assert.equal(tableEvents.length, 0, "No table:updated event emitted when transaction fails (TEST 32)");
   });
+
+  // TEST 33: Unforced closeSession endpoint rejects when unpaid orders remain.
+  await t.test("TEST 33: Unforced closeSession endpoint rejects when unpaid orders remain", async () => {
+    const session = await prisma.tableSession.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableId: table1A.id,
+        tableNo: "1",
+        status: "OPEN",
+      },
+    });
+
+    const order = await prisma.order.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableSessionId: session.id,
+        tableNo: "1",
+        orderNo: `P0-UNPAID-CLOSE-${Date.now()}`,
+        status: "DELIVERED",
+        paymentStatus: "PENDING",
+        subtotal: 60,
+        total: 60,
+      },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/tables/sessions/${session.id}/close`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+      payload: {},
+    });
+
+    assert.equal(res.statusCode, 400, "Unforced close on session with unpaid order must return 400 (TEST 33)");
+    const body = JSON.parse(res.payload);
+    assert.equal(body.code, "unpaid_orders_remain", "Error code must indicate unpaid orders remain");
+
+    const dbSession = await prisma.tableSession.findUnique({ where: { id: session.id } });
+    assert.equal(dbSession.status, "OPEN", "Session must remain OPEN after rejected close attempt");
+
+    // Cleanup
+    await prisma.order.delete({ where: { id: order.id } });
+    await prisma.tableSession.delete({ where: { id: session.id } });
+  });
+
+  // TEST 34: Forced closeSession endpoint closes session and frees table.
+  await t.test("TEST 34: Forced closeSession endpoint closes session and frees table", async () => {
+    const session = await prisma.tableSession.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableId: table1A.id,
+        tableNo: "1",
+        status: "OPEN",
+      },
+    });
+
+    const order = await prisma.order.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableSessionId: session.id,
+        tableNo: "1",
+        orderNo: `P0-FORCE-CLOSE-${Date.now()}`,
+        status: "DELIVERED",
+        paymentStatus: "PENDING",
+        subtotal: 75,
+        total: 75,
+      },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/tables/sessions/${session.id}/close`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+      payload: { force: true, reason: "Manager force cleared table" },
+    });
+
+    assert.equal(res.statusCode, 200, "Forced close must succeed (TEST 34)");
+    const dbSession = await prisma.tableSession.findUnique({ where: { id: session.id } });
+    assert.equal(dbSession.status, "CLOSED", "Session must be CLOSED after forced close");
+
+    // Cleanup
+    await prisma.order.delete({ where: { id: order.id } });
+    await prisma.tableSession.delete({ where: { id: session.id } });
+  });
+
+  // TEST 35: Duplicate settle-bill calls are idempotent and do not fail.
+  await t.test("TEST 35: Duplicate settle-bill calls are idempotent and safe", async () => {
+    const session = await prisma.tableSession.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableId: table1A.id,
+        tableNo: "1",
+        status: "OPEN",
+      },
+    });
+
+    const order = await prisma.order.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableSessionId: session.id,
+        tableNo: "1",
+        orderNo: `P0-IDEM-SETTLE-${Date.now()}`,
+        status: "DELIVERED",
+        paymentStatus: "PENDING",
+        subtotal: 90,
+        total: 90,
+      },
+    });
+
+    // First settle call
+    const res1 = await app.inject({
+      method: "POST",
+      url: `/owner/${restaurantA.id}/tables/1/settle-bill`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+      payload: { paymentMode: "CASH" },
+    });
+    assert.equal(res1.statusCode, 200);
+    const body1 = JSON.parse(res1.payload);
+    assert.equal(body1.cleared, true);
+
+    // Second duplicate settle call
+    const res2 = await app.inject({
+      method: "POST",
+      url: `/owner/${restaurantA.id}/tables/1/settle-bill`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+      payload: { paymentMode: "CASH" },
+    });
+    assert.equal(res2.statusCode, 200, "Duplicate settle-bill must succeed idempotently (TEST 35)");
+    const body2 = JSON.parse(res2.payload);
+    assert.equal(body2.cleared, false);
+
+    // Cleanup
+    await prisma.order.delete({ where: { id: order.id } });
+    await prisma.tableSession.delete({ where: { id: session.id } });
+  });
 });

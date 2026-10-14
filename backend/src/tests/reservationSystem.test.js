@@ -179,7 +179,21 @@ test("Time-Based Table Reservation System Test Suite", async (t) => {
     assert.strictEqual(avail2.available, true, "Slot 20:00-21:00 should be available for T1");
   });
 
-  await t.test("5. QR Code scan resolution during active reservation slot blocks dine-in", async () => {
+  await t.test("5. Cancel reservation frees table availability", async () => {
+    if (createdReservationT1?.id) {
+      await updateReservationStatus({
+        prisma,
+        restaurantId: testRestaurant.id,
+        reservationId: createdReservationT1.id,
+        status: "CANCELLED",
+        cancelReason: "Test cancel",
+      });
+      const resUpdated = await prisma.reservation.findUnique({ where: { id: createdReservationT1.id } });
+      assert.strictEqual(resUpdated.status, "CANCELLED");
+    }
+  });
+
+  await t.test("6. QR Code scan resolution during active reservation slot blocks dine-in", async () => {
     const todayStr = new Date().toISOString().split("T")[0];
     const now = new Date();
     const currentHours = String(now.getHours()).padStart(2, "0");
@@ -228,19 +242,5 @@ test("Time-Based Table Reservation System Test Suite", async (t) => {
         return true;
       }
     );
-  });
-
-  await t.test("6. Cancel reservation frees table availability", async () => {
-    if (createdReservationT1?.id) {
-      await updateReservationStatus({
-        prisma,
-        restaurantId: testRestaurant.id,
-        reservationId: createdReservationT1.id,
-        status: "CANCELLED",
-        cancelReason: "Test cancel",
-      });
-      const resUpdated = await prisma.reservation.findUnique({ where: { id: createdReservationT1.id } });
-      assert.strictEqual(resUpdated.status, "CANCELLED");
-    }
   });
 });

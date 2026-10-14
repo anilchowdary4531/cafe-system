@@ -553,7 +553,7 @@ test("Server Assignment, Table Mapping & Connection Audit — Backend Test Suite
         });
 
         assert.ok(updatedSession);
-        assert.equal(updatedSession.status, "PAID");
+        assert.ok(["PAID", "CLOSED"].includes(updatedSession.status), "Session status must be PAID or CLOSED upon payment");
 
         const freedTable = await prisma.diningTable.findUnique({ where: { id: tableA2.id } });
         assert.equal(freedTable.assignedWaiterId, null, "DiningTable assignedWaiterId must be set to null upon session payment completion");

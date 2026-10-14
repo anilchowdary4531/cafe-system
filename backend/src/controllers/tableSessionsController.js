@@ -166,7 +166,20 @@ export async function updatePaymentStatus(req, reply) {
       return reply.code(400).send({ success: false, message: "sessionId and paymentStatus are required" });
     }
 
-    const session = await updateSessionPaymentStatus({ prisma, sessionId, paymentMode, paymentStatus });
+    const realtime = req.server?.realtime || req.realtime || null;
+    const actor = req.staffActor || {
+      userId: req.user?.id || null,
+      role: req.user?.role || "STAFF",
+    };
+
+    const session = await updateSessionPaymentStatus({
+      prisma,
+      sessionId,
+      paymentMode,
+      paymentStatus,
+      realtime,
+      actor,
+    });
 
     const emitSession = getEmitter(req);
     if (emitSession && session) emitSession(session);
@@ -181,19 +194,40 @@ export async function updatePaymentStatus(req, reply) {
 export async function closeSession(req, reply) {
   try {
     const sessionId = Number(req.params.sessionId || req.body?.sessionId);
+    const force = Boolean(req.body?.force);
 
     if (!sessionId) {
       return reply.code(400).send({ success: false, message: "sessionId is required" });
     }
 
-    const session = await closeTableSession({ prisma, sessionId });
+    const realtime = req.server?.realtime || req.realtime || null;
+    const actor = req.staffActor || {
+      userId: req.user?.id || null,
+      role: req.user?.role || "STAFF",
+    };
+
+    const session = await closeTableSession({
+      prisma,
+      sessionId,
+      force,
+      realtime,
+      actor,
+    });
 
     const emitSession = getEmitter(req);
-    if (emitSession) emitSession(session);
+    if (emitSession && session) emitSession(session);
 
     return reply.send({ success: true, session });
   } catch (err) {
     console.error("[TableSession] closeSession error:", err);
+    if (err.code === "unpaid_orders_remain") {
+      return reply.code(400).send({
+        success: false,
+        code: "unpaid_orders_remain",
+        unpaidCount: err.unpaidCount,
+        message: err.message,
+      });
+    }
     return reply.code(500).send({ success: false, message: err.message || "Failed to close session" });
   }
 }

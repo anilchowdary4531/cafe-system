@@ -426,6 +426,9 @@ const TABLE_STATE_KEYS = {
     PRINTED: "PRINTED_TABLE",
     PAID: "PAID_TABLE",
     RUNNING_KOT: "RUNNING_KOT_TABLE",
+    DELIVERED: "DELIVERED_TABLE",
+    FAILED: "FAILED_TABLE",
+    CANCELLED: "CANCELLED_TABLE",
 };
 
 const TABLE_STATE_LABELS = {
@@ -435,6 +438,9 @@ const TABLE_STATE_LABELS = {
     [TABLE_STATE_KEYS.PRINTED]: "Printed Table",
     [TABLE_STATE_KEYS.PAID]: "Paid Table",
     [TABLE_STATE_KEYS.RUNNING_KOT]: "Running KOT Table",
+    [TABLE_STATE_KEYS.DELIVERED]: "Payment Pending",
+    [TABLE_STATE_KEYS.FAILED]: "Payment Failed",
+    [TABLE_STATE_KEYS.CANCELLED]: "Payment Cancelled",
 };
 
 const TABLE_STATE_LEGEND = [
@@ -444,6 +450,7 @@ const TABLE_STATE_LEGEND = [
     TABLE_STATE_KEYS.PRINTED,
     TABLE_STATE_KEYS.PAID,
     TABLE_STATE_KEYS.RUNNING_KOT,
+    TABLE_STATE_KEYS.DELIVERED,
 ];
 
 const ACTIVE_KOT_STATUSES = new Set(["PREPARING", "READY"]);
@@ -456,11 +463,27 @@ const resolveTableState = (table, printedTableKeys = new Set()) => {
     const activeOrders = Array.isArray(table?.activeOrders) ? table.activeOrders : [];
     if (activeOrders.length > 0) {
         const assignmentKey = String(table?.assignmentKey || table?.key || "");
-        const isPrinted =
-            printedTableKeys.has(assignmentKey) ||
-            activeOrders.some(
-                (order) => String(order?.status || "").toUpperCase() === "DELIVERED"
+        const isPrinted = printedTableKeys.has(assignmentKey);
+
+        const allDelivered = activeOrders.every(
+            (order) => String(order?.status || "").toUpperCase() === "DELIVERED"
+        );
+
+        if (allDelivered) {
+            const hasFailed = activeOrders.some(
+                (o) => String(o?.paymentStatus || "").toUpperCase() === "FAILED"
             );
+            if (hasFailed) return TABLE_STATE_KEYS.FAILED;
+
+            const hasCancelled = activeOrders.some(
+                (o) => String(o?.paymentStatus || "").toUpperCase() === "CANCELLED"
+            );
+            if (hasCancelled) return TABLE_STATE_KEYS.CANCELLED;
+
+            if (isPrinted) return TABLE_STATE_KEYS.PRINTED;
+            return TABLE_STATE_KEYS.DELIVERED;
+        }
+
         if (isPrinted) return TABLE_STATE_KEYS.PRINTED;
 
         const hasRunningKot = activeOrders.some((order) =>
@@ -474,6 +497,78 @@ const resolveTableState = (table, printedTableKeys = new Set()) => {
     }
 
     return TABLE_STATE_KEYS.BLANK;
+};
+
+const resolveTableCardBadge = (table, tableStateKey, printedTableKeys) => {
+    const activeOrders = Array.isArray(table?.activeOrders) ? table.activeOrders : [];
+    const isOccupied = table?.isOccupied || activeOrders.length > 0;
+
+    if (isOccupied) {
+        if (activeOrders.length > 0) {
+            const anyFailed = activeOrders.some(
+                (o) => String(o?.paymentStatus || "").toUpperCase() === "FAILED"
+            );
+            if (anyFailed) {
+                return {
+                    label: "Payment Failed",
+                    className: "bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/40",
+                };
+            }
+
+            const anyCancelled = activeOrders.some(
+                (o) => String(o?.paymentStatus || "").toUpperCase() === "CANCELLED"
+            );
+            if (anyCancelled) {
+                return {
+                    label: "Payment Cancelled",
+                    className: "bg-red-500/20 text-red-600 dark:text-red-300 border border-red-500/40",
+                };
+            }
+
+            const allDelivered = activeOrders.every(
+                (o) => String(o?.status || "").toUpperCase() === "DELIVERED"
+            );
+            const assignmentKey = String(table?.assignmentKey || table?.key || "");
+            const isPrinted = printedTableKeys?.has(assignmentKey);
+
+            if (allDelivered) {
+                if (isPrinted) {
+                    return {
+                        label: "Bill Printed",
+                        className: "bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/40",
+                    };
+                }
+                return {
+                    label: "Payment Pending",
+                    className: "bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/40",
+                };
+            }
+
+            if (isPrinted) {
+                return {
+                    label: "Bill Printed",
+                    className: "bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/40",
+                };
+            }
+        }
+
+        return {
+            label: "Running",
+            className: "bg-blue-500/20 text-blue-600 dark:text-blue-300 border border-blue-500/40",
+        };
+    }
+
+    if (table?.isReserved || table?.activeReservation || table?.upcomingReservation || table?.is_reserved) {
+        return {
+            label: "Reserved",
+            className: "bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-500/40",
+        };
+    }
+
+    return {
+        label: "Available",
+        className: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/40",
+    };
 };
 
 const resolveOrderSortTime = (order) => {
@@ -943,6 +1038,7 @@ export default function OwnerLayout() {
         socket.on("notification:new", loadTableOverview);
         socket.on("reservation:updated", loadTableOverview);
         socket.on("table:updated", loadTableOverview);
+        socket.on("table:session_updated", loadTableOverview);
         socket.on("table:waiter_assigned", loadTableOverview);
         socket.on("table:layout_updated", loadTableOverview);
 
@@ -952,6 +1048,7 @@ export default function OwnerLayout() {
             socket.off("notification:new", loadTableOverview);
             socket.off("reservation:updated", loadTableOverview);
             socket.off("table:updated", loadTableOverview);
+            socket.off("table:session_updated", loadTableOverview);
             socket.off("table:waiter_assigned", loadTableOverview);
             socket.off("table:layout_updated", loadTableOverview);
         };
@@ -1400,6 +1497,46 @@ export default function OwnerLayout() {
         setTimeout(() => {
             printWindow.print();
         }, 250);
+    };
+
+    const handleSettleBill = async (table, assignmentKey, paymentMode = "CASH") => {
+        const targetTableNo = table?.tableNo || table?.label || null;
+        if (!restaurantId || !targetTableNo) return;
+
+        setCompletingTableKey(assignmentKey || String(table?.id || targetTableNo));
+        setReceiptActionError("");
+
+        try {
+            await api.post(`/owner/${restaurantId}/tables/${encodeURIComponent(targetTableNo)}/settle-bill`, {
+                paymentMode,
+                changedByName: user?.name || user?.email || "Owner",
+            });
+
+            if (assignmentKey) {
+                setPrintedTableKeys((prev) => {
+                    const next = new Set(prev);
+                    next.delete(assignmentKey);
+                    return next;
+                });
+            }
+            await refreshTableOverview();
+            setOpenOrdersTableKey("");
+            showToast({
+                title: "Bill Settled & Table Freed 🎉",
+                message: `Table ${targetTableNo} bill settled via ${paymentMode} and released.`,
+                variant: "success",
+            });
+        } catch (err) {
+            const errorMsg = err?.response?.data?.message || err?.message || "Failed to settle bill";
+            setReceiptActionError(errorMsg);
+            showToast({
+                title: "Settlement Error",
+                message: errorMsg,
+                variant: "error",
+            });
+        } finally {
+            setCompletingTableKey("");
+        }
     };
 
     const handleFreeTable = async (table, assignmentKey, options = {}) => {
@@ -2279,7 +2416,8 @@ export default function OwnerLayout() {
                                                 );
                                                 const isCompletingThisTable =
                                                     completingTableKey === assignmentKey;
-                                                const tableStateKey = resolveTableState(table);
+                                                const tableStateKey = resolveTableState(table, printedTableKeys);
+                                                const tableCardBadge = resolveTableCardBadge(table, tableStateKey, printedTableKeys);
                                                 const tableStateClassToken =
                                                     toTableStateClassToken(tableStateKey);
                                                 const ordersPlacement = tablePopoverPlacement[`orders:${assignmentKey}`];
@@ -2340,21 +2478,25 @@ export default function OwnerLayout() {
                                                                 : "hover:-translate-y-0.5 z-1"
                                                         }`}
                                                         style={{
-                                                            minHeight: `${Math.max(65, Math.round(110 * (tableZoom / 100)))}px`,
-                                                            maxWidth: `${Math.max(80, Math.round(140 * (tableZoom / 100)))}px`,
+                                                            minHeight: `${Math.max(70, Math.round(110 * (tableZoom / 100)))}px`,
                                                             fontSize: `${Math.max(9, Math.round(12 * (tableZoom / 100)))}px`,
                                                         }}
                                                     >
                                                         <div className="flex h-full flex-col justify-between">
                                                             {/* Card Header: Table Number / Name + Actions */}
                                                             <div className="flex items-start justify-between gap-1">
-                                                                <div className="min-w-0">
+                                                                <div className="min-w-0 flex-1">
                                                                     <p
-                                                                        className="truncate font-extrabold leading-none text-[color:var(--app-text)]"
+                                                                        className="truncate font-extrabold leading-tight text-[color:var(--app-text)]"
+                                                                        title={`Table ${tableLabel}`}
                                                                         style={{
                                                                             fontSize: `${Math.max(
-                                                                                13,
-                                                                                Math.round(20 * (tableZoom / 100))
+                                                                                11,
+                                                                                tableLabel.length > 6
+                                                                                    ? Math.round(13 * (tableZoom / 100))
+                                                                                    : tableLabel.length > 4
+                                                                                    ? Math.round(16 * (tableZoom / 100))
+                                                                                    : Math.round(19 * (tableZoom / 100))
                                                                             )}px`,
                                                                         }}
                                                                     >
@@ -2362,7 +2504,7 @@ export default function OwnerLayout() {
                                                                     </p>
                                                                 </div>
 
-                                                                <div className="flex items-center gap-1">
+                                                                <div className="flex items-center gap-1 shrink-0">
                                                                     {table.isOccupied && (
                                                                         <button
                                                                             type="button"
@@ -2382,7 +2524,7 @@ export default function OwnerLayout() {
                                                                                 setOpenMoreTableKey("");
                                                                                 setReceiptActionError("");
                                                                             }}
-                                                                            className="theme-table-meta-pill rounded-full px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold leading-none transition hover:opacity-90"
+                                                                            className="theme-table-meta-pill rounded-full px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold leading-none transition hover:opacity-90 shrink-0"
                                                                             title={`Show orders for table ${tableLabel}`}
                                                                         >
                                                                             {table.activeOrderCount || 0} ord
@@ -2405,7 +2547,7 @@ export default function OwnerLayout() {
                                                                             setOpenOrdersTableKey("");
                                                                             setOpenStaffTableKey("");
                                                                         }}
-                                                                        className="theme-table-icon-btn rounded-md p-1 transition hover:bg-black/10 dark:hover:bg-white/10"
+                                                                        className="theme-table-icon-btn rounded-md p-1 transition hover:bg-black/10 dark:hover:bg-white/10 shrink-0"
                                                                         title={`Actions for Table ${tableLabel}`}
                                                                         aria-label={`Table ${tableLabel} actions`}
                                                                     >
@@ -2418,33 +2560,18 @@ export default function OwnerLayout() {
                                                             <div className="my-auto flex flex-col gap-1 py-0.5">
                                                                 <div className="flex items-center gap-1 flex-wrap">
                                                                     <span
-                                                                        className={`inline-flex items-center gap-1 rounded-full px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold ${
-                                                                            table.isOccupied
-                                                                                ? "bg-blue-500/20 text-blue-600 dark:text-blue-300 border border-blue-500/40"
-                                                                                : tableStateKey === TABLE_STATE_KEYS.RESERVED || table.isReserved
-                                                                                ? "bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-500/40"
-                                                                                : tableStateKey === TABLE_STATE_KEYS.RUNNING_KOT
-                                                                                ? "bg-orange-500/20 text-orange-600 dark:text-orange-300 border border-orange-500/40"
-                                                                                : tableStateKey === TABLE_STATE_KEYS.PRINTED
-                                                                                ? "bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/40"
-                                                                                : tableStateKey === TABLE_STATE_KEYS.PAID
-                                                                                ? "bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/40"
-                                                                                : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/40"
-                                                                        }`}
+                                                                        className={`inline-flex items-center gap-1 rounded-full px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold ${tableCardBadge.className}`}
                                                                     >
                                                                         <span className="h-1.5 w-1.5 rounded-full bg-current shrink-0" />
-                                                                        <span>
-                                                                            {table.isOccupied
-                                                                                ? "Running"
-                                                                                : tableStateKey === TABLE_STATE_KEYS.RESERVED || table.isReserved
-                                                                                ? "Reserved"
-                                                                                : "Available"}
-                                                                        </span>
+                                                                        <span>{tableCardBadge.label}</span>
                                                                     </span>
 
-                                                                    <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] font-semibold theme-muted">
+                                                                    <span
+                                                                        className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] font-semibold theme-muted"
+                                                                        title={`${table.seats || 4} seats capacity`}
+                                                                    >
                                                                         <Users size={10} className="shrink-0" />
-                                                                        <span>{table.seats || 4}s</span>
+                                                                        <span>{table.seats || 4} seats</span>
                                                                     </span>
                                                                 </div>
 
@@ -2488,8 +2615,12 @@ export default function OwnerLayout() {
                                                                 )}
 
                                                                 {table.isOccupied ? (
-                                                                    <span className="theme-table-time-pill inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold shrink-0">
-                                                                        {occupiedFor || "now"}
+                                                                    <span
+                                                                        className="theme-table-time-pill inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold shrink-0"
+                                                                        title={`Occupied duration: ${occupiedFor || "just now"}`}
+                                                                    >
+                                                                        <Clock size={9} className="mr-0.5 shrink-0" />
+                                                                        {occupiedFor || "just now"}
                                                                     </span>
                                                                 ) : null}
                                                             </div>
@@ -2562,15 +2693,34 @@ export default function OwnerLayout() {
                                                                                     className="theme-table-order-row rounded-md px-2 py-1.5"
                                                                                 >
                                                                                     <div className="flex items-start justify-between gap-2">
-                                                                                        <p className="font-medium">
-                                                                                            {order.orderNo
-                                                                                                ? order.orderNo
-                                                                                                : `#${order.id}`}
-                                                                                            <span className="theme-muted ml-1 text-[10px] uppercase">
-                                                                                                {order.status}
-                                                                                            </span>
-                                                                                        </p>
-                                                                                        <p className="font-semibold">
+                                                                                        <div className="min-w-0">
+                                                                                            <p className="font-medium flex items-center gap-1.5 flex-wrap">
+                                                                                                <span>{order.orderNo ? order.orderNo : `#${order.id}`}</span>
+                                                                                                <span className="theme-muted text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10">
+                                                                                                    {order.status}
+                                                                                                </span>
+                                                                                            </p>
+                                                                                            <div className="mt-1">
+                                                                                                {String(order.paymentStatus || "").toUpperCase() === "PAID" || String(order.paymentStatus || "").toUpperCase() === "SUCCESS" ? (
+                                                                                                    <span className="inline-block rounded px-1.5 py-0.5 text-[9px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40">
+                                                                                                        PAID
+                                                                                                    </span>
+                                                                                                ) : String(order.paymentStatus || "").toUpperCase() === "FAILED" ? (
+                                                                                                    <span className="inline-block rounded px-1.5 py-0.5 text-[9px] font-bold bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/40">
+                                                                                                        PAYMENT FAILED
+                                                                                                    </span>
+                                                                                                ) : String(order.paymentStatus || "").toUpperCase() === "CANCELLED" ? (
+                                                                                                    <span className="inline-block rounded px-1.5 py-0.5 text-[9px] font-bold bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/40">
+                                                                                                        PAYMENT CANCELLED
+                                                                                                    </span>
+                                                                                                ) : (
+                                                                                                    <span className="inline-block rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40">
+                                                                                                        PAYMENT PENDING
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <p className="font-semibold shrink-0">
                                                                                             {formatReceiptAmount(orderTotal)}
                                                                                         </p>
                                                                                     </div>
@@ -2632,7 +2782,7 @@ export default function OwnerLayout() {
                                                                     </p>
                                                                 ) : null}
                                                                 {activeOrders.length > 0 ? (
-                                                                    <div className="mt-2 flex items-center justify-end gap-1.5">
+                                                                    <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-[color:var(--app-border)]/40">
                                                                         <button
                                                                             type="button"
                                                                             onClick={() =>
@@ -2643,12 +2793,43 @@ export default function OwnerLayout() {
                                                                                 })
                                                                             }
                                                                             className="theme-soft-button rounded-md px-2 py-1 text-[10px] font-semibold"
+                                                                            title="Print customer receipt (does not clear table)"
                                                                         >
                                                                             Print
                                                                         </button>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() =>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                handleSettleBill(
+                                                                                    table,
+                                                                                    assignmentKey,
+                                                                                    "CASH"
+                                                                                )
+                                                                            }
+                                                                            disabled={isCompletingThisTable}
+                                                                            className="rounded-md bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 text-[10px] font-bold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60"
+                                                                            title="Settle bill via Cash and release table"
+                                                                        >
+                                                                            {isCompletingThisTable ? "Settling..." : "Settle (Cash)"}
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                handleSettleBill(
+                                                                                    table,
+                                                                                    assignmentKey,
+                                                                                    "UPI"
+                                                                                )
+                                                                            }
+                                                                            disabled={isCompletingThisTable}
+                                                                            className="rounded-md bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 text-[10px] font-bold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60"
+                                                                            title="Settle bill via UPI and release table"
+                                                                        >
+                                                                            UPI
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
                                                                                 handleFreeTable(
                                                                                     table,
                                                                                     assignmentKey
@@ -2656,10 +2837,9 @@ export default function OwnerLayout() {
                                                                             }
                                                                             disabled={isCompletingThisTable}
                                                                             className="theme-button rounded-md px-2 py-1 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                                                                            title="Force clear table"
                                                                         >
-                                                                            {isCompletingThisTable
-                                                                                ? "Completing..."
-                                                                                : "Done"}
+                                                                            Force Free
                                                                         </button>
                                                                     </div>
                                                                 ) : null}
@@ -2836,6 +3016,27 @@ export default function OwnerLayout() {
                                                                 )}
 
                                                                 <div className="my-1 border-t border-[color:var(--app-border)]/40" />
+
+                                                                {/* Settle Bill if Occupied */}
+                                                                {table.isOccupied && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(event) => {
+                                                                            event.stopPropagation();
+                                                                            setOpenMoreTableKey("");
+                                                                            handleSettleBill(table, assignmentKey, "CASH");
+                                                                        }}
+                                                                        disabled={isCompletingThisTable}
+                                                                        className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-left cursor-pointer mb-1 disabled:opacity-60"
+                                                                    >
+                                                                        <CreditCard size={13} className="shrink-0" />
+                                                                        <span>
+                                                                            {isCompletingThisTable
+                                                                                ? "Settling..."
+                                                                                : "Settle Bill & Free"}
+                                                                        </span>
+                                                                    </button>
+                                                                )}
 
                                                                 {/* 4. Free Table */}
                                                                 <button

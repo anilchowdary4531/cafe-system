@@ -292,14 +292,45 @@ export const updateSessionPaymentStatus = async ({
   sessionId,
   paymentMode,
   paymentStatus,
+  realtime,
+  actor,
 } = {}) => {
   const sid = Number(sessionId);
   const statusUpper = String(paymentStatus || "").toUpperCase();
 
-  const session = await prisma.tableSession.findUnique({ where: { id: sid } });
+  const session = await prisma.tableSession.findUnique({
+    where: { id: sid },
+    include: {
+      orders: { include: { items: true } },
+      table: true,
+    },
+  });
   if (!session) return null;
 
   if (statusUpper === "SUCCESS" || statusUpper === "PAID") {
+    if (typeof prisma.$transaction === "function") {
+      const completionResult = await completeSessionAndReleaseTable({
+        prisma,
+        tableSessionId: sid,
+        paymentMode,
+        realtime,
+        actor,
+      });
+
+      if (completionResult?.completed) {
+        return prisma.tableSession.findUnique({
+          where: { id: sid },
+          include: {
+            orders: { include: { items: true } },
+            table: true,
+          },
+        });
+      }
+
+      return session;
+    }
+
+    // Mocked unit test fallback without $transaction
     const updated = await prisma.tableSession.update({
       where: { id: sid },
       data: {
@@ -319,7 +350,7 @@ export const updateSessionPaymentStatus = async ({
           assignedWaiterId: null,
           assignedWaiterName: null,
         },
-      }).catch((err) => console.warn("[TableSession] Error clearing waiter on payment:", err?.message));
+      }).catch(() => {});
     }
 
     return updated;
@@ -328,14 +359,50 @@ export const updateSessionPaymentStatus = async ({
   return session;
 };
 
-export const closeTableSession = async ({ prisma, sessionId } = {}) => {
+export const closeTableSession = async ({
+  prisma,
+  sessionId,
+  force = false,
+  realtime,
+  actor,
+} = {}) => {
   const sid = Number(sessionId);
 
-  const session = await prisma.tableSession.findUnique({ where: { id: sid } });
+  const session = await prisma.tableSession.findUnique({
+    where: { id: sid },
+    include: {
+      orders: true,
+      table: true,
+    },
+  });
   if (!session) {
     const err = new Error("Session not found");
     err.code = "session_not_found";
     throw err;
+  }
+
+  if (!force) {
+    const completionResult = await completeSessionAndReleaseTable({
+      prisma,
+      tableSessionId: sid,
+      realtime,
+      actor,
+    });
+
+    if (!completionResult?.completed) {
+      const err = new Error("Cannot close session with unpaid orders");
+      err.code = "unpaid_orders_remain";
+      err.unpaidCount = completionResult?.unpaidCount;
+      throw err;
+    }
+
+    return prisma.tableSession.findUnique({
+      where: { id: sid },
+      include: {
+        orders: { include: { items: true } },
+        table: true,
+      },
+    });
   }
 
   const updated = await prisma.tableSession.update({

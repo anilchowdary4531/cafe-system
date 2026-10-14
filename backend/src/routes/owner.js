@@ -1173,8 +1173,12 @@ export default async function ownerRoutes(app, deps) {
       const effectiveRid = table.restaurantId || restaurantId;
       const activeSession = table.tableSessions[0];
       const activeOrders = activeSession?.orders || [];
-      const unpaidOrders = activeOrders.filter((o) => o.paymentStatus === "PENDING" && o.status !== "CANCELLED");
-      const activePrepOrders = activeOrders.filter((o) => ["PLACED", "ACCEPTED", "PREPARING"].includes(o.status));
+      const activePrepOrders = activeOrders.filter(
+        (o) => ["ACCEPTED", "PREPARING", "READY"].includes(o.status)
+      );
+      const unpaidOrders = activeOrders.filter(
+        (o) => !["PAID", "SUCCESS"].includes(String(o.paymentStatus || "").toUpperCase()) && o.status !== "CANCELLED"
+      );
 
       // Validation check if not forced
       if (!force && (unpaidOrders.length > 0 || activePrepOrders.length > 0)) {
@@ -3145,38 +3149,56 @@ export default async function ownerRoutes(app, deps) {
     }
   });
 
-  app.post("/owner/:restaurantId/tables/:tableNo/settle-bill", async (req, reply) => {
+  const handleSettleBill = async (req, reply) => {
     try {
+      const restaurantId = Number(req.params.restaurantId);
+      const tableParam = String(req.params.tableNo || req.params.tableId || "").trim();
+      if (!restaurantId || !tableParam) return reply.code(400).send({ message: "Invalid id values" });
+
       const actor =
         req.staffActor ||
-        ({
-          userId: Number(req.user?.id || 0) || null,
-          role: String(req.user?.role || "").toUpperCase(),
-          restaurantId: Number(req.user?.restaurantId || 0) || null,
-          branchId: Number(req.user?.branchId || 0) || null,
-        });
-
-      const restaurantId = Number(req.params.restaurantId);
-      const tableNo = String(req.params.tableNo || "").trim();
-      if (!restaurantId || !tableNo) return reply.code(400).send({ message: "Invalid id values" });
-      if (!actor?.role) return reply.code(401).send({ message: "Authentication required" });
-      if (actor?.restaurantId && actor.restaurantId !== restaurantId && actor.role !== "SUPER_ADMIN") {
-        return reply.code(403).send({ message: "Forbidden" });
-      }
+        (await requireStaffJwt(req, reply, {
+          prisma,
+          allowedRoles: STAFF_ALLOWED_ROLES,
+          matchRestaurantParam: "restaurantId",
+        }));
+      if (!actor) return;
 
       const paymentMode = normalizeBillPaymentMode(req.body?.paymentMode || req.body?.paymentMethod || req.body?.method);
       const changedByName = req.body?.changedByName ? String(req.body.changedByName).trim() : null;
       const activeStatuses = ["PLACED", "ACCEPTED", "PREPARING", "READY"];
 
+      // Resolve table by tableNo or id
+      const diningTable = await prisma.diningTable.findFirst({
+        where: {
+          restaurantId,
+          OR: [
+            { tableNo: tableParam },
+            ...(Number.isInteger(Number(tableParam)) ? [{ id: Number(tableParam) }] : []),
+          ],
+        },
+      });
+
+      const effectiveTableNo = diningTable?.tableNo || tableParam;
+
+      const orderWhereOr = [{ tableNo: effectiveTableNo }];
+      if (diningTable) {
+        orderWhereOr.push({ tableSession: { tableId: diningTable.id } });
+      }
+
       const activeOrders = await prisma.order.findMany({
         where: {
           restaurantId,
-          tableNo,
-          OR: [
-            { status: { in: activeStatuses } },
+          OR: orderWhereOr,
+          AND: [
             {
-              status: "DELIVERED",
-              paymentStatus: { notIn: ["PAID", "SUCCESS"] },
+              OR: [
+                { status: { in: activeStatuses } },
+                {
+                  status: "DELIVERED",
+                  paymentStatus: { notIn: ["PAID", "SUCCESS"] },
+                },
+              ],
             },
           ],
         },
@@ -3192,7 +3214,7 @@ export default async function ownerRoutes(app, deps) {
 
       if (!activeOrders.length) {
         return reply.send({
-          message: `Table ${tableNo} already has no active bill`,
+          message: `Table ${effectiveTableNo} already has no active bill`,
           orders: [],
           cleared: false,
         });
@@ -3247,7 +3269,7 @@ export default async function ownerRoutes(app, deps) {
       });
 
       return {
-        message: `Table ${tableNo} bill settled`,
+        message: `Table ${effectiveTableNo} bill settled`,
         orders: updatedOrders,
         cleared: true,
         paymentMode,
@@ -3256,7 +3278,10 @@ export default async function ownerRoutes(app, deps) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to settle table bill" });
     }
-  });
+  };
+
+  app.post("/owner/:restaurantId/tables/:tableNo/settle-bill", handleSettleBill);
+  app.post("/api/owner/:restaurantId/tables/:tableNo/settle-bill", handleSettleBill);
 
   const payLaterController = buildPayLaterController({ prisma });
   app.get("/owner/:restaurantId/pay-later/customers", payLaterController.getCustomers);
