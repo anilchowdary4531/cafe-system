@@ -48,6 +48,7 @@ import {
     Handshake,
     Boxes,
     ShoppingCart,
+    ShieldCheck,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
@@ -99,6 +100,7 @@ const MODULES = [
     "staff",
     "settings",
     "notifications",
+    "audit",
 ];
 
 const defaultAccessByRole = (role) => {
@@ -732,6 +734,13 @@ export default function OwnerLayout() {
             path: "/owner/staff",
             icon: <Users size={18} />,
             accessKey: "staff",
+        },
+        {
+            label: "Audit Logs",
+            path: "/owner/audit-logs",
+            icon: <ShieldCheck size={18} />,
+            accessKey: "audit",
+            fallbackKey: "reports",
         },
         {
             label: "Profile",

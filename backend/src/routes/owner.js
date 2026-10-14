@@ -62,7 +62,7 @@ import {
   splitTableOrTransferItems,
 } from "../controllers/tableOperationController.js";
 import { assignWaiterToTable, unassignWaiterFromTable, getWaiterAssignmentHistory, getWaiterWorkspaceData, getStaffPerformanceMetrics } from "../services/staffManagementService.js";
-import { getAuditLogs } from "../services/auditLogService.js";
+import { getAuditLogs, logAuditEvent } from "../services/auditLogService.js";
 import { approveCancellation, approveDiscount, approveReprint } from "../controllers/managerApprovalController.js";
 
 export default async function ownerRoutes(app, deps) {
@@ -1273,12 +1273,26 @@ export default async function ownerRoutes(app, deps) {
       });
 
       if (realtime?.io) {
-        realtime.io.to(`restaurant_${effectiveRid}`).emit("table:updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
-        realtime.io.to(`restaurant:${effectiveRid}`).emit("table:updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
+        const clearPayload = {
+          restaurantId: effectiveRid,
+          tableId: table.id,
+          tableNo: table.tableNo,
+          assignedWaiterId: updatedTable?.assignedWaiterId || null,
+          assignedWaiterName: updatedTable?.assignedWaiterName || null,
+        };
+        realtime.io.to(`restaurant_${effectiveRid}`).emit("table:updated", clearPayload);
+        realtime.io.to(`restaurant:${effectiveRid}`).emit("table:updated", clearPayload);
         realtime.io.to(`restaurant_${effectiveRid}`).emit("table:session_updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
         realtime.io.to(`restaurant:${effectiveRid}`).emit("table:session_updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
         realtime.io.to(`restaurant_${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
         realtime.io.to(`restaurant:${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
+
+        if (realtime?.staff) {
+          realtime.staff.to(`restaurant:${effectiveRid}`).emit("table:updated", clearPayload);
+          realtime.staff.to(`restaurant_${effectiveRid}`).emit("table:updated", clearPayload);
+          realtime.staff.to(`restaurant:${effectiveRid}`).emit("table:session_updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
+          realtime.staff.to(`restaurant_${effectiveRid}`).emit("table:session_updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
+        }
       }
 
       return reply.send({
@@ -2674,6 +2688,36 @@ export default async function ownerRoutes(app, deps) {
         update: { restaurantId, permissions: serializeAccess(normalizedAccess, effectiveRole) },
       });
 
+      await logAuditEvent({
+        prisma,
+        restaurantId,
+        actor: { id: actor.userId || actor.id, name: actor.userName || actor.name, role: actor.role },
+        action: "STAFF_CREATED",
+        entity: "STAFF",
+        entityId: user.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        details: {
+          role: user.role,
+          designation: user.designation || undefined,
+        },
+        req,
+      });
+
+      if (isTemporary) {
+        await logAuditEvent({
+          prisma,
+          restaurantId,
+          actor: { id: actor.userId || actor.id, name: actor.userName || actor.name, role: actor.role },
+          action: "STAFF_TEMP_PASSWORD_ISSUED",
+          entity: "STAFF",
+          entityId: user.id,
+          status: "SUCCESS",
+          severity: "INFO",
+          req,
+        });
+      }
+
       return {
         message: "Staff user created",
         user: buildStaffUserResponse(user, normalizedAccess),
@@ -2772,6 +2816,60 @@ export default async function ownerRoutes(app, deps) {
         }
       }
 
+      if (nextRole !== staff.role) {
+        await logAuditEvent({
+          prisma,
+          restaurantId,
+          actor: { id: actor.userId || actor.id, name: actor.userName || actor.name, role: actor.role },
+          action: "STAFF_ROLE_CHANGED",
+          entity: "STAFF",
+          entityId: staff.id,
+          status: "SUCCESS",
+          severity: "INFO",
+          details: {
+            previousRole: staff.role,
+            newRole: nextRole,
+          },
+          req,
+        });
+      }
+
+      if (password && req.body?.isTemporaryPassword === true) {
+        await logAuditEvent({
+          prisma,
+          restaurantId,
+          actor: { id: actor.userId || actor.id, name: actor.userName || actor.name, role: actor.role },
+          action: "STAFF_TEMP_PASSWORD_ISSUED",
+          entity: "STAFF",
+          entityId: staff.id,
+          status: "SUCCESS",
+          severity: "INFO",
+          req,
+        });
+      }
+
+      const updatedFields = [];
+      if (name !== undefined && name !== staff.name) updatedFields.push("name");
+      if (email !== undefined && email !== staff.email) updatedFields.push("email");
+      if (phone !== undefined && phone !== staff.phone) updatedFields.push("phone");
+      if (designation !== undefined && nextDesignation !== staff.designation) updatedFields.push("designation");
+      if (role && nextRole !== staff.role) updatedFields.push("role");
+      if (password) updatedFields.push("password");
+      if (isActive !== undefined && Boolean(isActive) !== staff.isActive) updatedFields.push("isActive");
+
+      await logAuditEvent({
+        prisma,
+        restaurantId,
+        actor: { id: actor.userId || actor.id, name: actor.userName || actor.name, role: actor.role },
+        action: "STAFF_UPDATED",
+        entity: "STAFF",
+        entityId: staff.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        details: { updatedFields },
+        req,
+      });
+
       return {
         message: "Staff user updated",
         user: buildStaffUserResponse(updated),
@@ -2806,6 +2904,22 @@ export default async function ownerRoutes(app, deps) {
           sessionVersion: { increment: 1 },
         },
         include: { staffAccess: { select: { permissions: true } } },
+      });
+
+      await logAuditEvent({
+        prisma,
+        restaurantId,
+        actor: { id: actor.userId || actor.id, name: actor.userName || actor.name, role: actor.role },
+        action: "STAFF_STATUS_CHANGED",
+        entity: "STAFF",
+        entityId: staff.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        details: {
+          previousStatus: staff.isActive ? "ACTIVE" : "DISABLED",
+          newStatus: isActive ? "ACTIVE" : "DISABLED",
+        },
+        req,
       });
 
       return {
@@ -2845,6 +2959,19 @@ export default async function ownerRoutes(app, deps) {
         data: { sessionVersion: { increment: 1 } },
       });
 
+      await logAuditEvent({
+        prisma,
+        restaurantId,
+        actor: { id: actor.userId || actor.id, name: actor.userName || actor.name, role: actor.role },
+        action: "STAFF_ACCESS_UPDATED",
+        entity: "STAFF",
+        entityId: staff.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        details: { changedModules: Object.keys(normalizedAccess || {}) },
+        req,
+      });
+
       return {
         message: "Staff access updated",
         access: normalizedAccess,
@@ -2873,6 +3000,19 @@ export default async function ownerRoutes(app, deps) {
 
       try {
         await prisma.user.delete({ where: { id: staffId } });
+
+        await logAuditEvent({
+          prisma,
+          restaurantId,
+          actor: { id: actor.userId || actor.id, name: actor.userName || actor.name, role: actor.role },
+          action: "STAFF_DELETED",
+          entity: "STAFF",
+          entityId: staffId,
+          status: "SUCCESS",
+          severity: "INFO",
+          req,
+        });
+
         return { message: "Staff user deleted" };
       } catch (err) {
         if (err?.code === "P2003") {
@@ -3137,17 +3277,29 @@ export default async function ownerRoutes(app, deps) {
   // ==========================================
   const emitTableAssignmentUpdate = (restaurantId, tableId, table) => {
     if (!realtime?.io) return;
+    const rid = Number(restaurantId);
     const payload = {
-      restaurantId: Number(restaurantId),
+      restaurantId: rid,
       tableId: Number(tableId),
       tableNo: table?.tableNo || null,
-      assignedWaiterId: table?.assignedWaiterId || null,
+      assignedWaiterId: table?.assignedWaiterId ? Number(table.assignedWaiterId) : null,
       assignedWaiterName: table?.assignedWaiterName || null,
     };
-    realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", payload);
-    realtime.io.to(`restaurant:${restaurantId}`).emit("table:updated", payload);
-    realtime.io.to(`restaurant_${restaurantId}`).emit("table:waiter_assigned", payload);
-    realtime.io.to(`restaurant:${restaurantId}`).emit("table:waiter_assigned", payload);
+    realtime.io.to(`restaurant_${rid}`).emit("table:updated", payload);
+    realtime.io.to(`restaurant:${rid}`).emit("table:updated", payload);
+    realtime.io.to(`restaurant_${rid}`).emit("table:waiter_assigned", payload);
+    realtime.io.to(`restaurant:${rid}`).emit("table:waiter_assigned", payload);
+
+    if (realtime?.staff) {
+      realtime.staff.to(`restaurant:${rid}`).emit("table:updated", payload);
+      realtime.staff.to(`restaurant_${rid}`).emit("table:updated", payload);
+      realtime.staff.to(`restaurant:${rid}`).emit("table:waiter_assigned", payload);
+      realtime.staff.to(`restaurant_${rid}`).emit("table:waiter_assigned", payload);
+      if (payload.assignedWaiterId) {
+        realtime.staff.to(`user:${payload.assignedWaiterId}`).emit("table:waiter_assigned", payload);
+        realtime.staff.to(`user_${payload.assignedWaiterId}`).emit("table:waiter_assigned", payload);
+      }
+    }
   };
 
   const handleAssignWaiter = async (req, reply) => {
@@ -3168,6 +3320,7 @@ export default async function ownerRoutes(app, deps) {
         waiterId,
         actor: actorInfo,
         reason,
+        realtime,
       });
       emitTableAssignmentUpdate(restaurantId, tableId, result.table);
       return { ok: true, message: waiterId ? "Waiter assigned" : "Waiter unassigned", ...result };
@@ -3194,6 +3347,7 @@ export default async function ownerRoutes(app, deps) {
         waiterId,
         actor: actorInfo,
         reason: reason || "Reassigned to new waiter",
+        realtime,
       });
       emitTableAssignmentUpdate(restaurantId, tableId, result.table);
       return { ok: true, message: "Waiter reassigned", ...result };
@@ -3219,6 +3373,7 @@ export default async function ownerRoutes(app, deps) {
         tableSessionId,
         actor: actorInfo,
         reason: reason || "Unassigned via Owner Panel",
+        realtime,
       });
       emitTableAssignmentUpdate(restaurantId, tableId, result.table);
       return { ok: true, message: "Waiter unassigned", ...result };
@@ -3271,10 +3426,20 @@ export default async function ownerRoutes(app, deps) {
   app.post("/owner/:restaurantId/approvals/discount", approveDiscount);
   app.post("/owner/:restaurantId/approvals/reprint", approveReprint);
 
-  app.get("/owner/:restaurantId/audit-logs", async (req, reply) => {
+  const handleGetAuditLogs = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
-      const { branchId, action, entity, actorUserId, limit, page } = req.query || {};
+      if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant ID" });
+
+      const actor = req.staffActor || req.user;
+      if (actor && actor.role !== "SUPER_ADMIN" && actor.restaurantId && Number(actor.restaurantId) !== restaurantId) {
+        return reply.code(403).send({ message: "Access forbidden: cannot access another restaurant's audit logs" });
+      }
+      if (actor && !["OWNER", "MANAGER", "SUPER_ADMIN"].includes(String(actor.role).toUpperCase())) {
+        return reply.code(403).send({ message: "Access forbidden: insufficient permissions to view audit logs" });
+      }
+
+      const { branchId, action, entity, actorUserId, severity, status, startDate, endDate, limit, page } = req.query || {};
       const result = await getAuditLogs({
         prisma,
         restaurantId,
@@ -3282,6 +3447,10 @@ export default async function ownerRoutes(app, deps) {
         action,
         entity,
         actorUserId,
+        severity,
+        status,
+        startDate,
+        endDate,
         limit,
         page,
       });
@@ -3289,7 +3458,10 @@ export default async function ownerRoutes(app, deps) {
     } catch (err) {
       return reply.code(400).send({ message: err?.message || "Failed to fetch audit logs" });
     }
-  });
+  };
+
+  app.get("/owner/:restaurantId/audit-logs", handleGetAuditLogs);
+  app.get("/api/owner/:restaurantId/audit-logs", handleGetAuditLogs);
 
   // ==========================================
   // FEATURE 12 — CUSTOMER CRM FOUNDATION ROUTES

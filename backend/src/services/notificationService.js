@@ -100,6 +100,8 @@ export const createAndDispatchNotification = async ({
       const payload = {
         id: notification.id,
         notificationType,
+        recipientType: notification.recipientType,
+        recipientId: notification.recipientId,
         title: notification.title,
         message: notification.message,
         orderId: notification.orderId,
@@ -117,8 +119,19 @@ export const createAndDispatchNotification = async ({
       } else if (recipientType === RECIPIENT_TYPES.USER || recipientType === RECIPIENT_TYPES.RESTAURANT) {
         if (restaurantId) {
           realtime.io.to(`restaurant:${restaurantId}`).emit("notification:new", payload);
+          realtime.io.to(`restaurant_${restaurantId}`).emit("notification:new", payload);
         }
         realtime.io.to(`user:${recipientId}`).emit("notification:new", payload);
+        realtime.io.to(`user_${recipientId}`).emit("notification:new", payload);
+
+        if (realtime?.staff) {
+          if (restaurantId) {
+            realtime.staff.to(`restaurant:${restaurantId}`).emit("notification:new", payload);
+            realtime.staff.to(`restaurant_${restaurantId}`).emit("notification:new", payload);
+          }
+          realtime.staff.to(`user:${recipientId}`).emit("notification:new", payload);
+          realtime.staff.to(`user_${recipientId}`).emit("notification:new", payload);
+        }
       }
     }
   } catch (wsErr) {

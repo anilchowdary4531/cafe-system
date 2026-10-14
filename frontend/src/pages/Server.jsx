@@ -56,11 +56,7 @@ const formatMoney = (value) => {
 
 export const normalizeTableKey = (val) => {
     if (!val) return "";
-    return String(val)
-        .trim()
-        .toLowerCase()
-        .replace(/^table\s*[-_]?/i, "")
-        .replace(/^t\s*[-_]?/i, "");
+    return String(val).trim().toLowerCase();
 };
 
 export default function Server() {
@@ -122,17 +118,6 @@ export default function Server() {
     useEffect(() => {
         fetchUnreadCount();
     }, [fetchUnreadCount]);
-
-    useEffect(() => {
-        if (!socket) return;
-        const handleNewNotif = () => {
-            fetchUnreadCount();
-        };
-        socket.on("notification:new", handleNewNotif);
-        return () => {
-            socket.off("notification:new", handleNewNotif);
-        };
-    }, [socket, fetchUnreadCount]);
 
     // Meal Shift Selection: "BREAKFAST" | "LUNCH" | "DINNER"
     const [activeShift, setActiveShift] = useState("LUNCH");
@@ -331,6 +316,19 @@ export default function Server() {
             refreshLiveOrders({ force: true });
             refreshReadyKots({ force: true });
 
+            if (data?.tableId) {
+                setSelectedTable((prev) => {
+                    if (!prev || (prev.id !== data.tableId && String(prev.tableNo) !== String(data.tableNo))) {
+                        return prev;
+                    }
+                    return {
+                        ...prev,
+                        assignedWaiterId: data.assignedWaiterId !== undefined ? data.assignedWaiterId : prev.assignedWaiterId,
+                        assignedWaiterName: data.assignedWaiterName !== undefined ? data.assignedWaiterName : prev.assignedWaiterName,
+                    };
+                });
+            }
+
             const status = String(data?.status || data?.kot?.status || "").toUpperCase();
             if (status === "READY") {
                 playNotificationSound();
@@ -344,6 +342,23 @@ export default function Server() {
             }
         };
 
+        const handleNewNotification = (notif) => {
+            fetchUnreadCount();
+            const typeUpper = String(notif?.notificationType || notif?.type || "").toUpperCase();
+            const isAssigned = typeUpper === "TABLE_ASSIGNMENT" || notif?.data?.action === "ASSIGNED" || notif?.data?.action === "REASSIGNED";
+            const isUnassigned = typeUpper === "TABLE_UNASSIGNED" || notif?.data?.action === "UNASSIGNED";
+
+            if (isAssigned || isUnassigned) {
+                playNotificationSound();
+                showToast({
+                    title: notif.title || (isAssigned ? "📋 Table Assigned" : "Table Unassigned"),
+                    message: notif.message || `Table ${notif.data?.tableNo || ""} assignment updated.`,
+                    variant: isAssigned ? "success" : "info",
+                });
+                refreshTables({ force: true });
+            }
+        };
+
         socket.on("table:updated", handleRealtimeUpdate);
         socket.on("table:waiter_assigned", handleRealtimeUpdate);
         socket.on("table:session_updated", handleRealtimeUpdate);
@@ -354,6 +369,7 @@ export default function Server() {
         socket.on("order:updated", handleRealtimeUpdate);
         socket.on("order_created", handleRealtimeUpdate);
         socket.on("new_order", handleRealtimeUpdate);
+        socket.on("notification:new", handleNewNotification);
 
         return () => {
             socket.off("table:updated", handleRealtimeUpdate);
@@ -366,8 +382,9 @@ export default function Server() {
             socket.off("order:updated", handleRealtimeUpdate);
             socket.off("order_created", handleRealtimeUpdate);
             socket.off("new_order", handleRealtimeUpdate);
+            socket.off("notification:new", handleNewNotification);
         };
-    }, [socket, refreshTables, refreshReservations, refreshLiveOrders, refreshReadyKots]);
+    }, [socket, refreshTables, refreshReservations, refreshLiveOrders, refreshReadyKots, fetchUnreadCount]);
 
     // Ordering Actions & Auto Server Assignment
     const handleSelectTableForOrder = useCallback(async (table) => {

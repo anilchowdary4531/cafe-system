@@ -12,6 +12,7 @@ export const unassignWaiterFromTable = async ({
     tableSessionId = null,
     actor = null,
     reason = null,
+    realtime = null,
 } = {}) => {
     const rid = Number(restaurantId);
     const tid = Number(tableId);
@@ -97,6 +98,29 @@ export const unassignWaiterFromTable = async ({
         },
     });
 
+    // 6. Dispatch persistent in-app notification to unassigned waiter
+    if (previousWaiterId) {
+        try {
+            await createAndDispatchNotification({
+                prisma,
+                realtime,
+                recipientType: RECIPIENT_TYPES.USER,
+                recipientId: previousWaiterId,
+                restaurantId: effectiveRid,
+                notificationType: NOTIFICATION_TYPES.TABLE_UNASSIGNED || "TABLE_UNASSIGNED",
+                title: `Table Assigned — Unassigned Table ${table.tableNo}`,
+                message: `You have been unassigned from Table ${table.tableNo}.`,
+                data: {
+                    tableId: tid,
+                    tableNo: table.tableNo,
+                    restaurantId: effectiveRid,
+                    action: "UNASSIGNED",
+                },
+                idempotencyKey: `waiter_unassigned_${tid}_${previousWaiterId}_${Math.floor(Date.now() / 30000)}`,
+            }).catch((err) => console.warn("[StaffService] Unassignment notification warning:", err?.message));
+        } catch (_) {}
+    }
+
     return { table: updatedTable, session: updatedSession, assignmentLog };
 };
 
@@ -111,6 +135,7 @@ export const assignWaiterToTable = async ({
     waiterId,
     actor = null,
     reason = null,
+    realtime = null,
 } = {}) => {
     const rid = Number(restaurantId);
     const tid = Number(tableId);
@@ -127,6 +152,7 @@ export const assignWaiterToTable = async ({
             tableSessionId,
             actor,
             reason,
+            realtime,
         });
     }
 
@@ -162,6 +188,7 @@ export const assignWaiterToTable = async ({
     }
 
     const isReassignment = Boolean(table.assignedWaiterId && table.assignedWaiterId !== wid);
+    const previousWaiterId = isReassignment ? table.assignedWaiterId : null;
 
     // Concurrency / Permission Guard:
     // Ordinary staff members cannot overwrite an existing server's table assignment without Owner/Manager authorization or force flag
@@ -234,13 +261,13 @@ export const assignWaiterToTable = async ({
     try {
         await createAndDispatchNotification({
             prisma,
-            realtime: null,
+            realtime,
             recipientType: RECIPIENT_TYPES.USER,
             recipientId: waiter.id,
             restaurantId: rid,
-            notificationType: NOTIFICATION_TYPES.IMPORTANT_ORDER_ALERT || "IMPORTANT_ORDER_ALERT",
+            notificationType: NOTIFICATION_TYPES.TABLE_ASSIGNMENT || "TABLE_ASSIGNMENT",
             title: `📋 Table Assigned — Table ${table.tableNo}`,
-            message: `You have been assigned to Table ${table.tableNo} (${table.section || "Main Floor"}).`,
+            message: `Table ${table.tableNo} has been assigned to you. Please check/attend Table ${table.tableNo}.`,
             data: {
                 tableId: tid,
                 tableNo: table.tableNo,
@@ -250,6 +277,31 @@ export const assignWaiterToTable = async ({
             idempotencyKey: `waiter_assigned_${tid}_${waiter.id}_${Math.floor(Date.now() / 30000)}`,
         }).catch((err) => console.warn("[StaffService] Assignment notification warning:", err?.message));
     } catch (_) {}
+
+    // 8. If reassignment, dispatch notification to previous waiter
+    if (isReassignment && previousWaiterId) {
+        try {
+            await createAndDispatchNotification({
+                prisma,
+                realtime,
+                recipientType: RECIPIENT_TYPES.USER,
+                recipientId: previousWaiterId,
+                restaurantId: rid,
+                notificationType: NOTIFICATION_TYPES.TABLE_UNASSIGNED || "TABLE_UNASSIGNED",
+                title: `Table Assigned — Reassigned Table ${table.tableNo}`,
+                message: `Table ${table.tableNo} has been reassigned to ${waiter.name}.`,
+                data: {
+                    tableId: tid,
+                    tableNo: table.tableNo,
+                    restaurantId: rid,
+                    action: "REASSIGNED",
+                    newWaiterId: waiter.id,
+                    newWaiterName: waiter.name,
+                },
+                idempotencyKey: `waiter_reassigned_prev_${tid}_${previousWaiterId}_${Math.floor(Date.now() / 30000)}`,
+            }).catch((err) => console.warn("[StaffService] Reassignment previous waiter notification warning:", err?.message));
+        } catch (_) {}
+    }
 
     return { table: updatedTable, session: updatedSession, assignmentLog };
 };

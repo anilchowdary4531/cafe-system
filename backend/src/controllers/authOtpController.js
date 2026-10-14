@@ -11,6 +11,7 @@ import {
   consumeStaffMagicLink,
   issueStaffSession,
 } from "../services/staffSessionService.js";
+import { logAuditEvent } from "../services/auditLogService.js";
 
 const ALLOWED_ACTOR_TYPES = new Set(["CUSTOMER", "OWNER", "STAFF", "SUPER_ADMIN"]);
 
@@ -95,6 +96,22 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions, on
         return reply.code(502).send({ message: waErr || smsErr || emailErr || "Failed to send OTP" });
       }
 
+      if (user) {
+        await logAuditEvent({
+          prisma,
+          restaurantId: user.restaurantId,
+          branchId: user.branchId,
+          actor: { id: user.id, name: user.name, role: user.role },
+          action: "AUTH_OTP_SENT",
+          entity: "OTP",
+          entityId: user.id,
+          status: "SUCCESS",
+          severity: "INFO",
+          details: { channel: deliveredByWhatsApp ? "whatsapp" : (deliveredBySms ? "sms" : "email") },
+          req,
+        });
+      }
+
       const payload = {
         message: "OTP sent",
         phone,
@@ -147,7 +164,26 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions, on
         }
       } else {
         const okRes = await verifyAuthOtp({ prisma, phone, actorType, otp });
-        if (!okRes.ok) return reply.code(okRes.status).send(okRes.payload);
+        if (!okRes.ok) {
+          if (actorType !== "CUSTOMER") {
+            const staffUser = await resolveStaffUser({ prisma, phone, actorType, restaurantId });
+            const isExp = String(okRes.payload?.message || "").toLowerCase().includes("expired");
+            await logAuditEvent({
+              prisma,
+              restaurantId: staffUser?.restaurantId || restaurantId,
+              branchId: staffUser?.branchId || null,
+              actor: staffUser ? { id: staffUser.id, name: staffUser.name, role: staffUser.role } : null,
+              action: isExp ? "AUTH_OTP_EXPIRED" : "AUTH_OTP_FAILED",
+              entity: "OTP",
+              entityId: staffUser?.id || 0,
+              status: "FAILURE",
+              severity: "WARN",
+              details: { reason: isExp ? "EXPIRED" : "INVALID_OR_EXPIRED" },
+              req,
+            });
+          }
+          return reply.code(okRes.status).send(okRes.payload);
+        }
       }
 
       if (actorType === "CUSTOMER") {
@@ -173,6 +209,19 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions, on
       const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
       const { token, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
       userPayload.sessionVersion = sessionVersion;
+
+      await logAuditEvent({
+        prisma,
+        restaurantId: user.restaurantId,
+        branchId: user.branchId,
+        actor: { id: user.id, name: user.name, role: user.role },
+        action: "AUTH_OTP_VERIFIED",
+        entity: "OTP",
+        entityId: user.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        req,
+      });
 
       return { message: "Login success", actorType, token, user: userPayload, offlineMode: false };
     } catch (err) {
@@ -261,6 +310,32 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions, on
         onOtpGenerated({ email: user.email, phone: user.phone, otp: otpCode, expiresAt: otpRes.expiresAt });
       }
 
+      await logAuditEvent({
+        prisma,
+        restaurantId: user.restaurantId,
+        actor: { id: user.id, name: user.name, role: user.role },
+        action: "AUTH_PASSWORD_RESET_REQUESTED",
+        entity: "USER",
+        entityId: user.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        details: { channel: "email" },
+        req,
+      });
+
+      await logAuditEvent({
+        prisma,
+        restaurantId: user.restaurantId,
+        actor: { id: user.id, name: user.name, role: user.role },
+        action: "AUTH_OTP_SENT",
+        entity: "OTP",
+        entityId: user.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        details: { channel: "email" },
+        req,
+      });
+
       return reply.code(200).send(GENERIC_RESPONSE);
     } catch (err) {
       console.log(err);
@@ -278,6 +353,11 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions, on
         return reply.code(400).send({ message: "Email and verification code are required." });
       }
 
+      const user = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true, email: true, name: true, role: true, restaurantId: true, sessionVersion: true, isActive: true },
+      });
+
       const verifyRes = await verifyAuthOtp({
         prisma,
         phone: email,
@@ -286,19 +366,69 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions, on
       });
 
       if (!verifyRes.ok) {
+        const isExp = String(verifyRes.payload?.message || "").toLowerCase().includes("expired");
+        if (isExp) {
+          await logAuditEvent({
+            prisma,
+            restaurantId: user?.restaurantId || null,
+            actor: user ? { id: user.id, name: user.name, role: user.role } : null,
+            action: "AUTH_OTP_EXPIRED",
+            entity: "OTP",
+            entityId: user?.id || 0,
+            status: "FAILURE",
+            severity: "WARN",
+            details: { reason: "EXPIRED" },
+            req,
+          });
+        } else {
+          await logAuditEvent({
+            prisma,
+            restaurantId: user?.restaurantId || null,
+            actor: user ? { id: user.id, name: user.name, role: user.role } : null,
+            action: "AUTH_OTP_FAILED",
+            entity: "OTP",
+            entityId: user?.id || 0,
+            status: "FAILURE",
+            severity: "WARN",
+            details: { reason: "INVALID_OR_EXPIRED" },
+            req,
+          });
+        }
+
         return reply.code(verifyRes.status || 400).send({
           message: verifyRes.payload?.message || "Invalid or expired verification code.",
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { email },
-        select: { id: true, email: true, restaurantId: true, sessionVersion: true, isActive: true },
-      });
-
       if (!user || user.isActive === false) {
+        await logAuditEvent({
+          prisma,
+          restaurantId: user?.restaurantId || null,
+          actor: user ? { id: user.id, name: user.name, role: user.role } : null,
+          action: "AUTH_OTP_FAILED",
+          entity: "OTP",
+          entityId: user?.id || 0,
+          status: "FAILURE",
+          severity: "WARN",
+          details: { reason: "USER_INACTIVE_OR_NOT_FOUND" },
+          req,
+        });
+
         return reply.code(400).send({ message: "Invalid or expired verification code." });
       }
+
+      await logAuditEvent({
+        prisma,
+        restaurantId: user.restaurantId,
+        actor: { id: user.id, name: user.name, role: user.role },
+        action: "AUTH_OTP_VERIFIED",
+        entity: "OTP",
+        entityId: user.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        details: { channel: "email" },
+        req,
+      });
 
       const resetToken = app.jwt.sign(
         {
@@ -351,7 +481,7 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions, on
 
       const user = await prisma.user.findUnique({
         where: { id: Number(decoded.userId) },
-        select: { id: true, restaurantId: true, sessionVersion: true, isActive: true },
+        select: { id: true, name: true, role: true, restaurantId: true, sessionVersion: true, isActive: true },
       });
 
       if (!user || user.isActive === false) {
@@ -378,6 +508,31 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions, on
           lastFailedLoginAt: null,
           lockedUntil: null,
         },
+      });
+
+      await logAuditEvent({
+        prisma,
+        restaurantId: user.restaurantId,
+        actor: { id: user.id, name: user.name, role: user.role },
+        action: "AUTH_PASSWORD_RESET_COMPLETED",
+        entity: "USER",
+        entityId: user.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        req,
+      });
+
+      await logAuditEvent({
+        prisma,
+        restaurantId: user.restaurantId,
+        actor: { id: user.id, name: user.name, role: user.role },
+        action: "AUTH_SESSION_INVALIDATED",
+        entity: "USER",
+        entityId: user.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        details: { reason: "PASSWORD_RESET" },
+        req,
       });
 
       return reply.code(200).send({

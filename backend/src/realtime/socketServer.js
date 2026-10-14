@@ -58,10 +58,18 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     const actor = socket.data.actor || {};
     const rid = Number(actor.restaurantId || 0);
     const bid = Number(actor.branchId || 0);
+    const uid = Number(actor.userId || 0);
 
     const rooms = [];
-    if (rid) rooms.push(restaurantRoom(rid));
+    if (rid) {
+      rooms.push(restaurantRoom(rid));
+      rooms.push(`restaurant_${rid}`);
+    }
     if (rid && bid) rooms.push(branchRoom(rid, bid));
+    if (uid) {
+      rooms.push(`user:${uid}`);
+      rooms.push(`user_${uid}`);
+    }
     if (rooms.length) socket.join(rooms);
 
     socket.on("order:create", async (payload, ack) => {
@@ -284,12 +292,34 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     }
   };
 
+  const emitTableAssignmentUpdated = (payload) => {
+    const rid = Number(payload?.restaurantId || 0);
+    if (!rid) return;
+    if (staff) {
+      staff.to(restaurantRoom(rid)).emit("table:updated", payload);
+      staff.to(`restaurant_${rid}`).emit("table:updated", payload);
+      staff.to(restaurantRoom(rid)).emit("table:waiter_assigned", payload);
+      staff.to(`restaurant_${rid}`).emit("table:waiter_assigned", payload);
+      if (payload?.assignedWaiterId) {
+        staff.to(`user:${payload.assignedWaiterId}`).emit("table:waiter_assigned", payload);
+        staff.to(`user_${payload.assignedWaiterId}`).emit("table:waiter_assigned", payload);
+      }
+    }
+    if (io) {
+      io.to(`restaurant_${rid}`).emit("table:updated", payload);
+      io.to(`restaurant:${rid}`).emit("table:updated", payload);
+      io.to(`restaurant_${rid}`).emit("table:waiter_assigned", payload);
+      io.to(`restaurant:${rid}`).emit("table:waiter_assigned", payload);
+    }
+  };
+
   return {
     io,
     staff,
     emitOrderCreated,
     emitOrderUpdated,
     emitTableSessionUpdated,
+    emitTableAssignmentUpdated,
     emitReservationUpdated,
     emitInventoryUpdated,
   };

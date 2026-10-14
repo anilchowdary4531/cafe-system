@@ -6,6 +6,7 @@ import { buildAiController } from "../controllers/aiController.js";
 import { buildInvoiceController } from "../controllers/invoiceController.js";
 import { normalizeOrderStatus } from "../services/orderService.js";
 import { normalizePhone } from "../services/phoneService.js";
+import { logAuditEvent } from "../services/auditLogService.js";
 
 export default async function staffRoutes(app, deps) {
   const { prisma, realtime, STAFF_ALLOWED_ROLES, normalizeDbPermissions } = deps;
@@ -211,6 +212,7 @@ export default async function staffRoutes(app, deps) {
         return reply.code(400).send({ message: "Incorrect current password" });
       }
 
+      const hadMustChange = Boolean(user.mustChangePassword);
       const hashedPassword = bcrypt.hashSync(String(newPassword), 10);
       const updatedUser = await prisma.user.update({
         where: { id: Number(staffId) },
@@ -232,6 +234,48 @@ export default async function staffRoutes(app, deps) {
       const { userPayload, effectiveRole } = buildStaffLoginPayload({ user: updatedUser, normalizeDbPermissions });
       const { token, sessionVersion } = await issueStaffSession({ prisma, app, user: updatedUser, effectiveRole });
       userPayload.sessionVersion = sessionVersion;
+
+      if (hadMustChange) {
+        await logAuditEvent({
+          prisma,
+          restaurantId: updatedUser.restaurantId,
+          branchId: updatedUser.branchId,
+          actor: { id: updatedUser.id, name: updatedUser.name, role: updatedUser.role },
+          action: "AUTH_FORCED_PASSWORD_CHANGE",
+          entity: "USER",
+          entityId: updatedUser.id,
+          status: "SUCCESS",
+          severity: "INFO",
+          req,
+        });
+      } else {
+        await logAuditEvent({
+          prisma,
+          restaurantId: updatedUser.restaurantId,
+          branchId: updatedUser.branchId,
+          actor: { id: updatedUser.id, name: updatedUser.name, role: updatedUser.role },
+          action: "AUTH_PASSWORD_CHANGED",
+          entity: "USER",
+          entityId: updatedUser.id,
+          status: "SUCCESS",
+          severity: "INFO",
+          req,
+        });
+      }
+
+      await logAuditEvent({
+        prisma,
+        restaurantId: updatedUser.restaurantId,
+        branchId: updatedUser.branchId,
+        actor: { id: updatedUser.id, name: updatedUser.name, role: updatedUser.role },
+        action: "AUTH_SESSION_INVALIDATED",
+        entity: "USER",
+        entityId: updatedUser.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        details: { reason: "PASSWORD_CHANGED" },
+        req,
+      });
 
       return {
         success: true,

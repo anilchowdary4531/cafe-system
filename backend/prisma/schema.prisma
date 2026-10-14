@@ -2472,9 +2472,15 @@ model AuditLog {
 
   details Json?
 
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+  severity  String? @default("INFO")
+  status    String? @default("SUCCESS")
+
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([restaurantId, createdAt])
+  @@index([restaurantId, action])
   @@index([restaurantId, entity, entityId])
   @@index([restaurantId, actorUserId])
   @@map("audit_logs")

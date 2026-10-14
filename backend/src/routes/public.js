@@ -6,6 +6,7 @@ import {
 import { resolveMenuPricing } from "../services/menuPricingService.js";
 import { staffLoginRateLimiter } from "../middleware/rateLimiter.js";
 import { getLoginLockoutConfig } from "../services/staffAuthService.js";
+import { logAuditEvent } from "../services/auditLogService.js";
 
 export default async function publicRoutes(app, deps) {
   const { prisma, normalizeDbPermissions, buildQrTargetUrl, STAFF_ACCESS_MODULES } = deps;
@@ -574,6 +575,20 @@ export default async function publicRoutes(app, deps) {
       const isLocked = Boolean(user.lockedUntil && new Date(user.lockedUntil) > now);
       if (isLocked) {
         bcrypt.compareSync(String(password), DUMMY_BCRYPT_HASH);
+        await logAuditEvent({
+          prisma,
+          restaurantId: user.restaurantId,
+          branchId: user.branchId,
+          actor: { id: user.id, name: user.name, role: user.role },
+          action: "AUTH_LOGIN_FAILURE",
+          entity: "USER",
+          entityId: user.id,
+          status: "FAILURE",
+          severity: "WARN",
+          details: { reason: "ACCOUNT_LOCKED" },
+          req,
+        });
+
         return reply.code(401).send({
           message: "Invalid email or password",
         });
@@ -583,6 +598,7 @@ export default async function publicRoutes(app, deps) {
       if (!valid) {
         const { threshold, durationMinutes } = getLoginLockoutConfig();
         const wasExpired = Boolean(user.lockedUntil && new Date(user.lockedUntil) <= now);
+        let didLock = false;
 
         await prisma.$transaction(async (tx) => {
           const current = await tx.user.findUnique({
@@ -592,6 +608,9 @@ export default async function publicRoutes(app, deps) {
           const isCurrentExpired = Boolean(current?.lockedUntil && new Date(current.lockedUntil) <= now);
           const newCount = (wasExpired || isCurrentExpired) ? 1 : ((current?.failedLoginAttempts || 0) + 1);
           const lockTime = newCount >= threshold ? new Date(now.getTime() + durationMinutes * 60 * 1000) : null;
+          if (lockTime) {
+            didLock = true;
+          }
           await tx.user.update({
             where: { id: user.id },
             data: {
@@ -601,6 +620,39 @@ export default async function publicRoutes(app, deps) {
             },
           });
         });
+
+        await logAuditEvent({
+          prisma,
+          restaurantId: user.restaurantId,
+          branchId: user.branchId,
+          actor: { id: user.id, name: user.name, role: user.role },
+          action: "AUTH_LOGIN_FAILURE",
+          entity: "USER",
+          entityId: user.id,
+          status: "FAILURE",
+          severity: "WARN",
+          details: { reason: "INVALID_CREDENTIALS" },
+          req,
+        });
+
+        if (didLock) {
+          await logAuditEvent({
+            prisma,
+            restaurantId: user.restaurantId,
+            branchId: user.branchId,
+            actor: { id: user.id, name: user.name, role: user.role },
+            action: "AUTH_ACCOUNT_LOCKED",
+            entity: "USER",
+            entityId: user.id,
+            status: "LOCKED",
+            severity: "WARN",
+            details: {
+              threshold,
+              lockoutMinutes: durationMinutes,
+            },
+            req,
+          });
+        }
 
         return reply.code(401).send({
           message: "Invalid email or password",
@@ -619,8 +671,39 @@ export default async function publicRoutes(app, deps) {
         new Date(user.temporaryPasswordExpiresAt).getTime() < Date.now();
 
       if (isTempExpired) {
+        await logAuditEvent({
+          prisma,
+          restaurantId: user.restaurantId,
+          branchId: user.branchId,
+          actor: { id: user.id, name: user.name, role: user.role },
+          action: "AUTH_LOGIN_FAILURE",
+          entity: "USER",
+          entityId: user.id,
+          status: "FAILURE",
+          severity: "WARN",
+          details: { reason: "TEMP_PASSWORD_EXPIRED" },
+          req,
+        });
+
         return reply.code(401).send({
           message: "Invalid email or password",
+        });
+      }
+
+      const hadExpiredLockout = Boolean(user.lockedUntil && new Date(user.lockedUntil) <= now);
+      if (hadExpiredLockout) {
+        await logAuditEvent({
+          prisma,
+          restaurantId: user.restaurantId,
+          branchId: user.branchId,
+          actor: { id: user.id, name: user.name, role: user.role },
+          action: "AUTH_LOCKOUT_EXPIRED",
+          entity: "USER",
+          entityId: user.id,
+          status: "SUCCESS",
+          severity: "INFO",
+          details: { reason: "LOCKOUT_EXPIRED" },
+          req,
         });
       }
 
@@ -640,6 +723,39 @@ export default async function publicRoutes(app, deps) {
       const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
       const { token, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
       userPayload.sessionVersion = sessionVersion;
+
+      if (mustChangePassword) {
+        await logAuditEvent({
+          prisma,
+          restaurantId: user.restaurantId,
+          branchId: user.branchId,
+          actor: { id: user.id, name: user.name, role: user.role },
+          action: "AUTH_TEMP_PASSWORD_USED",
+          entity: "USER",
+          entityId: user.id,
+          status: "SUCCESS",
+          severity: "INFO",
+          details: { role: effectiveRole, branchId: user.branchId || null },
+          req,
+        });
+      }
+
+      await logAuditEvent({
+        prisma,
+        restaurantId: user.restaurantId,
+        branchId: user.branchId,
+        actor: { id: user.id, name: user.name, role: user.role },
+        action: "AUTH_LOGIN_SUCCESS",
+        entity: "USER",
+        entityId: user.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        details: {
+          role: effectiveRole,
+          branchId: user.branchId || null,
+        },
+        req,
+      });
 
       if (mustChangePassword) {
         return {

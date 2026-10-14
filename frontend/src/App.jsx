@@ -69,6 +69,7 @@ import OwnerPayLater from "./pages/admin/OwnerPayLater";
 import OwnerInventory from "./pages/admin/OwnerInventory";
 import OwnerShiftManager from "./pages/admin/OwnerShiftManager";
 import OwnerReports from "./pages/admin/OwnerReports";
+import OwnerAuditLogs from "./pages/admin/OwnerAuditLogs";
 import OwnerCustomerManager from "./pages/admin/OwnerCustomerManager";
 import OwnerCustomerDetail from "./pages/admin/OwnerCustomerDetail";
 import OwnerDiscounts from "./pages/admin/OwnerDiscounts";
@@ -620,6 +621,14 @@ export default function App() {
                         <Route path="staff-attendance" element={<OwnerStaffAttendance />} />
                         <Route path="staff-tasks" element={<OwnerStaffTasks />} />
                         <Route path="settings" element={<OwnerSettings />} />
+                        <Route
+                            path="audit-logs"
+                            element={
+                                <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER"]}>
+                                    <OwnerAuditLogs />
+                                </ProtectedRoute>
+                            }
+                        />
                         <Route path="notifications" element={<OwnerNotifications />} />
                         <Route path="supply" element={<OwnerSupplyChainMarketplace />} />
                         <Route path="supply-chain" element={<OwnerSupplyChainIntelligence />} />

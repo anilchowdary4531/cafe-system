@@ -337,6 +337,11 @@ const isSensitiveOwnerRoute = (url, method) => {
     return true;
   }
 
+  // Audit logs (ALL methods)
+  if (normalizedUrl.includes("/audit-logs") || normalizedUrl.includes("/audit")) {
+    return true;
+  }
+
   // Settings mutations
   if (normalizedUrl.includes("/settings") && normalizedMethod !== "GET") {
     return true;

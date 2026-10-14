@@ -15,13 +15,15 @@ import {
 } from "lucide-react";
 import { API } from "../config";
 import { showToast } from "../utils/toast";
+import StaffEditModal from "./StaffEditModal";
 
-export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId }) {
+export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, onEditStaff }) {
     const [staffUsers, setStaffUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState("");
     const [showAddForm, setShowAddForm] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [editingStaff, setEditingStaff] = useState(null);
     const [addForm, setAddForm] = useState({
         name: "",
         phone: "",
@@ -74,6 +76,13 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId }) 
         const link = `${window.location.origin}/login?mode=staff&email=${encodeURIComponent(user.email)}`;
         const text = `Hi ${user.name}, here is your login link for Tiffzy: ${link}`;
         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+    };
+
+    const handleEditClick = (user) => {
+        setEditingStaff(user);
+        if (typeof onEditStaff === "function") {
+            onEditStaff(user);
+        }
     };
 
     const handleAddPerson = async (e) => {
@@ -301,20 +310,37 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId }) 
                                 </div>
 
                                 {/* Action Buttons */}
-                                <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100 text-xs">
+                                <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-neutral-100 text-xs">
                                     <button
-                                        onClick={() => copyLoginLink(u)}
-                                        className="px-2.5 py-1 text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors flex items-center gap-1"
-                                        title="Copy Login Link"
+                                        type="button"
+                                        onClick={() => handleEditClick(u)}
+                                        className="px-2.5 py-1 text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/60 rounded-lg transition-colors flex items-center gap-1 font-medium cursor-pointer"
+                                        title="Edit staff member"
+                                        aria-label="Edit staff member"
+                                        data-testid={`edit-staff-${u.id}`}
                                     >
-                                        <Copy className="w-3 h-3" /> Copy Link
+                                        <Pencil className="w-3 h-3" />
+                                        <span>Edit</span>
                                     </button>
                                     <button
-                                        onClick={() => shareWhatsApp(u)}
-                                        className="px-2.5 py-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1"
-                                        title="Share on WhatsApp"
+                                        type="button"
+                                        onClick={() => copyLoginLink(u)}
+                                        className="px-2.5 py-1 text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                        title="Copy Login Link"
+                                        aria-label="Copy Link"
                                     >
-                                        <Send className="w-3 h-3" /> WhatsApp
+                                        <Copy className="w-3 h-3" />
+                                        <span>Copy Link</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => shareWhatsApp(u)}
+                                        className="px-2.5 py-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                        title="Share on WhatsApp"
+                                        aria-label="WhatsApp"
+                                    >
+                                        <Send className="w-3 h-3" />
+                                        <span>WhatsApp</span>
                                     </button>
                                 </div>
                             </div>
@@ -322,6 +348,20 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId }) 
                     )}
                 </div>
             </div>
+
+            {/* Existing Phase 2 Edit Workflow Modal */}
+            {editingStaff && (
+                <StaffEditModal
+                    isOpen={Boolean(editingStaff)}
+                    onClose={() => setEditingStaff(null)}
+                    staffUser={editingStaff}
+                    restaurantId={restaurantId}
+                    onSaved={async () => {
+                        setEditingStaff(null);
+                        await loadStaff();
+                    }}
+                />
+            )}
         </div>
     );
 }
