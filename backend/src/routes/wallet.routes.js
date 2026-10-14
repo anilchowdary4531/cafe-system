@@ -170,6 +170,7 @@ export default async function walletRoutes(app, deps) {
         orderId,
         amount,
         idempotencyKey,
+        realtime: deps?.realtime || req.server?.realtime || null,
       });
       return result;
     } catch (err) {

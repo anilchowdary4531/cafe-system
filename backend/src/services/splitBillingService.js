@@ -440,9 +440,31 @@ export const recordSessionPayment = async ({
         let paidAt = session.paidAt || null;
 
         if (newRemaining <= 0.01) {
-            sessionStatus = "PAID";
+            sessionStatus = "CLOSED";
             paidAt = new Date();
             closedAt = new Date();
+
+            // Mark all non-cancelled orders in this session as PAID
+            await tx.order.updateMany({
+                where: {
+                    tableSessionId: sid,
+                    status: { not: "CANCELLED" },
+                },
+                data: {
+                    paymentStatus: "PAID",
+                },
+            });
+
+            // Clear table waiter assignment
+            if (session.tableId) {
+                await tx.diningTable.update({
+                    where: { id: session.tableId },
+                    data: {
+                        assignedWaiterId: null,
+                        assignedWaiterName: null,
+                    },
+                });
+            }
         }
 
         const updatedSession = await tx.tableSession.update({
@@ -483,7 +505,7 @@ export const recordSessionPayment = async ({
             session: updatedSession,
             totalPaidSoFar,
             remainingBalance: newRemaining,
-            isFullyPaid: sessionStatus === "PAID",
+            isFullyPaid: sessionStatus === "CLOSED",
         };
     });
 };

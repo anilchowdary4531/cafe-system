@@ -104,6 +104,59 @@ export async function recordPaymentController(req, reply) {
       req.server.realtime.emitTableSessionUpdated(result.session);
     }
 
+    if (result.isFullyPaid) {
+      const io = req.server?.realtime?.io || null;
+      const staff = req.server?.realtime?.staff || null;
+      const effectiveRid = restaurantId;
+      const clearPayload = {
+        restaurantId: effectiveRid,
+        tableId: result.session?.tableId,
+        tableNo: result.session?.tableNo,
+        assignedWaiterId: null,
+        assignedWaiterName: null,
+      };
+
+      if (io) {
+        io.to(`restaurant_${effectiveRid}`).emit("table:updated", clearPayload);
+        io.to(`restaurant:${effectiveRid}`).emit("table:updated", clearPayload);
+        io.to(`restaurant_${effectiveRid}`).emit("table:session_updated", {
+          restaurantId: effectiveRid,
+          tableId: result.session?.tableId,
+          tableNo: result.session?.tableNo,
+          sessionId: result.session?.id,
+          status: "CLOSED",
+        });
+        io.to(`restaurant:${effectiveRid}`).emit("table:session_updated", {
+          restaurantId: effectiveRid,
+          tableId: result.session?.tableId,
+          tableNo: result.session?.tableNo,
+          sessionId: result.session?.id,
+          status: "CLOSED",
+        });
+        io.to(`restaurant_${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
+        io.to(`restaurant:${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
+      }
+
+      if (staff) {
+        staff.to(`restaurant_${effectiveRid}`).emit("table:updated", clearPayload);
+        staff.to(`restaurant:${effectiveRid}`).emit("table:updated", clearPayload);
+        staff.to(`restaurant_${effectiveRid}`).emit("table:session_updated", {
+          restaurantId: effectiveRid,
+          tableId: result.session?.tableId,
+          tableNo: result.session?.tableNo,
+          sessionId: result.session?.id,
+          status: "CLOSED",
+        });
+        staff.to(`restaurant:${effectiveRid}`).emit("table:session_updated", {
+          restaurantId: effectiveRid,
+          tableId: result.session?.tableId,
+          tableNo: result.session?.tableNo,
+          sessionId: result.session?.id,
+          status: "CLOSED",
+        });
+      }
+    }
+
     return reply.send({
       success: true,
       message: result.isFullyPaid ? "Payment completed. Session closed." : `Partial payment of ₹${amount} recorded successfully.`,

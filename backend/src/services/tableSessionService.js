@@ -362,3 +362,220 @@ export const closeTableSession = async ({ prisma, sessionId } = {}) => {
 
   return updated;
 };
+
+/**
+ * Unified, idempotent session completion and table release operation.
+ * Verifies that ALL non-cancelled orders belonging to the session are paid.
+ * Only closes the session, clears waiter assignment, and frees the table when
+ * financial completeness is reached. Emits realtime socket events.
+ */
+export const completeSessionAndReleaseTable = async ({
+  prisma,
+  tableSessionId,
+  orderId,
+  paymentMode,
+  realtime,
+  actor,
+} = {}) => {
+  if (!prisma) return null;
+
+  let sid = tableSessionId ? Number(tableSessionId) : null;
+
+  // 1. Resolve tableSessionId if not provided directly
+  if (!sid && orderId) {
+    const numericOrderId = Number(orderId);
+    if (!Number.isNaN(numericOrderId)) {
+      const orderRecord = await prisma.order.findUnique({
+        where: { id: numericOrderId },
+        select: { id: true, tableSessionId: true, tableNo: true, restaurantId: true },
+      });
+      if (orderRecord?.tableSessionId) {
+        sid = orderRecord.tableSessionId;
+      } else if (orderRecord?.tableNo && orderRecord?.restaurantId) {
+        const foundSession = await prisma.tableSession.findFirst({
+          where: {
+            restaurantId: orderRecord.restaurantId,
+            tableNo: orderRecord.tableNo,
+            status: { in: ACTIVE_STATUSES },
+          },
+          select: { id: true },
+        });
+        if (foundSession) {
+          sid = foundSession.id;
+        }
+      }
+    }
+  }
+
+  if (!sid) {
+    return { completed: false, reason: "no_table_session" };
+  }
+
+  // 2. Fetch session and its non-cancelled orders
+  const session = await prisma.tableSession.findUnique({
+    where: { id: sid },
+    include: {
+      orders: {
+        where: { status: { not: "CANCELLED" } },
+        select: { id: true, status: true, paymentStatus: true, total: true, orderNo: true },
+      },
+      table: true,
+    },
+  });
+
+  if (!session) {
+    return { completed: false, reason: "session_not_found" };
+  }
+
+  // Idempotency: If already closed, do not re-close or corrupt state
+  if (session.status === "CLOSED") {
+    return { completed: true, session, alreadyClosed: true };
+  }
+
+  // 3. Verify financial completeness: Check if all payable non-cancelled orders are paid
+  const numericOrderId = orderId ? Number(orderId) : null;
+  const unpaidOrders = (session.orders || []).filter((o) => {
+    if (numericOrderId && o.id === numericOrderId) {
+      // The current order being completed is considered paid
+      return false;
+    }
+    const payStatus = String(o.paymentStatus || "").toUpperCase();
+    return payStatus !== "PAID" && payStatus !== "SUCCESS";
+  });
+
+  if (unpaidOrders.length > 0) {
+    // Other orders in the session remain unpaid -> DO NOT close session, DO NOT free table
+    return {
+      completed: false,
+      session,
+      reason: "unpaid_orders_remain",
+      unpaidCount: unpaidOrders.length,
+    };
+  }
+
+  // 4. All orders are financially complete! Execute atomic closure and table release
+  const updatedSession = await prisma.$transaction(async (tx) => {
+    // A. Ensure all non-cancelled orders in session are marked PAID
+    await tx.order.updateMany({
+      where: {
+        tableSessionId: sid,
+        status: { not: "CANCELLED" },
+        paymentStatus: { notIn: ["PAID", "SUCCESS"] },
+      },
+      data: {
+        paymentStatus: "PAID",
+        ...(paymentMode ? { paymentMode } : {}),
+      },
+    });
+
+    // B. Close TableSession
+    const closed = await tx.tableSession.update({
+      where: { id: sid },
+      data: {
+        status: "CLOSED",
+        closedAt: new Date(),
+        paidAt: session.paidAt || new Date(),
+      },
+      include: {
+        orders: { include: { items: true } },
+        table: true,
+      },
+    });
+
+    // C. Clear waiter assignment from table
+    if (session.tableId) {
+      await tx.diningTable.update({
+        where: { id: session.tableId },
+        data: {
+          assignedWaiterId: null,
+          assignedWaiterName: null,
+        },
+      });
+    }
+
+    // D. Audit log in TableOperationLog if available
+    try {
+      if (tx.tableOperationLog) {
+        await tx.tableOperationLog.create({
+          data: {
+            restaurantId: session.restaurantId,
+            operationType: "SESSION_COMPLETED",
+            sourceTableId: session.tableId,
+            sourceTableNo: session.tableNo,
+            sourceSessionId: session.id,
+            performedByName: actor?.userName || actor?.name || "System/Payment",
+            performedByUserRole: actor?.role || "SYSTEM",
+            details: {
+              paymentMode: paymentMode || "UNKNOWN",
+              total: session.total,
+              ordersCount: session.orders?.length || 0,
+            },
+          },
+        });
+      }
+    } catch {
+      // Non-blocking audit log
+    }
+
+    return closed;
+  });
+
+  // 5. Emit Realtime Events after successful transaction commit
+  const effectiveRid = session.restaurantId;
+  const clearPayload = {
+    restaurantId: effectiveRid,
+    tableId: session.tableId,
+    tableNo: session.tableNo,
+    assignedWaiterId: null,
+    assignedWaiterName: null,
+  };
+
+  const io = realtime?.io || null;
+  const staff = realtime?.staff || null;
+
+  if (io) {
+    io.to(`restaurant_${effectiveRid}`).emit("table:updated", clearPayload);
+    io.to(`restaurant:${effectiveRid}`).emit("table:updated", clearPayload);
+    io.to(`restaurant_${effectiveRid}`).emit("table:session_updated", {
+      restaurantId: effectiveRid,
+      tableId: session.tableId,
+      tableNo: session.tableNo,
+      sessionId: session.id,
+      status: "CLOSED",
+    });
+    io.to(`restaurant:${effectiveRid}`).emit("table:session_updated", {
+      restaurantId: effectiveRid,
+      tableId: session.tableId,
+      tableNo: session.tableNo,
+      sessionId: session.id,
+      status: "CLOSED",
+    });
+    io.to(`restaurant_${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
+    io.to(`restaurant:${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
+  }
+
+  if (staff) {
+    staff.to(`restaurant_${effectiveRid}`).emit("table:updated", clearPayload);
+    staff.to(`restaurant:${effectiveRid}`).emit("table:updated", clearPayload);
+    staff.to(`restaurant_${effectiveRid}`).emit("table:session_updated", {
+      restaurantId: effectiveRid,
+      tableId: session.tableId,
+      tableNo: session.tableNo,
+      sessionId: session.id,
+      status: "CLOSED",
+    });
+    staff.to(`restaurant:${effectiveRid}`).emit("table:session_updated", {
+      restaurantId: effectiveRid,
+      tableId: session.tableId,
+      tableNo: session.tableNo,
+      sessionId: session.id,
+      status: "CLOSED",
+    });
+  }
+
+  if (typeof realtime?.emitTableSessionUpdated === "function") {
+    realtime.emitTableSessionUpdated(updatedSession);
+  }
+
+  return { completed: true, session: updatedSession };
+};

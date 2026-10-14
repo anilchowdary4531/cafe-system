@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { toSubunit } from "./moneyService.js";
 import { normalizePhone } from "./phoneService.js";
+import { completeSessionAndReleaseTable } from "./tableSessionService.js";
 
 const normalizeVerificationStatus = (value) => {
   const s = String(value || "").trim().toUpperCase();
@@ -344,6 +345,14 @@ export const verifyPayment = async ({ prisma, actor, input } = {}) => {
         });
       });
 
+      await completeSessionAndReleaseTable({
+        prisma,
+        orderId: order.id,
+        paymentMode: "PAY_LATER",
+        realtime: actor?.realtime || null,
+        actor,
+      });
+
       return { order: nextOrder, verified: true };
     }
 
@@ -359,6 +368,16 @@ export const verifyPayment = async ({ prisma, actor, input } = {}) => {
         ...(nextMode ? { paymentMode: nextMode } : {}),
       },
     });
+
+    if (status === "SUCCESS") {
+      await completeSessionAndReleaseTable({
+        prisma,
+        orderId: order.id,
+        paymentMode: nextMode || "OFFLINE",
+        realtime: actor?.realtime || null,
+        actor,
+      });
+    }
 
     return { order: updatedOrder, verified: status === "SUCCESS" };
   }
@@ -460,6 +479,14 @@ export const verifyPayment = async ({ prisma, actor, input } = {}) => {
       actor
     );
 
+    await completeSessionAndReleaseTable({
+      prisma,
+      orderId: payment.orderId,
+      paymentMode: "ONLINE",
+      realtime: actor?.realtime || null,
+      actor,
+    });
+
     return { payment: updated, verified: true };
   }
 
@@ -499,6 +526,14 @@ export const verifyPayment = async ({ prisma, actor, input } = {}) => {
     payment.amount || payment.order?.total || 0,
     actor
   );
+
+  await completeSessionAndReleaseTable({
+    prisma,
+    orderId: payment.orderId,
+    paymentMode: updated.method || payment.method,
+    realtime: actor?.realtime || null,
+    actor,
+  });
 
   return { payment: updated, verified: true };
 };

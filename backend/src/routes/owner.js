@@ -64,6 +64,7 @@ import {
 import { assignWaiterToTable, unassignWaiterFromTable, getWaiterAssignmentHistory, getWaiterWorkspaceData, getStaffPerformanceMetrics } from "../services/staffManagementService.js";
 import { getAuditLogs, logAuditEvent } from "../services/auditLogService.js";
 import { approveCancellation, approveDiscount, approveReprint } from "../controllers/managerApprovalController.js";
+import { completeSessionAndReleaseTable } from "../services/tableSessionService.js";
 
 export default async function ownerRoutes(app, deps) {
   const { prisma, buildQrTargetUrl, FRONTEND_URL, STAFF_ACCESS_MODULES, STAFF_ALLOWED_ROLES, normalizeAccess, normalizeDbPermissions, serializeAccess, realtime } = deps;
@@ -658,13 +659,20 @@ export default async function ownerRoutes(app, deps) {
           where: {
             restaurantId,
             tableNo: { not: null },
-            status: { in: activeStatuses },
+            OR: [
+              { status: { in: activeStatuses } },
+              {
+                status: "DELIVERED",
+                paymentStatus: { notIn: ["PAID", "SUCCESS"] },
+              },
+            ],
           },
           select: {
             id: true,
             tableNo: true,
             orderNo: true,
             status: true,
+            paymentStatus: true,
             createdAt: true,
             total: true,
             items: {
@@ -744,18 +752,19 @@ export default async function ownerRoutes(app, deps) {
           id: order.id,
           orderNo: order.orderNo,
           status: order.status,
+          paymentStatus: order.paymentStatus,
           createdAt: order.createdAt,
           total: Number(order.total || 0),
-            items: Array.isArray(order.items)
-              ? order.items.map((item) => ({
-                  id: item.id,
-                  itemName: item.itemName,
-                  preparedByName: item.preparedByName || null,
-                  qty: Number(item.qty || 0),
-                  price: Number(item.price || 0),
-                  total: Number(item.total || 0),
-                }))
-              : [],
+          items: Array.isArray(order.items)
+            ? order.items.map((item) => ({
+                id: item.id,
+                itemName: item.itemName,
+                preparedByName: item.preparedByName || null,
+                qty: Number(item.qty || 0),
+                price: Number(item.price || 0),
+                total: Number(item.total || 0),
+              }))
+            : [],
         });
         return acc;
       }, {});
@@ -3163,12 +3172,19 @@ export default async function ownerRoutes(app, deps) {
         where: {
           restaurantId,
           tableNo,
-          status: { in: activeStatuses },
+          OR: [
+            { status: { in: activeStatuses } },
+            {
+              status: "DELIVERED",
+              paymentStatus: { notIn: ["PAID", "SUCCESS"] },
+            },
+          ],
         },
         select: {
           id: true,
           restaurantId: true,
           branchId: true,
+          tableSessionId: true,
           createdAt: true,
         },
         orderBy: { createdAt: "asc" },
@@ -3214,6 +3230,17 @@ export default async function ownerRoutes(app, deps) {
 
         return results;
       });
+
+      for (const order of updatedOrders) {
+        await completeSessionAndReleaseTable({
+          prisma,
+          tableSessionId: order.tableSessionId,
+          orderId: order.id,
+          paymentMode,
+          realtime,
+          actor,
+        });
+      }
 
       updatedOrders.forEach((order) => {
         realtime?.emitOrderUpdated?.(order);

@@ -18,6 +18,7 @@ import {
 } from "../services/loyaltyService.js";
 import { computeBill } from "../services/billingService.js";
 import { toSubunit, fromSubunit } from "../services/moneyService.js";
+import { getOrCreateActiveSession, recalculateSessionTotals } from "../services/tableSessionService.js";
 
 const normalizeDeliveryAddress = (value) => {
   if (!value) return "";
@@ -438,6 +439,28 @@ export default async function customerRoutes(app, deps) {
       });
       const invoiceNo = `${String(restaurant.invoicePrefix || "INV").toUpperCase()}-${invoiceSequence}`;
 
+      let activeTableSessionId = null;
+      if (normalizedTableNo) {
+        const diningTable = await prisma.diningTable.findFirst({
+          where: {
+            restaurantId: restaurant.id,
+            tableNo: normalizedTableNo,
+          },
+        });
+
+        if (diningTable) {
+          const session = await getOrCreateActiveSession({
+            prisma,
+            restaurantId: restaurant.id,
+            tableId: diningTable.id,
+            guestCount: 1,
+          });
+          if (session) {
+            activeTableSessionId = session.id;
+          }
+        }
+      }
+
       const order = await prisma.order.create({
         data: {
           restaurantId: restaurant.id,
@@ -448,6 +471,7 @@ export default async function customerRoutes(app, deps) {
           phone: normalizedPhone || null,
           email: normalizedEmail || null,
           tableNo: normalizedTableNo,
+          tableSessionId: activeTableSessionId,
           notes,
           deliveryAddress: isPickupOrder ? null : normalizedDeliveryAddress || null,
           deliveryLatitude: isPickupOrder ? null : normalizedDeliveryLocation.latitude,
@@ -496,6 +520,12 @@ export default async function customerRoutes(app, deps) {
           orderId: order.id,
           pointsToRedeem: redeemedPoints,
         }).catch((e) => console.log("Loyalty redemption error:", e?.message));
+      }
+
+      if (activeTableSessionId) {
+        await recalculateSessionTotals({ prisma, sessionId: activeTableSessionId }).catch((e) =>
+          console.warn("[CustomerOrder] Error recalculating session totals:", e?.message)
+        );
       }
 
 

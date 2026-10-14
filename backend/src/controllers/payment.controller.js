@@ -1,5 +1,6 @@
 import { validateCreateOrderPayload } from "../middleware/paymentValidation.js";
 import { createCashfreePaymentSession, verifyCashfreeOrderSession, verifyCashfreeWebhookSignature, getPaymentMetrics, createCashfreeRefund } from "../services/cashfree.service.js";
+import { completeSessionAndReleaseTable } from "../services/tableSessionService.js";
 
 export const buildPaymentController = ({ prisma }) => {
   const createOrder = async (req, reply) => {
@@ -306,6 +307,13 @@ export const buildPaymentController = ({ prisma }) => {
                 transactionId: cfResult.paymentId || null,
               },
             });
+            await completeSessionAndReleaseTable({
+              prisma,
+              tableSessionId: existingOrder.tableSessionId,
+              orderId: existingOrder.id,
+              paymentMode: cfResult.paymentMethod || existingOrder.paymentMode || "ONLINE",
+              realtime: req.server?.realtime || req.realtime || null,
+            });
           } catch (updateErr) {
             console.error("[PaymentController] Order/Payment DB update error:", updateErr.message);
           }
@@ -513,6 +521,13 @@ export const buildPaymentController = ({ prisma }) => {
               transactionId: paymentDetails.cf_payment_id ? String(paymentDetails.cf_payment_id) : null,
             },
           }).catch((pErr) => console.warn("[PaymentController] Webhook Payment DB update notice:", pErr.message));
+          await completeSessionAndReleaseTable({
+            prisma,
+            tableSessionId: existingOrder.tableSessionId,
+            orderId: existingOrder.id,
+            paymentMode: paymentDetails.payment_group || "ONLINE",
+            realtime: req.server?.realtime || req.realtime || null,
+          });
         }
       } else if (eventType === "PAYMENT_FAILED" || eventType === "PAYMENT.FAILED") {
         if (existingOrder && (existingOrder.paymentStatus === "PAID" || existingOrder.status === "PAID")) {

@@ -11,6 +11,7 @@ import {
 } from "./cashfreePpiService.js";
 import { createWalletLoadPgOrder } from "./cashfreePgCreditService.js";
 import defaultPrisma from "../prisma.js";
+import { completeSessionAndReleaseTable } from "./tableSessionService.js";
 
 const round2 = (num) => Math.round((Number(num || 0) + Number.EPSILON) * 100) / 100;
 const getDb = (passedPrisma) => passedPrisma || defaultPrisma;
@@ -572,7 +573,7 @@ export const verifyAndCreditTopup = async (
  */
 export const payOrderWithWallet = async (
   passedPrisma,
-  { customerAccountId, orderId, amount, customerPhone, idempotencyKey }
+  { customerAccountId, orderId, amount, customerPhone, idempotencyKey, realtime }
 ) => {
   const prisma = getDb(passedPrisma);
   const numAmount = round2(amount);
@@ -648,7 +649,7 @@ export const payOrderWithWallet = async (
   }
 
   // Atomic local DB debit
-  return await prisma.$transaction(async (tx) => {
+  const txResult = await prisma.$transaction(async (tx) => {
     const freshWallet = await tx.wallet.findUnique({ where: { id: wallet.id } });
 
     if (!freshWallet || freshWallet.status !== "ACTIVE") {
@@ -700,6 +701,15 @@ export const payOrderWithWallet = async (
       balanceAfter: round2(updated.balance),
     };
   });
+
+  await completeSessionAndReleaseTable({
+    prisma,
+    orderId: cleanOrderId,
+    paymentMode: "WALLET",
+    realtime,
+  });
+
+  return txResult;
 };
 
 /**
