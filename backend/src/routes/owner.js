@@ -660,16 +660,32 @@ export default async function ownerRoutes(app, deps) {
             restaurantId,
             tableNo: { not: null },
             OR: [
-              { status: { in: activeStatuses } },
+              {
+                status: { in: activeStatuses },
+                OR: [
+                  { tableSessionId: null },
+                  { tableSession: { status: { in: ["OPEN", "BILLING", "PAID"] } } },
+                ],
+              },
               {
                 status: "DELIVERED",
                 paymentStatus: { notIn: ["PAID", "SUCCESS"] },
+                tableSession: { status: { in: ["OPEN", "BILLING", "PAID"] } },
               },
             ],
           },
           select: {
             id: true,
             tableNo: true,
+            tableSessionId: true,
+            tableSession: {
+              select: {
+                id: true,
+                tableId: true,
+                tableNo: true,
+                status: true,
+              },
+            },
             orderNo: true,
             status: true,
             paymentStatus: true,
@@ -720,11 +736,17 @@ export default async function ownerRoutes(app, deps) {
         }),
       ]);
 
-      const activeSessionsByTable = activeSessions.reduce((acc, session) => {
+      const activeSessionsByTableId = new Map();
+      const activeSessionsByTable = {};
+      for (const session of activeSessions) {
+        if (session.tableId) {
+          activeSessionsByTableId.set(Number(session.tableId), session);
+        }
         const tableKey = String(session.tableNo || "").trim().toLowerCase();
-        if (tableKey) acc[tableKey] = session;
-        return acc;
-      }, {});
+        if (tableKey && !activeSessionsByTable[tableKey]) {
+          activeSessionsByTable[tableKey] = session;
+        }
+      }
 
       const reservationsByTableId = new Map();
       const reservationsByTableNo = new Map();
@@ -743,13 +765,13 @@ export default async function ownerRoutes(app, deps) {
         }
       }
 
-      const activeOrdersByTable = activeOrders.reduce((acc, order) => {
-        const tableKey = String(order.tableNo || "").trim().toLowerCase();
-        if (!tableKey) return acc;
+      const activeOrdersByTableId = new Map();
+      const activeOrdersByTable = {};
 
-        if (!acc[tableKey]) acc[tableKey] = [];
-        acc[tableKey].push({
+      for (const order of activeOrders) {
+        const formattedOrder = {
           id: order.id,
+          tableSessionId: order.tableSessionId || null,
           orderNo: order.orderNo,
           status: order.status,
           paymentStatus: order.paymentStatus,
@@ -765,9 +787,22 @@ export default async function ownerRoutes(app, deps) {
                 total: Number(item.total || 0),
               }))
             : [],
-        });
-        return acc;
-      }, {});
+        };
+
+        const targetTableId = order.tableSession?.tableId ? Number(order.tableSession.tableId) : null;
+        if (targetTableId) {
+          if (!activeOrdersByTableId.has(targetTableId)) {
+            activeOrdersByTableId.set(targetTableId, []);
+          }
+          activeOrdersByTableId.get(targetTableId).push(formattedOrder);
+        }
+
+        const tableKey = String(order.tableNo || "").trim().toLowerCase();
+        if (tableKey) {
+          if (!activeOrdersByTable[tableKey]) activeOrdersByTable[tableKey] = [];
+          activeOrdersByTable[tableKey].push(formattedOrder);
+        }
+      }
 
       const latestOrderByTable = latestTableOrders.reduce((acc, order) => {
         const tableKey = String(order.tableNo || "").trim().toLowerCase();
@@ -802,10 +837,13 @@ export default async function ownerRoutes(app, deps) {
           qrCodeUrl: buildQrTargetUrl(restaurant.slug, table.tableNo),
           qrTargetUrl: `/order/table/${token}`,
           ...(function buildTableState() {
+          const tid = Number(table.id);
           const tableKey = String(table.tableNo || "").trim().toLowerCase();
-          const tableActiveOrders = activeOrdersByTable[tableKey] || [];
+          const tableActiveOrders = activeOrdersByTableId.has(tid)
+            ? activeOrdersByTableId.get(tid)
+            : (tableKey ? (activeOrdersByTable[tableKey] || []) : []);
           const latestOrder = latestOrderByTable[tableKey] || null;
-          const activeSession = activeSessionsByTable[tableKey] || null;
+          const activeSession = activeSessionsByTableId.get(tid) || (tableKey ? activeSessionsByTable[tableKey] : null) || null;
           
           const resById = reservationsByTableId.get(Number(table.id)) || [];
           const resByNo = reservationsByTableNo.get(tableKey) || [];
@@ -1138,25 +1176,28 @@ export default async function ownerRoutes(app, deps) {
       const body = req.body || {};
       const { force = false, reason = "Customer left table", performedByUserId = null, performedByName = null, performedByUserRole = "SERVER" } = body;
 
-      let table = await prisma.diningTable.findFirst({
-        where: {
-          restaurantId,
-          OR: [
-            ...(isNumeric ? [{ id: parsedId }] : []),
-            { tableNo: rawParam },
-          ],
-        },
-        include: {
-          tableSessions: {
-            where: { status: { in: ["OPEN", "BILLING", "PAID"] } },
-            include: { orders: { include: { items: true } } },
+      let table = null;
+      if (isNumeric) {
+        table = await prisma.diningTable.findFirst({
+          where: {
+            id: parsedId,
+            restaurantId,
           },
-        },
-      });
+          include: {
+            tableSessions: {
+              where: { status: { in: ["OPEN", "BILLING", "PAID"] } },
+              include: { orders: { include: { items: true } } },
+            },
+          },
+        });
+      }
 
-      if (!table && isNumeric) {
-        table = await prisma.diningTable.findUnique({
-          where: { id: parsedId },
+      if (!table && rawParam) {
+        table = await prisma.diningTable.findFirst({
+          where: {
+            restaurantId,
+            tableNo: rawParam,
+          },
           include: {
             tableSessions: {
               where: { status: { in: ["OPEN", "BILLING", "PAID"] } },

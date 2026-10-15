@@ -1183,4 +1183,354 @@ test("PHASE P0 — Financial & Table-State Integrity Regression Test Suite", asy
     await prisma.order.delete({ where: { id: order.id } });
     await prisma.tableSession.delete({ where: { id: session.id } });
   });
+
+  // TEST 36: Full E2E Owner Force Free endpoint clears table occupancy on GET /owner/:id/tables while preserving financial records
+  await t.test("TEST 36: Full E2E Owner Force Free endpoint clears table occupancy on GET /owner/:id/tables while preserving financial records", async () => {
+    // 1. Create active TableSession on table1A
+    const session = await prisma.tableSession.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableId: table1A.id,
+        tableNo: table1A.tableNo,
+        status: "OPEN",
+        waiterId: waiterUserA.id,
+        waiterName: waiterUserA.name,
+      },
+    });
+
+    // 2. Create DELIVERED order with paymentStatus = PENDING
+    const order = await prisma.order.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableSessionId: session.id,
+        tableNo: table1A.tableNo,
+        orderNo: `P0-FORCE-FREE-${Date.now()}`,
+        status: "DELIVERED",
+        paymentStatus: "PENDING",
+        subtotal: 120,
+        total: 120,
+        items: {
+          create: [{ menuItemId: menuItemA.id, itemName: "Filter Coffee", qty: 2, price: 60, total: 120 }],
+        },
+      },
+    });
+
+    // 3. Confirm GET /owner/:restaurantId/tables shows isOccupied = true and activeOrders contains the order
+    const getBefore = await app.inject({
+      method: "GET",
+      url: `/owner/${restaurantA.id}/tables`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+    });
+    assert.equal(getBefore.statusCode, 200);
+    const tablesBefore = JSON.parse(getBefore.payload);
+    const t1Before = tablesBefore.find((t) => t.id === table1A.id);
+    assert.ok(t1Before, "Table 1 must exist");
+    assert.equal(t1Before.isOccupied, true, "Table with active session and DELIVERED+PENDING order must be occupied");
+    assert.equal(t1Before.activeOrders.length, 1, "Must contain exactly 1 active order before clear");
+    assert.equal(t1Before.activeOrders[0].id, order.id);
+
+    // 4. Call POST /owner/:restaurantId/tables/:tableId/clear with force=true
+    emittedEvents.length = 0;
+    const clearRes = await app.inject({
+      method: "POST",
+      url: `/owner/${restaurantA.id}/tables/${table1A.id}/clear`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+      payload: {
+        force: true,
+        clearWaiter: true,
+        reason: "Owner emergency force free",
+        performedByUserId: ownerUserA.id,
+        performedByName: ownerUserA.name,
+        performedByUserRole: "OWNER",
+      },
+    });
+
+    // 5. Assert HTTP 200
+    assert.equal(clearRes.statusCode, 200, "POST /clear with force=true must return HTTP 200");
+    const clearBody = JSON.parse(clearRes.payload);
+    assert.equal(clearBody.success, true);
+
+    // 6. Assert TableSession = CLOSED in database
+    const dbSession = await prisma.tableSession.findUnique({ where: { id: session.id } });
+    assert.equal(dbSession.status, "CLOSED", "TableSession status must be CLOSED after force clear");
+    assert.ok(dbSession.closedAt, "TableSession closedAt must be populated");
+
+    // 7. Assert assigned waiter is cleared on table
+    const dbTable = await prisma.diningTable.findUnique({ where: { id: table1A.id } });
+    assert.equal(dbTable.assignedWaiterId, null, "Assigned waiter must be cleared");
+
+    // 8. Assert unpaid order remains DELIVERED and PENDING in DB (Financial integrity!)
+    const dbOrder = await prisma.order.findUnique({ where: { id: order.id } });
+    assert.ok(dbOrder, "Order must NOT be deleted from database");
+    assert.equal(dbOrder.status, "DELIVERED", "Order status must remain DELIVERED");
+    assert.equal(dbOrder.paymentStatus, "PENDING", "Order paymentStatus must remain PENDING (not marked fake PAID)");
+    assert.equal(dbOrder.total, 120, "Order total amount must remain unchanged");
+
+    // 9. Call GET /owner/:restaurantId/tables after clear
+    const getAfter = await app.inject({
+      method: "GET",
+      url: `/owner/${restaurantA.id}/tables`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+    });
+    assert.equal(getAfter.statusCode, 200);
+    const tablesAfter = JSON.parse(getAfter.payload);
+    const t1After = tablesAfter.find((t) => t.id === table1A.id);
+
+    // 10. Assert: isOccupied = false and activeOrders does NOT contain the closed-session order
+    assert.equal(t1After.isOccupied, false, "Table MUST be FREE (isOccupied: false) after Force Free");
+    assert.equal(t1After.activeOrders.length, 0, "activeOrders must be empty for force-cleared table");
+    assert.equal(t1After.activeOrderCount, 0);
+
+    // 11. Assert socket events were emitted
+    assert.ok(emittedEvents.some((e) => e.event === "table:updated"), "table:updated event must be emitted");
+    assert.ok(emittedEvents.some((e) => e.event === "table:session_updated"), "table:session_updated event must be emitted");
+    assert.ok(emittedEvents.some((e) => e.event === "table:layout_updated"), "table:layout_updated event must be emitted");
+
+    // Cleanup
+    await prisma.orderItem.deleteMany({ where: { orderId: order.id } });
+    await prisma.order.delete({ where: { id: order.id } });
+    await prisma.tableSession.delete({ where: { id: session.id } });
+  });
+
+  // TEST 37: Multiple DELIVERED/PENDING orders are preserved and table is FREE after Force Free
+  await t.test("TEST 37: Multiple DELIVERED/PENDING orders are preserved and table is FREE after Force Free", async () => {
+    const session = await prisma.tableSession.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableId: table2A.id,
+        tableNo: table2A.tableNo,
+        status: "OPEN",
+      },
+    });
+
+    const order1 = await prisma.order.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableSessionId: session.id,
+        tableNo: table2A.tableNo,
+        orderNo: `P0-MULTI-1-${Date.now()}`,
+        status: "DELIVERED",
+        paymentStatus: "PENDING",
+        subtotal: 50,
+        total: 50,
+      },
+    });
+
+    const order2 = await prisma.order.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableSessionId: session.id,
+        tableNo: table2A.tableNo,
+        orderNo: `P0-MULTI-2-${Date.now()}`,
+        status: "DELIVERED",
+        paymentStatus: "PENDING",
+        subtotal: 75,
+        total: 75,
+      },
+    });
+
+    // Check occupied before
+    const get1 = await app.inject({
+      method: "GET",
+      url: `/owner/${restaurantA.id}/tables`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+    });
+    const t2Before = JSON.parse(get1.payload).find((t) => t.id === table2A.id);
+    assert.equal(t2Before.isOccupied, true);
+    assert.equal(t2Before.activeOrders.length, 2);
+
+    // Force clear
+    const clearRes = await app.inject({
+      method: "POST",
+      url: `/owner/${restaurantA.id}/tables/${table2A.id}/clear`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+      payload: { force: true },
+    });
+    assert.equal(clearRes.statusCode, 200);
+
+    // Check free after
+    const get2 = await app.inject({
+      method: "GET",
+      url: `/owner/${restaurantA.id}/tables`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+    });
+    const t2After = JSON.parse(get2.payload).find((t) => t.id === table2A.id);
+    assert.equal(t2After.isOccupied, false, "Table must be FREE after Force Free");
+    assert.equal(t2After.activeOrders.length, 0);
+
+    // Assert both orders still exist in database with financial integrity
+    const dbOrder1 = await prisma.order.findUnique({ where: { id: order1.id } });
+    const dbOrder2 = await prisma.order.findUnique({ where: { id: order2.id } });
+    assert.equal(dbOrder1.status, "DELIVERED");
+    assert.equal(dbOrder1.paymentStatus, "PENDING");
+    assert.equal(dbOrder2.status, "DELIVERED");
+    assert.equal(dbOrder2.paymentStatus, "PENDING");
+
+    // Cleanup
+    await prisma.order.delete({ where: { id: order1.id } });
+    await prisma.order.delete({ where: { id: order2.id } });
+    await prisma.tableSession.delete({ where: { id: session.id } });
+  });
+
+  // TEST 38: State matrix: ACTIVE vs CLOSED sessions and PREPARING/READY statuses
+  await t.test("TEST 38: State matrix: ACTIVE vs CLOSED sessions and PREPARING/READY statuses", async () => {
+    // A. ACTIVE SESSION + PREPARING -> OCCUPIED
+    const sessionPrep = await prisma.tableSession.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableId: table1A.id,
+        tableNo: table1A.tableNo,
+        status: "OPEN",
+      },
+    });
+    const orderPrep = await prisma.order.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableSessionId: sessionPrep.id,
+        tableNo: table1A.tableNo,
+        orderNo: `P0-PREP-${Date.now()}`,
+        status: "PREPARING",
+        paymentStatus: "PENDING",
+        subtotal: 40,
+        total: 40,
+      },
+    });
+
+    const getPrep = await app.inject({
+      method: "GET",
+      url: `/owner/${restaurantA.id}/tables`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+    });
+    const t1Prep = JSON.parse(getPrep.payload).find((t) => t.id === table1A.id);
+    assert.equal(t1Prep.isOccupied, true, "ACTIVE SESSION + PREPARING must be OCCUPIED");
+    assert.equal(t1Prep.activeOrders.length, 1);
+
+    // B. ACTIVE SESSION + READY -> OCCUPIED
+    await prisma.order.update({
+      where: { id: orderPrep.id },
+      data: { status: "READY" },
+    });
+    const getReady = await app.inject({
+      method: "GET",
+      url: `/owner/${restaurantA.id}/tables`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+    });
+    const t1Ready = JSON.parse(getReady.payload).find((t) => t.id === table1A.id);
+    assert.equal(t1Ready.isOccupied, true, "ACTIVE SESSION + READY must be OCCUPIED");
+
+    // C. Force clear -> table is FREE
+    await app.inject({
+      method: "POST",
+      url: `/owner/${restaurantA.id}/tables/${table1A.id}/clear`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+      payload: { force: true },
+    });
+    const getAfterClear = await app.inject({
+      method: "GET",
+      url: `/owner/${restaurantA.id}/tables`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+    });
+    const t1Cleared = JSON.parse(getAfterClear.payload).find((t) => t.id === table1A.id);
+    assert.equal(t1Cleared.isOccupied, false, "CLOSED SESSION + historical orders must be FREE");
+
+    // Cleanup
+    await prisma.order.delete({ where: { id: orderPrep.id } });
+    await prisma.tableSession.delete({ where: { id: sessionPrep.id } });
+  });
+
+  // TEST 39: Table 2 vs Table T2 isolation with authoritative DiningTable.id lookup
+  await t.test("TEST 39: Table 2 vs Table T2 isolation with authoritative DiningTable.id lookup", async () => {
+    // Open session on Table 2 (table2A)
+    const session2 = await prisma.tableSession.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableId: table2A.id,
+        tableNo: "2",
+        status: "OPEN",
+      },
+    });
+    const order2 = await prisma.order.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableSessionId: session2.id,
+        tableNo: "2",
+        orderNo: `P0-T2-ISO-2-${Date.now()}`,
+        status: "DELIVERED",
+        paymentStatus: "PENDING",
+        subtotal: 55,
+        total: 55,
+      },
+    });
+
+    // Open session on Table T2 (tableT2A)
+    const sessionT2 = await prisma.tableSession.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableId: tableT2A.id,
+        tableNo: "T2",
+        status: "OPEN",
+      },
+    });
+    const orderT2 = await prisma.order.create({
+      data: {
+        restaurantId: restaurantA.id,
+        tableSessionId: sessionT2.id,
+        tableNo: "T2",
+        orderNo: `P0-T2-ISO-T2-${Date.now()}`,
+        status: "DELIVERED",
+        paymentStatus: "PENDING",
+        subtotal: 95,
+        total: 95,
+      },
+    });
+
+    // Both tables must be occupied with their distinct active orders
+    const getBoth = await app.inject({
+      method: "GET",
+      url: `/owner/${restaurantA.id}/tables`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+    });
+    const allTables = JSON.parse(getBoth.payload);
+    const t2 = allTables.find((t) => t.id === table2A.id);
+    const tT2 = allTables.find((t) => t.id === tableT2A.id);
+    assert.equal(t2.isOccupied, true);
+    assert.equal(tT2.isOccupied, true);
+    assert.equal(t2.activeOrders[0].id, order2.id);
+    assert.equal(tT2.activeOrders[0].id, orderT2.id);
+
+    // Force clear Table 2 using its authoritative ID table2A.id
+    const clearT2 = await app.inject({
+      method: "POST",
+      url: `/owner/${restaurantA.id}/tables/${table2A.id}/clear`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+      payload: { force: true },
+    });
+    assert.equal(clearT2.statusCode, 200);
+
+    // Verify: Table 2 is FREE, but Table T2 is STILL OCCUPIED!
+    const getAfterT2Clear = await app.inject({
+      method: "GET",
+      url: `/owner/${restaurantA.id}/tables`,
+      headers: { authorization: `Bearer ${ownerTokenA}` },
+    });
+    const allAfter = JSON.parse(getAfterT2Clear.payload);
+    const t2After = allAfter.find((t) => t.id === table2A.id);
+    const tT2After = allAfter.find((t) => t.id === tableT2A.id);
+
+    assert.equal(t2After.isOccupied, false, "Table 2 must be FREE after its clear call");
+    assert.equal(t2After.activeOrders.length, 0);
+
+    assert.equal(tT2After.isOccupied, true, "Table T2 must REMAIN OCCUPIED when Table 2 is cleared");
+    assert.equal(tT2After.activeOrders.length, 1);
+    assert.equal(tT2After.activeOrders[0].id, orderT2.id);
+
+    const dbSessionT2 = await prisma.tableSession.findUnique({ where: { id: sessionT2.id } });
+    assert.equal(dbSessionT2.status, "OPEN", "Table T2 session must remain OPEN");
+
+    // Cleanup
+    await prisma.order.delete({ where: { id: order2.id } });
+    await prisma.order.delete({ where: { id: orderT2.id } });
+    await prisma.tableSession.delete({ where: { id: session2.id } });
+    await prisma.tableSession.delete({ where: { id: sessionT2.id } });
+  });
 });

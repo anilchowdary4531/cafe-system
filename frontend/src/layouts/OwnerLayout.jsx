@@ -1550,7 +1550,10 @@ export default function OwnerLayout() {
         }
 
         const tableNoLabel = table?.tableNo || table?.label || "this table";
-        if (!options.force && !window.confirm(`Are you sure you want to free Table ${tableNoLabel}? Confirm that the customer has left and there are no outstanding orders.`)) {
+        const confirmMsg = options.force
+            ? `Are you sure you want to FORCE FREE Table ${tableNoLabel}? This will close the table session immediately even if payment is pending.`
+            : `Are you sure you want to free Table ${tableNoLabel}? Confirm that the customer has left and there are no outstanding orders.`;
+        if (!window.confirm(confirmMsg)) {
             return;
         }
 
@@ -2832,7 +2835,8 @@ export default function OwnerLayout() {
                                                                             onClick={() =>
                                                                                 handleFreeTable(
                                                                                     table,
-                                                                                    assignmentKey
+                                                                                    assignmentKey,
+                                                                                    { force: true }
                                                                                 )
                                                                             }
                                                                             disabled={isCompletingThisTable}
