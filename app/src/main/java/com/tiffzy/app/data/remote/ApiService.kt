@@ -5,31 +5,6 @@ import okhttp3.MultipartBody
 import retrofit2.http.*
 
 interface ApiService {
-
-    // WALLET ENDPOINTS
-    @GET("api/wallet/summary")
-    suspend fun getWalletSummary(): WalletSummaryResponse
-
-    @GET("api/wallet/transactions")
-    suspend fun getWalletTransactions(
-        @Query("page") page: Int = 1,
-        @Query("limit") limit: Int = 20,
-        @Query("type") type: String? = null,
-        @Query("direction") direction: String? = null
-    ): WalletTransactionsResponse
-
-    @POST("api/wallet/topup/create")
-    suspend fun createTopupSession(@Body request: TopupSessionRequest): TopupSessionResponse
-
-    @POST("api/wallet/topup/verify")
-    suspend fun verifyTopup(@Body request: VerifyTopupRequest): VerifyTopupResponse
-
-    @POST("api/wallet/pay-order")
-    suspend fun payOrderWithWallet(@Body request: PayOrderWalletRequest): PayOrderWalletResponse
-
-    @GET("api/v1/wallet/ppi/status")
-    suspend fun getPpiStatus(): PpiStatusResponse
-
     @GET("healthz")
     suspend fun checkHealth(): HealthResponse
 
@@ -120,10 +95,34 @@ interface ApiService {
         @Body request: VerifyPaymentRequest
     ): SimpleResponse
 
+    @GET("api/wallet")
+    suspend fun getWallet(): WalletResponse
+
+    @POST("api/wallet/pay-order")
+    suspend fun payOrderWithWallet(
+        @Body request: WalletPayOrderRequest
+    ): WalletPayOrderResponse
+
+    @GET("api/wallet/transactions")
+    suspend fun getWalletTransactions(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20
+    ): WalletTransactionsResponse
+
+    @POST("api/wallet/topup/create")
+    suspend fun createWalletTopup(
+        @Body request: WalletTopupCreateRequest
+    ): WalletTopupCreateResponse
+
+    @POST("api/wallet/topup/verify")
+    suspend fun verifyWalletTopup(
+        @Body request: WalletTopupVerifyRequest
+    ): WalletTopupVerifyResponse
+
     @GET("customer/notifications")
     suspend fun getNotifications(): NotificationsResponse
 
-    @POST("customer/notifications/{id}/read")
+    @PATCH("customer/notifications/{id}/read")
     suspend fun markNotificationRead(@Path("id") id: Int): SimpleResponse
 
     @POST("customer/public/delete-account/request-otp")

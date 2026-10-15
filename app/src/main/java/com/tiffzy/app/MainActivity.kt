@@ -19,6 +19,9 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import com.cashfree.pg.api.CFPaymentGatewayService
+import com.cashfree.pg.core.api.callback.CFCheckoutResponseCallback
+import com.cashfree.pg.core.api.utils.CFErrorResponse
 import com.razorpay.PaymentData
 import com.razorpay.PaymentResultWithDataListener
 import com.tiffzy.app.data.local.AuthDataStore
@@ -28,7 +31,7 @@ import com.tiffzy.app.utils.LanguageHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
+class MainActivity : ComponentActivity(), PaymentResultWithDataListener, CFCheckoutResponseCallback {
     
     private var navController: NavHostController? = null
 
@@ -38,6 +41,8 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         
         var onPaymentSuccess: ((String, PaymentData) -> Unit)? = null
         var onPaymentError: ((Int, String?, PaymentData?) -> Unit)? = null
+
+        var cashfreeCheckoutCallback: CFCheckoutResponseCallback? = null
     }
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -49,6 +54,12 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         instance = this
+        
+        try {
+            CFPaymentGatewayService.getInstance().setCheckoutCallback(this)
+        } catch (e: Exception) {
+            android.util.Log.e("CASHFREE_DEBUG", "Failed to register Cashfree callback in onCreate: ${e.message}")
+        }
         
         val dataStore = AuthDataStore(this)
         
@@ -77,21 +88,28 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
             // Handle initial intent if it contains payment success
             LaunchedEffect(intent) {
                 if (intent.getBooleanExtra("payment_success", false)) {
+                    com.tiffzy.app.data.repository.CartRepository.getInstance().clearCart()
                     val orderId = intent.getStringExtra("order_id") ?: ""
-                    if (orderId.isNotEmpty()) {
+                    val orderIdInt = orderId.toIntOrNull()
+                    if (orderIdInt != null) {
+                        controller.navigate("order_detail/$orderIdInt") {
+                            popUpTo(0) { inclusive = false }
+                        }
+                    } else if (orderId.isNotEmpty()) {
                         controller.navigate("order_success/PENDING/$orderId") {
-                            popUpTo(0) { inclusive = true }
+                            popUpTo(0) { inclusive = false }
                         }
                     }
                 }
             }
             
-            // Re-fetch language code to handle dynamic changes (e.g. from Settings)
+            // Re-fetch language code and dark theme to handle dynamic changes
             val languageCode by dataStore.appLanguage.collectAsState(initial = "en")
+            val darkTheme by dataStore.darkTheme.collectAsState(initial = false)
             
-            // Keying the entire theme/nav on languageCode forces a safe recomposition when language changes
-            key(languageCode) {
-                TiffzyAppTheme {
+            // Keying the entire theme/nav forces a safe recomposition when theme or language changes
+            key(languageCode, darkTheme) {
+                TiffzyAppTheme(darkTheme = darkTheme) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background,
@@ -112,12 +130,16 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         
         // Handle Cashfree payment success
         if (intent.getBooleanExtra("payment_success", false)) {
+            com.tiffzy.app.data.repository.CartRepository.getInstance().clearCart()
             val orderId = intent.getStringExtra("order_id") ?: ""
-            if (orderId.isNotEmpty()) {
-                // Navigate to order success screen. 
-                // We might not have the orderNo here, but Success screen can handle it.
+            val orderIdInt = orderId.toIntOrNull()
+            if (orderIdInt != null) {
+                navController?.navigate("order_detail/$orderIdInt") {
+                    popUpTo(0) { inclusive = false }
+                }
+            } else if (orderId.isNotEmpty()) {
                 navController?.navigate("order_success/PENDING/$orderId") {
-                    popUpTo(0) { inclusive = true }
+                    popUpTo(0) { inclusive = false }
                 }
             }
         }
@@ -143,6 +165,22 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         onPaymentError?.invoke(code, response ?: "Payment cancelled or failed", data)
     }
 
+    override fun onResume() {
+        super.onResume()
+    }
+
+    override fun onPaymentVerify(orderId: String) {
+        android.util.Log.d("CASHFREE_DEBUG", "MainActivity onPaymentVerify: orderId=$orderId")
+        cashfreeCheckoutCallback?.onPaymentVerify(orderId)
+    }
+
+    override fun onPaymentFailure(cfErrorResponse: CFErrorResponse, orderId: String) {
+        val status = cfErrorResponse.status ?: "FAILED"
+        val message = cfErrorResponse.message ?: "Transaction failed"
+        android.util.Log.e("CASHFREE_DEBUG", "MainActivity onPaymentFailure: status=$status, message=$message, orderId=$orderId")
+        cashfreeCheckoutCallback?.onPaymentFailure(cfErrorResponse, orderId)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         if (instance == this) {
@@ -150,5 +188,6 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         }
         onPaymentSuccess = null
         onPaymentError = null
+        cashfreeCheckoutCallback = null
     }
 }
