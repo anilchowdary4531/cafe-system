@@ -19,6 +19,7 @@ import DeleteAccountSection from "./customer/profile/DeleteAccountSection";
 import CustomerLoyaltySection from "./customer/profile/CustomerLoyaltySection";
 import CustomerOffersSection from "./customer/profile/CustomerOffersSection";
 import CustomerReservationsSection from "./customer/profile/CustomerReservationsSection";
+import CustomerProfileHeader from "../components/CustomerProfileHeader";
 
 
 const formatMoney = (value) => `Rs ${Math.round(Number(value || 0))}`;
@@ -40,16 +41,27 @@ export default function Profile({ section = "overview" }) {
 
     if (!customer) {
         return (
-            <div className="theme-page min-h-screen px-4 py-14">
-                <div className="theme-panel mx-auto max-w-3xl rounded-3xl p-8 text-center">
-                    <h1 className="text-3xl font-bold">Profile</h1>
-                    <p className="theme-muted mt-3">No active customer session found. Log in with OTP first.</p>
-                    <NavLink
-                        to="/login?mode=customer"
-                        className="theme-button mt-6 inline-block rounded-2xl px-5 py-3 font-semibold"
-                    >
-                        Login With OTP
-                    </NavLink>
+            <div className="theme-page min-h-screen px-4 sm:px-6 md:px-8 lg:px-10 py-3 sm:py-4 font-sans text-sm text-[color:var(--app-text)]">
+                <div className="w-full max-w-[1440px] mx-auto space-y-4">
+                    <CustomerProfileHeader
+                        isOverview={false}
+                        sectionLabel="Profile"
+                        backTo="/"
+                        title="Guest"
+                    />
+                    <div className="theme-panel mx-auto max-w-2xl rounded-2xl p-6 sm:p-8 text-center border border-[color:var(--app-border)]/40 mt-4">
+                        <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-2xl bg-orange-500/10 text-[var(--app-primary)] mb-3">
+                            <UserCircle2 size={32} />
+                        </div>
+                        <h1 className="text-xl sm:text-2xl font-bold">Customer Profile</h1>
+                        <p className="theme-muted mt-2 text-xs sm:text-sm">No active customer session found. Log in with OTP to view your orders, wallet, and settings.</p>
+                        <NavLink
+                            to="/login?mode=customer"
+                            className="inline-flex items-center justify-center gap-2 mt-5 rounded-xl bg-[var(--app-primary)] px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm hover:opacity-95 transition-all cursor-pointer"
+                        >
+                            Login With OTP
+                        </NavLink>
+                    </div>
                 </div>
             </div>
         );
@@ -70,7 +82,7 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
 
     const sidebarMeta = useMemo(() => {
         const phone = String(profile?.phone || "").trim();
-        const title = String(profile?.name || "Customer").trim();
+        const title = String(profile?.name || "Guest").trim();
         const subtitle = profile?.email ? String(profile.email) : phone;
         return { title, subtitle, phone };
     }, [profile?.email, profile?.name, profile?.phone]);
@@ -152,31 +164,19 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
 
     if (isOverviewPage) {
         return (
-            <div className="theme-page min-h-screen px-4 sm:px-6 md:px-8 lg:px-10 py-6 sm:py-8 font-sans text-sm text-[color:var(--app-text)]">
-                <div className="w-full max-w-[1440px] mx-auto space-y-6 sm:space-y-7">
-                    {/* PROFILE HEADER - Compact, aligned, enterprise dashboard style */}
-                    <header className="pb-5 border-b border-[color:var(--app-border)]/40">
-                        <div className="flex items-center gap-4">
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-orange-500/10 text-[var(--app-primary)] border border-orange-500/20">
-                                {avatarDataUrl ? (
-                                    <img src={avatarDataUrl} alt="Profile avatar" className="h-full w-full object-cover" />
-                                ) : (
-                                    <UserCircle2 size={32} />
-                                )}
-                            </div>
-                            <div className="min-w-0">
-                                <h1 className="truncate text-2xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-[1.75rem]">
-                                    {sidebarMeta.title}
-                                </h1>
-                                <p className="theme-muted mt-0.5 truncate text-sm font-medium">
-                                    {sidebarMeta.subtitle}
-                                </p>
-                            </div>
-                        </div>
-                    </header>
+            <div className="theme-page min-h-screen px-4 sm:px-6 md:px-8 lg:px-10 py-3 sm:py-4 font-sans text-sm text-[color:var(--app-text)]">
+                <div className="w-full max-w-[1440px] mx-auto space-y-3.5 sm:space-y-4">
+                    {/* CUSTOMER PROFILE HEADER - Compact Tiffzy Brand Header + Profile Identity */}
+                    <CustomerProfileHeader
+                        isOverview={true}
+                        title={sidebarMeta.title}
+                        subtitle={sidebarMeta.subtitle}
+                        phone={sidebarMeta.phone}
+                        avatarDataUrl={avatarDataUrl}
+                    />
 
                     {/* PROFILE NAVIGATION - Borderless compact grid, subtle orange hover */}
-                    <nav className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3.5 pb-6 border-b border-[color:var(--app-border)]/40">
+                    <nav className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5 pb-4 border-b border-[color:var(--app-border)]/40">
                         <OverviewActionCard
                             to={buildProfilePath("/profile/wallet")}
                             icon={<Wallet size={18} />}
@@ -238,7 +238,7 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
                             <NavLink
                                 to={buildProfilePath("/profile/wallet")}
                                 reloadDocument
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--app-primary)] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95 transition-all"
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--app-primary)] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95 transition-all cursor-pointer"
                             >
                                 <Wallet size={14} />
                                 Manage Wallet
@@ -281,22 +281,17 @@ function CustomerProfileLayout({ section, buildProfilePath }) {
     }
 
     return (
-        <div className="theme-page min-h-screen px-4 sm:px-6 md:px-8 lg:px-10 py-6 sm:py-8 font-sans text-sm text-[color:var(--app-text)]">
-            <div className="w-full max-w-[1440px] mx-auto space-y-6 sm:space-y-7">
-                <header className="flex items-center gap-3 pb-4 border-b border-[color:var(--app-border)]/40">
-                    <NavLink
-                        to={buildProfilePath("/profile/overview")}
-                        reloadDocument
-                        aria-label="Back to overview"
-                        title="Back to overview"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[color:var(--app-text)] hover:bg-orange-500/10 hover:text-[var(--app-primary)] transition-all"
-                    >
-                        <ArrowLeft size={18} />
-                    </NavLink>
-                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--app-text)]">
-                        {sectionLabel}
-                    </h1>
-                </header>
+        <div className="theme-page min-h-screen px-4 sm:px-6 md:px-8 lg:px-10 py-3 sm:py-4 font-sans text-sm text-[color:var(--app-text)]">
+            <div className="w-full max-w-[1440px] mx-auto space-y-3.5 sm:space-y-4">
+                <CustomerProfileHeader
+                    isOverview={false}
+                    sectionLabel={sectionLabel}
+                    backTo={buildProfilePath("/profile/overview")}
+                    title={sidebarMeta.title}
+                    subtitle={sidebarMeta.subtitle}
+                    phone={sidebarMeta.phone}
+                    avatarDataUrl={avatarDataUrl}
+                />
 
                 <main className="min-w-0">{sectionNode}</main>
             </div>
@@ -391,7 +386,7 @@ function RecentOrdersSection({ profile, customerToken, buildProfilePath }) {
     }, [data?.groups]);
 
     return (
-        <section className="pb-6 border-b border-[color:var(--app-border)]/40 space-y-3">
+        <section className="pb-4 sm:pb-4.5 border-b border-[color:var(--app-border)]/40 space-y-3">
             <div className="flex items-center justify-between">
                 <div>
                     <div className="text-xs font-bold uppercase tracking-wider text-[var(--app-primary)]">

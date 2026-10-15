@@ -335,14 +335,19 @@ export default function WalletSection({ customerToken }) {
     };
 
     return (
-        <div className="space-y-6 pb-12 animate-fadeIn">
-            {/* SECTION 1: WALLET HEADER */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
+        <div className="w-full space-y-3.5 font-sans text-sm text-[color:var(--app-text)] pb-6">
+            {/* SUBHEADER: CONSOLE TITLE & REFRESH ACTION */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 pb-2.5 border-b border-[color:var(--app-border)]/30">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight md:text-[2rem] text-white">
-                        Tiffzy Wallet
-                    </h1>
-                    <p className="mt-1 text-xs sm:text-sm text-stone-400">
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--app-text)]">
+                            Tiffzy Wallet
+                        </h1>
+                        <span className="inline-flex items-center rounded bg-orange-500/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--app-primary)] border border-orange-500/20">
+                            CUSTOMER CONSOLE
+                        </span>
+                    </div>
+                    <p className="theme-muted text-xs mt-0.5">
                         Manage your wallet balance and transactions
                     </p>
                 </div>
@@ -352,25 +357,25 @@ export default function WalletSection({ customerToken }) {
                     type="button"
                     onClick={handleRefreshAll}
                     disabled={refreshing}
-                    className="theme-soft-button min-h-[44px] px-4 py-2 rounded-2xl text-stone-200 hover:text-white transition-all flex items-center gap-2 border border-white/10 hover:border-white/20 font-semibold text-xs sm:text-sm shadow-sm self-start sm:self-auto"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--app-border)] px-2.5 py-1 text-xs font-semibold theme-muted hover:text-[color:var(--app-text)] hover:bg-[color:var(--app-border)]/30 transition-all disabled:opacity-50 self-start sm:self-auto cursor-pointer"
                     title="Refresh Wallet & Analytics"
                 >
-                    <RefreshCw size={16} className={refreshing ? "animate-spin text-amber-400" : ""} />
+                    <RefreshCw size={12} className={refreshing ? "animate-spin text-[var(--app-primary)]" : ""} />
                     <span>Refresh</span>
                 </button>
             </div>
 
             {/* Error & Success Messages */}
             {error && (
-                <div className="rounded-2xl bg-rose-500/10 border border-rose-500/20 p-4 text-rose-300 text-sm flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-3 rounded-md border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-600 dark:text-rose-400">
                     <div className="flex items-center gap-2">
-                        <AlertCircle size={18} className="shrink-0" />
+                        <AlertCircle size={15} className="shrink-0" />
                         <span>{error}</span>
                     </div>
                     <button
                         type="button"
                         onClick={() => setError("")}
-                        className="text-rose-400 hover:text-rose-200 text-xs font-bold"
+                        className="font-bold text-rose-700 hover:text-rose-800 dark:text-rose-300 dark:hover:text-white transition-colors cursor-pointer"
                     >
                         Dismiss
                     </button>
@@ -378,15 +383,15 @@ export default function WalletSection({ customerToken }) {
             )}
 
             {successMsg && (
-                <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4 text-emerald-300 text-sm flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-xs text-emerald-600 dark:text-emerald-400">
                     <div className="flex items-center gap-2">
-                        <CheckCircle2 size={18} className="shrink-0" />
+                        <CheckCircle2 size={15} className="shrink-0" />
                         <span>{successMsg}</span>
                     </div>
                     <button
                         type="button"
                         onClick={() => setSuccessMsg("")}
-                        className="text-emerald-400 hover:text-emerald-200 text-xs font-bold"
+                        className="font-bold text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-white transition-colors cursor-pointer"
                     >
                         Dismiss
                     </button>

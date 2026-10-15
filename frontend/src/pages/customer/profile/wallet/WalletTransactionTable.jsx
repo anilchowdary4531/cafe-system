@@ -1,17 +1,11 @@
 import { useState, useMemo } from "react";
 import {
-    History,
-    ArrowDownLeft,
-    ArrowUpRight,
     Search,
     ChevronLeft,
     ChevronRight,
-    RotateCcw,
-    Utensils,
-    CreditCard,
-    AlertCircle,
     Eye,
     X,
+    History,
 } from "lucide-react";
 
 const FILTER_TABS = [
@@ -49,30 +43,20 @@ const getTransactionMeta = (txn) => {
     if (type === "WALLET_TOPUP") {
         return {
             title: "Wallet Top-up",
-            icon: ArrowDownLeft,
-            iconClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
         };
     }
     if (type === "ORDER_PAYMENT") {
         return {
             title: "Food Order Payment",
-            icon: Utensils,
-            iconClass: "bg-rose-500/15 text-rose-400 border-rose-500/25",
         };
     }
     if (type === "REFUND") {
         return {
             title: "Order Refund",
-            icon: RotateCcw,
-            iconClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
         };
     }
     return {
         title: isCredit ? "Credit Adjustment" : "Debit Adjustment",
-        icon: isCredit ? ArrowDownLeft : ArrowUpRight,
-        iconClass: isCredit
-            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
-            : "bg-rose-500/15 text-rose-400 border-rose-500/25",
     };
 };
 
@@ -112,27 +96,22 @@ export default function WalletTransactionTable({
     const endIndex = Math.min(page * limit, total);
 
     return (
-        <div className="theme-panel rounded-3xl p-5 sm:p-7 border border-[var(--app-border)] shadow-md space-y-5">
+        <div className="pb-4 border-b border-[color:var(--app-border)]/30 space-y-3">
             {/* Header & Controls Bar */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center border border-amber-500/20">
-                        <History size={18} />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <div className="text-xs font-bold uppercase tracking-wider text-[var(--app-primary)]">
+                        Recent Wallet Activity
                     </div>
-                    <div>
-                        <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                            Recent Wallet Activity
-                        </h3>
-                        <p className="text-[11px] text-stone-400">
-                            Latest wallet transactions & statement
-                        </p>
-                    </div>
+                    <p className="theme-muted text-xs mt-0.5">
+                        Latest Wallet Transactions & Statement
+                    </p>
                 </div>
 
                 {/* Filter Tabs & Search Bar */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-                    {/* Tabs */}
-                    <div className="inline-flex items-center p-1 rounded-xl bg-white/5 border border-white/10 overflow-x-auto">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    {/* Preset Filter Tabs */}
+                    <div className="inline-flex items-center rounded-lg border border-[color:var(--app-border)] p-0.5 bg-[color:var(--app-bg)]/50 overflow-x-auto">
                         {FILTER_TABS.map((tab) => {
                             const isSelected = activeType === tab.id;
                             return (
@@ -141,10 +120,10 @@ export default function WalletTransactionTable({
                                     type="button"
                                     onClick={() => onTypeChange(tab.id)}
                                     disabled={loading}
-                                    className={`min-h-[36px] px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer whitespace-nowrap ${
                                         isSelected
-                                            ? "bg-amber-500 text-stone-950 font-bold shadow-sm"
-                                            : "text-stone-300 hover:text-white hover:bg-white/5"
+                                            ? "bg-[var(--app-primary)] text-white shadow-sm font-bold"
+                                            : "theme-muted hover:text-[color:var(--app-text)] hover:bg-[color:var(--app-border)]/30"
                                     }`}
                                 >
                                     {tab.label}
@@ -154,26 +133,26 @@ export default function WalletTransactionTable({
                     </div>
 
                     {/* Search Field */}
-                    <div className="relative min-w-[200px]">
+                    <div className="relative min-w-[180px]">
                         <Search
-                            size={14}
-                            className="absolute left-3 top-3 text-stone-400 pointer-events-none"
+                            size={13}
+                            className="absolute left-2.5 top-1/2 -translate-y-1/2 theme-muted pointer-events-none"
                         />
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search transactions..."
-                            className="theme-input min-h-[38px] w-full pl-8 pr-7 py-1.5 rounded-xl text-xs border border-white/10 focus:border-amber-500 outline-none"
+                            className="w-full pl-7 pr-6 py-1 rounded-lg text-xs border border-[color:var(--app-border)] bg-[color:var(--app-bg)] text-[color:var(--app-text)] focus:border-[var(--app-primary)] outline-none transition-colors"
                         />
                         {searchQuery && (
                             <button
                                 type="button"
                                 onClick={() => setSearchQuery("")}
-                                className="absolute right-2.5 top-2.5 text-stone-400 hover:text-white"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 theme-muted hover:text-[color:var(--app-text)] cursor-pointer"
                                 title="Clear search"
                             >
-                                <X size={14} />
+                                <X size={12} />
                             </button>
                         )}
                     </div>
@@ -182,17 +161,17 @@ export default function WalletTransactionTable({
 
             {/* Transactions Content */}
             {loading ? (
-                <div className="py-16 text-center space-y-3">
-                    <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                    <p className="text-xs text-stone-400">Loading wallet ledger...</p>
+                <div className="py-12 text-center space-y-2">
+                    <div className="w-6 h-6 border-2 border-[var(--app-primary)] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="text-xs theme-muted">Loading wallet ledger...</p>
                 </div>
             ) : filteredTransactions.length === 0 ? (
-                <div className="py-14 text-center rounded-2xl border border-dashed border-white/10 p-6 space-y-2">
-                    <History size={32} className="text-stone-500 mx-auto" />
-                    <p className="text-sm font-semibold text-stone-300">
+                <div className="py-10 text-center rounded-lg border border-dashed border-[color:var(--app-border)]/40 p-6 space-y-1">
+                    <History size={26} className="theme-muted mx-auto mb-1" />
+                    <p className="text-sm font-semibold text-[color:var(--app-text)]">
                         No wallet transactions yet.
                     </p>
-                    <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                    <p className="text-xs theme-muted max-w-sm mx-auto">
                         {searchQuery
                             ? `No transactions match "${searchQuery}". Try clearing the search.`
                             : "Add money or make a food purchase to view your transaction ledger."}
@@ -201,87 +180,85 @@ export default function WalletTransactionTable({
             ) : (
                 <>
                     {/* DESKTOP TABLE VIEW (md and up) */}
-                    <div className="hidden md:block overflow-x-auto rounded-2xl border border-white/10">
+                    <div className="hidden md:block overflow-x-auto border border-[color:var(--app-border)]/50 rounded-md">
                         <table className="w-full text-left text-xs">
-                            <thead className="bg-white/5 text-stone-400 uppercase tracking-wider font-semibold border-b border-white/10">
+                            <thead className="bg-[color:var(--app-bg)]/80 theme-muted border-b border-[color:var(--app-border)]/40 font-semibold">
                                 <tr>
-                                    <th className="px-4 py-3.5 whitespace-nowrap">Date / Time</th>
-                                    <th className="px-4 py-3.5">Description</th>
-                                    <th className="px-4 py-3.5">Type</th>
-                                    <th className="px-4 py-3.5">Reference / Order</th>
-                                    <th className="px-4 py-3.5 text-center">Status</th>
-                                    <th className="px-4 py-3.5 text-right">Amount</th>
-                                    <th className="px-4 py-3.5 text-right">Balance After</th>
-                                    <th className="px-4 py-3.5 text-center">Action</th>
+                                    <th className="p-2.5 whitespace-nowrap">Date / Time</th>
+                                    <th className="p-2.5">Description</th>
+                                    <th className="p-2.5">Type</th>
+                                    <th className="p-2.5">Reference / Order</th>
+                                    <th className="p-2.5 text-center">Status</th>
+                                    <th className="p-2.5 text-right">Amount</th>
+                                    <th className="p-2.5 text-right">Balance After</th>
+                                    <th className="p-2.5 text-center">Action</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/5">
+                            <tbody className="divide-y divide-[color:var(--app-border)]/20">
                                 {filteredTransactions.map((txn) => {
                                     const meta = getTransactionMeta(txn);
-                                    const Icon = meta.icon;
                                     const isCredit = txn.direction === "CREDIT";
 
                                     return (
                                         <tr
                                             key={txn.id}
                                             onClick={() => onSelectTransaction(txn)}
-                                            className="hover:bg-white/[0.04] transition-colors cursor-pointer group"
+                                            className="hover:bg-[color:var(--app-border)]/15 transition-colors cursor-pointer group"
                                         >
                                             {/* Date & Time */}
-                                            <td className="px-4 py-3.5 text-stone-300 whitespace-nowrap">
+                                            <td className="p-2.5 theme-muted whitespace-nowrap">
                                                 {formatDateTime(txn.createdAt)}
                                             </td>
 
                                             {/* Description */}
-                                            <td className="px-4 py-3.5">
+                                            <td className="p-2.5">
                                                 <div className="min-w-0">
-                                                    <p className="font-bold text-white group-hover:text-amber-400 transition-colors truncate">
+                                                    <p className="font-semibold text-[color:var(--app-text)] group-hover:text-[var(--app-primary)] transition-colors truncate max-w-[240px]">
                                                         {txn.description || meta.title}
                                                     </p>
-                                                    <p className="text-[11px] text-stone-400">
+                                                    <p className="text-[11px] theme-muted">
                                                         {meta.title}
                                                     </p>
                                                 </div>
                                             </td>
 
                                             {/* Type */}
-                                            <td className="px-4 py-3.5 whitespace-nowrap">
-                                                <div
-                                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                                            <td className="p-2.5 whitespace-nowrap">
+                                                <span
+                                                    className={`font-semibold ${
                                                         isCredit
-                                                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
-                                                            : "bg-rose-500/15 text-rose-400 border-rose-500/25"
+                                                            ? "text-emerald-600 dark:text-emerald-400"
+                                                            : "text-rose-600 dark:text-rose-400"
                                                     }`}
                                                 >
-                                                    <Icon size={13} />
-                                                    <span>{isCredit ? "Credit" : "Debit"}</span>
-                                                </div>
+                                                    {isCredit ? "Credit" : "Debit"}
+                                                </span>
                                             </td>
 
                                             {/* Order Reference */}
-                                            <td className="px-4 py-3.5 text-stone-300">
+                                            <td className="p-2.5 text-[color:var(--app-text)]">
                                                 {txn.orderId ? (
-                                                    <span className="font-mono px-2 py-0.5 rounded bg-white/5 border border-white/10 text-stone-300">
+                                                    <span className="font-mono px-1.5 py-0.5 rounded bg-[color:var(--app-border)]/20 border border-[color:var(--app-border)]/40 text-xs">
                                                         #{txn.orderId}
                                                     </span>
                                                 ) : txn.referenceId ? (
-                                                    <span className="font-mono text-stone-400 text-[11px] truncate block max-w-[120px]">
+                                                    <span className="font-mono theme-muted text-[11px] truncate block max-w-[120px]">
                                                         {txn.referenceId}
                                                     </span>
                                                 ) : (
-                                                    <span className="text-stone-500">—</span>
+                                                    <span className="theme-muted">—</span>
                                                 )}
                                             </td>
 
                                             {/* Status Badge */}
-                                            <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                                            <td className="p-2.5 text-center whitespace-nowrap">
                                                 <span
-                                                    className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider ${
+                                                    className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${
                                                         txn.status === "SUCCESS"
-                                                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                                                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                                                             : txn.status === "PENDING"
-                                                            ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                                                            : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+                                                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                                            : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
                                                     }`}
                                                 >
                                                     {txn.status || "SUCCESS"}
@@ -289,33 +266,35 @@ export default function WalletTransactionTable({
                                             </td>
 
                                             {/* Amount */}
-                                            <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                            <td className="p-2.5 text-right whitespace-nowrap font-bold">
                                                 <span
-                                                    className={`text-sm font-black ${
-                                                        isCredit ? "text-emerald-400" : "text-rose-400"
-                                                    }`}
+                                                    className={
+                                                        isCredit
+                                                            ? "text-emerald-600 dark:text-emerald-400"
+                                                            : "text-rose-600 dark:text-rose-400"
+                                                    }
                                                 >
                                                     {isCredit ? "+" : "-"}₹{formatINR(txn.amount)}
                                                 </span>
                                             </td>
 
                                             {/* Balance After */}
-                                            <td className="px-4 py-3.5 text-right font-medium text-stone-300 whitespace-nowrap">
+                                            <td className="p-2.5 text-right font-medium text-[color:var(--app-text)] whitespace-nowrap">
                                                 ₹{formatINR(txn.balanceAfter)}
                                             </td>
 
                                             {/* Action */}
-                                            <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                                            <td className="p-2.5 text-center whitespace-nowrap">
                                                 <button
                                                     type="button"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         onSelectTransaction(txn);
                                                     }}
-                                                    className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-white/10 transition-colors"
+                                                    className="p-1 rounded text-stone-400 hover:text-[color:var(--app-text)] hover:bg-[color:var(--app-border)]/20 transition-colors cursor-pointer"
                                                     title="View details"
                                                 >
-                                                    <Eye size={15} />
+                                                    <Eye size={13} />
                                                 </button>
                                             </td>
                                         </tr>
@@ -326,48 +305,40 @@ export default function WalletTransactionTable({
                     </div>
 
                     {/* MOBILE CARD VIEW (below md) */}
-                    <div className="md:hidden space-y-3">
+                    <div className="md:hidden space-y-2">
                         {filteredTransactions.map((txn) => {
                             const meta = getTransactionMeta(txn);
-                            const Icon = meta.icon;
                             const isCredit = txn.direction === "CREDIT";
 
                             return (
                                 <div
                                     key={txn.id}
                                     onClick={() => onSelectTransaction(txn)}
-                                    className="theme-card rounded-2xl p-4 border border-white/10 active:bg-white/[0.04] transition-all cursor-pointer space-y-3"
+                                    className="p-3 rounded-lg border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)]/40 active:bg-[color:var(--app-border)]/20 transition-all cursor-pointer space-y-1.5"
                                 >
                                     <div className="flex items-start justify-between gap-2">
-                                        <div className="flex items-center gap-3">
-                                            <div
-                                                className={`w-9 h-9 rounded-xl flex items-center justify-center border shrink-0 ${meta.iconClass}`}
-                                            >
-                                                <Icon size={18} />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-bold text-white">
-                                                    {meta.title}
-                                                </p>
-                                                <p className="text-[11px] text-stone-400 line-clamp-1">
-                                                    {txn.description}
-                                                </p>
-                                            </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-[color:var(--app-text)] truncate">
+                                                {txn.description || meta.title}
+                                            </p>
+                                            <p className="text-[11px] theme-muted">
+                                                {meta.title}
+                                            </p>
                                         </div>
 
                                         <div className="text-right shrink-0">
                                             <p
-                                                className={`text-sm font-black ${
-                                                    isCredit ? "text-emerald-400" : "text-rose-400"
+                                                className={`text-xs font-bold ${
+                                                    isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                                                 }`}
                                             >
                                                 {isCredit ? "+" : "-"}₹{formatINR(txn.amount)}
                                             </p>
                                             <span
-                                                className={`inline-block px-2 py-0.2 rounded-full text-[9px] font-bold uppercase ${
+                                                className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${
                                                     txn.status === "SUCCESS"
-                                                        ? "bg-emerald-500/20 text-emerald-400"
-                                                        : "bg-amber-500/20 text-amber-400"
+                                                        ? "text-emerald-600 dark:text-emerald-400"
+                                                        : "text-amber-600 dark:text-amber-400"
                                                 }`}
                                             >
                                                 {txn.status || "SUCCESS"}
@@ -375,10 +346,10 @@ export default function WalletTransactionTable({
                                         </div>
                                     </div>
 
-                                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-stone-400">
+                                    <div className="pt-1.5 border-t border-[color:var(--app-border)]/20 flex items-center justify-between text-[11px] theme-muted">
                                         <span>{formatDateTime(txn.createdAt)}</span>
-                                        <span className="font-medium text-stone-300">
-                                            Balance: ₹{formatINR(txn.balanceAfter)}
+                                        <span className="font-semibold text-[color:var(--app-text)]">
+                                            Bal: ₹{formatINR(txn.balanceAfter)}
                                         </span>
                                     </div>
                                 </div>
@@ -390,36 +361,36 @@ export default function WalletTransactionTable({
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-                <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-400">
+                <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs theme-muted">
                     <p>
-                        Showing <strong className="text-stone-200">{startIndex}</strong> to{" "}
-                        <strong className="text-stone-200">{endIndex}</strong> of{" "}
-                        <strong className="text-stone-200">{total}</strong> transactions
+                        Showing <strong className="text-[color:var(--app-text)]">{startIndex}</strong> to{" "}
+                        <strong className="text-[color:var(--app-text)]">{endIndex}</strong> of{" "}
+                        <strong className="text-[color:var(--app-text)]">{total}</strong> transactions
                     </p>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                         <button
                             type="button"
                             onClick={() => onPageChange(page - 1)}
                             disabled={page <= 1 || loading}
-                            className="min-h-[36px] px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 font-semibold text-stone-200 transition-all"
+                            className="px-2.5 py-1 rounded-md border border-[color:var(--app-border)] hover:bg-[color:var(--app-border)]/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 font-semibold text-[color:var(--app-text)] transition-all cursor-pointer"
                         >
-                            <ChevronLeft size={15} />
+                            <ChevronLeft size={13} />
                             <span>Previous</span>
                         </button>
 
-                        <span className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 font-bold text-amber-400">
-                            Page {page} of {totalPages}
+                        <span className="px-2.5 py-1 rounded-md border border-[color:var(--app-border)]/60 font-semibold text-[var(--app-primary)]">
+                            {page} / {totalPages}
                         </span>
 
                         <button
                             type="button"
                             onClick={() => onPageChange(page + 1)}
                             disabled={page >= totalPages || loading}
-                            className="min-h-[36px] px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 font-semibold text-stone-200 transition-all"
+                            className="px-2.5 py-1 rounded-md border border-[color:var(--app-border)] hover:bg-[color:var(--app-border)]/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 font-semibold text-[color:var(--app-text)] transition-all cursor-pointer"
                         >
                             <span>Next</span>
-                            <ChevronRight size={15} />
+                            <ChevronRight size={13} />
                         </button>
                     </div>
                 </div>

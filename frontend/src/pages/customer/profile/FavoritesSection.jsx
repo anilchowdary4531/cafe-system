@@ -36,7 +36,7 @@ export default function FavoritesSection() {
     };
 
     return (
-        <div className="w-full space-y-5 text-left">
+        <div className="w-full space-y-3.5 text-left">
             <div className="space-y-1">
                 <div className="text-xs font-bold uppercase tracking-wider text-[var(--app-primary)]">
                     FAVORITES
@@ -50,7 +50,7 @@ export default function FavoritesSection() {
             </div>
 
             {favorites.length === 0 ? (
-                <div className="rounded-xl border border-[color:var(--app-border)]/40 bg-white/40 dark:bg-slate-900/40 p-6 sm:p-8 text-center space-y-2">
+                <div className="rounded-xl border border-[color:var(--app-border)]/40 bg-white/40 dark:bg-slate-900/40 p-5 sm:p-6 text-center space-y-2">
                     <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-lg bg-orange-500/10 text-[var(--app-primary)]">
                         <Heart size={22} />
                     </div>

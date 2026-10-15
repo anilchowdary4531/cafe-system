@@ -143,7 +143,7 @@ describe("Customer Profile Overview Page Redesign Audit", () => {
         expect(screen.getAllByText("Coming soon").length).toBeGreaterThan(0);
     });
 
-    it("renders customer profile header with Back button, Logo, Tiffzy text, and Cart, without language selector", () => {
+    it("does not render global customer navbar on customer profile pages", () => {
         render(
             <MemoryRouter initialEntries={["/profile/overview?scope=customer"]}>
                 <Navbar />
@@ -151,18 +151,10 @@ describe("Customer Profile Overview Page Redesign Audit", () => {
             </MemoryRouter>
         );
 
-        // Header structure
-        const returnLink = screen.getByRole("link", { name: /return/i });
-        expect(returnLink).toBeInTheDocument();
-
-        const homeLink = screen.getByRole("link", { name: /tiffzy home/i });
-        expect(homeLink).toBeInTheDocument();
-        expect(screen.getAllByText("Tiffzy").length).toBeGreaterThan(0);
-
-        const cartLink = screen.getByRole("link", { name: /cart/i });
-        expect(cartLink).toBeInTheDocument();
-
-        // Language selector should NOT be present in profile header
+        // Global navbar header elements must NOT be present
+        expect(screen.queryByRole("link", { name: /return/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole("link", { name: /tiffzy home/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole("link", { name: /cart/i })).not.toBeInTheDocument();
         expect(screen.queryByTitle(/select language/i)).not.toBeInTheDocument();
     });
 
@@ -212,6 +204,59 @@ describe("Customer Profile Overview Page Redesign Audit", () => {
 
         // Language should be persisted in localStorage
         expect(localStorage.getItem("app_language")).toBe("te");
+    });
+
+    it("renders compact Tiffzy brand header linking to customer home '/' on profile overview", () => {
+        render(
+            <MemoryRouter initialEntries={["/profile/overview?scope=customer"]}>
+                <Profile section="overview" />
+            </MemoryRouter>
+        );
+
+        // Clickable Tiffzy brand link navigating to Customer Home ("/")
+        const brandLink = screen.getByRole("link", { name: /^tiffzy$/i });
+        expect(brandLink).toBeInTheDocument();
+        expect(brandLink).toHaveAttribute("href", "/");
+
+        // Profile identity rendered directly below Tiffzy brand
+        expect(screen.getByText("Ramesh Nanda")).toBeInTheDocument();
+        expect(screen.getByText("rameshnanda485@gmail.com")).toBeInTheDocument();
+    });
+
+    it("renders compact Tiffzy header on subpages (wallet, settings, pay-later) with back navigation and single back button", () => {
+        const { unmount } = render(
+            <MemoryRouter initialEntries={["/profile/wallet?scope=customer"]}>
+                <Profile section="wallet" />
+            </MemoryRouter>
+        );
+
+        // Clickable Tiffzy brand link navigating to Customer Home ("/")
+        const brandLink = screen.getByRole("link", { name: /^tiffzy$/i });
+        expect(brandLink).toBeInTheDocument();
+        expect(brandLink).toHaveAttribute("href", "/");
+
+        // Section label in header
+        expect(screen.getAllByText("Wallet").length).toBeGreaterThan(0);
+
+        // Exactly one back-to-overview navigation button (no duplicate back buttons)
+        const backButtons = screen.getAllByRole("link", { name: /back to overview/i });
+        expect(backButtons.length).toBe(1);
+        expect(backButtons[0]).toHaveAttribute("href", "/profile/overview?scope=customer");
+
+        unmount();
+
+        // Check settings subpage
+        render(
+            <MemoryRouter initialEntries={["/profile/settings?scope=customer"]}>
+                <LanguageProvider>
+                    <Profile section="settings" />
+                </LanguageProvider>
+            </MemoryRouter>
+        );
+
+        const settingsBrandLink = screen.getByRole("link", { name: /^tiffzy$/i });
+        expect(settingsBrandLink).toHaveAttribute("href", "/");
+        expect(screen.getByRole("link", { name: /back to overview/i })).toHaveAttribute("href", "/profile/overview?scope=customer");
     });
 });
 

@@ -383,9 +383,9 @@ export default function OrderHistory({ embedded = false } = {}) {
     };
 
     return (
-        <div className={embedded ? "space-y-4" : "theme-page min-h-screen px-4 py-10 md:px-8"}>
-            <div className={embedded ? "space-y-4" : "mx-auto w-full max-w-6xl space-y-6"}>
-                <header className={embedded ? "space-y-4" : "theme-panel rounded-[32px] p-6 md:p-8"}>
+        <div className={embedded ? "space-y-3.5" : "theme-page min-h-screen px-4 py-10 md:px-8"}>
+            <div className={embedded ? "space-y-3.5" : "mx-auto w-full max-w-6xl space-y-6"}>
+                <header className={embedded ? "space-y-3" : "theme-panel rounded-[32px] p-6 md:p-8"}>
                     <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                         <div>
                             <p className="theme-accent-text text-xs font-semibold uppercase tracking-[0.32em]">Orders</p>
@@ -466,7 +466,7 @@ export default function OrderHistory({ embedded = false } = {}) {
                                 </div>
                             )}
 
-                            <div className={embedded ? "mt-4 grid gap-2 sm:grid-cols-4" : "mt-6 grid gap-3 md:grid-cols-4"}>
+                            <div className={embedded ? "mt-3 grid gap-2 sm:grid-cols-4" : "mt-6 grid gap-3 md:grid-cols-4"}>
                                 <label className={embedded ? "space-y-1 block" : "theme-card rounded-2xl p-4 md:col-span-1"}>
                                     <span className={embedded ? "text-xs font-bold uppercase tracking-wider text-[var(--app-primary)]" : "theme-muted text-xs font-semibold uppercase tracking-[0.22em]"}>Date</span>
                                     <input
@@ -556,32 +556,32 @@ export default function OrderHistory({ embedded = false } = {}) {
                                 </div>
                             )}
 
-                            <div className={embedded ? "mt-5" : "mt-6 grid gap-4 lg:grid-cols-2"}>
-                                    <div className="theme-card rounded-2xl p-5">
+                            <div className={embedded ? "mt-3.5" : "mt-6 grid gap-4 lg:grid-cols-2"}>
+                                    <div className="theme-card rounded-2xl p-4 sm:p-5">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                             <p className="theme-muted text-xs font-semibold uppercase tracking-[0.22em]">Order insights</p>
-                                            <p className="mt-2 text-lg font-semibold">Orders vs spend</p>
+                                            <p className="mt-1 text-base sm:text-lg font-semibold">Orders vs spend</p>
                                         </div>
                                         <div className="flex items-center gap-2 text-xs">
-                                            <span className="theme-soft-button rounded-xl px-3 py-1.5 font-semibold">{derivedStats.totalOrders} orders</span>
-                                            <span className="theme-soft-button rounded-xl px-3 py-1.5 font-semibold">{formatMoney(derivedStats.totalSpend)}</span>
+                                            <span className="theme-soft-button rounded-xl px-2.5 py-1 sm:px-3 sm:py-1.5 font-semibold">{derivedStats.totalOrders} orders</span>
+                                            <span className="theme-soft-button rounded-xl px-2.5 py-1 sm:px-3 sm:py-1.5 font-semibold">{formatMoney(derivedStats.totalSpend)}</span>
                                         </div>
                                     </div>
 
                                     {spendTrendData.length === 0 ? (
                                         <div className="theme-empty mt-4 rounded-2xl p-6">No data yet.</div>
                                     ) : (
-                                        <div className="mt-4 overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,rgba(255,250,238,0.06),rgba(255,248,232,0.035)),repeating-linear-gradient(0deg,rgba(255,255,255,0.03)_0px,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_44px),repeating-linear-gradient(90deg,rgba(255,255,255,0.02)_0px,rgba(255,255,255,0.02)_1px,transparent_1px,transparent_64px)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                                            <div className="mb-4 flex flex-wrap items-center gap-2">
-                                                <span className="rounded-full border border-[#dfc07b]/30 bg-[#dfc07b]/10 px-3 py-1 text-[11px] font-semibold text-[#f3d78d]">
+                                        <div className="mt-3.5 overflow-hidden rounded-[24px] bg-[linear-gradient(180deg,rgba(255,250,238,0.06),rgba(255,248,232,0.035)),repeating-linear-gradient(0deg,rgba(255,255,255,0.03)_0px,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_44px),repeating-linear-gradient(90deg,rgba(255,255,255,0.02)_0px,rgba(255,255,255,0.02)_1px,transparent_1px,transparent_64px)] p-3 sm:p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                                            <div className="mb-3 flex flex-wrap items-center gap-2">
+                                                <span className="rounded-full border border-[#dfc07b]/30 bg-[#dfc07b]/10 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-semibold text-[#f3d78d]">
                                                     Avg {formatMoney(derivedStats.averageOrderValue)}
                                                 </span>
-                                                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/80">
+                                                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-semibold text-white/80">
                                                     Peak {formatMoney(Math.max(...spendTrendData.map((item) => Number(item.spend || 0)), 0))}
                                                 </span>
                                             </div>
-                                        <div className="h-56">
+                                        <div className="h-48 sm:h-52">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <AreaChart data={spendTrendData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
                                                     <defs>
@@ -800,7 +800,7 @@ export default function OrderHistory({ embedded = false } = {}) {
                 </header>
 
                 {enabled && !loading && !error && (
-                    <div className={embedded ? "space-y-6" : "space-y-8"}>
+                    <div className={embedded ? "space-y-4" : "space-y-8"}>
                         {/* PRESENT ORDERS */}
                         <section className="space-y-3" aria-labelledby="present-orders-heading">
                             <div className="flex items-center justify-between">

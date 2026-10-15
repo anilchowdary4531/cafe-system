@@ -62,100 +62,89 @@ export default function WalletTransactionDetailModal({
     const typeName = getTypeName(transaction.type);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
             {/* Modal Box */}
             <div
-                className="w-full max-w-lg rounded-3xl bg-stone-900 border border-white/15 p-6 sm:p-7 shadow-2xl relative text-stone-200 space-y-6"
+                className="w-full max-w-md rounded-xl bg-[color:var(--app-bg)] border border-[color:var(--app-border)] p-5 sm:p-6 shadow-2xl relative text-[color:var(--app-text)] space-y-4"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header with Close */}
                 <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                        <div
-                            className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${
-                                isCredit
-                                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                                    : "bg-rose-500/15 text-rose-400 border-rose-500/30"
-                            }`}
-                        >
-                            {isCredit ? <ArrowDownLeft size={22} /> : <ArrowUpRight size={22} />}
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-white tracking-tight">
-                                Transaction Details
-                            </h3>
-                            <p className="text-xs text-stone-400">{typeName}</p>
-                        </div>
+                    <div>
+                        <h3 className="text-base font-bold text-[color:var(--app-text)] tracking-tight">
+                            Transaction Details
+                        </h3>
+                        <p className="text-xs theme-muted">{typeName}</p>
                     </div>
 
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors"
+                        className="p-1 rounded-md theme-muted hover:text-[color:var(--app-text)] hover:bg-[color:var(--app-border)]/20 transition-colors cursor-pointer"
                         title="Close modal"
                     >
-                        <X size={18} />
+                        <X size={16} />
                     </button>
                 </div>
 
                 {/* Amount Hero */}
-                <div className="p-5 rounded-2xl bg-white/5 border border-white/10 text-center space-y-1">
-                    <p className="text-xs uppercase tracking-wider font-semibold text-stone-400">
+                <div className="p-4 rounded-lg bg-[color:var(--app-border)]/10 border border-[color:var(--app-border)]/30 text-center space-y-1">
+                    <p className="text-xs uppercase tracking-wider font-semibold theme-muted">
                         {isCredit ? "Credited Amount" : "Debited Amount"}
                     </p>
                     <p
-                        className={`text-3xl sm:text-4xl font-black ${
-                            isCredit ? "text-emerald-400" : "text-rose-400"
+                        className={`text-2xl sm:text-3xl font-extrabold ${
+                            isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                         }`}
                     >
                         {isCredit ? "+" : "-"}₹{formatINR(transaction.amount)}
                     </p>
-                    <div className="pt-2 flex items-center justify-center gap-2">
+                    <div className="pt-1 flex items-center justify-center gap-2">
                         <span
-                            className={`inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[11px] font-bold ${
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
                                 transaction.status === "SUCCESS"
-                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                                     : transaction.status === "PENDING"
-                                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                                    : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                    : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
                             }`}
                         >
-                            {transaction.status === "SUCCESS" && <CheckCircle2 size={12} />}
-                            {transaction.status === "PENDING" && <Clock size={12} />}
-                            {transaction.status === "FAILED" && <AlertCircle size={12} />}
+                            {transaction.status === "SUCCESS" && <CheckCircle2 size={11} />}
+                            {transaction.status === "PENDING" && <Clock size={11} />}
+                            {transaction.status === "FAILED" && <AlertCircle size={11} />}
                             {transaction.status || "SUCCESS"}
                         </span>
-                        <span className="text-xs text-stone-400">·</span>
-                        <span className="text-xs font-semibold text-stone-300">
+                        <span className="text-xs theme-muted">·</span>
+                        <span className="text-xs font-semibold theme-muted">
                             {transaction.direction}
                         </span>
                     </div>
                 </div>
 
                 {/* Details Grid */}
-                <div className="space-y-3 text-xs">
+                <div className="space-y-2 text-xs">
                     {/* Description */}
-                    <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 flex items-start gap-3">
-                        <FileText size={16} className="text-stone-400 mt-0.5 shrink-0" />
+                    <div className="p-2.5 rounded-lg border border-[color:var(--app-border)]/20 bg-[color:var(--app-border)]/5 flex items-start gap-2.5">
+                        <FileText size={15} className="theme-muted mt-0.5 shrink-0" />
                         <div>
-                            <span className="text-stone-400 block font-semibold">Description</span>
-                            <span className="text-stone-200 text-sm font-medium">
+                            <span className="theme-muted block font-semibold">Description</span>
+                            <span className="text-[color:var(--app-text)] text-xs font-medium">
                                 {transaction.description || "N/A"}
                             </span>
                         </div>
                     </div>
 
                     {/* Balance Before & Balance After */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5">
-                            <span className="text-stone-400 block font-semibold">Balance Before</span>
-                            <span className="text-stone-200 text-sm font-bold">
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="p-2.5 rounded-lg border border-[color:var(--app-border)]/20 bg-[color:var(--app-border)]/5">
+                            <span className="theme-muted block font-semibold">Balance Before</span>
+                            <span className="text-[color:var(--app-text)] font-bold">
                                 ₹{formatINR(transaction.balanceBefore)}
                             </span>
                         </div>
-                        <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5">
-                            <span className="text-stone-400 block font-semibold">Balance After</span>
-                            <span className="text-amber-400 text-sm font-bold">
+                        <div className="p-2.5 rounded-lg border border-[color:var(--app-border)]/20 bg-[color:var(--app-border)]/5">
+                            <span className="theme-muted block font-semibold">Balance After</span>
+                            <span className="text-[var(--app-primary)] font-bold">
                                 ₹{formatINR(transaction.balanceAfter)}
                             </span>
                         </div>
@@ -163,12 +152,12 @@ export default function WalletTransactionDetailModal({
 
                     {/* Order Reference if present */}
                     {transaction.orderId && (
-                        <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
-                            <span className="text-stone-400 flex items-center gap-1.5 font-semibold">
-                                <Receipt size={14} className="text-amber-400" />
+                        <div className="p-2.5 rounded-lg border border-[color:var(--app-border)]/20 bg-[color:var(--app-border)]/5 flex items-center justify-between">
+                            <span className="theme-muted flex items-center gap-1.5 font-semibold">
+                                <Receipt size={13} className="text-[var(--app-primary)]" />
                                 Order ID
                             </span>
-                            <span className="font-mono text-stone-200 font-bold">
+                            <span className="font-mono text-[color:var(--app-text)] font-bold">
                                 #{transaction.orderId}
                             </span>
                         </div>
@@ -176,12 +165,12 @@ export default function WalletTransactionDetailModal({
 
                     {/* Reference ID if present */}
                     {transaction.referenceId && (
-                        <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
-                            <span className="text-stone-400 flex items-center gap-1.5 font-semibold">
-                                <Hash size={14} className="text-stone-400" />
+                        <div className="p-2.5 rounded-lg border border-[color:var(--app-border)]/20 bg-[color:var(--app-border)]/5 flex items-center justify-between">
+                            <span className="theme-muted flex items-center gap-1.5 font-semibold">
+                                <Hash size={13} className="theme-muted" />
                                 Reference ID
                             </span>
-                            <span className="font-mono text-stone-300 font-medium truncate max-w-[200px]">
+                            <span className="font-mono text-[color:var(--app-text)] font-medium truncate max-w-[180px]">
                                 {transaction.referenceId}
                             </span>
                         </div>
@@ -189,24 +178,24 @@ export default function WalletTransactionDetailModal({
 
                     {/* Reference Type if present */}
                     {transaction.referenceType && (
-                        <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
-                            <span className="text-stone-400 flex items-center gap-1.5 font-semibold">
-                                <Layers size={14} className="text-stone-400" />
+                        <div className="p-2.5 rounded-lg border border-[color:var(--app-border)]/20 bg-[color:var(--app-border)]/5 flex items-center justify-between">
+                            <span className="theme-muted flex items-center gap-1.5 font-semibold">
+                                <Layers size={13} className="theme-muted" />
                                 Reference Type
                             </span>
-                            <span className="text-stone-300 font-medium">
+                            <span className="text-[color:var(--app-text)] font-medium">
                                 {transaction.referenceType}
                             </span>
                         </div>
                     )}
 
                     {/* Date & Time */}
-                    <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
-                        <span className="text-stone-400 flex items-center gap-1.5 font-semibold">
-                            <Calendar size={14} className="text-stone-400" />
+                    <div className="p-2.5 rounded-lg border border-[color:var(--app-border)]/20 bg-[color:var(--app-border)]/5 flex items-center justify-between">
+                        <span className="theme-muted flex items-center gap-1.5 font-semibold">
+                            <Calendar size={13} className="theme-muted" />
                             Timestamp
                         </span>
-                        <span className="text-stone-300 text-right font-medium">
+                        <span className="text-[color:var(--app-text)] text-right font-medium">
                             {formatDateTime(transaction.createdAt)}
                         </span>
                     </div>
@@ -216,7 +205,7 @@ export default function WalletTransactionDetailModal({
                 <button
                     type="button"
                     onClick={onClose}
-                    className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/15 text-stone-200 font-bold text-xs transition-colors"
+                    className="w-full py-2 rounded-lg border border-[color:var(--app-border)]/60 hover:bg-[color:var(--app-border)]/20 text-[color:var(--app-text)] font-semibold text-xs transition-colors cursor-pointer"
                 >
                     Close
                 </button>

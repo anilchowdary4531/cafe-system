@@ -166,10 +166,10 @@ export default function SettingsSection({ profile, customerToken, loading, savin
     );
 
     return (
-        <div className="w-full space-y-6">
-            <div className="space-y-1">
-                <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Settings</h1>
-                <p className="theme-muted text-sm">Account details, app preferences, and security controls.</p>
+        <div className="w-full space-y-4">
+            <div className="space-y-0.5">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--app-text)]">Settings</h1>
+                <p className="theme-muted text-xs sm:text-sm">Account details, app preferences, and security controls.</p>
             </div>
 
             {(error || addressError) && (
@@ -178,11 +178,11 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                 </div>
             )}
 
-            <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
+            <div className="grid gap-4 sm:gap-5 lg:grid-cols-12 lg:items-start">
                 {/* Left Main Column */}
-                <div className="space-y-6 lg:col-span-7">
+                <div className="space-y-4 sm:space-y-5 lg:col-span-7">
                     {/* Profile Details Card */}
-                    <section className="rounded-3xl border border-black/5 bg-white/40 p-5 sm:p-6 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-4">
+                    <section className="rounded-2xl sm:rounded-3xl border border-black/5 bg-white/40 p-4 sm:p-5 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-3.5">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <h2 className="text-lg font-bold">Profile Details</h2>
@@ -250,7 +250,7 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                     </section>
 
                     {/* Delivery Addresses Card */}
-                    <section id="addresses" className="scroll-mt-24 rounded-3xl border border-black/5 bg-white/40 p-5 sm:p-6 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-4">
+                    <section id="addresses" className="scroll-mt-24 rounded-2xl sm:rounded-3xl border border-black/5 bg-white/40 p-4 sm:p-5 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-3.5">
                         <div>
                             <h2 className="text-lg font-bold">Delivery Addresses</h2>
                             <p className="theme-muted text-xs">Manage saved locations for fast delivery checkout.</p>
@@ -399,27 +399,27 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                 </div>
 
                 {/* Right Column */}
-                <div className="space-y-6 lg:col-span-5">
+                <div className="space-y-4 sm:space-y-5 lg:col-span-5">
                     {/* Appearance & Sound Card */}
-                    <section className="rounded-3xl border border-black/5 bg-white/40 p-5 sm:p-6 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-4">
+                    <section className="rounded-2xl sm:rounded-3xl border border-black/5 bg-white/40 p-4 sm:p-5 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-3.5">
                         <div>
                             <h2 className="text-lg font-bold">Appearance & Audio</h2>
                             <p className="theme-muted text-xs">Customize app theme, audio tones, and language.</p>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-3.5">
                             <div>
-                                <label className="theme-muted mb-2 block text-xs font-semibold uppercase tracking-wider">UI Theme</label>
+                                <label className="theme-muted mb-1.5 block text-xs font-semibold uppercase tracking-wider">UI Theme</label>
                                 <ThemeSelector />
                             </div>
 
                             <div>
-                                <label className="theme-muted mb-2 block text-xs font-semibold uppercase tracking-wider">Notification Tone</label>
+                                <label className="theme-muted mb-1.5 block text-xs font-semibold uppercase tracking-wider">Notification Tone</label>
                                 <NotificationSoundPicker />
                             </div>
 
                             <div>
-                                <label className="theme-muted mb-2 block text-xs font-semibold uppercase tracking-wider">Language</label>
+                                <label className="theme-muted mb-1.5 block text-xs font-semibold uppercase tracking-wider">Language</label>
                                 <div className="rounded-2xl border border-black/5 bg-black/5 overflow-hidden dark:border-white/5 dark:bg-white/5">
                                     <LanguageSelector variant="menu-item" />
                                 </div>
@@ -428,7 +428,7 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                     </section>
 
                     {/* Privacy & Device Settings Card */}
-                    <section className="rounded-3xl border border-black/5 bg-white/40 p-5 sm:p-6 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-3">
+                    <section className="rounded-2xl sm:rounded-3xl border border-black/5 bg-white/40 p-4 sm:p-5 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-3">
                         <div>
                             <h2 className="text-lg font-bold">Privacy & Device Controls</h2>
                             <p className="theme-muted text-xs">Manage device permissions and session preferences.</p>
@@ -470,7 +470,7 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                     </section>
 
                     {/* System & Account Actions Card */}
-                    <section className="rounded-3xl border border-black/5 bg-white/40 p-5 sm:p-6 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-4">
+                    <section className="rounded-2xl sm:rounded-3xl border border-black/5 bg-white/40 p-4 sm:p-5 backdrop-blur-md dark:border-white/5 dark:bg-slate-900/40 space-y-3.5">
                         <div>
                             <h2 className="text-lg font-bold">System & Account</h2>
                             <p className="theme-muted text-xs">Manage system cache and account session.</p>

@@ -57,19 +57,19 @@ export default function PayLaterSection() {
 
     if (loading) {
         return (
-            <div className="py-16 text-center space-y-3">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 animate-spin">
-                    <Sparkles size={24} />
+            <div className="py-6 text-center space-y-2.5">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 animate-spin">
+                    <Sparkles size={20} />
                 </div>
-                <p className="theme-muted text-sm font-medium">Loading your Pay Later Khata accounts...</p>
+                <p className="theme-muted text-xs sm:text-sm font-medium">Loading your Pay Later Khata accounts...</p>
             </div>
         );
     }
 
     return (
-        <div className="w-full space-y-6 text-left">
+        <div className="w-full space-y-4 text-left">
             {/* HERO SUMMARY BANNER */}
-            <div className="rounded-xl border border-[color:var(--app-border)]/40 bg-white/60 p-5 sm:p-6 dark:bg-slate-900/40">
+            <div className="rounded-xl border border-[color:var(--app-border)]/40 bg-white/60 p-4 sm:p-5 dark:bg-slate-900/40">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                     <div className="space-y-1.5">
                         <div className="text-xs font-bold uppercase tracking-wider text-[var(--app-primary)] flex items-center gap-1.5">

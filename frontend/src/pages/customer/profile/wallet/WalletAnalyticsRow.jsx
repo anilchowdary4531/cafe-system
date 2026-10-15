@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, Activity, Calendar } from "lucide-react";
+import { Calendar } from "lucide-react";
 
 const formatINR = (val) => {
     const num = Number(val || 0);
@@ -11,11 +11,11 @@ const formatINR = (val) => {
 export default function WalletAnalyticsRow({ summary, loading }) {
     if (loading) {
         return (
-            <div className="theme-panel rounded-3xl p-5 border border-[var(--app-border)] space-y-3 animate-pulse">
-                <div className="h-4 w-32 bg-white/10 rounded-md"></div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="pb-4 border-b border-[color:var(--app-border)]/30 space-y-2 animate-pulse">
+                <div className="h-3 w-28 bg-[color:var(--app-border)]/40 rounded"></div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-2 border-y border-[color:var(--app-border)]/20">
                     {[1, 2, 3].map((i) => (
-                        <div key={i} className="h-16 bg-white/5 rounded-xl"></div>
+                        <div key={i} className="h-12 bg-[color:var(--app-border)]/20 rounded"></div>
                     ))}
                 </div>
             </div>
@@ -30,78 +30,58 @@ export default function WalletAnalyticsRow({ summary, loading }) {
     const totalRefunded = summary?.totalRefunded || 0;
 
     return (
-        <div className="theme-panel rounded-3xl p-5 sm:p-6 border border-[var(--app-border)] shadow-sm space-y-4">
+        <div className="pb-4 border-b border-[color:var(--app-border)]/30 space-y-2">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center border border-amber-500/20">
-                        <Activity size={14} />
-                    </div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-stone-300">
-                        Wallet Summary
-                    </h3>
+            <div className="flex items-center justify-between">
+                <div className="text-xs font-bold uppercase tracking-wider text-[var(--app-primary)]">
+                    Wallet Summary
                 </div>
-                <span className="text-[11px] text-stone-500">
+                <span className="theme-muted text-[11px]">
                     Period overview & activity
                 </span>
             </div>
 
-            {/* Compact 3-Column Summary Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 divide-y sm:divide-y-0 sm:divide-x divide-white/10">
+            {/* Flat 3-Column Analytics KPI Row (Matching Owner Analytics Overview Row) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-2 border-y border-[color:var(--app-border)]/30 text-xs">
                 {/* 1. Total Top-ups / Total Added */}
-                <div className="pt-3 sm:pt-0 sm:pr-4 space-y-1">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                            Total Top-ups
-                        </span>
-                        <div className="w-6 h-6 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
-                            <ArrowDownLeft size={14} />
-                        </div>
+                <div>
+                    <div className="theme-muted text-xs font-medium uppercase tracking-wide">
+                        Total Top-ups
                     </div>
-                    <p className="text-xl sm:text-2xl font-black text-emerald-400 tracking-tight">
+                    <div className="text-xl sm:text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 mt-0.5">
                         +₹{formatINR(totalDeposited)}
-                    </p>
-                    <div className="flex items-center gap-1.5 text-[11px] text-stone-400">
-                        <Calendar size={11} className="text-stone-500" />
-                        <span>This month: <strong className="text-emerald-400/90 font-semibold">₹{formatINR(monthDeposits)}</strong></span>
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs theme-muted">
+                        <Calendar size={11} className="text-[var(--app-primary)]" />
+                        <span>This month: <strong className="text-[color:var(--app-text)] font-semibold">₹{formatINR(monthDeposits)}</strong></span>
                     </div>
                 </div>
 
                 {/* 2. Total Food Spend / Food Spend */}
-                <div className="pt-3 sm:pt-0 sm:px-4 space-y-1">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                            Total Food Spend
-                        </span>
-                        <div className="w-6 h-6 rounded-lg bg-rose-500/15 text-rose-400 flex items-center justify-center">
-                            <ArrowUpRight size={14} />
-                        </div>
+                <div>
+                    <div className="theme-muted text-xs font-medium uppercase tracking-wide">
+                        Total Food Spend
                     </div>
-                    <p className="text-xl sm:text-2xl font-black text-rose-400 tracking-tight">
+                    <div className="text-xl sm:text-2xl font-bold tracking-tight text-rose-600 dark:text-rose-400 mt-0.5">
                         -₹{formatINR(totalSpent)}
-                    </p>
-                    <div className="flex items-center gap-1.5 text-[11px] text-stone-400">
-                        <Calendar size={11} className="text-stone-500" />
-                        <span>This month: <strong className="text-rose-400/90 font-semibold">₹{formatINR(monthSpent)}</strong></span>
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs theme-muted">
+                        <Calendar size={11} className="text-[var(--app-primary)]" />
+                        <span>This month: <strong className="text-[color:var(--app-text)] font-semibold">₹{formatINR(monthSpent)}</strong></span>
                     </div>
                 </div>
 
                 {/* 3. Total Transactions / Transactions */}
-                <div className="pt-3 sm:pt-0 sm:pl-4 space-y-1">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                            Total Transactions
-                        </span>
-                        <div className="w-6 h-6 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center">
-                            <Activity size={14} />
-                        </div>
+                <div>
+                    <div className="theme-muted text-xs font-medium uppercase tracking-wide">
+                        Total Transactions
                     </div>
-                    <p className="text-xl sm:text-2xl font-black text-stone-100 tracking-tight">
+                    <div className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--app-text)] mt-0.5">
                         {totalTransactions}
-                    </p>
-                    <div className="flex items-center gap-1.5 text-[11px] text-stone-400">
+                    </div>
+                    <div className="mt-0.5 text-xs theme-muted">
                         {totalRefunded > 0 ? (
-                            <span>Refunds credited: <strong className="text-amber-400 font-semibold">₹{formatINR(totalRefunded)}</strong></span>
+                            <span>Refunds credited: <strong className="text-amber-600 dark:text-amber-400 font-semibold">₹{formatINR(totalRefunded)}</strong></span>
                         ) : (
                             <span>Ledger activity records in selected period</span>
                         )}

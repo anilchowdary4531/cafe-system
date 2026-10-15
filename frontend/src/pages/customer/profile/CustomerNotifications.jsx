@@ -24,7 +24,7 @@ export default function CustomerNotifications() {
 
   if (loading && notifications.length === 0) {
     return (
-      <div className="py-12 flex flex-col items-center justify-center gap-2 text-[color:var(--app-muted)] text-sm">
+      <div className="py-6 flex flex-col items-center justify-center gap-2 text-[color:var(--app-muted)] text-sm">
         <Loader2 size={24} className="animate-spin text-orange-500" />
         <span>Loading notifications...</span>
       </div>
@@ -32,9 +32,9 @@ export default function CustomerNotifications() {
   }
 
   return (
-    <div className="w-full space-y-4 text-left">
+    <div className="w-full space-y-3.5 text-left">
       {/* Header with Unread Count & Mark All Read action */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-2.5">
         <div className="flex items-center gap-2.5">
           <h2 className="text-base sm:text-lg font-bold text-[color:var(--app-text)]">
             Notifications
@@ -54,7 +54,7 @@ export default function CustomerNotifications() {
             type="button"
             id="mark-all-notifications-read-btn"
             onClick={markAllAsRead}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)]/70 bg-white/60 dark:bg-slate-900/60 px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500/30"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)]/70 bg-white/60 dark:bg-slate-900/60 px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500/30 cursor-pointer"
           >
             <CheckCheck size={14} />
             <span>Mark all as read</span>
@@ -65,7 +65,7 @@ export default function CustomerNotifications() {
       {notifications.length === 0 ? (
         <div
           id="customer-notifications-empty"
-          className="rounded-xl border border-[color:var(--app-border)]/40 bg-white/40 dark:bg-slate-900/40 p-6 sm:p-8 text-center space-y-2"
+          className="rounded-xl border border-[color:var(--app-border)]/40 bg-white/40 dark:bg-slate-900/40 p-5 sm:p-6 text-center space-y-2"
         >
           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-lg bg-orange-500/10 text-[var(--app-primary)]">
             <Bell size={22} />

@@ -84,52 +84,7 @@ export default function Navbar() {
     })();
 
     if (isCustomerProfilePage) {
-        return (
-            <header className="theme-nav flex h-16 sm:h-[70px] w-full items-center justify-between border-b px-4 sm:px-6 md:px-8 lg:px-10">
-                {/* Left navigation: [ ← ] [ Tiffzy logo ] Tiffzy */}
-                <div className="flex items-center gap-2 sm:gap-3">
-                    <Link
-                        to={customerMenuPath || "/"}
-                        className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg text-[color:var(--app-text)] hover:bg-orange-500/10 hover:text-[var(--app-primary)] transition-colors"
-                        aria-label="Return"
-                        title="Return"
-                    >
-                        <ChevronLeft size={22} className="stroke-[2.2]" />
-                    </Link>
-
-                    <Link
-                        to="/"
-                        className="flex items-center gap-2 sm:gap-2.5 focus:outline-none"
-                        aria-label="Tiffzy Home"
-                        title="Tiffzy Home"
-                    >
-                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center">
-                            <BrandLogo className="theme-brand-logo h-full w-full object-contain" title="Tiffzy logo" />
-                        </div>
-                        <span className="theme-brand-text text-xl sm:text-2xl font-semibold tracking-tight text-[var(--app-primary)]">
-                            Tiffzy
-                        </span>
-                    </Link>
-                </div>
-
-                {/* Right actions: Cart */}
-                <div className="flex items-center">
-                    <Link
-                        to="/cart"
-                        className="theme-icon-button theme-icon-button-primary relative inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg p-2 transition-all"
-                        aria-label="Cart"
-                        title="Cart"
-                    >
-                        <ShoppingCart size={19} />
-                        {cartCount > 0 && (
-                            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                                {cartCount}
-                            </span>
-                        )}
-                    </Link>
-                </div>
-            </header>
-        );
+        return null;
     }
 
     return (
