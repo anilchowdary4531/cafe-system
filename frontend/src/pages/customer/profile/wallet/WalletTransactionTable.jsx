@@ -121,10 +121,10 @@ export default function WalletTransactionTable({
                     </div>
                     <div>
                         <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                            Latest Wallet Transactions
+                            Recent Wallet Activity
                         </h3>
                         <p className="text-[11px] text-stone-400">
-                            Complete statement of all debits and credits
+                            Latest wallet transactions & statement
                         </p>
                     </div>
                 </div>
@@ -205,9 +205,10 @@ export default function WalletTransactionTable({
                         <table className="w-full text-left text-xs">
                             <thead className="bg-white/5 text-stone-400 uppercase tracking-wider font-semibold border-b border-white/10">
                                 <tr>
-                                    <th className="px-4 py-3.5">Type & Description</th>
-                                    <th className="px-4 py-3.5">Reference</th>
-                                    <th className="px-4 py-3.5">Date & Time</th>
+                                    <th className="px-4 py-3.5 whitespace-nowrap">Date / Time</th>
+                                    <th className="px-4 py-3.5">Description</th>
+                                    <th className="px-4 py-3.5">Type</th>
+                                    <th className="px-4 py-3.5">Reference / Order</th>
                                     <th className="px-4 py-3.5 text-center">Status</th>
                                     <th className="px-4 py-3.5 text-right">Amount</th>
                                     <th className="px-4 py-3.5 text-right">Balance After</th>
@@ -226,22 +227,34 @@ export default function WalletTransactionTable({
                                             onClick={() => onSelectTransaction(txn)}
                                             className="hover:bg-white/[0.04] transition-colors cursor-pointer group"
                                         >
-                                            {/* Type & Description */}
+                                            {/* Date & Time */}
+                                            <td className="px-4 py-3.5 text-stone-300 whitespace-nowrap">
+                                                {formatDateTime(txn.createdAt)}
+                                            </td>
+
+                                            {/* Description */}
                                             <td className="px-4 py-3.5">
-                                                <div className="flex items-center gap-3">
-                                                    <div
-                                                        className={`w-8 h-8 rounded-xl flex items-center justify-center border shrink-0 ${meta.iconClass}`}
-                                                    >
-                                                        <Icon size={16} />
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="font-bold text-white group-hover:text-amber-400 transition-colors truncate">
-                                                            {txn.description || meta.title}
-                                                        </p>
-                                                        <p className="text-[11px] text-stone-400">
-                                                            {meta.title}
-                                                        </p>
-                                                    </div>
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-white group-hover:text-amber-400 transition-colors truncate">
+                                                        {txn.description || meta.title}
+                                                    </p>
+                                                    <p className="text-[11px] text-stone-400">
+                                                        {meta.title}
+                                                    </p>
+                                                </div>
+                                            </td>
+
+                                            {/* Type */}
+                                            <td className="px-4 py-3.5 whitespace-nowrap">
+                                                <div
+                                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                                                        isCredit
+                                                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
+                                                            : "bg-rose-500/15 text-rose-400 border-rose-500/25"
+                                                    }`}
+                                                >
+                                                    <Icon size={13} />
+                                                    <span>{isCredit ? "Credit" : "Debit"}</span>
                                                 </div>
                                             </td>
 
@@ -260,13 +273,8 @@ export default function WalletTransactionTable({
                                                 )}
                                             </td>
 
-                                            {/* Date & Time */}
-                                            <td className="px-4 py-3.5 text-stone-300 whitespace-nowrap">
-                                                {formatDateTime(txn.createdAt)}
-                                            </td>
-
                                             {/* Status Badge */}
-                                            <td className="px-4 py-3.5 text-center">
+                                            <td className="px-4 py-3.5 text-center whitespace-nowrap">
                                                 <span
                                                     className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider ${
                                                         txn.status === "SUCCESS"
@@ -297,7 +305,7 @@ export default function WalletTransactionTable({
                                             </td>
 
                                             {/* Action */}
-                                            <td className="px-4 py-3.5 text-center">
+                                            <td className="px-4 py-3.5 text-center whitespace-nowrap">
                                                 <button
                                                     type="button"
                                                     onClick={(e) => {

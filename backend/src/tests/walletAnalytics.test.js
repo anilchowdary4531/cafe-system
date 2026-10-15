@@ -342,8 +342,35 @@ test("Tiffzy Customer Wallet Analytics Backend Test Suite", async (t) => {
     assert.equal(body.data.summary.totalTransactions, 4);
   });
 
-  // 14. Invalid period is handled correctly (HTTP 400)
-  await t.test("14. Invalid period returns HTTP 400 with descriptive error", async () => {
+  // 14. period=3m works
+  await t.test("14. period=3m returns daily buckets for last 3 months", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/wallet/analytics?period=3m",
+      headers: { Authorization: `Bearer ${tokenA}` },
+    });
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.payload);
+    assert.ok(body.data.trend);
+  });
+
+  // 15. period=1y works
+  await t.test("15. period=1y returns monthly buckets for last 1 year", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/wallet/analytics?period=1y",
+      headers: { Authorization: `Bearer ${tokenA}` },
+    });
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.payload);
+    assert.ok(body.data.trend);
+    for (const pt of body.data.trend) {
+      assert.match(pt.date, /^\d{4}-\d{2}$/);
+    }
+  });
+
+  // 16. Invalid period is handled correctly (HTTP 400)
+  await t.test("16. Invalid period returns HTTP 400 with descriptive error", async () => {
     const res = await app.inject({
       method: "GET",
       url: "/api/wallet/analytics?period=10y",

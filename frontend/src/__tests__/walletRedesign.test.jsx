@@ -63,6 +63,7 @@ describe("Tiffzy Customer Wallet Redesign Frontend Test Suite", () => {
 
             render(<WalletAnalyticsRow summary={summary} loading={false} />);
 
+            expect(screen.getByText(/Wallet Summary/i)).toBeInTheDocument();
             expect(screen.getByText(/Total Top-ups/i)).toBeInTheDocument();
             expect(screen.getByText(/\+₹5,000.00/i)).toBeInTheDocument();
             expect(screen.getByText(/Total Food Spend/i)).toBeInTheDocument();
@@ -89,12 +90,22 @@ describe("Tiffzy Customer Wallet Redesign Frontend Test Suite", () => {
             expect(screen.getByText(/Wallet Activity/i)).toBeInTheDocument();
             expect(screen.getByRole("button", { name: /7 Days/i })).toBeInTheDocument();
             expect(screen.getByRole("button", { name: /30 Days/i })).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: /3 Months/i })).toBeInTheDocument();
             expect(screen.getByRole("button", { name: /6 Months/i })).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: /1 Year/i })).toBeInTheDocument();
             expect(screen.getByRole("button", { name: /All/i })).toBeInTheDocument();
 
             // Click 7 Days
             fireEvent.click(screen.getByRole("button", { name: /7 Days/i }));
             expect(handlePeriodChange).toHaveBeenCalledWith("7d");
+
+            // Click 3 Months
+            fireEvent.click(screen.getByRole("button", { name: /3 Months/i }));
+            expect(handlePeriodChange).toHaveBeenCalledWith("3m");
+
+            // Click 1 Year
+            fireEvent.click(screen.getByRole("button", { name: /1 Year/i }));
+            expect(handlePeriodChange).toHaveBeenCalledWith("1y");
         });
 
         it("shows empty state when no activity points exist", () => {
@@ -107,7 +118,29 @@ describe("Tiffzy Customer Wallet Redesign Frontend Test Suite", () => {
                 />
             );
 
+            expect(screen.getByText(/No wallet activity in this period/i)).toBeInTheDocument();
             expect(screen.getByText(/Not enough activity to display a trend/i)).toBeInTheDocument();
+        });
+
+        it("shows error state with retry button when analytics fails", () => {
+            const handleRetry = vi.fn();
+            render(
+                <WalletActivityChart
+                    trend={[]}
+                    selectedPeriod="30d"
+                    onPeriodChange={vi.fn()}
+                    loading={false}
+                    error="Network timeout"
+                    onRetry={handleRetry}
+                />
+            );
+
+            expect(screen.getByText(/Unable to load wallet activity/i)).toBeInTheDocument();
+            expect(screen.getByText(/Network timeout/i)).toBeInTheDocument();
+
+            const retryBtn = screen.getByRole("button", { name: /Retry/i });
+            fireEvent.click(retryBtn);
+            expect(handleRetry).toHaveBeenCalled();
         });
     });
 

@@ -205,10 +205,10 @@ export const getWalletAnalytics = async (
     throw err;
   }
 
-  const ALLOWED_PERIODS = ["7d", "30d", "6m", "all"];
+  const ALLOWED_PERIODS = ["7d", "30d", "3m", "6m", "1y", "all"];
   const cleanPeriod = String(period || "30d").trim().toLowerCase();
   if (!ALLOWED_PERIODS.includes(cleanPeriod)) {
-    const err = new Error("Invalid period. Allowed periods: 7d, 30d, 6m, all");
+    const err = new Error("Invalid period. Allowed periods: 7d, 30d, 3m, 6m, 1y, all");
     err.statusCode = 400;
     throw err;
   }
@@ -222,8 +222,12 @@ export const getWalletAnalytics = async (
     startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   } else if (cleanPeriod === "30d") {
     startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  } else if (cleanPeriod === "3m") {
+    startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
   } else if (cleanPeriod === "6m") {
     startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+  } else if (cleanPeriod === "1y") {
+    startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
   }
 
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
@@ -296,7 +300,7 @@ export const getWalletAnalytics = async (
   const monthSpentVal = round2(monthSpent?._sum?.amount || 0);
 
   // Group trend into chronological time-series buckets
-  const isMonthlyBucket = cleanPeriod === "6m" || (cleanPeriod === "all" && ledgerItems.length > 0 && (ledgerItems[ledgerItems.length - 1].createdAt - ledgerItems[0].createdAt > 90 * 24 * 60 * 60 * 1000));
+  const isMonthlyBucket = cleanPeriod === "6m" || cleanPeriod === "1y" || (cleanPeriod === "all" && ledgerItems.length > 0 && (ledgerItems[ledgerItems.length - 1].createdAt - ledgerItems[0].createdAt > 90 * 24 * 60 * 60 * 1000));
   const trendMap = new Map();
 
   for (const item of ledgerItems) {

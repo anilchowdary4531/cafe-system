@@ -337,14 +337,14 @@ export default function WalletSection({ customerToken }) {
     return (
         <div className="space-y-6 pb-12 animate-fadeIn">
             {/* SECTION 1: WALLET HEADER */}
-            <div className="flex items-center justify-between px-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
                 <div>
-                    <p className="theme-accent-text text-[11px] font-semibold uppercase tracking-[0.28em]">
-                        Prepaid Balance
-                    </p>
                     <h1 className="text-2xl font-bold tracking-tight md:text-[2rem] text-white">
                         Tiffzy Wallet
                     </h1>
+                    <p className="mt-1 text-xs sm:text-sm text-stone-400">
+                        Manage your wallet balance and transactions
+                    </p>
                 </div>
 
                 {/* Refresh Action */}
@@ -352,10 +352,11 @@ export default function WalletSection({ customerToken }) {
                     type="button"
                     onClick={handleRefreshAll}
                     disabled={refreshing}
-                    className="theme-soft-button min-h-[44px] min-w-[44px] p-2.5 rounded-2xl text-stone-300 hover:text-white transition-all flex items-center justify-center border border-white/10 hover:border-white/20"
+                    className="theme-soft-button min-h-[44px] px-4 py-2 rounded-2xl text-stone-200 hover:text-white transition-all flex items-center gap-2 border border-white/10 hover:border-white/20 font-semibold text-xs sm:text-sm shadow-sm self-start sm:self-auto"
                     title="Refresh Wallet & Analytics"
                 >
-                    <RefreshCw size={18} className={refreshing ? "animate-spin text-amber-400" : ""} />
+                    <RefreshCw size={16} className={refreshing ? "animate-spin text-amber-400" : ""} />
+                    <span>Refresh</span>
                 </button>
             </div>
 
@@ -392,14 +393,7 @@ export default function WalletSection({ customerToken }) {
                 </div>
             )}
 
-            {analyticsError && (
-                <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-3 text-amber-300 text-xs flex items-center gap-2">
-                    <Info size={16} className="shrink-0" />
-                    <span>{analyticsError}</span>
-                </div>
-            )}
-
-            {/* SECTION 2: HERO AREA (Two-column: Balance Card + Add Money Card) */}
+            {/* 1 & 2: HERO AREA (Balance Card + Add Money Card side-by-side) */}
             <WalletBalanceHero
                 wallet={wallet}
                 loadingWallet={loading}
@@ -407,21 +401,17 @@ export default function WalletSection({ customerToken }) {
                 topupLoading={topupLoading}
             />
 
-            {/* SECTION 3: ANALYTICS CARDS (Total Top-ups, Total Food Spend, Total Transactions) */}
-            <WalletAnalyticsRow
-                summary={analytics?.summary}
-                loading={loading || analyticsLoading}
-            />
-
-            {/* SECTION 4: WALLET ACTIVITY CHART (Recharts AreaChart + Period Selector) */}
+            {/* 3: WALLET BALANCE & ACTIVITY GRAPH (Full width, 6 periods, Recharts AreaChart) */}
             <WalletActivityChart
                 trend={analytics?.trend || []}
                 selectedPeriod={selectedPeriod}
                 onPeriodChange={handlePeriodChange}
                 loading={analyticsLoading}
+                error={analyticsError}
+                onRetry={() => fetchAnalytics(selectedPeriod)}
             />
 
-            {/* SECTION 5, 6, 8, 9: LATEST TRANSACTIONS TABLE & CARDS WITH FILTERS, SEARCH & PAGINATION */}
+            {/* 4: RECENT WALLET ACTIVITY (Wide desktop table, mobile responsive cards) */}
             <WalletTransactionTable
                 transactions={transactions}
                 total={pagination.total}
@@ -433,6 +423,12 @@ export default function WalletSection({ customerToken }) {
                 onTypeChange={handleFilterChange}
                 onPageChange={handlePageChange}
                 onSelectTransaction={(txn) => setSelectedTransaction(txn)}
+            />
+
+            {/* 5: COMPACT WALLET SUMMARY (Total Added, Food Spend, Total Transactions) */}
+            <WalletAnalyticsRow
+                summary={analytics?.summary}
+                loading={loading || analyticsLoading}
             />
 
             {/* SECTION 7: TRANSACTION DETAILS MODAL */}
