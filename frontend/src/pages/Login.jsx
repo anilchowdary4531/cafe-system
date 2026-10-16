@@ -7,7 +7,7 @@ import { api } from "../utils/apiClient";
 import BrandLogo from "../components/BrandLogo";
 import LanguageSelector from "../components/LanguageSelector";
 import { useLanguage } from "../context/LanguageContext";
-import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
+import { ORDER_FLOW_SCOPES, setStoredOrderFlowScope, isTableOrMenuPath } from "../utils/orderFlow";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
 
 export default function Login() {
@@ -128,11 +128,6 @@ export default function Login() {
         return () => clearInterval(interval);
     }, [forgotResendTimer]);
 
-    const customerMenuPath = useMemo(() => {
-        const slug = String(restaurantContext?.slug || "").trim();
-        return buildRestaurantMenuPath(slug, restaurantContext?.tableNo);
-    }, [restaurantContext?.slug, restaurantContext?.tableNo]);
-
     const handleSuccessfulStaffLogin = (data, { session = false } = {}) => {
         if (session) {
             loginSession(data);
@@ -173,17 +168,83 @@ export default function Login() {
     };
 
     const getCustomerRedirectTarget = () => {
+        const isQrFlow = Boolean(
+            location.state?.isQrFlow ||
+            location.state?.flow === "table_qr" ||
+            location.state?.flow === "qr_table" ||
+            searchParams.get("flow") === "table_qr" ||
+            searchParams.get("flow") === "qr_table"
+        );
+
+        let candidate = "";
+
         const from = location.state?.from;
         if (typeof from === "string" && from.trim()) {
-            return from.trim();
-        }
-        if (from && typeof from === "object") {
+            candidate = from.trim();
+        } else if (from && typeof from === "object") {
             const pathname = String(from.pathname || "").trim();
             if (pathname) {
-                return `${pathname}${from.search || ""}${from.hash || ""}`;
+                candidate = `${pathname}${from.search || ""}${from.hash || ""}`;
             }
         }
-        return customerMenuPath;
+
+        if (!candidate) {
+            const queryTarget =
+                searchParams.get("returnUrl") ||
+                searchParams.get("redirectTo") ||
+                searchParams.get("redirect") ||
+                searchParams.get("from");
+            if (queryTarget && typeof queryTarget === "string" && queryTarget.trim()) {
+                candidate = queryTarget.trim();
+            }
+        }
+
+        if (!candidate) {
+            try {
+                const storedTarget =
+                    sessionStorage.getItem("returnUrl") ||
+                    sessionStorage.getItem("redirectTo") ||
+                    localStorage.getItem("returnUrl") ||
+                    localStorage.getItem("redirectTo");
+                if (storedTarget && typeof storedTarget === "string" && storedTarget.trim()) {
+                    candidate = storedTarget.trim();
+                }
+            } catch {
+                // ignore storage access errors
+            }
+        }
+
+        // Always clean up transient redirect keys from storage
+        try {
+            sessionStorage.removeItem("returnUrl");
+            sessionStorage.removeItem("redirectTo");
+            localStorage.removeItem("returnUrl");
+            localStorage.removeItem("redirectTo");
+        } catch {
+            // ignore storage removal errors
+        }
+
+        // Avoid recursive redirect to login
+        if (candidate === "/login" || candidate.startsWith("/login?") || candidate.startsWith("/login/")) {
+            candidate = "";
+        }
+
+        // If candidate is a restaurant / table / QR route:
+        // ONLY allow if this login was genuinely initiated from an active QR/table flow.
+        // For normal login, stale restaurant/table routes are strictly rejected.
+        if (isTableOrMenuPath(candidate)) {
+            if (!isQrFlow) {
+                candidate = "";
+            }
+        }
+
+        // For standard customer login, ensure order flow scope is reset to ONLINE
+        if (!isQrFlow) {
+            setStoredOrderFlowScope(ORDER_FLOW_SCOPES.ONLINE);
+        }
+
+        // Canonical customer destination defaults strictly to Home ("/")
+        return candidate || "/";
     };
 
     const getRedirectPath = (role, designation, userId) => {

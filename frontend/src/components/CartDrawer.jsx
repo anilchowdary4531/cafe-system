@@ -26,6 +26,10 @@ export default function CartDrawer({ open, setOpen }) {
         }
 
         setOpen(false);
+        const isQrFlow = Boolean(
+            location.pathname?.startsWith("/m/") ||
+            location.pathname?.startsWith("/order/table/")
+        );
         navigate("/login?mode=customer", {
             state: {
                 from: {
@@ -33,6 +37,7 @@ export default function CartDrawer({ open, setOpen }) {
                     search: location.search,
                     hash: location.hash,
                 },
+                isQrFlow,
             },
         });
     };

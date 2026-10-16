@@ -56,6 +56,11 @@ export default function Cart() {
             return;
         }
 
+        const isQrFlow = Boolean(
+            location.pathname?.startsWith("/m/") ||
+            location.pathname?.startsWith("/order/table/")
+        );
+
         navigate("/login?mode=customer", {
             state: {
                 from: {
@@ -63,6 +68,7 @@ export default function Cart() {
                     search: location.search,
                     hash: location.hash,
                 },
+                isQrFlow,
             },
         });
     };

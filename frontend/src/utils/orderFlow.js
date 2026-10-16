@@ -47,3 +47,18 @@ export const setStoredOrderFlowScope = (scope) => {
 export const resolveOrderFlowScope = (pathname = "") => {
     return getOrderFlowScopeFromPath(pathname) || getStoredOrderFlowScope();
 };
+
+export const isTableOrMenuPath = (pathname = "") => {
+    if (!pathname || typeof pathname !== "string") return false;
+    const trimmed = pathname.trim().toLowerCase();
+    return (
+        trimmed.startsWith("/m/") ||
+        trimmed.startsWith("/debug/menu/") ||
+        trimmed.startsWith("/order/table/") ||
+        trimmed.includes("/table%") ||
+        trimmed.includes("/table/") ||
+        trimmed.includes("/table ") ||
+        /\btable\b/.test(trimmed)
+    );
+};
+

@@ -1345,26 +1345,28 @@ export default function NewOrder() {
             <div className="lg:min-h-screen lg:flex lg:flex-col">
                 <header className="border-b border-[color:var(--app-border)]/40">
                     <div className="px-2 py-2 space-y-2.5">
-                        <div className="grid w-full grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] lg:items-center">
-                            <div className="min-w-0">
+                        <div className="grid w-full grid-cols-1 gap-2.5 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-center">
+                            <div className="min-w-0 flex items-center gap-2.5 sm:gap-3.5">
+                                <OwnerMenuButton />
                                 <button
                                     type="button"
                                     onClick={() => navigate("/owner")}
-                                    className="mb-1 inline-flex items-center gap-2 text-left cursor-pointer transition-opacity hover:opacity-80 focus:outline-none"
+                                    className="inline-flex items-center gap-2 text-left cursor-pointer transition-opacity hover:opacity-80 focus:outline-none shrink-0"
                                     aria-label="Go to dashboard"
                                     title="Go to dashboard"
                                 >
                                     <BrandLogo className="theme-brand-logo h-7 w-7 object-contain" title="Tiffzy logo" />
                                     <span className="theme-brand-text text-xl font-bold tracking-tight">Tiffzy</span>
                                 </button>
-                                <h1 className="mt-1 flex items-center gap-3 text-xl sm:text-2xl font-bold text-[color:var(--app-text)]">
-                                    <OwnerMenuButton />
-                                    Billing Desk
-                                </h1>
-                                <p className="theme-muted mt-0.5 text-xs sm:text-sm truncate">
-                                    {user?.restaurant?.name || "Restaurant"} - {connected ? "Live" : "Offline"}
-                                    {socketError ? ` (${socketError})` : ""}
-                                </p>
+                                <div className="min-w-0">
+                                    <h1 className="text-xl sm:text-2xl font-bold text-[color:var(--app-text)] leading-tight truncate">
+                                        Billing Desk
+                                    </h1>
+                                    <p className="theme-muted text-xs sm:text-sm truncate">
+                                        {user?.restaurant?.name || "Restaurant"} - {connected ? "Live" : "Offline"}
+                                        {socketError ? ` (${socketError})` : ""}
+                                    </p>
+                                </div>
                             </div>
 
                             <div className="flex w-full items-center gap-2.5 lg:mx-0 lg:max-w-[620px]">

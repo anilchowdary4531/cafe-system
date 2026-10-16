@@ -564,7 +564,18 @@ export default function RestaurantMenu() {
                             </button>
                         ) : (
                             <button
-                                onClick={() => navigate("/login?mode=customer")}
+                                onClick={() =>
+                                    navigate("/login?mode=customer", {
+                                        state: {
+                                            from: {
+                                                pathname: location.pathname,
+                                                search: location.search,
+                                                hash: location.hash,
+                                            },
+                                            isQrFlow: true,
+                                        },
+                                    })
+                                }
                                 className="theme-soft-button inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition sm:px-4 sm:py-2 sm:text-sm"
                             >
                                 <LogIn size={15} />
