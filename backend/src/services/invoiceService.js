@@ -87,9 +87,47 @@ export const buildInvoicePdf = async ({ order } = {}) => {
   };
 
   summaryLine("Subtotal", subtotal);
-  summaryLine("GST", taxAmount);
-  summaryLine("Service", serviceCharge);
-  summaryLine("Discount", -discount);
+
+  let snapshot = order?.billingSnapshot;
+  if (typeof snapshot === "string") {
+    try {
+      snapshot = JSON.parse(snapshot);
+    } catch {
+      snapshot = null;
+    }
+  }
+
+  // Itemized or fallback Taxes
+  if (Array.isArray(snapshot?.taxes) && snapshot.taxes.length > 0) {
+    snapshot.taxes.forEach((t) => {
+      const label = `${t.name || "Tax"}${t.rate ? ` (${t.rate}%)` : ""}`;
+      summaryLine(label, toSubunit(t.amount || 0));
+    });
+  } else if (taxAmount > 0) {
+    summaryLine("GST", taxAmount);
+  }
+
+  // Itemized or fallback Extra Charges
+  if (Array.isArray(snapshot?.charges) && snapshot.charges.length > 0) {
+    snapshot.charges.forEach((c) => {
+      summaryLine(c.name || "Charge", toSubunit(c.amount || 0));
+    });
+  } else if (serviceCharge > 0) {
+    summaryLine("Service", serviceCharge);
+  }
+
+  if (discount > 0) {
+    summaryLine("Discount", -discount);
+  }
+
+  if (snapshot?.tip > 0) {
+    summaryLine("Tip", toSubunit(snapshot.tip));
+  }
+
+  if (snapshot?.roundOff && snapshot.roundOff !== 0) {
+    summaryLine("Round Off", toSubunit(snapshot.roundOff));
+  }
+
   doc.moveDown(0.25);
   doc.fontSize(11).fillColor("#111").text("Total", colPrice, doc.y, { width: 70, continued: true });
   doc.fontSize(11).fillColor("#111").text(formatInr(total), colTotal, doc.y);

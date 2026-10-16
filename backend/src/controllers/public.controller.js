@@ -3,6 +3,7 @@ import { createAndDispatchNotification } from '../services/notificationService.j
 import { RECIPIENT_TYPES, NOTIFICATION_TYPES } from '../constants/notificationTypes.js';
 import { getOrCreateActiveSession, recalculateSessionTotals } from '../services/tableSessionService.js';
 import { createKotsForOrder, dispatchKotPrint } from '../services/kotService.js';
+import { calculateBill } from '../services/billingService.js';
 
 // 🔢 ORDER NUMBER
 function makeOrderNo() {
@@ -132,16 +133,20 @@ export async function placeCustomerOrder(req, reply) {
     });
 
     // 💰 CALCULATIONS
-    const subtotal = normalized.reduce((a, b) => a + b.total, 0);
-    let taxAmount = 0;
-    if (restaurant.taxEnabled && restaurant.defaultTaxPercent) {
-        taxAmount = (subtotal * Number(restaurant.defaultTaxPercent)) / 100;
-    }
-    let serviceChargeAmount = 0;
-    if (restaurant.serviceChargeEnabled && restaurant.serviceChargePercent) {
-        serviceChargeAmount = (subtotal * Number(restaurant.serviceChargePercent)) / 100;
-    }
-    const total = subtotal + taxAmount + serviceChargeAmount;
+    const effectiveOrderType = cleanTableNo ? "DINE_IN" : (fulfillment ? String(fulfillment).toUpperCase() : "DELIVERY");
+    const bill = calculateBill({
+        items: normalized.map((item) => ({
+            price: Number(item.price || 0),
+            qty: Math.max(1, Number(item.qty || 1)),
+        })),
+        orderType: effectiveOrderType,
+        billingConfig: restaurant.billingConfig,
+        taxEnabled: Boolean(restaurant.taxEnabled),
+        taxType: restaurant.taxType,
+        taxPercent: restaurant.defaultTaxPercent,
+        serviceChargeEnabled: Boolean(restaurant.serviceChargeEnabled),
+        serviceChargePercent: restaurant.serviceChargePercent,
+    });
 
     // 🏷️ LINK TABLE & TABLE SESSION
     let tableSessionId = null;
@@ -175,10 +180,12 @@ export async function placeCustomerOrder(req, reply) {
             tableNo: cleanTableNo,
             tableSessionId,
             notes: notes ? String(notes).trim() : null,
-            subtotal,
-            taxAmount,
-            serviceChargeAmount,
-            total,
+            subtotal: bill.subtotal,
+            taxAmount: bill.taxAmount,
+            serviceChargeAmount: bill.serviceChargeAmount,
+            discountAmount: bill.discountAmount,
+            total: bill.total,
+            billingSnapshot: bill.snapshot,
             paymentStatus: 'PENDING',
             status: 'PLACED',
             items: {

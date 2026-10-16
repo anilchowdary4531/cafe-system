@@ -153,6 +153,7 @@ export const recalculateSessionTotals = async ({ prisma, sessionId }) => {
           defaultTaxPercent: true,
           serviceChargeEnabled: true,
           serviceChargePercent: true,
+          billingConfig: true,
         },
       },
       orders: {
@@ -182,6 +183,8 @@ export const recalculateSessionTotals = async ({ prisma, sessionId }) => {
 
   const bill = computeBill({
     items: allOrderItems,
+    orderType: "DINE_IN",
+    billingConfig: rest.billingConfig,
     taxEnabled: Boolean(rest.taxEnabled),
     taxType: rest.taxType || "EXCLUSIVE",
     taxPercent: rest.defaultTaxPercent || 5,

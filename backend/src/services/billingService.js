@@ -12,69 +12,345 @@ const percentOf = (amountSubunit, percent) => {
   return Math.round(clampSubunit(amountSubunit) * bp / 10000);
 };
 
-export const computeBill = ({
+export const matchesOrderType = (appliesTo, currentOrderType = "ALL") => {
+  if (!appliesTo) return true;
+  const current = String(currentOrderType || "ALL").trim().toUpperCase();
+  if (typeof appliesTo === "string") {
+    const norm = appliesTo.trim().toUpperCase();
+    return norm === "ALL" || norm === current || current === "ALL";
+  }
+  if (Array.isArray(appliesTo)) {
+    if (appliesTo.length === 0) return true;
+    const uppercased = appliesTo.map((a) => String(a).trim().toUpperCase());
+    return uppercased.includes("ALL") || uppercased.includes(current) || current === "ALL";
+  }
+  return true;
+};
+
+export const resolveRestaurantBillingConfig = (restaurant) => {
+  if (!restaurant) return { taxes: [], charges: [], roundOff: false, allowTips: true };
+  let config = restaurant.billingConfig;
+  if (typeof config === "string") {
+    try {
+      config = JSON.parse(config);
+    } catch {
+      config = null;
+    }
+  }
+  if (config && (Array.isArray(config.taxes) || Array.isArray(config.charges))) {
+    return {
+      taxes: Array.isArray(config.taxes) ? config.taxes : [],
+      charges: Array.isArray(config.charges) ? config.charges : [],
+      roundOff: Boolean(config.roundOff),
+      allowTips: config.allowTips !== false,
+    };
+  }
+
+  // Construct from legacy fields
+  const taxes = [];
+  if (restaurant.taxEnabled && Number(restaurant.defaultTaxPercent || 0) > 0) {
+    taxes.push({
+      name: "GST",
+      rate: Number(restaurant.defaultTaxPercent),
+      type: "PERCENTAGE",
+      isInclusive: String(restaurant.taxType || "EXCLUSIVE").toUpperCase() === "INCLUSIVE",
+      isEnabled: true,
+      appliesTo: ["ALL"],
+    });
+  }
+
+  const charges = [];
+  if (restaurant.serviceChargeEnabled && Number(restaurant.serviceChargePercent || 0) > 0) {
+    charges.push({
+      name: "Service Charge",
+      amount: Number(restaurant.serviceChargePercent),
+      type: "PERCENTAGE",
+      isEnabled: true,
+      appliesTo: ["ALL"],
+    });
+  }
+
+  return {
+    taxes,
+    charges,
+    roundOff: false,
+    allowTips: true,
+  };
+};
+
+export const calculateBill = ({
   items = [],
+  orderType = "ALL",
+  billingConfig = null,
+  taxes = null,
+  charges = null,
   taxEnabled = false,
   taxType = "EXCLUSIVE",
   taxPercent = 0,
   serviceChargeEnabled = false,
   serviceChargePercent = 0,
   discountSubunit = 0,
+  discountAmount = 0,
+  couponDiscountSubunit = 0,
+  couponDiscount = 0,
+  promoDiscountSubunit = 0,
+  promoDiscountAmount = 0,
   loyaltyDiscountSubunit = 0,
+  loyaltyDiscountAmount = 0,
+  tip = 0,
+  tipSubunit = 0,
+  roundOff = null,
 } = {}) => {
   const normalizedItems = Array.isArray(items) ? items : [];
 
   const subtotalSubunit = normalizedItems.reduce((sum, item) => {
-    const qty = Math.max(1, Number(item?.qty || 1));
-    const unit = clampSubunit(item?.priceSubunit);
+    const qty = Math.max(1, Number(item?.qty || item?.quantity || 1));
+    const unit =
+      item?.priceSubunit !== undefined
+        ? clampSubunit(item.priceSubunit)
+        : toSubunit(item?.price ?? item?.unitPrice ?? 0);
     return sum + unit * qty;
   }, 0);
 
-  const promoDiscount = Math.max(0, clampSubunit(discountSubunit));
-  const loyaltyDiscount = Math.max(0, clampSubunit(loyaltyDiscountSubunit));
+  const effectiveDiscountSubunit =
+    discountSubunit || couponDiscountSubunit || promoDiscountSubunit;
+  const effectiveDiscountAmount =
+    discountAmount || couponDiscount || promoDiscountAmount;
+
+  const promoDiscount = Math.max(
+    0,
+    effectiveDiscountSubunit
+      ? clampSubunit(effectiveDiscountSubunit)
+      : toSubunit(effectiveDiscountAmount || 0)
+  );
+  const loyaltyDiscount = Math.max(
+    0,
+    loyaltyDiscountSubunit ? clampSubunit(loyaltyDiscountSubunit) : toSubunit(loyaltyDiscountAmount || 0)
+  );
   const totalDiscount = promoDiscount + loyaltyDiscount;
+  const netSubtotalSubunit = Math.max(0, subtotalSubunit - totalDiscount);
 
-  let taxSubunit = 0;
-  if (taxEnabled) {
-    taxSubunit = percentOf(subtotalSubunit, taxPercent);
+  const normalizedOrderType = String(orderType || "ALL").trim().toUpperCase();
+
+  // Resolve taxes list
+  let resolvedTaxes = [];
+  if (Array.isArray(taxes)) {
+    resolvedTaxes = taxes;
+  } else if (billingConfig && Array.isArray(billingConfig.taxes)) {
+    resolvedTaxes = billingConfig.taxes;
+  } else if (taxEnabled) {
+    resolvedTaxes = [
+      {
+        name: "Tax",
+        rate: Number(taxPercent || 0),
+        type: "PERCENTAGE",
+        isInclusive: String(taxType || "EXCLUSIVE").toUpperCase() === "INCLUSIVE",
+        isEnabled: true,
+        appliesTo: ["ALL"],
+      },
+    ];
   }
 
+  const activeTaxes = resolvedTaxes.filter(
+    (t) => t.isEnabled !== false && matchesOrderType(t.appliesTo, normalizedOrderType)
+  );
+
+  const inclusiveTaxes = activeTaxes.filter((t) => Boolean(t.isInclusive));
+  const exclusiveTaxes = activeTaxes.filter((t) => !t.isInclusive);
+
+  // Inclusive tax calculation
+  const inclusiveTaxSnapshots = [];
+  const totalInclusivePercent = inclusiveTaxes.reduce(
+    (acc, t) => acc + (String(t.type || "PERCENTAGE").toUpperCase() === "PERCENTAGE" ? Number(t.rate || 0) : 0),
+    0
+  );
+
+  let totalInclusiveTaxSubunit = 0;
+  if (inclusiveTaxes.length > 0 && totalInclusivePercent > 0) {
+    const baseBeforeTax = Math.round(subtotalSubunit / (1 + totalInclusivePercent / 100));
+    totalInclusiveTaxSubunit = Math.max(0, subtotalSubunit - baseBeforeTax);
+
+    inclusiveTaxes.forEach((t) => {
+      const rate = Number(t.rate || 0);
+      const taxPart = Math.round((totalInclusiveTaxSubunit * rate) / totalInclusivePercent);
+      inclusiveTaxSnapshots.push({
+        name: t.name || "Tax (Inclusive)",
+        rate,
+        type: t.type || "PERCENTAGE",
+        isInclusive: true,
+        amount: fromSubunit(taxPart),
+        amountSubunit: taxPart,
+      });
+    });
+  }
+
+  // Exclusive tax calculation
+  const exclusiveTaxSnapshots = [];
+  let totalExclusiveTaxSubunit = 0;
+
+  exclusiveTaxes.forEach((t) => {
+    const isFixed = String(t.type || "").toUpperCase() === "FIXED";
+    let taxAmtSubunit = 0;
+    if (isFixed) {
+      taxAmtSubunit = clampSubunit(toSubunit(t.rate || t.amount || 0));
+    } else {
+      taxAmtSubunit = percentOf(subtotalSubunit, t.rate || 0);
+    }
+    totalExclusiveTaxSubunit += taxAmtSubunit;
+    exclusiveTaxSnapshots.push({
+      name: t.name || "Tax",
+      rate: Number(t.rate || 0),
+      type: isFixed ? "FIXED" : "PERCENTAGE",
+      isInclusive: false,
+      amount: fromSubunit(taxAmtSubunit),
+      amountSubunit: taxAmtSubunit,
+    });
+  });
+
+  const allTaxSnapshots = [...inclusiveTaxSnapshots, ...exclusiveTaxSnapshots];
+  const totalTaxSubunit = totalInclusiveTaxSubunit + totalExclusiveTaxSubunit;
+
+  // Resolve charges list
+  let resolvedCharges = [];
+  if (Array.isArray(charges)) {
+    resolvedCharges = charges;
+  } else if (billingConfig && Array.isArray(billingConfig.charges)) {
+    resolvedCharges = billingConfig.charges;
+  } else if (serviceChargeEnabled) {
+    resolvedCharges = [
+      {
+        name: "Service Charge",
+        amount: Number(serviceChargePercent || 0),
+        type: "PERCENTAGE",
+        isEnabled: true,
+        appliesTo: ["ALL"],
+      },
+    ];
+  }
+
+  const activeCharges = resolvedCharges.filter(
+    (c) => c.isEnabled !== false && matchesOrderType(c.appliesTo, normalizedOrderType)
+  );
+
+  const chargeSnapshots = [];
+  let totalChargesSubunit = 0;
   let serviceChargeSubunit = 0;
-  if (serviceChargeEnabled) {
-    serviceChargeSubunit = percentOf(subtotalSubunit, serviceChargePercent);
-  }
 
-  const normalizedTaxType = String(taxType || "EXCLUSIVE").toUpperCase();
+  activeCharges.forEach((c) => {
+    const isPercentage = String(c.type || "").toUpperCase() === "PERCENTAGE";
+    let chargeSubunit = 0;
+    if (isPercentage) {
+      chargeSubunit = percentOf(subtotalSubunit, c.amount || c.rate || 0);
+    } else {
+      chargeSubunit = clampSubunit(toSubunit(c.amount || c.rate || 0));
+    }
+
+    totalChargesSubunit += chargeSubunit;
+    if (String(c.name || "").toLowerCase().includes("service")) {
+      serviceChargeSubunit += chargeSubunit;
+    }
+
+    chargeSnapshots.push({
+      name: c.name || "Charge",
+      amount: fromSubunit(chargeSubunit),
+      amountSubunit: chargeSubunit,
+      type: isPercentage ? "PERCENTAGE" : "FIXED",
+      isTaxable: Boolean(c.isTaxable),
+    });
+  });
+
+  // Tip
+  const resolvedTipSubunit = tipSubunit
+    ? clampSubunit(tipSubunit)
+    : clampSubunit(toSubunit(tip || 0));
+
+  // Pre-discount total
   const totalBeforeDiscount =
-    normalizedTaxType === "INCLUSIVE" ? subtotalSubunit + serviceChargeSubunit : subtotalSubunit + taxSubunit + serviceChargeSubunit;
+    subtotalSubunit + totalExclusiveTaxSubunit + totalChargesSubunit;
+  const totalBeforeRounding = Math.max(0, totalBeforeDiscount - totalDiscount) + resolvedTipSubunit;
 
-  const totalSubunit = Math.max(0, totalBeforeDiscount - totalDiscount);
+  // Round-off
+  const shouldRoundOff = Boolean(
+    roundOff !== null && roundOff !== undefined ? roundOff : billingConfig?.roundOff
+  );
+
+  let roundOffSubunit = 0;
+  let grandTotalSubunit = totalBeforeRounding;
+
+  if (shouldRoundOff && totalBeforeRounding > 0) {
+    const rounded = Math.round(totalBeforeRounding / 100) * 100;
+    roundOffSubunit = rounded - totalBeforeRounding;
+    grandTotalSubunit = Math.max(0, rounded);
+  } else {
+    grandTotalSubunit = Math.max(0, totalBeforeRounding);
+  }
 
   return {
     subtotalSubunit,
-    taxSubunit,
+    taxSubunit: totalTaxSubunit,
+    exclusiveTaxSubunit: totalExclusiveTaxSubunit,
+    inclusiveTaxSubunit: totalInclusiveTaxSubunit,
     serviceChargeSubunit,
+    chargesSubunit: totalChargesSubunit,
     discountSubunit: totalDiscount,
     promoDiscountSubunit: promoDiscount,
     loyaltyDiscountSubunit: loyaltyDiscount,
-    totalSubunit,
-    // Backward-compatible float fields for existing schema.
+    tipSubunit: resolvedTipSubunit,
+    roundOffSubunit,
+    totalSubunit: grandTotalSubunit,
+
+    // Backward-compatible float fields for existing schema
     subtotal: fromSubunit(subtotalSubunit),
-    taxAmount: fromSubunit(taxSubunit),
-    tax: fromSubunit(taxSubunit),
-    serviceChargeAmount: fromSubunit(serviceChargeSubunit),
-    serviceCharge: fromSubunit(serviceChargeSubunit),
+    taxAmount: fromSubunit(totalTaxSubunit),
+    tax: fromSubunit(totalTaxSubunit),
+    serviceChargeAmount: fromSubunit(serviceChargeSubunit || totalChargesSubunit),
+    serviceCharge: fromSubunit(serviceChargeSubunit || totalChargesSubunit),
+    totalCharges: fromSubunit(totalChargesSubunit),
+    charges: chargeSnapshots,
+    taxes: allTaxSnapshots,
+    tip: fromSubunit(resolvedTipSubunit),
+    roundOff: fromSubunit(roundOffSubunit),
+    discount: fromSubunit(totalDiscount),
     discountAmount: fromSubunit(totalDiscount),
     totalDiscount: fromSubunit(totalDiscount),
     promoDiscountAmount: fromSubunit(promoDiscount),
     couponDiscount: fromSubunit(promoDiscount),
     loyaltyDiscountAmount: fromSubunit(loyaltyDiscount),
     loyaltyDiscount: fromSubunit(loyaltyDiscount),
-    netSubtotal: fromSubunit(Math.max(0, subtotalSubunit - totalDiscount)),
+    netSubtotal: fromSubunit(netSubtotalSubunit),
     deliveryFee: 0,
-    total: fromSubunit(totalSubunit),
+    total: fromSubunit(grandTotalSubunit),
+    grandTotal: fromSubunit(grandTotalSubunit),
+
+    // Financial snapshot suitable for Order.billingSnapshot storage
+    snapshot: {
+      subtotal: fromSubunit(subtotalSubunit),
+      discount: fromSubunit(totalDiscount),
+      promoDiscount: fromSubunit(promoDiscount),
+      loyaltyDiscount: fromSubunit(loyaltyDiscount),
+      netSubtotal: fromSubunit(netSubtotalSubunit),
+      taxes: allTaxSnapshots.map((t) => ({
+        name: t.name,
+        rate: t.rate,
+        type: t.type,
+        isInclusive: t.isInclusive,
+        amount: t.amount,
+      })),
+      charges: chargeSnapshots.map((c) => ({
+        name: c.name,
+        amount: c.amount,
+        type: c.type,
+      })),
+      totalTax: fromSubunit(totalTaxSubunit),
+      totalCharges: fromSubunit(totalChargesSubunit),
+      tip: fromSubunit(resolvedTipSubunit),
+      roundOff: fromSubunit(roundOffSubunit),
+      total: fromSubunit(grandTotalSubunit),
+    },
   };
 };
+
+export const computeBill = calculateBill;
 
 export const toPriceSubunitItems = ({ menuItems = [], items = [] } = {}) => {
   const byId = new Map((menuItems || []).map((m) => [Number(m.id), m]));

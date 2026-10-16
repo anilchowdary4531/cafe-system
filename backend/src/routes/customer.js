@@ -419,8 +419,18 @@ export default async function customerRoutes(app, deps = {}) {
       }
 
       // Authoritative Bill Calculation via billingService
+      const effectiveOrderType = normalizedTableNo
+        ? "DINE_IN"
+        : isPickupOrder
+        ? "PICKUP"
+        : requestedFulfillment
+        ? String(requestedFulfillment).toUpperCase()
+        : "DELIVERY";
+
       const bill = computeBill({
         items: normalizedItems.map((i) => ({ priceSubunit: toSubunit(i.price), qty: i.qty })),
+        orderType: effectiveOrderType,
+        billingConfig: restaurant.billingConfig,
         taxEnabled: Boolean(restaurant.taxEnabled || restaurant.defaultTaxPercent > 0),
         taxType: restaurant.taxType || "EXCLUSIVE",
         taxPercent: Number(restaurant.defaultTaxPercent || restaurant.taxPercent || 0),
@@ -428,6 +438,7 @@ export default async function customerRoutes(app, deps = {}) {
         serviceChargePercent: Number(restaurant.serviceChargePercent || 0),
         discountSubunit: promoSubunit,
         loyaltyDiscountSubunit: loyaltySubunit,
+        tip: body.tip,
       });
 
 
@@ -482,7 +493,9 @@ export default async function customerRoutes(app, deps = {}) {
           subtotal: bill.subtotal,
           taxAmount: bill.taxAmount ?? bill.tax ?? 0,
           serviceChargeAmount: bill.serviceChargeAmount ?? bill.serviceCharge ?? 0,
+          discountAmount: bill.discountAmount ?? bill.totalDiscount ?? 0,
           total: bill.total,
+          billingSnapshot: bill.snapshot,
           loyaltyPointsRedeemed: redeemedPoints,
           loyaltyDiscountAmount: bill.loyaltyDiscountAmount ?? bill.loyaltyDiscount ?? 0,
           status: "PLACED",
@@ -884,8 +897,18 @@ export default async function customerRoutes(app, deps = {}) {
       }
 
       // Compute Authoritative Bill
+      const effectiveOrderType = body.tableNumber
+        ? "DINE_IN"
+        : body.fulfillment
+        ? String(body.fulfillment).toUpperCase()
+        : body.orderType
+        ? String(body.orderType).toUpperCase()
+        : "ALL";
+
       const bill = computeBill({
         items: normalizedItems.map((i) => ({ priceSubunit: toSubunit(i.price), qty: i.qty })),
+        orderType: effectiveOrderType,
+        billingConfig: restaurant.billingConfig,
         taxEnabled: Boolean(restaurant.taxEnabled || restaurant.defaultTaxPercent > 0),
         taxType: restaurant.taxType || "EXCLUSIVE",
         taxPercent: Number(restaurant.defaultTaxPercent || restaurant.taxPercent || 0),
@@ -893,6 +916,7 @@ export default async function customerRoutes(app, deps = {}) {
         serviceChargePercent: Number(restaurant.serviceChargePercent || 0),
         discountSubunit: promoSubunit,
         loyaltyDiscountSubunit: loyaltySubunit,
+        tip: body.tip,
       });
 
       return {
@@ -905,9 +929,15 @@ export default async function customerRoutes(app, deps = {}) {
           totalDiscount: bill.totalDiscount ?? bill.discountAmount ?? 0,
           netSubtotal: bill.netSubtotal ?? bill.subtotal,
           tax: bill.tax ?? bill.taxAmount ?? 0,
+          taxes: bill.taxes,
           serviceCharge: bill.serviceCharge ?? bill.serviceChargeAmount ?? 0,
+          charges: bill.charges,
+          totalCharges: bill.totalCharges,
+          tip: bill.tip,
+          roundOff: bill.roundOff,
           deliveryFee: bill.deliveryFee ?? 0,
           total: bill.total,
+          grandTotal: bill.total,
         },
         coupon: couponInfo,
         couponError,

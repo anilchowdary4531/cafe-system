@@ -61,6 +61,7 @@ model Restaurant {
   serviceChargePercent Float   @default(0) @map("service_charge_percent")
 
   // BILLING
+  billingConfig     Json?   @map("billing_config")
   invoicePrefix     String? @default("INV") @map("invoice_prefix")
   nextInvoiceNumber Int     @default(1001) @map("next_invoice_number")
   nextKotNumber     Int     @default(101)  @map("next_kot_number")
@@ -387,6 +388,7 @@ model Order {
   serviceChargeAmount Float @default(0) @map("service_charge_amount")
   discountAmount      Float @default(0) @map("discount_amount")
   total               Float
+  billingSnapshot     Json? @map("billing_snapshot")
 
   // PROMOTIONS & DISCOUNTS
   promotionId    Int?       @map("promotion_id")

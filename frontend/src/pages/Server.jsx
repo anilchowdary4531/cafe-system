@@ -307,14 +307,32 @@ export default function Server() {
         return Array.from(set);
     }, [tables]);
 
+    const handledNotificationIdsRef = useRef(new Map());
+    const callbacksRef = useRef({
+        refreshTables,
+        refreshReservations,
+        refreshLiveOrders,
+        refreshReadyKots,
+        fetchUnreadCount,
+    });
+    useEffect(() => {
+        callbacksRef.current = {
+            refreshTables,
+            refreshReservations,
+            refreshLiveOrders,
+            refreshReadyKots,
+            fetchUnreadCount,
+        };
+    });
+
     // Socket real-time updates & Ready Order alerts
     useEffect(() => {
         if (!socket) return;
         const handleRealtimeUpdate = (data) => {
-            refreshTables({ force: true });
-            refreshReservations({ force: true });
-            refreshLiveOrders({ force: true });
-            refreshReadyKots({ force: true });
+            callbacksRef.current.refreshTables?.({ force: true });
+            callbacksRef.current.refreshReservations?.({ force: true });
+            callbacksRef.current.refreshLiveOrders?.({ force: true });
+            callbacksRef.current.refreshReadyKots?.({ force: true });
 
             if (data?.tableId) {
                 setSelectedTable((prev) => {
@@ -343,7 +361,38 @@ export default function Server() {
         };
 
         const handleNewNotification = (notif) => {
-            fetchUnreadCount();
+            if (!notif) return;
+
+            // Defensive deduplication using stable identifier (id or idempotencyKey or table+action)
+            const notifKey = notif.id
+                ? `id:${notif.id}`
+                : (notif.idempotencyKey || notif.data?.idempotencyKey)
+                    ? `idem:${notif.idempotencyKey || notif.data?.idempotencyKey}`
+                    : notif.data?.tableId && notif.data?.action
+                        ? `table:${notif.data.tableId}:${notif.data.action}`
+                        : null;
+
+            if (notifKey) {
+                const now = Date.now();
+                const lastSeen = handledNotificationIdsRef.current.get(notifKey);
+
+                // Periodic eviction of IDs older than 30s to keep map bounded
+                if (handledNotificationIdsRef.current.size > 100) {
+                    for (const [k, timestamp] of handledNotificationIdsRef.current.entries()) {
+                        if (now - timestamp > 30000) {
+                            handledNotificationIdsRef.current.delete(k);
+                        }
+                    }
+                }
+
+                if (lastSeen && now - lastSeen < 10000) {
+                    // Duplicate event arriving within 10s dedupe window; suppress duplicate toast/sound/count
+                    return;
+                }
+                handledNotificationIdsRef.current.set(notifKey, now);
+            }
+
+            callbacksRef.current.fetchUnreadCount?.();
             const typeUpper = String(notif?.notificationType || notif?.type || "").toUpperCase();
             const isAssigned = typeUpper === "TABLE_ASSIGNMENT" || notif?.data?.action === "ASSIGNED" || notif?.data?.action === "REASSIGNED";
             const isUnassigned = typeUpper === "TABLE_UNASSIGNED" || notif?.data?.action === "UNASSIGNED";
@@ -355,7 +404,7 @@ export default function Server() {
                     message: notif.message || `Table ${notif.data?.tableNo || ""} assignment updated.`,
                     variant: isAssigned ? "success" : "info",
                 });
-                refreshTables({ force: true });
+                callbacksRef.current.refreshTables?.({ force: true });
             }
         };
 
@@ -384,7 +433,7 @@ export default function Server() {
             socket.off("new_order", handleRealtimeUpdate);
             socket.off("notification:new", handleNewNotification);
         };
-    }, [socket, refreshTables, refreshReservations, refreshLiveOrders, refreshReadyKots, fetchUnreadCount]);
+    }, [socket]);
 
     // Ordering Actions & Auto Server Assignment
     const handleSelectTableForOrder = useCallback(async (table) => {

@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { buildReadableOrderNo, createOrderByStaff, updateOrderStatus } from "../services/orderService.js";
+import { resolveRestaurantBillingConfig } from "../services/billingService.js";
 import { buildUploadController } from "../controllers/uploadController.js";
 import { deleteAssetByKey, uploadRestaurantAsset } from "../services/storageService.js";
 import { requireStaffJwt } from "../services/staffAuthService.js";
@@ -2473,6 +2474,7 @@ export default async function ownerRoutes(app, deps) {
             bannerUrl: true, brandColor: true, faviconUrl: true,
             timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
             serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
+            billingConfig: true,
             isActive: true, tobaccoApproved: true, updatedAt: true,
           },
         });
@@ -2499,6 +2501,7 @@ export default async function ownerRoutes(app, deps) {
       return {
         restaurant: {
           ...restaurant,
+          billingConfig: resolveRestaurantBillingConfig(restaurant),
           tobaccoApproved,
           logo: restaurant.logoUrl || "",
           logoUrl: undefined,
@@ -2544,6 +2547,33 @@ export default async function ownerRoutes(app, deps) {
         timezone: body.timezone, currency: body.currency, taxEnabled: body.taxEnabled,
         taxType: body.taxType, defaultTaxPercent: body.defaultTaxPercent, serviceChargeEnabled: body.serviceChargeEnabled,
         serviceChargePercent: body.serviceChargePercent, invoicePrefix: body.invoicePrefix, nextInvoiceNumber: body.nextInvoiceNumber,
+        billingConfig: body.billingConfig !== undefined ? (() => {
+          let raw = body.billingConfig;
+          if (typeof raw === "string") {
+            try { raw = JSON.parse(raw); } catch { raw = null; }
+          }
+          if (!raw || typeof raw !== "object") return undefined;
+          return {
+            taxes: (Array.isArray(raw.taxes) ? raw.taxes : []).map((t) => ({
+              name: String(t.name || "Tax").trim(),
+              rate: Math.max(0, Number(t.rate || 0)),
+              type: String(t.type || "PERCENTAGE").toUpperCase() === "FIXED" ? "FIXED" : "PERCENTAGE",
+              isInclusive: Boolean(t.isInclusive),
+              isEnabled: t.isEnabled !== false,
+              appliesTo: Array.isArray(t.appliesTo) ? t.appliesTo : (t.appliesTo ? [String(t.appliesTo)] : ["ALL"]),
+            })),
+            charges: (Array.isArray(raw.charges) ? raw.charges : []).map((c) => ({
+              name: String(c.name || "Charge").trim(),
+              amount: Math.max(0, Number(c.amount || 0)),
+              type: String(c.type || "FIXED").toUpperCase() === "PERCENTAGE" ? "PERCENTAGE" : "FIXED",
+              isEnabled: c.isEnabled !== false,
+              appliesTo: Array.isArray(c.appliesTo) ? c.appliesTo : (c.appliesTo ? [String(c.appliesTo)] : ["ALL"]),
+              isTaxable: Boolean(c.isTaxable),
+            })),
+            roundOff: Boolean(raw.roundOff),
+            allowTips: raw.allowTips !== false,
+          };
+        })() : undefined,
         isActive: body.isActive,
       };
       const filteredData = Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== undefined));
@@ -2586,6 +2616,7 @@ export default async function ownerRoutes(app, deps) {
             bannerUrl: true, brandColor: true, faviconUrl: true,
             timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
             serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
+            billingConfig: true,
             isActive: true, updatedAt: true,
           },
         });
@@ -2604,11 +2635,20 @@ export default async function ownerRoutes(app, deps) {
             bannerUrl: true, brandColor: true, faviconUrl: true,
             timezone: true, currency: true, taxEnabled: true, taxType: true, defaultTaxPercent: true,
             serviceChargeEnabled: true, serviceChargePercent: true, invoicePrefix: true, nextInvoiceNumber: true,
+            billingConfig: true,
             isActive: true, updatedAt: true,
           },
         });
       }
-      return { message: "Settings updated", restaurant: { ...updated, logo: updated.logoUrl || "", logoUrl: undefined } };
+      return {
+        message: "Settings updated",
+        restaurant: {
+          ...updated,
+          billingConfig: resolveRestaurantBillingConfig(updated),
+          logo: updated.logoUrl || "",
+          logoUrl: undefined,
+        },
+      };
     } catch (err) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to update settings" });

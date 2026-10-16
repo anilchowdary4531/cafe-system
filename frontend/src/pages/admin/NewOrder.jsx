@@ -208,11 +208,27 @@ const buildBillPrintMarkup = ({ restaurantName, order } = {}) => {
               .join("")
         : `<tr><td colspan="2" class="empty-row">No items found.</td></tr>`;
 
+    const snapshot = order?.billingSnapshot || {};
+    const taxesList = Array.isArray(snapshot?.taxes) && snapshot.taxes.length > 0 ? snapshot.taxes : [];
+    const chargesList = Array.isArray(snapshot?.charges) && snapshot.charges.length > 0 ? snapshot.charges : [];
+    const tipAmount = Number(snapshot?.tip || order?.tip || 0);
+    const roundOffAmount = Number(snapshot?.roundOff || order?.roundOff || 0);
+
+    const taxSummaryRows = taxesList.length > 0
+        ? taxesList.map((t) => [t.name ? `${t.name}${t.rate ? ` (${t.rate}%)` : ""}` : "Tax", Number(t.amount || 0)])
+        : (taxAmount > 0 ? [["Tax", taxAmount]] : []);
+
+    const chargeSummaryRows = chargesList.length > 0
+        ? chargesList.map((c) => [c.name || "Charge", Number(c.amount || 0)])
+        : (serviceChargeAmount > 0 ? [["Service Charge", serviceChargeAmount]] : []);
+
     const summaryRows = [
         ["Subtotal", subtotal],
-        ...(taxAmount > 0 ? [["Tax", taxAmount]] : []),
-        ...(serviceChargeAmount > 0 ? [["Service Charge", serviceChargeAmount]] : []),
+        ...taxSummaryRows,
+        ...chargeSummaryRows,
         ...(discountAmount > 0 ? [["Discount", -discountAmount]] : []),
+        ...(tipAmount > 0 ? [["Tip", tipAmount]] : []),
+        ...(roundOffAmount !== 0 ? [["Round Off", roundOffAmount]] : []),
         ...(paymentMethod === "CASH" && cashGiven !== null ? [["Cash Given", cashGiven]] : []),
         ...(paymentMethod === "CASH" && changeReturned !== null ? [["Change Returned", changeReturned]] : []),
     ]

@@ -1,4 +1,4 @@
-import { computeBill, toPriceSubunitItems } from "./billingService.js";
+import { computeBill, calculateBill, toPriceSubunitItems } from "./billingService.js";
 import { reserveStockForOrder, restoreStockForOrder, deductStockForOrder, reverseStockForOrder } from "./inventoryService.js";
 import { normalizePhone } from "./phoneService.js";
 import { createAndDispatchNotification } from "./notificationService.js";
@@ -98,6 +98,7 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
       defaultTaxPercent: true,
       serviceChargeEnabled: true,
       serviceChargePercent: true,
+      billingConfig: true,
     },
   });
   if (!restaurant) {
@@ -266,8 +267,11 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
     }
   }
 
-  const bill = computeBill({
+  const resolvedOrderType = body.fulfillment ? String(body.fulfillment).trim().toUpperCase() : (body.orderType ? String(body.orderType).trim().toUpperCase() : (tableNo ? "DINE_IN" : "POS"));
+  const bill = calculateBill({
     items: normalizedItems,
+    orderType: resolvedOrderType,
+    billingConfig: restaurant.billingConfig,
     taxEnabled: Boolean(restaurant.taxEnabled),
     taxType: restaurant.taxType,
     taxPercent: restaurant.defaultTaxPercent,
@@ -275,6 +279,7 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
     serviceChargePercent: restaurant.serviceChargePercent,
     discountSubunit: calculatedDiscountSubunit,
     loyaltyDiscountSubunit,
+    tip: body.tip,
   });
 
   const invoiceNumber = Number(restaurant.nextInvoiceNumber || 1001);
@@ -359,6 +364,7 @@ export const createOrderByStaff = async ({ prisma, actor, input } = {}) => {
         serviceChargeAmount: bill.serviceChargeAmount,
         discountAmount: bill.discountAmount,
         total: bill.total,
+        billingSnapshot: bill.snapshot,
         promotionId: appliedPromotionId,
         couponCode: appliedCouponCode,
         discountType: appliedDiscountType,

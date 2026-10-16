@@ -302,11 +302,55 @@ export const verifyPayment = async ({ prisma, actor, input } = {}) => {
           customer: { phone: normPhone },
           status: "ACTIVE",
         },
+        include: {
+          restaurant: {
+            select: { billingConfig: true },
+          },
+        },
       });
 
       if (!account) {
         const err = new Error("pay_later_not_approved");
         err.code = "pay_later_not_approved";
+        throw err;
+      }
+
+      // Enforce credit limit: pendingBalance + order.total <= creditLimit
+      const orderTotal = Number(order.total || 0);
+      const currentPendingBalance = Number(account.pendingBalance || 0);
+      const newPendingBalance = currentPendingBalance + orderTotal;
+
+      let restBillingConfig = {};
+      if (account.restaurant?.billingConfig) {
+        try {
+          restBillingConfig =
+            typeof account.restaurant.billingConfig === "string"
+              ? JSON.parse(account.restaurant.billingConfig)
+              : account.restaurant.billingConfig;
+        } catch {
+          restBillingConfig = {};
+        }
+      }
+
+      const creditLimit =
+        account.creditLimit !== undefined && account.creditLimit !== null
+          ? Number(account.creditLimit)
+          : (restBillingConfig.payLaterCreditLimit !== undefined && restBillingConfig.payLaterCreditLimit !== null)
+            ? Number(restBillingConfig.payLaterCreditLimit)
+            : (restBillingConfig.creditLimit !== undefined && restBillingConfig.creditLimit !== null)
+              ? Number(restBillingConfig.creditLimit)
+              : 5000;
+
+      if (newPendingBalance > creditLimit) {
+        const err = new Error("pay_later_limit_exceeded");
+        err.code = "pay_later_limit_exceeded";
+        err.statusCode = 400;
+        err.details = {
+          creditLimit,
+          currentPendingBalance,
+          orderTotal,
+          newPendingBalance,
+        };
         throw err;
       }
 

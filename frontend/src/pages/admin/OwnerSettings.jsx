@@ -13,6 +13,7 @@ import {
     Trash2,
     Upload,
     UserCircle2,
+    Plus,
 } from "lucide-react";
 import { API } from "../../config";
 import ThemeSelector from "../../components/ThemeSelector";
@@ -46,6 +47,12 @@ const emptyForm = {
     invoicePrefix: "",
     nextInvoiceNumber: 1001,
     isActive: true,
+    billingConfig: {
+        taxes: [],
+        charges: [],
+        roundOff: false,
+        allowTips: true,
+    },
 };
 
 const sectionClass = "space-y-2 pb-2.5 border-b border-orange-200/60";
@@ -198,6 +205,107 @@ export default function OwnerSettings() {
         }
     };
 
+    const handleAddTax = () => {
+        setForm((prev) => {
+            const currentTaxes = Array.isArray(prev.billingConfig?.taxes) ? prev.billingConfig.taxes : [];
+            return {
+                ...prev,
+                billingConfig: {
+                    ...prev.billingConfig,
+                    taxes: [
+                        ...currentTaxes,
+                        {
+                            name: `Tax ${currentTaxes.length + 1}`,
+                            rate: 2.5,
+                            type: "PERCENTAGE",
+                            isInclusive: false,
+                            isEnabled: true,
+                            appliesTo: ["ALL"],
+                        },
+                    ],
+                },
+            };
+        });
+    };
+
+    const handleUpdateTax = (index, field, value) => {
+        setForm((prev) => {
+            const currentTaxes = [...(prev.billingConfig?.taxes || [])];
+            currentTaxes[index] = { ...currentTaxes[index], [field]: value };
+            return {
+                ...prev,
+                billingConfig: { ...prev.billingConfig, taxes: currentTaxes },
+            };
+        });
+    };
+
+    const handleRemoveTax = (index) => {
+        setForm((prev) => {
+            const currentTaxes = [...(prev.billingConfig?.taxes || [])];
+            currentTaxes.splice(index, 1);
+            return {
+                ...prev,
+                billingConfig: { ...prev.billingConfig, taxes: currentTaxes },
+            };
+        });
+    };
+
+    const handleAddCharge = () => {
+        setForm((prev) => {
+            const currentCharges = Array.isArray(prev.billingConfig?.charges) ? prev.billingConfig.charges : [];
+            return {
+                ...prev,
+                billingConfig: {
+                    ...prev.billingConfig,
+                    charges: [
+                        ...currentCharges,
+                        {
+                            name: "Packaging Charge",
+                            amount: 10,
+                            type: "FIXED",
+                            isEnabled: true,
+                            appliesTo: ["ALL"],
+                            isTaxable: false,
+                        },
+                    ],
+                },
+            };
+        });
+    };
+
+    const handleUpdateCharge = (index, field, value) => {
+        setForm((prev) => {
+            const currentCharges = [...(prev.billingConfig?.charges || [])];
+            currentCharges[index] = { ...currentCharges[index], [field]: value };
+            return {
+                ...prev,
+                billingConfig: { ...prev.billingConfig, charges: currentCharges },
+            };
+        });
+    };
+
+    const handleRemoveCharge = (index) => {
+        setForm((prev) => {
+            const currentCharges = [...(prev.billingConfig?.charges || [])];
+            currentCharges.splice(index, 1);
+            return {
+                ...prev,
+                billingConfig: { ...prev.billingConfig, charges: currentCharges },
+            };
+        });
+    };
+
+    const handleToggleBillingOption = (key) => (e) => {
+        const checked = e.target.checked;
+        setForm((prev) => ({
+            ...prev,
+            billingConfig: {
+                ...prev.billingConfig,
+                [key]: checked,
+            },
+        }));
+    };
+
     const loadSettings = async () => {
         if (!restaurantId) {
             setLoading(false);
@@ -208,7 +316,27 @@ export default function OwnerSettings() {
         try {
             setLoading(true);
             const res = await axios.get(`${API}/owner/${restaurantId}/settings`);
-            setForm({ ...emptyForm, ...(res.data?.restaurant || {}) });
+            const rest = res.data?.restaurant || {};
+            const billingConfig = rest.billingConfig || {
+                taxes: rest.defaultTaxPercent > 0 ? [{
+                    name: "GST",
+                    rate: Number(rest.defaultTaxPercent),
+                    type: "PERCENTAGE",
+                    isInclusive: rest.taxType === "INCLUSIVE",
+                    isEnabled: Boolean(rest.taxEnabled),
+                    appliesTo: ["ALL"],
+                }] : [],
+                charges: rest.serviceChargePercent > 0 ? [{
+                    name: "Service Charge",
+                    amount: Number(rest.serviceChargePercent),
+                    type: "PERCENTAGE",
+                    isEnabled: Boolean(rest.serviceChargeEnabled),
+                    appliesTo: ["ALL"],
+                }] : [],
+                roundOff: false,
+                allowTips: true,
+            };
+            setForm({ ...emptyForm, ...rest, billingConfig });
             setError("");
         } catch (err) {
             console.log(err);
@@ -233,15 +361,28 @@ export default function OwnerSettings() {
             setSuccess("");
             setError("");
 
+            const taxes = Array.isArray(form.billingConfig?.taxes) ? form.billingConfig.taxes : [];
+            const charges = Array.isArray(form.billingConfig?.charges) ? form.billingConfig.charges : [];
+            const activePercentTaxes = taxes.filter((t) => t.isEnabled && t.type !== "FIXED");
+            const sumTaxRate = activePercentTaxes.reduce((sum, t) => sum + Number(t.rate || 0), 0);
+            const hasInclusive = activePercentTaxes.some((t) => Boolean(t.isInclusive));
+            const activePercentCharges = charges.filter((c) => c.isEnabled && c.type === "PERCENTAGE");
+            const sumChargeRate = activePercentCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+
             const payload = {
                 ...form,
-                defaultTaxPercent: Number(form.defaultTaxPercent || 0),
-                serviceChargePercent: Number(form.serviceChargePercent || 0),
+                billingConfig: form.billingConfig,
+                taxEnabled: taxes.length > 0 ? taxes.some((t) => t.isEnabled) : Boolean(form.taxEnabled),
+                taxType: hasInclusive ? "INCLUSIVE" : (form.taxType || "EXCLUSIVE"),
+                defaultTaxPercent: taxes.length > 0 ? sumTaxRate : Number(form.defaultTaxPercent || 0),
+                serviceChargeEnabled: charges.length > 0 ? charges.some((c) => c.isEnabled) : Boolean(form.serviceChargeEnabled),
+                serviceChargePercent: charges.length > 0 ? sumChargeRate : Number(form.serviceChargePercent || 0),
                 nextInvoiceNumber: Number(form.nextInvoiceNumber || 1001),
             };
 
             const res = await axios.put(`${API}/owner/${restaurantId}/settings`, payload);
-            setForm({ ...emptyForm, ...(res.data?.restaurant || payload) });
+            const savedRest = res.data?.restaurant || payload;
+            setForm({ ...emptyForm, ...savedRest, billingConfig: savedRest.billingConfig || form.billingConfig });
             setSuccess("Settings updated successfully.");
         } catch (err) {
             console.log(err);
@@ -487,71 +628,221 @@ export default function OwnerSettings() {
                     <article className={sectionClass}>
                         <SectionHeader
                             icon={ReceiptText}
-                            title="Tax & Billing"
-                            subtitle="Control tax mode, service charge, and invoice numbering."
+                            title="Tax & Billing Configuration"
+                            subtitle="Configure custom taxes (CGST, SGST, VAT), extra charges, round-off, and invoice settings."
                         />
 
-                        <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
-                            <label className="flex cursor-pointer items-center justify-between gap-2 border-b border-stone-200/60 py-0.5">
+                        {/* TAXES SECTION */}
+                        <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50/50 p-3">
+                            <div className="flex items-center justify-between mb-2">
                                 <div>
-                                    <p className="text-xs font-bold text-stone-900">Tax Enabled</p>
-                                    <p className="text-[10px] text-stone-500">{taxStatusText}</p>
+                                    <h4 className="text-xs font-bold text-stone-900">Custom Taxes</h4>
+                                    <p className="text-[10px] text-stone-500">Configure restaurant-specific taxes (e.g. CGST 2.5%, SGST 2.5%, VAT).</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleAddTax}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-orange-600 px-2 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-orange-700 transition"
+                                >
+                                    <Plus size={12} /> Add Tax
+                                </button>
+                            </div>
+
+                            {(form.billingConfig?.taxes || []).length === 0 ? (
+                                <p className="text-[11px] text-stone-400 italic py-1">No taxes configured. Orders will be tax-free unless a tax is added.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {(form.billingConfig?.taxes || []).map((tax, idx) => (
+                                        <div key={idx} className="flex flex-wrap items-center gap-2 rounded-lg border border-stone-200 bg-white p-2 text-xs">
+                                            <input
+                                                type="text"
+                                                placeholder="Tax Name (e.g. CGST)"
+                                                value={tax.name || ""}
+                                                onChange={(e) => handleUpdateTax(idx, "name", e.target.value)}
+                                                className="w-28 rounded border border-stone-200 px-2 py-1 text-xs font-semibold focus:border-stone-800 outline-none"
+                                            />
+                                            <div className="flex items-center gap-1">
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    placeholder="Rate"
+                                                    value={tax.rate ?? 0}
+                                                    onChange={(e) => handleUpdateTax(idx, "rate", Number(e.target.value))}
+                                                    className="w-16 rounded border border-stone-200 px-2 py-1 text-xs font-semibold focus:border-stone-800 outline-none"
+                                                />
+                                                <select
+                                                    value={tax.type || "PERCENTAGE"}
+                                                    onChange={(e) => handleUpdateTax(idx, "type", e.target.value)}
+                                                    className="rounded border border-stone-200 bg-white px-1.5 py-1 text-xs font-semibold focus:border-stone-800 outline-none"
+                                                >
+                                                    <option value="PERCENTAGE">%</option>
+                                                    <option value="FIXED">₹</option>
+                                                </select>
+                                            </div>
+
+                                            <select
+                                                value={Array.isArray(tax.appliesTo) ? (tax.appliesTo[0] || "ALL") : (tax.appliesTo || "ALL")}
+                                                onChange={(e) => handleUpdateTax(idx, "appliesTo", [e.target.value])}
+                                                className="rounded border border-stone-200 bg-white px-2 py-1 text-xs font-semibold focus:border-stone-800 outline-none"
+                                            >
+                                                <option value="ALL">All Orders</option>
+                                                <option value="DINE_IN">Dine-In Only</option>
+                                                <option value="TAKEAWAY">Takeaway Only</option>
+                                                <option value="DELIVERY">Delivery Only</option>
+                                                <option value="PICKUP">Pickup Only</option>
+                                            </select>
+
+                                            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-stone-700">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={Boolean(tax.isInclusive)}
+                                                    onChange={(e) => handleUpdateTax(idx, "isInclusive", e.target.checked)}
+                                                    className="h-3 w-3 accent-orange-600"
+                                                />
+                                                Inclusive in price
+                                            </label>
+
+                                            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-stone-700">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={Boolean(tax.isEnabled)}
+                                                    onChange={(e) => handleUpdateTax(idx, "isEnabled", e.target.checked)}
+                                                    className="h-3 w-3 accent-orange-600"
+                                                />
+                                                Active
+                                            </label>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveTax(idx)}
+                                                className="ml-auto text-stone-400 hover:text-rose-600 p-1 transition"
+                                                title="Delete Tax"
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* EXTRA CHARGES SECTION */}
+                        <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50/50 p-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <div>
+                                    <h4 className="text-xs font-bold text-stone-900">Extra Charges & Surcharges</h4>
+                                    <p className="text-[10px] text-stone-500">Configure packaging fees, delivery charges, service charge, or custom surcharges.</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleAddCharge}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-orange-600 px-2 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-orange-700 transition"
+                                >
+                                    <Plus size={12} /> Add Charge
+                                </button>
+                            </div>
+
+                            {(form.billingConfig?.charges || []).length === 0 ? (
+                                <p className="text-[11px] text-stone-400 italic py-1">No extra charges configured.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {(form.billingConfig?.charges || []).map((charge, idx) => (
+                                        <div key={idx} className="flex flex-wrap items-center gap-2 rounded-lg border border-stone-200 bg-white p-2 text-xs">
+                                            <input
+                                                type="text"
+                                                placeholder="Charge Name (e.g. Packaging)"
+                                                value={charge.name || ""}
+                                                onChange={(e) => handleUpdateCharge(idx, "name", e.target.value)}
+                                                className="w-32 rounded border border-stone-200 px-2 py-1 text-xs font-semibold focus:border-stone-800 outline-none"
+                                            />
+                                            <div className="flex items-center gap-1">
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    placeholder="Amount"
+                                                    value={charge.amount ?? 0}
+                                                    onChange={(e) => handleUpdateCharge(idx, "amount", Number(e.target.value))}
+                                                    className="w-16 rounded border border-stone-200 px-2 py-1 text-xs font-semibold focus:border-stone-800 outline-none"
+                                                />
+                                                <select
+                                                    value={charge.type || "FIXED"}
+                                                    onChange={(e) => handleUpdateCharge(idx, "type", e.target.value)}
+                                                    className="rounded border border-stone-200 bg-white px-1.5 py-1 text-xs font-semibold focus:border-stone-800 outline-none"
+                                                >
+                                                    <option value="FIXED">₹ (Flat)</option>
+                                                    <option value="PERCENTAGE">%</option>
+                                                </select>
+                                            </div>
+
+                                            <select
+                                                value={Array.isArray(charge.appliesTo) ? (charge.appliesTo[0] || "ALL") : (charge.appliesTo || "ALL")}
+                                                onChange={(e) => handleUpdateCharge(idx, "appliesTo", [e.target.value])}
+                                                className="rounded border border-stone-200 bg-white px-2 py-1 text-xs font-semibold focus:border-stone-800 outline-none"
+                                            >
+                                                <option value="ALL">All Orders</option>
+                                                <option value="DINE_IN">Dine-In Only</option>
+                                                <option value="TAKEAWAY">Takeaway Only</option>
+                                                <option value="DELIVERY">Delivery Only</option>
+                                                <option value="PICKUP">Pickup Only</option>
+                                            </select>
+
+                                            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-stone-700">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={Boolean(charge.isEnabled)}
+                                                    onChange={(e) => handleUpdateCharge(idx, "isEnabled", e.target.checked)}
+                                                    className="h-3 w-3 accent-orange-600"
+                                                />
+                                                Active
+                                            </label>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveCharge(idx)}
+                                                className="ml-auto text-stone-400 hover:text-rose-600 p-1 transition"
+                                                title="Delete Charge"
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ROUND-OFF & TIPS */}
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            <label className="flex cursor-pointer items-center justify-between gap-2 border-b border-stone-200/60 py-1">
+                                <div>
+                                    <p className="text-xs font-bold text-stone-900">Allow Customer Tips</p>
+                                    <p className="text-[10px] text-stone-500">Enable optional tip selection during checkout.</p>
                                 </div>
                                 <input
                                     type="checkbox"
-                                    checked={Boolean(form.taxEnabled)}
-                                    onChange={setChecked("taxEnabled")}
+                                    checked={form.billingConfig?.allowTips !== false}
+                                    onChange={handleToggleBillingOption("allowTips")}
                                     className="h-3.5 w-3.5 accent-orange-600"
                                 />
                             </label>
 
-                            <label className="flex cursor-pointer items-center justify-between gap-2 border-b border-stone-200/60 py-0.5">
+                            <label className="flex cursor-pointer items-center justify-between gap-2 border-b border-stone-200/60 py-1">
                                 <div>
-                                    <p className="text-xs font-bold text-stone-900">Service Charge</p>
-                                    <p className="text-[10px] text-stone-500">{serviceChargeText}</p>
+                                    <p className="text-xs font-bold text-stone-900">Round-Off Grand Total</p>
+                                    <p className="text-[10px] text-stone-500">Automatically round the final payable amount to the nearest whole rupee.</p>
                                 </div>
                                 <input
                                     type="checkbox"
-                                    checked={Boolean(form.serviceChargeEnabled)}
-                                    onChange={setChecked("serviceChargeEnabled")}
+                                    checked={Boolean(form.billingConfig?.roundOff)}
+                                    onChange={handleToggleBillingOption("roundOff")}
                                     className="h-3.5 w-3.5 accent-orange-600"
                                 />
                             </label>
                         </div>
 
-                        <div className="mt-1.5 grid gap-x-4 gap-y-1.5 md:grid-cols-2">
-                            <Field label="Tax Type">
-                                <select
-                                    className={inputClass}
-                                    value={form.taxType || "EXCLUSIVE"}
-                                    onChange={setField("taxType")}
-                                >
-                                    <option value="EXCLUSIVE">EXCLUSIVE</option>
-                                    <option value="INCLUSIVE">INCLUSIVE</option>
-                                </select>
-                            </Field>
-                            <Field label="Default Tax Percent">
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    className={inputClass}
-                                    placeholder="5"
-                                    value={form.defaultTaxPercent ?? 0}
-                                    onChange={setField("defaultTaxPercent")}
-                                />
-                            </Field>
-                            <Field label="Service Charge Percent">
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    className={inputClass}
-                                    placeholder="10"
-                                    value={form.serviceChargePercent ?? 0}
-                                    onChange={setField("serviceChargePercent")}
-                                />
-                            </Field>
+                        {/* INVOICE NUMBERING */}
+                        <div className="mt-3 grid gap-x-4 gap-y-1.5 md:grid-cols-2">
                             <Field label="Invoice Prefix" hint="Example: CK-2026-">
                                 <input
                                     className={inputClass}

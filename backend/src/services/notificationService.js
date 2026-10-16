@@ -110,27 +110,39 @@ export const createAndDispatchNotification = async ({
         createdAt: notification.createdAt,
       };
 
-      if (recipientType === RECIPIENT_TYPES.CUSTOMER) {
-        realtime.io.to(`customer:${recipientId}`).emit("notification:new", payload);
-        realtime.io.to(`customer_${recipientId}`).emit("notification:new", payload);
-      } else if (recipientType === "SUPPLIER") {
-        realtime.io.to(`supplier:${recipientId}`).emit("notification:new", payload);
-        realtime.io.to(`supplier_${recipientId}`).emit("notification:new", payload);
-      } else if (recipientType === RECIPIENT_TYPES.USER || recipientType === RECIPIENT_TYPES.RESTAURANT) {
-        if (restaurantId) {
-          realtime.io.to(`restaurant:${restaurantId}`).emit("notification:new", payload);
-          realtime.io.to(`restaurant_${restaurantId}`).emit("notification:new", payload);
-        }
-        realtime.io.to(`user:${recipientId}`).emit("notification:new", payload);
-        realtime.io.to(`user_${recipientId}`).emit("notification:new", payload);
+      const emitToTargetRooms = (target, rooms, event, data) => {
+        if (!target || typeof target.to !== "function") return;
+        const validRooms = rooms.filter(Boolean);
+        if (!validRooms.length) return;
 
-        if (realtime?.staff) {
-          if (restaurantId) {
-            realtime.staff.to(`restaurant:${restaurantId}`).emit("notification:new", payload);
-            realtime.staff.to(`restaurant_${restaurantId}`).emit("notification:new", payload);
+        let chain = target.to(validRooms[0]);
+        for (let i = 1; i < validRooms.length; i++) {
+          if (typeof chain?.to === "function") {
+            chain = chain.to(validRooms[i]);
           }
-          realtime.staff.to(`user:${recipientId}`).emit("notification:new", payload);
-          realtime.staff.to(`user_${recipientId}`).emit("notification:new", payload);
+        }
+        if (typeof chain?.emit === "function") {
+          chain.emit(event, data);
+        }
+      };
+
+      if (recipientType === RECIPIENT_TYPES.CUSTOMER) {
+        emitToTargetRooms(realtime.io, [`customer:${recipientId}`, `customer_${recipientId}`], "notification:new", payload);
+      } else if (recipientType === "SUPPLIER") {
+        emitToTargetRooms(realtime.io, [`supplier:${recipientId}`, `supplier_${recipientId}`], "notification:new", payload);
+      } else if (recipientType === RECIPIENT_TYPES.USER) {
+        // User-targeted notification: dispatch ONLY to user room, never broadcast restaurant-wide
+        emitToTargetRooms(realtime.io, [`user:${recipientId}`, `user_${recipientId}`], "notification:new", payload);
+        if (realtime?.staff) {
+          emitToTargetRooms(realtime.staff, [`user:${recipientId}`, `user_${recipientId}`], "notification:new", payload);
+        }
+      } else if (recipientType === RECIPIENT_TYPES.RESTAURANT) {
+        // Restaurant-wide notification: broadcast to restaurant rooms
+        if (restaurantId) {
+          emitToTargetRooms(realtime.io, [`restaurant:${restaurantId}`, `restaurant_${restaurantId}`], "notification:new", payload);
+          if (realtime?.staff) {
+            emitToTargetRooms(realtime.staff, [`restaurant:${restaurantId}`, `restaurant_${restaurantId}`], "notification:new", payload);
+          }
         }
       }
     }

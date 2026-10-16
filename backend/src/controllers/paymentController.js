@@ -27,7 +27,13 @@ export const buildPaymentController = ({ prisma }) => {
       // eslint-disable-next-line no-console
       console.log(err);
       const code = err?.code || "";
-      if (code.endsWith("_required") || code === "razorpay_order_id_mismatch" || code === "customer_payment_verification_requires_payment_id") {
+      if (
+        code.endsWith("_required") ||
+        code === "razorpay_order_id_mismatch" ||
+        code === "customer_payment_verification_requires_payment_id" ||
+        code === "pay_later_limit_exceeded" ||
+        code === "pay_later_not_approved"
+      ) {
         return reply.code(400).send({ message: err?.message || "Invalid input or missing fields" });
       }
       if (code === "order_not_found") return reply.code(404).send({ message: "Order not found" });

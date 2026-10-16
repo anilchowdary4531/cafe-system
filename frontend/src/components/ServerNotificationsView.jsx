@@ -138,14 +138,17 @@ export default function ServerNotificationsView({
             setNotifications((prev) => {
                 const exists = prev.some((n) => String(n.id) === String(notification.id));
                 if (exists) return prev;
+
+                // Only increment unread count once for newly received notification
+                setUnreadCount((prevCount) => {
+                    const nextCount = prevCount + 1;
+                    if (onUnreadCountChangeRef.current) {
+                        onUnreadCountChangeRef.current(nextCount);
+                    }
+                    return nextCount;
+                });
+
                 return [notification, ...prev];
-            });
-            setUnreadCount((prev) => {
-                const nextCount = prev + 1;
-                if (onUnreadCountChangeRef.current) {
-                    onUnreadCountChangeRef.current(nextCount);
-                }
-                return nextCount;
             });
         };
 

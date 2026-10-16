@@ -301,6 +301,56 @@ const buildReceiptPrintMarkup = ({
                 })
                 .join("");
 
+            let snapshot = order?.billingSnapshot;
+            if (typeof snapshot === "string") {
+                try { snapshot = JSON.parse(snapshot); } catch { snapshot = null; }
+            }
+
+            const taxesList = Array.isArray(snapshot?.taxes) ? snapshot.taxes : [];
+            const chargesList = Array.isArray(snapshot?.charges) ? snapshot.charges : [];
+
+            let breakdownMarkup = "";
+            if (taxesList.length > 0) {
+                breakdownMarkup += taxesList.map((t) => `
+                    <tr>
+                        <td style="color:#666; font-size:11px;">${escapeReceiptText(t.name || "Tax")}${t.rate ? ` (${t.rate}%)` : ""}</td>
+                        <td style="text-align:right; font-size:11px;">${formatReceiptAmount(t.amount || 0)}</td>
+                    </tr>
+                `).join("");
+            } else if (order?.taxAmount > 0) {
+                breakdownMarkup += `
+                    <tr>
+                        <td style="color:#666; font-size:11px;">Tax</td>
+                        <td style="text-align:right; font-size:11px;">${formatReceiptAmount(order.taxAmount)}</td>
+                    </tr>
+                `;
+            }
+
+            if (chargesList.length > 0) {
+                breakdownMarkup += chargesList.map((c) => `
+                    <tr>
+                        <td style="color:#666; font-size:11px;">${escapeReceiptText(c.name || "Charge")}</td>
+                        <td style="text-align:right; font-size:11px;">${formatReceiptAmount(c.amount || 0)}</td>
+                    </tr>
+                `).join("");
+            } else if (order?.serviceChargeAmount > 0) {
+                breakdownMarkup += `
+                    <tr>
+                        <td style="color:#666; font-size:11px;">Service Charge</td>
+                        <td style="text-align:right; font-size:11px;">${formatReceiptAmount(order.serviceChargeAmount)}</td>
+                    </tr>
+                `;
+            }
+
+            if (Number(order?.discountAmount || snapshot?.discount || 0) > 0) {
+                breakdownMarkup += `
+                    <tr>
+                        <td style="color:#10b981; font-size:11px;">Discount</td>
+                        <td style="text-align:right; color:#10b981; font-size:11px;">-${formatReceiptAmount(order?.discountAmount || snapshot?.discount)}</td>
+                    </tr>
+                `;
+            }
+
             return `
                 <div class="order-block">
                     <div class="order-head">
@@ -309,6 +359,7 @@ const buildReceiptPrintMarkup = ({
                     </div>
                     <table>
                         <tbody>${itemsMarkup || `<tr><td colspan="2">No items found.</td></tr>`}</tbody>
+                        ${breakdownMarkup ? `<tfoot>${breakdownMarkup}</tfoot>` : ""}
                     </table>
                     <div class="order-total">
                         <span>Order Total</span>

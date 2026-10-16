@@ -294,6 +294,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
 
     const [previewBilling, setPreviewBilling] = useState(null);
     const [previewLoading, setPreviewLoading] = useState(false);
+    const [previewError, setPreviewError] = useState(null);
 
     const slug = String(restaurantContext?.slug || "").trim();
     const restaurantName = String(restaurantContext?.name || "CafeKing").trim() || "CafeKing";
@@ -315,16 +316,22 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         [addressData]
     );
 
+    const isTableOrder = Boolean(String(tableChoice || restaurantContext?.tableNo || "").trim());
+    const isOnlineOrder = !isTableOrder;
+    const selectedFulfillment = isOnlineOrder ? normalizeFulfillment(fulfillment) : "dinein";
+
     // Re-calculate Authoritative Bill Preview from Backend
     useEffect(() => {
         if (!open || !slug || !cart || cart.length === 0) {
             setPreviewBilling(null);
+            setPreviewError(null);
             return;
         }
 
         let isCancelled = false;
         const fetchPreview = async () => {
             setPreviewLoading(true);
+            setPreviewError(null);
             try {
                 const res = await api.post("/customer/checkout/preview", {
                     slug,
@@ -340,7 +347,7 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                     })),
                     couponCode: appliedCouponCode || undefined,
                     pointsToRedeem: redeemedLoyaltyPoints || undefined,
-                }, getCustomerAuthConfig());
+                }, getCustomerAuthConfig() || {});
 
                 if (!isCancelled && res.data?.billing) {
                     setPreviewBilling(res.data.billing);
@@ -348,7 +355,10 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                     if (res.data?.loyaltyError) setLoyaltyError(res.data.loyaltyError);
                 }
             } catch (err) {
-                // Ignore preview error fallback
+                if (!isCancelled) {
+                    const msg = err.response?.data?.message || "Failed to calculate billing preview.";
+                    setPreviewError(msg);
+                }
             } finally {
                 if (!isCancelled) setPreviewLoading(false);
             }
@@ -491,9 +501,6 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         setLoyaltyError("");
     };
 
-    const isTableOrder = Boolean(String(tableChoice || restaurantContext?.tableNo || "").trim());
-    const isOnlineOrder = !isTableOrder;
-    const selectedFulfillment = isOnlineOrder ? normalizeFulfillment(fulfillment) : "dinein";
     const selectedPaymentMethod = normalizePaymentMethod(paymentMethod);
     const selectedSavedAddress = useMemo(
         () => savedAddresses.find((address) => String(address?.id || "") === String(selectedAddressId || "")) || null,
@@ -540,6 +547,14 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                 setError("Your cart is empty.");
                 return;
             }
+            if (previewLoading) {
+                setError("Calculating bill breakdown. Please wait a moment...");
+                return;
+            }
+            if (previewError) {
+                setError(previewError);
+                return;
+            }
             setError("");
             setSuccess("");
             setCheckoutStep("payment");
@@ -579,6 +594,16 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
         const normalizedPhone = String(phone || customer?.phone || "").trim();
         const normalizedName = String(customerName || customer?.name || "").trim();
         const normalizedEmail = String(email || customer?.email || "").trim();
+
+        if (previewLoading) {
+            setError("Calculating bill. Please wait a moment...");
+            return;
+        }
+
+        if (previewError) {
+            setError(previewError);
+            return;
+        }
 
         if (isOnlineOrder && !normalizedPhone) {
             setError("Phone number is required to continue.");
@@ -1091,16 +1116,42 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                         <span className="tabular-nums">-₹{toInr(previewBilling.loyaltyDiscount || previewBilling.loyaltyDiscountAmount)}</span>
                                     </div>
                                 )}
-                                {Number(previewBilling?.tax || previewBilling?.taxAmount || 0) > 0 && (
+                                {Array.isArray(previewBilling?.taxes) && previewBilling.taxes.length > 0 ? (
+                                    previewBilling.taxes.map((t, idx) => (
+                                        <div key={idx} className="flex justify-between theme-muted">
+                                            <span>{t.name || "Tax"}{t.rate ? ` (${t.rate}%)` : ""}</span>
+                                            <span className="tabular-nums">₹{toInr(t.amount)}</span>
+                                        </div>
+                                    ))
+                                ) : Number(previewBilling?.tax || previewBilling?.taxAmount || 0) > 0 ? (
                                     <div className="flex justify-between theme-muted">
                                         <span>Taxes</span>
                                         <span className="tabular-nums">₹{toInr(previewBilling.tax || previewBilling.taxAmount)}</span>
                                     </div>
-                                )}
-                                {Number(previewBilling?.serviceCharge || previewBilling?.serviceChargeAmount || 0) > 0 && (
+                                ) : null}
+                                {Array.isArray(previewBilling?.charges) && previewBilling.charges.length > 0 ? (
+                                    previewBilling.charges.map((c, idx) => (
+                                        <div key={idx} className="flex justify-between theme-muted">
+                                            <span>{c.name || "Charge"}</span>
+                                            <span className="tabular-nums">₹{toInr(c.amount)}</span>
+                                        </div>
+                                    ))
+                                ) : Number(previewBilling?.serviceCharge || previewBilling?.serviceChargeAmount || 0) > 0 ? (
                                     <div className="flex justify-between theme-muted">
                                         <span>Service Charge</span>
                                         <span className="tabular-nums">₹{toInr(previewBilling.serviceCharge || previewBilling.serviceChargeAmount)}</span>
+                                    </div>
+                                ) : null}
+                                {Number(previewBilling?.tip || 0) > 0 && (
+                                    <div className="flex justify-between theme-muted">
+                                        <span>Tip</span>
+                                        <span className="tabular-nums">₹{toInr(previewBilling.tip)}</span>
+                                    </div>
+                                )}
+                                {Number(previewBilling?.roundOff || 0) !== 0 && (
+                                    <div className="flex justify-between theme-muted">
+                                        <span>Round Off</span>
+                                        <span className="tabular-nums">{Number(previewBilling.roundOff) > 0 ? "+" : ""}₹{toInr(previewBilling.roundOff)}</span>
                                     </div>
                                 )}
                                 <div className="border-t border-white/10 pt-2 flex justify-between text-base font-bold">
