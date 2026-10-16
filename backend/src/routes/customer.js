@@ -17,6 +17,7 @@ import {
   listLoyaltyHistory,
 } from "../services/loyaltyService.js";
 import { computeBill } from "../services/billingService.js";
+import defaultPrisma from "../prisma.js";
 import { toSubunit, fromSubunit } from "../services/moneyService.js";
 import { getOrCreateActiveSession, recalculateSessionTotals } from "../services/tableSessionService.js";
 
@@ -68,8 +69,9 @@ const normalizeDeliveryLocation = (body) => {
   };
 };
 
-export default async function customerRoutes(app, deps) {
-  const { prisma, realtime } = deps;
+export default async function customerRoutes(app, deps = {}) {
+  const prisma = deps?.prisma || defaultPrisma;
+  const realtime = deps?.realtime || null;
   const otpController = buildCustomerOtpController({ prisma, app });
   const profileController = buildCustomerProfileController({ prisma });
   const addressController = buildCustomerAddressController({ prisma });
@@ -271,9 +273,9 @@ export default async function customerRoutes(app, deps) {
         .filter((id) => Number.isInteger(id) && id > 0);
 
       let normalizedItems = [];
-      if (requestedIds.length > 0) {
-        const itemNames = items.map((i) => String(i.name || i.itemName || "").trim().toLowerCase()).filter(Boolean);
+      const itemNames = items.map((i) => String(i.name || i.itemName || "").trim().toLowerCase()).filter(Boolean);
 
+      if (requestedIds.length > 0 || itemNames.length > 0) {
         let availableMenuItems = await prisma.menuItem.findMany({
           where: {
             restaurantId: restaurant.id,
@@ -420,6 +422,7 @@ export default async function customerRoutes(app, deps) {
       const bill = computeBill({
         items: normalizedItems.map((i) => ({ priceSubunit: toSubunit(i.price), qty: i.qty })),
         taxEnabled: Boolean(restaurant.taxEnabled || restaurant.defaultTaxPercent > 0),
+        taxType: restaurant.taxType || "EXCLUSIVE",
         taxPercent: Number(restaurant.defaultTaxPercent || restaurant.taxPercent || 0),
         serviceChargeEnabled: Boolean(restaurant.serviceChargeEnabled),
         serviceChargePercent: Number(restaurant.serviceChargePercent || 0),
@@ -477,11 +480,11 @@ export default async function customerRoutes(app, deps) {
           deliveryLatitude: isPickupOrder ? null : normalizedDeliveryLocation.latitude,
           deliveryLongitude: isPickupOrder ? null : normalizedDeliveryLocation.longitude,
           subtotal: bill.subtotal,
-          taxAmount: bill.tax,
-          serviceChargeAmount: bill.serviceCharge,
+          taxAmount: bill.taxAmount ?? bill.tax ?? 0,
+          serviceChargeAmount: bill.serviceChargeAmount ?? bill.serviceCharge ?? 0,
           total: bill.total,
           loyaltyPointsRedeemed: redeemedPoints,
-          loyaltyDiscountAmount: bill.loyaltyDiscount,
+          loyaltyDiscountAmount: bill.loyaltyDiscountAmount ?? bill.loyaltyDiscount ?? 0,
           status: "PLACED",
           customerId: customerRecord?.id || null,
           items: {
@@ -735,50 +738,85 @@ export default async function customerRoutes(app, deps) {
         });
       }
 
-      // Re-verify items against DB active menu items
+      if (!items.length) {
+        return {
+          ok: true,
+          restaurant: { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
+          billing: {
+            subtotal: 0,
+            couponDiscount: 0,
+            loyaltyDiscount: 0,
+            totalDiscount: 0,
+            netSubtotal: 0,
+            tax: 0,
+            serviceCharge: 0,
+            deliveryFee: 0,
+            total: 0,
+          },
+          coupon: null,
+          couponError: null,
+          loyalty: null,
+          loyaltyError: null,
+          items: [],
+        };
+      }
+
+      // Re-verify items against DB active menu items by both ID and Name
       const requestedIds = items
         .map((item) => Number(item.id || item.menuItemId))
         .filter((id) => Number.isInteger(id) && id > 0);
+      const itemNames = items
+        .map((i) => String(i.name || i.itemName || "").trim().toLowerCase())
+        .filter(Boolean);
 
-      let normalizedItems = [];
-      if (requestedIds.length > 0) {
-        const dbMenuItems = await prisma.menuItem.findMany({
+      let availableMenuItems = [];
+      if (requestedIds.length > 0 || itemNames.length > 0) {
+        availableMenuItems = await prisma.menuItem.findMany({
           where: {
             restaurantId: restaurant.id,
-            id: { in: requestedIds },
             isAvailable: true,
+            OR: [
+              ...(requestedIds.length > 0 ? [{ id: { in: requestedIds } }] : []),
+              ...(itemNames.length > 0 ? [{ name: { in: itemNames } }] : []),
+            ],
           },
           select: { id: true, name: true, price: true },
         });
 
-        const dbItemMap = new Map(dbMenuItems.map((item) => [item.id, item]));
-
-        for (const rawItem of items) {
-          const itemId = Number(rawItem.id || rawItem.menuItemId);
-          const dbItem = dbItemMap.get(itemId);
-          if (!dbItem) continue;
-
-          const qty = Math.max(1, Number(rawItem.qty || rawItem.quantity || 1));
-          const price = Number(dbItem.price);
-          normalizedItems.push({
-            menuItemId: dbItem.id,
-            itemName: dbItem.name,
-            qty,
-            price,
-            total: price * qty,
+        if (!availableMenuItems.length) {
+          availableMenuItems = await prisma.menuItem.findMany({
+            where: { restaurantId: restaurant.id, isAvailable: true },
+            select: { id: true, name: true, price: true },
           });
         }
-      } else {
-        normalizedItems = items.map((rawItem) => {
-          const qty = Math.max(1, Number(rawItem.qty || rawItem.quantity || 1));
-          const price = Number(rawItem.price || 0);
-          return {
-            menuItemId: null,
-            itemName: String(rawItem.name || "Item").trim(),
-            qty,
-            price,
-            total: price * qty,
-          };
+      }
+
+      const availableById = new Map(availableMenuItems.map((item) => [item.id, item]));
+      const availableByName = new Map(availableMenuItems.map((item) => [item.name.toLowerCase(), item]));
+
+      const normalizedItems = [];
+      for (const rawItem of items) {
+        const itemId = Number(rawItem.id || rawItem.menuItemId);
+        const itemName = String(rawItem.name || rawItem.itemName || "").trim().toLowerCase();
+        const dbItem = availableById.get(itemId) || (itemName ? availableByName.get(itemName) : null);
+
+        const rawPrice = Number(rawItem.price);
+        const hasValidRawPrice = rawItem.price !== undefined && rawItem.price !== null && !Number.isNaN(rawPrice) && rawPrice >= 0;
+
+        if (!dbItem && !hasValidRawPrice) {
+          return reply.code(400).send({
+            message: `One or more items are unavailable`,
+          });
+        }
+
+        const qty = Math.max(1, Number(rawItem.qty || rawItem.quantity || 1));
+        const price = hasValidRawPrice ? rawPrice : Number(dbItem.price);
+        normalizedItems.push({
+          menuItemId: dbItem?.id || null,
+          itemName: dbItem?.name || String(rawItem.name || rawItem.itemName || "Item").trim(),
+          qty,
+          price,
+          total: price * qty,
         });
       }
 
@@ -849,6 +887,7 @@ export default async function customerRoutes(app, deps) {
       const bill = computeBill({
         items: normalizedItems.map((i) => ({ priceSubunit: toSubunit(i.price), qty: i.qty })),
         taxEnabled: Boolean(restaurant.taxEnabled || restaurant.defaultTaxPercent > 0),
+        taxType: restaurant.taxType || "EXCLUSIVE",
         taxPercent: Number(restaurant.defaultTaxPercent || restaurant.taxPercent || 0),
         serviceChargeEnabled: Boolean(restaurant.serviceChargeEnabled),
         serviceChargePercent: Number(restaurant.serviceChargePercent || 0),
@@ -856,19 +895,18 @@ export default async function customerRoutes(app, deps) {
         loyaltyDiscountSubunit: loyaltySubunit,
       });
 
-
       return {
         ok: true,
         restaurant: { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
         billing: {
           subtotal: bill.subtotal,
-          couponDiscount: bill.couponDiscount,
-          loyaltyDiscount: bill.loyaltyDiscount,
-          totalDiscount: bill.totalDiscount,
-          netSubtotal: bill.netSubtotal,
-          tax: bill.tax,
-          serviceCharge: bill.serviceCharge,
-          deliveryFee: bill.deliveryFee,
+          couponDiscount: bill.couponDiscount ?? bill.promoDiscountAmount ?? 0,
+          loyaltyDiscount: bill.loyaltyDiscount ?? bill.loyaltyDiscountAmount ?? 0,
+          totalDiscount: bill.totalDiscount ?? bill.discountAmount ?? 0,
+          netSubtotal: bill.netSubtotal ?? bill.subtotal,
+          tax: bill.tax ?? bill.taxAmount ?? 0,
+          serviceCharge: bill.serviceCharge ?? bill.serviceChargeAmount ?? 0,
+          deliveryFee: bill.deliveryFee ?? 0,
           total: bill.total,
         },
         coupon: couponInfo,

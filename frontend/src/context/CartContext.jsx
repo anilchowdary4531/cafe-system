@@ -69,16 +69,23 @@ export function CartProvider({ children }) {
         setActiveScope(currentScope === ORDER_FLOW_SCOPES.TABLE ? ORDER_FLOW_SCOPES.TABLE : ORDER_FLOW_SCOPES.ONLINE);
     }, [scope]);
 
+    const getItemKey = (i) => i?.cartKey || (i?.variantId ? `${i?.id || i?.menuItemId}_var_${i.variantId}` : (i?.id || i?.menuItemId));
+
     const addToCart = useCallback((item, { silent = false } = {}) => {
+        if (!item) return;
+        const normalizedId = item.id || item.menuItemId || item.cartKey;
+        const itemKey = item.cartKey || (item.variantId ? `${normalizedId}_var_${item.variantId}` : normalizedId);
+        const addQty = Math.max(1, Number(item.quantity || item.qty || 1));
+
         updateCart((currentCart) => {
-            const existing = currentCart.find((i) => i.id === item.id);
+            const existing = currentCart.find((i) => getItemKey(i) === itemKey);
             if (existing) {
                 return currentCart.map((i) =>
-                    i.id === item.id ? { ...i, quantity: (i.quantity || 0) + 1 } : i
+                    getItemKey(i) === itemKey ? { ...i, quantity: (i.quantity || 0) + addQty } : i
                 );
             }
 
-            return [...currentCart, { ...item, quantity: 1 }];
+            return [...currentCart, { ...item, id: normalizedId, quantity: addQty }];
         });
 
         if (!silent) {
@@ -90,13 +97,13 @@ export function CartProvider({ children }) {
                 actionLabel: "Undo",
                 onAction: () => {
                     updateCart((currentCart) => {
-                        const existing = currentCart.find((i) => i.id === item.id);
+                        const existing = currentCart.find((i) => getItemKey(i) === itemKey);
                         if (!existing) return currentCart;
-                        if (Number(existing.quantity || 0) <= 1) {
-                            return currentCart.filter((i) => i.id !== item.id);
+                        if (Number(existing.quantity || 0) <= addQty) {
+                            return currentCart.filter((i) => getItemKey(i) !== itemKey);
                         }
                         return currentCart.map((i) =>
-                            i.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+                            getItemKey(i) === itemKey ? { ...i, quantity: i.quantity - addQty } : i
                         );
                     });
                 },
@@ -106,27 +113,27 @@ export function CartProvider({ children }) {
 
     const increaseQty = useCallback((id) => {
         updateCart((currentCart) =>
-            currentCart.map((i) => (i.id === id ? { ...i, quantity: (i.quantity || 0) + 1 } : i))
+            currentCart.map((i) => (i.id === id || i.cartKey === id || getItemKey(i) === id ? { ...i, quantity: (i.quantity || 0) + 1 } : i))
         );
     }, [updateCart]);
 
     const decreaseQty = useCallback((id) => {
         updateCart((currentCart) =>
             currentCart
-                .map((i) => (i.id === id ? { ...i, quantity: (i.quantity || 0) - 1 } : i))
+                .map((i) => (i.id === id || i.cartKey === id || getItemKey(i) === id ? { ...i, quantity: (i.quantity || 0) - 1 } : i))
                 .filter((i) => (i.quantity || 0) > 0)
         );
     }, [updateCart]);
 
     const removeFromCart = useCallback((id) => {
-        updateCart((currentCart) => currentCart.filter((item) => item.id !== id));
+        updateCart((currentCart) => currentCart.filter((item) => item.id !== id && item.cartKey !== id && getItemKey(item) !== id));
     }, [updateCart]);
 
     const clearCart = useCallback(() => {
         updateCart([]);
     }, [updateCart]);
 
-    const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const total = cart.reduce((sum, i) => sum + Number(i.price || 0) * Math.max(1, Number(i.quantity || i.qty || 1)), 0);
 
     const value = useMemo(
         () => ({

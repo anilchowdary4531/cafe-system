@@ -51,7 +51,7 @@ export function useAuth() {
     return useContext(AuthContext) || {};
 }
 
-export default function AuthProvider({ children }) {
+export function AuthProvider({ children }) {
     const navigate = useNavigate();
     const initialStaffSession = getActiveStaffSession();
     const [staffToken, setStaffToken] = useState(() => initialStaffSession?.token || null);
@@ -240,3 +240,5 @@ export default function AuthProvider({ children }) {
         </AuthContext.Provider>
     );
 }
+
+export default AuthProvider;

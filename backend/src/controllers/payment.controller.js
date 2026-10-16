@@ -30,6 +30,22 @@ export const buildPaymentController = ({ prisma }) => {
       let resolvedName = inputName;
       let resolvedPhone = inputPhone;
       let resolvedEmail = inputEmail;
+      let resolvedAmount = amount;
+
+      // Ensure authoritative order total if orderId is provided
+      if (orderId && prisma) {
+        try {
+          const numOrderId = Number(orderId);
+          if (!Number.isNaN(numOrderId) && numOrderId > 0 && numOrderId < 2147483647) {
+            const dbOrder = await prisma.order.findUnique({ where: { id: numOrderId } });
+            if (dbOrder && Number.isFinite(Number(dbOrder.total)) && Number(dbOrder.total) > 0) {
+              resolvedAmount = Number(dbOrder.total);
+            }
+          }
+        } catch (oErr) {
+          console.warn("[PaymentController] Order lookup warning:", oErr.message);
+        }
+      }
 
       // Look up customer in Prisma DB if customerId is provided
       if (customerId && prisma) {
@@ -93,7 +109,7 @@ export const buildPaymentController = ({ prisma }) => {
 
       const result = await createCashfreePaymentSession({
         orderId,
-        amount,
+        amount: resolvedAmount,
         customerId: customerId || "guest",
         customerPhone: resolvedPhone,
         customerName: resolvedName,
@@ -111,7 +127,7 @@ export const buildPaymentController = ({ prisma }) => {
         try {
           const numRestId = Number(restaurantId || body.restaurantId || 1);
           const numOrderId = Number(orderId);
-          const amountSubunit = Math.round(Number(amount || 0) * 100);
+          const amountSubunit = Math.round(Number(resolvedAmount || 0) * 100);
 
           if (numOrderId && !Number.isNaN(numOrderId)) {
             await prisma.payment.create({

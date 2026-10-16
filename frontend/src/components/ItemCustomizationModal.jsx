@@ -172,7 +172,8 @@ export default function ItemCustomizationModal({
     const allSelectedModifiers = Object.values(selectedModifiersMap).flat();
 
     const resultPayload = {
-      menuItemId: item.id,
+      id: item.id || item.menuItemId,
+      menuItemId: item.id || item.menuItemId,
       name: item.name,
       category: item.category,
       image: item.image,
@@ -185,10 +186,11 @@ export default function ItemCustomizationModal({
       selectedModifiers: allSelectedModifiers,
       notes: notes.trim(),
       qty,
+      quantity: qty,
       unitPrice,
       price: unitPrice,
       totalPrice,
-      cartKey: `${item.id}_${selectedVariant?.id || "def"}_${allSelectedModifiers.map((m) => m.modifierId).sort().join("-")}_${notes.trim()}`,
+      cartKey: `${item.id || item.menuItemId}_${selectedVariant?.id || "def"}_${allSelectedModifiers.map((m) => m.modifierId).sort().join("-")}_${notes.trim()}`,
     };
 
     onSave(resultPayload);

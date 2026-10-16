@@ -39,8 +39,8 @@ export default function Cart() {
         scope: `restaurant:${slug}`,
     });
 
-    const taxEnabled = Boolean(menuData?.restaurant?.taxEnabled);
-    const taxPercent = Number(menuData?.restaurant?.taxPercent || 0);
+    const taxEnabled = Boolean(menuData?.restaurant?.taxEnabled || menuData?.restaurant?.defaultTaxPercent > 0);
+    const taxPercent = Number(menuData?.restaurant?.defaultTaxPercent || menuData?.restaurant?.taxPercent || 0);
     const tax = taxEnabled ? (subtotal * taxPercent) / 100 : 0;
     const total = subtotal + tax;
     const isCustomerLoggedIn = Boolean(customerToken || customer);

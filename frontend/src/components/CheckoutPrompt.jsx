@@ -328,7 +328,16 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
             try {
                 const res = await api.post("/customer/checkout/preview", {
                     slug,
-                    items: cart.map((i) => ({ id: i.id, quantity: i.quantity || 1 })),
+                    items: cart.map((i) => ({
+                        id: i.id || i.menuItemId,
+                        menuItemId: i.menuItemId || i.id,
+                        name: i.name || i.itemName,
+                        price: i.price !== undefined ? Number(i.price) : undefined,
+                        quantity: Math.max(1, Number(i.quantity || i.qty || 1)),
+                        qty: Math.max(1, Number(i.quantity || i.qty || 1)),
+                        variantId: i.variantId || i.variant?.id,
+                        selectedModifiers: i.selectedModifiers,
+                    })),
                     couponCode: appliedCouponCode || undefined,
                     pointsToRedeem: redeemedLoyaltyPoints || undefined,
                 }, getCustomerAuthConfig());
@@ -422,9 +431,9 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
 
     const cartSubtotal = useMemo(() => {
         const list = Array.isArray(cart) ? cart : [];
-        return list.reduce((sum, it) => sum + Number(it.price || 0) * Math.max(1, Number(it.quantity || 1)), 0);
+        return list.reduce((sum, it) => sum + Number(it.price || 0) * Math.max(1, Number(it.quantity || it.qty || 1)), 0);
     }, [cart]);
-    const payableAmount = Number(placedOrder?.total || previewBilling?.total || cartSubtotal || 0);
+    const payableAmount = Number(placedOrder?.total ?? previewBilling?.total ?? cartSubtotal ?? 0);
 
     const handleApplyCoupon = async () => {
         if (!couponInput.trim()) return;
@@ -644,10 +653,13 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                 couponCode: appliedCouponCode || undefined,
                 pointsToRedeem: redeemedLoyaltyPoints || undefined,
                 items: cart.map((item) => ({
-                    id: item.id,
-                    name: item.name,
-                    price: item.price,
-                    qty: item.quantity || 1,
+                    id: item.id || item.menuItemId,
+                    menuItemId: item.menuItemId || item.id,
+                    name: item.name || item.itemName,
+                    price: item.price !== undefined ? Number(item.price) : undefined,
+                    qty: Math.max(1, Number(item.quantity || item.qty || 1)),
+                    variantId: item.variantId || item.variant?.id,
+                    selectedModifiers: item.selectedModifiers,
                 })),
             };
 
@@ -1065,24 +1077,30 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                             <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4 space-y-2 text-xs">
                                 <div className="flex justify-between theme-muted">
                                     <span>Subtotal</span>
-                                    <span className="tabular-nums">₹{toInr(previewBilling?.subtotal || cartSubtotal)}</span>
+                                    <span className="tabular-nums">₹{toInr(previewBilling?.subtotal ?? cartSubtotal)}</span>
                                 </div>
-                                {Number(previewBilling?.couponDiscount || 0) > 0 && (
+                                {Number(previewBilling?.couponDiscount || previewBilling?.promoDiscountAmount || 0) > 0 && (
                                     <div className="flex justify-between text-emerald-400 font-semibold">
                                         <span>Coupon Discount ({appliedCouponCode})</span>
-                                        <span className="tabular-nums">-₹{toInr(previewBilling.couponDiscount)}</span>
+                                        <span className="tabular-nums">-₹{toInr(previewBilling.couponDiscount || previewBilling.promoDiscountAmount)}</span>
                                     </div>
                                 )}
-                                {Number(previewBilling?.loyaltyDiscount || 0) > 0 && (
+                                {Number(previewBilling?.loyaltyDiscount || previewBilling?.loyaltyDiscountAmount || 0) > 0 && (
                                     <div className="flex justify-between text-amber-400 font-semibold">
                                         <span>Loyalty Discount ({redeemedLoyaltyPoints} pts)</span>
-                                        <span className="tabular-nums">-₹{toInr(previewBilling.loyaltyDiscount)}</span>
+                                        <span className="tabular-nums">-₹{toInr(previewBilling.loyaltyDiscount || previewBilling.loyaltyDiscountAmount)}</span>
                                     </div>
                                 )}
-                                {Number(previewBilling?.tax || 0) > 0 && (
+                                {Number(previewBilling?.tax || previewBilling?.taxAmount || 0) > 0 && (
                                     <div className="flex justify-between theme-muted">
                                         <span>Taxes</span>
-                                        <span className="tabular-nums">₹{toInr(previewBilling.tax)}</span>
+                                        <span className="tabular-nums">₹{toInr(previewBilling.tax || previewBilling.taxAmount)}</span>
+                                    </div>
+                                )}
+                                {Number(previewBilling?.serviceCharge || previewBilling?.serviceChargeAmount || 0) > 0 && (
+                                    <div className="flex justify-between theme-muted">
+                                        <span>Service Charge</span>
+                                        <span className="tabular-nums">₹{toInr(previewBilling.serviceCharge || previewBilling.serviceChargeAmount)}</span>
                                     </div>
                                 )}
                                 <div className="border-t border-white/10 pt-2 flex justify-between text-base font-bold">

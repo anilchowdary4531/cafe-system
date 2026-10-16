@@ -61,10 +61,17 @@ export const computeBill = ({
     // Backward-compatible float fields for existing schema.
     subtotal: fromSubunit(subtotalSubunit),
     taxAmount: fromSubunit(taxSubunit),
+    tax: fromSubunit(taxSubunit),
     serviceChargeAmount: fromSubunit(serviceChargeSubunit),
+    serviceCharge: fromSubunit(serviceChargeSubunit),
     discountAmount: fromSubunit(totalDiscount),
+    totalDiscount: fromSubunit(totalDiscount),
     promoDiscountAmount: fromSubunit(promoDiscount),
+    couponDiscount: fromSubunit(promoDiscount),
     loyaltyDiscountAmount: fromSubunit(loyaltyDiscount),
+    loyaltyDiscount: fromSubunit(loyaltyDiscount),
+    netSubtotal: fromSubunit(Math.max(0, subtotalSubunit - totalDiscount)),
+    deliveryFee: 0,
     total: fromSubunit(totalSubunit),
   };
 };
@@ -95,6 +102,8 @@ export const toPriceSubunitItems = ({ menuItems = [], items = [] } = {}) => {
           notes: String(raw?.notes || "").trim() || null,
           qty,
           unitPrice: rawPrice,
+          price: rawPrice,
+          total: rawPrice * qty,
           priceSubunit: toSubunit(rawPrice),
         });
         continue;
@@ -211,6 +220,8 @@ export const toPriceSubunitItems = ({ menuItems = [], items = [] } = {}) => {
       notes: String(raw?.notes || "").trim() || null,
       qty,
       unitPrice: finalUnitPrice,
+      price: finalUnitPrice,
+      total: finalUnitPrice * qty,
       priceSubunit: toSubunit(finalUnitPrice),
     });
   }
