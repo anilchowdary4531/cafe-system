@@ -443,8 +443,21 @@ export default function OrderHistory({ embedded = false } = {}) {
 
                     {enabled && loading && <p className="theme-muted mt-6">Loading orders...</p>}
                     {enabled && error && (
-                        <div className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                            {error}
+                        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                            <span>{error}</span>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (!loading) {
+                                        refresh({ force: true });
+                                    }
+                                }}
+                                disabled={loading}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-red-400/30 bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-200 transition-all hover:bg-red-500/30 disabled:opacity-50 cursor-pointer"
+                            >
+                                <RefreshCcw size={14} className={loading ? "animate-spin" : ""} />
+                                {loading ? "Retrying..." : "Retry"}
+                            </button>
                         </div>
                     )}
 

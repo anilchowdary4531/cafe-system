@@ -136,15 +136,17 @@ describe("Checkout Amount Calculation & Order Summary Audit", () => {
         // 5. Verify Header amount: Cafe Fido • ₹294.00
         expect(screen.getByText(/Cafe Fido • ₹294\.00/)).toBeInTheDocument();
 
-        // 6. Verify Top-right total: ₹294.00
+        // 6. Verify Bill Summary total: ₹294.00
         const matchingTotals = screen.getAllByText("₹294.00");
-        expect(matchingTotals.length).toBeGreaterThanOrEqual(2);
+        expect(matchingTotals.length).toBeGreaterThanOrEqual(1);
 
         // 7. Verify Bottom sticky bar: Rs 294.00
         expect(screen.getByText("Rs 294.00")).toBeInTheDocument();
 
-        // 8. Verify Continue to Payment button is present
-        expect(screen.getByRole("button", { name: /continue to payment/i })).toBeInTheDocument();
+        // 8. Verify Primary Pay button is present and enabled
+        const payBtns = screen.getAllByRole("button", { name: /send otp & pay|pay rs|place order/i });
+        expect(payBtns.length).toBeGreaterThanOrEqual(1);
+        expect(payBtns[0]).not.toBeDisabled();
     });
 
     it("3. Quantity > 1: Chicken Pulao x 2 (₹520) + Coffee x 3 (₹60) yields Subtotal ₹580.00", async () => {
@@ -206,8 +208,8 @@ describe("Checkout Amount Calculation & Order Summary Audit", () => {
         );
 
         expect(screen.getByText("Your cart is empty")).toBeInTheDocument();
-        const continueBtn = screen.getByRole("button", { name: /continue to payment/i });
-        expect(continueBtn).toBeDisabled();
+        const payBtns = screen.getAllByRole("button", { name: /send otp & pay|pay rs|place order/i });
+        expect(payBtns[0]).toBeDisabled();
     });
 
     it("5. Coupon discount: Displays coupon line and deducts from authoritative total", async () => {

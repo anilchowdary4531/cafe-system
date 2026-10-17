@@ -12,16 +12,23 @@ const percentOf = (amountSubunit, percent) => {
   return Math.round(clampSubunit(amountSubunit) * bp / 10000);
 };
 
+export const normalizeOrderType = (t) => {
+  const norm = String(t || "").trim().toUpperCase();
+  if (norm === "PICKUP" || norm === "TAKE_AWAY") return "TAKEAWAY";
+  if (norm === "DINEIN" || norm === "TABLE") return "DINE_IN";
+  return norm;
+};
+
 export const matchesOrderType = (appliesTo, currentOrderType = "ALL") => {
   if (!appliesTo) return true;
-  const current = String(currentOrderType || "ALL").trim().toUpperCase();
+  const current = normalizeOrderType(currentOrderType || "ALL");
   if (typeof appliesTo === "string") {
-    const norm = appliesTo.trim().toUpperCase();
+    const norm = normalizeOrderType(appliesTo);
     return norm === "ALL" || norm === current || current === "ALL";
   }
   if (Array.isArray(appliesTo)) {
     if (appliesTo.length === 0) return true;
-    const uppercased = appliesTo.map((a) => String(a).trim().toUpperCase());
+    const uppercased = appliesTo.map((a) => normalizeOrderType(a));
     return uppercased.includes("ALL") || uppercased.includes(current) || current === "ALL";
   }
   return true;
@@ -132,12 +139,21 @@ export const calculateBill = ({
 
   const normalizedOrderType = String(orderType || "ALL").trim().toUpperCase();
 
+  let effectiveBillingConfig = billingConfig;
+  if (typeof effectiveBillingConfig === "string") {
+    try {
+      effectiveBillingConfig = JSON.parse(effectiveBillingConfig);
+    } catch {
+      effectiveBillingConfig = null;
+    }
+  }
+
   // Resolve taxes list
   let resolvedTaxes = [];
   if (Array.isArray(taxes)) {
     resolvedTaxes = taxes;
-  } else if (billingConfig && Array.isArray(billingConfig.taxes)) {
-    resolvedTaxes = billingConfig.taxes;
+  } else if (effectiveBillingConfig && Array.isArray(effectiveBillingConfig.taxes)) {
+    resolvedTaxes = effectiveBillingConfig.taxes;
   } else if (taxEnabled) {
     resolvedTaxes = [
       {
@@ -214,8 +230,8 @@ export const calculateBill = ({
   let resolvedCharges = [];
   if (Array.isArray(charges)) {
     resolvedCharges = charges;
-  } else if (billingConfig && Array.isArray(billingConfig.charges)) {
-    resolvedCharges = billingConfig.charges;
+  } else if (effectiveBillingConfig && Array.isArray(effectiveBillingConfig.charges)) {
+    resolvedCharges = effectiveBillingConfig.charges;
   } else if (serviceChargeEnabled) {
     resolvedCharges = [
       {
@@ -271,7 +287,7 @@ export const calculateBill = ({
 
   // Round-off
   const shouldRoundOff = Boolean(
-    roundOff !== null && roundOff !== undefined ? roundOff : billingConfig?.roundOff
+    roundOff !== null && roundOff !== undefined ? roundOff : effectiveBillingConfig?.roundOff
   );
 
   let roundOffSubunit = 0;

@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import { Link, NavLink, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Gift, Heart, IndianRupee, MapPin, Settings, Sparkles, Star, UserCircle2, Bell, Wallet, Calendar } from "lucide-react";
+import { ArrowLeft, Gift, Heart, IndianRupee, MapPin, Settings, Sparkles, Star, UserCircle2, Bell, Wallet, Calendar, RefreshCcw } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import useCustomerProfile from "../hooks/useCustomerProfile";
 import useCachedGet from "../hooks/useCachedGet";
@@ -365,7 +365,7 @@ function RecentOrdersSection({ profile, customerToken, buildProfilePath }) {
     const enabled = Boolean(phone || customerToken);
     const params = useMemo(() => (phone ? { phone } : undefined), [phone]);
 
-    const { data, loading, error } = useCachedGet("/customer/orders", {
+    const { data, loading, error, refresh } = useCachedGet("/customer/orders", {
         enabled,
         params,
         ttlMs: 15_000,
@@ -409,7 +409,22 @@ function RecentOrdersSection({ profile, customerToken, buildProfilePath }) {
             {!enabled && <p className="theme-muted text-xs py-2">Login session required to load recent orders.</p>}
             {enabled && loading && <p className="theme-muted text-xs py-2">Loading recent orders...</p>}
             {enabled && error && (
-                <div className="rounded-md border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-600 dark:text-rose-400">{error}</div>
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-600 dark:text-rose-400">
+                    <span>{error}</span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (!loading) {
+                                refresh({ force: true });
+                            }
+                        }}
+                        disabled={loading}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-[var(--app-primary)] px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-50 transition-all cursor-pointer"
+                    >
+                        <RefreshCcw size={12} className={loading ? "animate-spin" : ""} />
+                        {loading ? "Retrying..." : "Retry"}
+                    </button>
+                </div>
             )}
 
             {enabled && !loading && !error && (

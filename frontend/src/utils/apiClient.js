@@ -125,20 +125,21 @@ export const cachedGet = async (
     }
 
     if (!force && inFlight.has(key)) {
-        await inFlight.get(key);
-        const latest = getCacheEntry(key);
-        if (latest?.data !== undefined) return latest.data;
+        return inFlight.get(key);
     }
 
-    const p = api.get(url, { params });
-    inFlight.set(key, p);
-    const res = await p.finally(() => {
+    const p = (async () => {
+        const res = await api.get(url, { params });
+        const entry = makeCacheEntry({ data: res.data, ttlMs });
+        if (entry.expiresAt) entry.staleExpiresAt = entry.expiresAt + Number(staleMs || 0);
+        setCacheEntry(key, entry);
+        return res.data;
+    })().finally(() => {
         inFlight.delete(key);
     });
-    const entry = makeCacheEntry({ data: res.data, ttlMs });
-    if (entry.expiresAt) entry.staleExpiresAt = entry.expiresAt + Number(staleMs || 0);
-    setCacheEntry(key, entry);
-    return res.data;
+
+    inFlight.set(key, p);
+    return p;
 };
 
 export const invalidateGetCache = ({ urlStartsWith } = {}) => {

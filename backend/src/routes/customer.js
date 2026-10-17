@@ -69,6 +69,21 @@ const normalizeDeliveryLocation = (body) => {
   };
 };
 
+const isTransientPrismaError = (err) => {
+  if (!err) return false;
+  const transientCodes = new Set(["P1001", "P1002", "P1008", "P1017", "P2024"]);
+  if (err.code && transientCodes.has(err.code)) return true;
+  if (err.name === "PrismaClientInitializationError" || err.name === "PrismaClientRustPanicError") return true;
+  const msg = String(err.message || "").toLowerCase();
+  return (
+    msg.includes("connection closed") ||
+    msg.includes("connection pool timeout") ||
+    msg.includes("timed out fetching a new connection") ||
+    msg.includes("connection terminated") ||
+    msg.includes("connection reset")
+  );
+};
+
 export default async function customerRoutes(app, deps = {}) {
   const prisma = deps?.prisma || defaultPrisma;
   const realtime = deps?.realtime || null;
@@ -78,26 +93,68 @@ export default async function customerRoutes(app, deps = {}) {
   const authController = buildCustomerAuthController({ prisma, app });
 
   app.get("/customer/orders", async (req, reply) => {
+    let phone = "";
     try {
       let tokenPhone = "";
-      try {
-        tokenPhone = await requireCustomerPhoneFromJwt(req, prisma);
-      } catch {
-        tokenPhone = "";
+      if (req.headers?.authorization) {
+        try {
+          await req.jwtVerify();
+          tokenPhone = normalizePhone(req.user?.phone || "");
+          if (!tokenPhone && req.user?.id) {
+            const user = await prisma.user.findUnique({
+              where: { id: Number(req.user.id) },
+              select: { phone: true },
+            });
+            if (user?.phone) tokenPhone = normalizePhone(user.phone);
+          }
+          if (!tokenPhone) {
+            return reply.code(401).send({ message: "Unauthorized" });
+          }
+        } catch {
+          return reply.code(401).send({ message: "Unauthorized" });
+        }
       }
 
-      const phone = normalizePhone(req.query?.phone || tokenPhone || "");
+      phone = normalizePhone(tokenPhone || req.query?.phone || "");
       if (!phone) return reply.code(400).send({ message: "Phone number is required" });
 
-      const orders = await prisma.order.findMany({
-        where: { phone },
-        include: {
-          restaurant: { select: { id: true, name: true, slug: true, city: true, state: true, logoUrl: true } },
-          items: true,
-          statusEvents: { orderBy: { createdAt: "asc" } },
-        },
-        orderBy: { createdAt: "desc" },
-      });
+      const queryOrders = () =>
+        prisma.order.findMany({
+          where: {
+            phone: {
+              in: getPhoneVariants(phone),
+            },
+          },
+          include: {
+            restaurant: { select: { id: true, name: true, slug: true, city: true, state: true, logoUrl: true } },
+            items: true,
+            statusEvents: { orderBy: { createdAt: "asc" } },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+
+      let orders;
+      try {
+        orders = await queryOrders();
+      } catch (firstErr) {
+        if (isTransientPrismaError(firstErr)) {
+          const logPayload = {
+            errName: firstErr.name,
+            errCode: firstErr.code,
+            errMsg: firstErr.message,
+            msg: "Transient Prisma error on customer orders, retrying once",
+          };
+          if (req.log?.warn) {
+            req.log.warn(logPayload);
+          } else {
+            console.warn(logPayload);
+          }
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          orders = await queryOrders();
+        } else {
+          throw firstErr;
+        }
+      }
 
       const byRestaurantId = new Map();
 
@@ -157,7 +214,20 @@ export default async function customerRoutes(app, deps = {}) {
 
       return { phone, groups };
     } catch (err) {
-      console.log(err);
+      const maskedPhone = phone ? `${phone.slice(0, 3)}****${phone.slice(-2)}` : "";
+      const errorLog = {
+        name: err.name,
+        code: err.code,
+        message: err.message,
+        meta: err.meta,
+        url: req.raw?.url || req.url,
+        phone: maskedPhone,
+      };
+      if (req.log?.error) {
+        req.log.error(errorLog, "Failed to fetch customer orders");
+      } else {
+        console.error("Failed to fetch customer orders:", errorLog);
+      }
       return reply.code(500).send({ message: "Failed to fetch customer orders" });
     }
   });
@@ -719,10 +789,12 @@ export default async function customerRoutes(app, deps = {}) {
       const { slug, items = [], couponCode, pointsToRedeem, restaurantId: rawRestId } = body;
 
       let restaurant = null;
-      if (rawRestId) {
-        restaurant = await prisma.restaurant.findUnique({ where: { id: Number(rawRestId) } });
-      } else if (slug) {
-        restaurant = await prisma.restaurant.findUnique({ where: { slug } });
+      const parsedRestId = Number(rawRestId);
+      if (Number.isInteger(parsedRestId) && parsedRestId > 0) {
+        restaurant = await prisma.restaurant.findUnique({ where: { id: parsedRestId } });
+      }
+      if (!restaurant && slug) {
+        restaurant = await prisma.restaurant.findUnique({ where: { slug: String(slug).trim() } });
       }
 
       if (!restaurant) {
