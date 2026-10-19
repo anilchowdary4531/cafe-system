@@ -41,6 +41,7 @@ model Restaurant {
   // GEO (optional - used for selecting nearest restaurant in UI)
   latitude  Float?
   longitude Float?
+  deliveryRadiusKm Float @default(5.0) @map("delivery_radius_km")
 
   // BUSINESS
   gstNumber String? @map("gst_number")
@@ -518,6 +519,9 @@ model CustomerAccount {
   email String?
   avatarUrl String? @map("avatar_url")
 
+  isOnline   Boolean   @default(false) @map("is_online")
+  lastSeenAt DateTime? @map("last_seen_at")
+
   addresses CustomerAddress[]
   payments  Payment[]
   wallet    Wallet?
@@ -529,6 +533,7 @@ model CustomerAccount {
   @@index([username])
   @@index([email])
   @@index([googleId])
+  @@index([isOnline])
   @@map("customer_accounts")
 }
 

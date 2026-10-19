@@ -35,6 +35,7 @@ export default function Login() {
     const [loading, setLoading] = useState(false); // staff loading
     const [error, setError] = useState(""); // staff error
 
+    const [customerInput, setCustomerInput] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
     const [customerName, setCustomerName] = useState("");
     const [customerEmail, setCustomerEmail] = useState("");
@@ -47,6 +48,8 @@ export default function Login() {
     const [customerError, setCustomerError] = useState("");
     const [customerSubMode] = useState("otp");
     const [deliveryInfo, setDeliveryInfo] = useState(null);
+    const [otpChannel, setOtpChannel] = useState("");
+    const [maskedDestination, setMaskedDestination] = useState("");
     const [resolvedPhone, setResolvedPhone] = useState("");
     const [resolvedEmail, setResolvedEmail] = useState("");
     const [resendTimer, setResendTimer] = useState(0);
@@ -99,17 +102,25 @@ export default function Login() {
         if (!str || !str.includes("@")) return "";
         const [name, domain] = str.split("@");
         if (!name) return "";
-        const maskedName = name.length <= 2 ? `${name[0]}***` : `${name[0]}***${name[name.length - 1]}`;
+        const maskedName = name.length <= 2 ? `${name[0]}****` : `${name[0]}****${name[name.length - 1]}`;
         return `${maskedName}@${domain}`;
     };
 
-    const getOtpDeliveryMessage = (deliveryObj) => {
-        if (!deliveryObj) return "OTP sent to your WhatsApp.";
-        const waOk = deliveryObj.whatsApp?.ok !== false && !deliveryObj.whatsApp?.skipped;
-        if (waOk) {
+    const getOtpDeliveryMessage = (deliveryObj, channel) => {
+        const norm = String(channel || "").toUpperCase();
+        if (norm === "EMAIL") {
+            return "OTP sent to your email.";
+        }
+        if (norm === "WHATSAPP") {
             return "OTP sent to your WhatsApp.";
         }
-        return "OTP sent to your mobile phone.";
+        if (deliveryObj?.email?.ok) {
+            return "OTP sent to your email.";
+        }
+        if (deliveryObj?.whatsApp?.ok) {
+            return "OTP sent to your WhatsApp.";
+        }
+        return "OTP sent to your WhatsApp.";
     };
 
     useEffect(() => {
@@ -292,6 +303,11 @@ export default function Login() {
         setDeliveryInfo(null);
         setResolvedPhone("");
         setResolvedEmail("");
+        setOtpChannel("");
+        setMaskedDestination("");
+        setCustomerInput("");
+        setCustomerPhone("");
+        setCustomerEmail("");
         if (customer?.name) {
             setCustomerName(customer.name);
             setHasExistingName(true);
@@ -568,27 +584,74 @@ export default function Login() {
     };
 
     const handleCustomerRequestOtp = async () => {
-        const rawInput = String(customerPhone || customerEmail || "").trim();
+        let rawInput = "";
+        if (customerStep === "otp") {
+            // Resend preserves the authoritative active channel
+            if (otpChannel === "EMAIL") {
+                rawInput = String(resolvedEmail || customerEmail || customerInput || "").trim();
+            } else if (otpChannel === "WHATSAPP") {
+                rawInput = String(resolvedPhone || customerPhone || customerInput || "").trim();
+            } else {
+                rawInput = String(customerInput || customerEmail || customerPhone || "").trim();
+            }
+        } else {
+            rawInput = String(customerInput || customerEmail || customerPhone || "").trim();
+        }
+
         if (!rawInput) {
             setCustomerError("Phone number or Email address is required.");
             return;
         }
 
-        const isEmail = rawInput.includes("@");
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawInput) || rawInput.includes("@");
         const phoneParam = isEmail ? "" : rawInput;
         const emailParam = isEmail ? rawInput : "";
 
         try {
             setCustomerLoading(true);
             setCustomerError("");
-            const res = await api.post("/customer/send-otp", { phone: phoneParam, email: emailParam });
+            const res = await api.post("/customer/send-otp", {
+                identifier: rawInput,
+                phone: phoneParam,
+                email: emailParam,
+            });
+
+            if (!res.data?.success) {
+                setCustomerError(res.data?.message || "Failed to deliver OTP");
+                return;
+            }
+
+            const rawChannel = String(res.data?.channel || (isEmail ? "EMAIL" : "WHATSAPP")).toUpperCase();
+            const authoritativeChannel = rawChannel === "EMAIL" ? "EMAIL" : "WHATSAPP";
+
+            const returnedMasked =
+                res.data?.maskedDestination ||
+                (authoritativeChannel === "EMAIL"
+                    ? maskEmail(res.data?.email || res.data?.destination || emailParam || rawInput)
+                    : maskPhone(res.data?.phone || res.data?.destination || phoneParam || rawInput));
+
+            setOtpChannel(authoritativeChannel);
+            setMaskedDestination(returnedMasked);
             setCustomerStep("otp");
             setCustomerOtp("");
             setCustomerOtpExpiresAt(res.data?.expiresAt || null);
             setCustomerDevOtp(res.data?.devOtp || "");
             setDeliveryInfo(res.data?.delivery || null);
-            setResolvedPhone(res.data?.phone || phoneParam);
-            setResolvedEmail(res.data?.email || emailParam);
+
+            if (authoritativeChannel === "EMAIL") {
+                const dest = res.data?.email || res.data?.destination || emailParam || rawInput;
+                setResolvedEmail(dest);
+                setCustomerEmail(dest);
+                setResolvedPhone("");
+                setCustomerPhone("");
+            } else {
+                const dest = res.data?.phone || res.data?.destination || phoneParam || rawInput;
+                setResolvedPhone(dest);
+                setCustomerPhone(dest);
+                setResolvedEmail("");
+                setCustomerEmail("");
+            }
+
             setResendTimer(60);
 
             const nameFromBackend = String(res.data?.existingName || "").trim();
@@ -610,11 +673,14 @@ export default function Login() {
     };
 
     const handleCustomerVerifyOtp = async () => {
-        const phone = String(customerPhone || resolvedPhone || "").trim();
+        const isEmailChannel = String(otpChannel).toUpperCase() === "EMAIL";
+        const destination = isEmailChannel
+            ? String(resolvedEmail || customerEmail || customerInput || "").trim()
+            : String(resolvedPhone || customerPhone || customerInput || "").trim();
         const otp = String(customerOtp || "").trim();
 
-        if (!phone && !resolvedEmail) {
-            setCustomerError("Phone number or email is required.");
+        if (!destination) {
+            setCustomerError(isEmailChannel ? "Email address is required." : "Phone number is required.");
             return;
         }
         if (!otp) {
@@ -626,19 +692,21 @@ export default function Login() {
             setCustomerLoading(true);
             setCustomerError("");
             const res = await api.post("/customer/verify-otp", {
-                phone,
+                identifier: destination,
+                phone: isEmailChannel ? destination : destination,
+                email: isEmailChannel ? destination : "",
+                channel: isEmailChannel ? "EMAIL" : "WHATSAPP",
                 otp,
                 name: String(customerName || "").trim(),
-                email: String(customerEmail || resolvedEmail || "").trim(),
             });
 
-            const customer = res.data?.customer || {};
+            const customerData = res.data?.customer || {};
 
             loginCustomer({
-                id: customer?.id || null,
-                name: customer?.name || customerName || "",
-                email: customer?.email || customerEmail || resolvedEmail || "",
-                phone: customer?.phone || phone,
+                id: customerData?.id || null,
+                name: customerData?.name || customerName || "",
+                email: isEmailChannel ? destination : (customerData?.email || ""),
+                phone: !isEmailChannel ? destination : (customerData?.phone || ""),
                 token: res.data?.token || "",
                 verified: true,
             });
@@ -663,13 +731,18 @@ export default function Login() {
             <div className="theme-login-brand hidden flex-col justify-center px-16 md:flex">
 
                 <div className="flex items-center gap-3 mb-6">
-                    <div className="theme-card flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl">
-                        <BrandLogo className="h-10 w-10" title="Brand logo" />
+                    <BrandLogo className="h-9 w-9 object-contain shrink-0" title="Tiffzy logo" variant="primary" />
+                    <div>
+                        <h1 className="theme-brand-text text-3xl font-black tracking-tight leading-none">
+                            Tiffzy
+                        </h1>
+                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--app-primary)] leading-tight mt-1">
+                            Food Business Platform
+                        </p>
+                        <p className="text-[10px] font-semibold text-[color:var(--app-muted)] leading-tight mt-0.5">
+                            All-in-one platform for restaurants and food businesses
+                        </p>
                     </div>
-
-                    <h1 className="text-5xl font-bold tracking-tight">
-                        Tiffzy
-                    </h1>
                 </div>
 
                 <p className="text-xl font-medium max-w-md leading-relaxed">
@@ -723,9 +796,16 @@ export default function Login() {
                     </div>
 
                     {/* MOBILE LOGO */}
-                    <div className="login-mobile-brand md:hidden flex items-center justify-center gap-2 mb-6">
-                        <BrandLogo className="h-7 w-7" title="Brand logo" />
-                        <h1 className="text-3xl font-bold">Tiffzy</h1>
+                    <div className="login-mobile-brand md:hidden flex items-center justify-center gap-2.5 mb-6">
+                        <BrandLogo className="h-8 w-8 object-contain shrink-0" title="Tiffzy logo" variant="primary" />
+                        <div>
+                            <span className="theme-brand-text text-2xl font-black tracking-tight leading-none block">
+                                Tiffzy
+                            </span>
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--app-primary)] block leading-tight mt-0.5">
+                                Food Business Platform
+                            </span>
+                        </div>
                     </div>
 
                     {mode === "staff" ? (
@@ -927,9 +1007,14 @@ export default function Login() {
                                                 <input
                                                     type="text"
                                                     placeholder="Enter phone number or email address"
-                                                    value={customerPhone || customerEmail}
+                                                    value={customerInput !== "" ? customerInput : (customerEmail || customerPhone)}
                                                     onChange={(e) => {
                                                         const val = e.target.value;
+                                                        setCustomerInput(val);
+                                                        setCustomerError("");
+                                                        setOtpChannel("");
+                                                        setMaskedDestination("");
+                                                        setDeliveryInfo(null);
                                                         if (val.includes("@")) {
                                                             setCustomerEmail(val);
                                                             setCustomerPhone("");
@@ -956,12 +1041,16 @@ export default function Login() {
                                         {/* OTP VERIFICATION FOR LOGIN */}
                                         <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm space-y-2">
                                             <div className="font-semibold flex items-center gap-2">
-                                                <span>✓</span> {getOtpDeliveryMessage(deliveryInfo)}
+                                                <span>✓</span> {getOtpDeliveryMessage(deliveryInfo, otpChannel)}
                                             </div>
                                             <div className="flex flex-wrap gap-2 text-xs font-mono">
-                                                {(resolvedPhone || customerPhone) && (
+                                                {String(otpChannel).toUpperCase() === "EMAIL" ? (
                                                     <span className="px-2.5 py-1 rounded-lg bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10">
-                                                        WhatsApp: {maskPhone(resolvedPhone || customerPhone)}
+                                                        Email: {maskedDestination || maskEmail(resolvedEmail || customerEmail || customerInput)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-2.5 py-1 rounded-lg bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10">
+                                                        WhatsApp: {maskedDestination || maskPhone(resolvedPhone || customerPhone || customerInput)}
                                                     </span>
                                                 )}
                                             </div>
@@ -1023,6 +1112,15 @@ export default function Login() {
                                                     setCustomerDevOtp("");
                                                     setHasExistingName(false);
                                                     setCustomerName("");
+                                                    setOtpChannel("");
+                                                    setMaskedDestination("");
+                                                    setResolvedPhone("");
+                                                    setResolvedEmail("");
+                                                    setDeliveryInfo(null);
+                                                    setCustomerError("");
+                                                    setCustomerInput("");
+                                                    setCustomerPhone("");
+                                                    setCustomerEmail("");
                                                 }}
                                                 className="theme-muted hover:underline"
                                             >

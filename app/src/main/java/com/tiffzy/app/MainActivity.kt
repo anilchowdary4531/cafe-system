@@ -63,10 +63,6 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener, CFCheck
         
         val dataStore = AuthDataStore(this)
         
-        // Setup condition to keep splash screen visible during initialization
-        var isReady by mutableStateOf(false)
-        splashScreen.setKeepOnScreenCondition { !isReady }
-        
         // Initialize language and other startup tasks asynchronously
         lifecycleScope.launch {
             try {
@@ -74,8 +70,6 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener, CFCheck
                 LanguageHelper.applyLanguage(this@MainActivity, lang)
             } catch (e: Exception) {
                 LanguageHelper.applyLanguage(this@MainActivity, "en")
-            } finally {
-                isReady = true
             }
         }
         
@@ -167,6 +161,28 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener, CFCheck
 
     override fun onResume() {
         super.onResume()
+        lifecycleScope.launch {
+            try {
+                val dataStore = AuthDataStore(this@MainActivity)
+                val token = dataStore.authToken.first()
+                val role = dataStore.userRole.first()
+                val type = dataStore.accountType.first()
+                if (!token.isNullOrBlank() && (type == "customer" || role == null || role.isEmpty())) {
+                    com.tiffzy.app.service.SocketManager.connectWithAuth(token)
+                }
+            } catch (e: Exception) {
+                // Ignore presence check error
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        try {
+            com.tiffzy.app.service.SocketManager.disconnect()
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
 
     override fun onPaymentVerify(orderId: String) {

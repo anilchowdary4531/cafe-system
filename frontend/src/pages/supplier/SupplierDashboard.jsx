@@ -962,9 +962,7 @@ export default function SupplierDashboard() {
                             </button>
 
                             <div className="flex items-center gap-2.5">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 border border-orange-500/20">
-                                    <BrandLogo className="h-6 w-6" title="Brand logo" />
-                                </div>
+                                <BrandLogo className="h-7 w-7 shrink-0 object-contain" title="Brand logo" variant="primary" />
                                 <div>
                                     <h1 className="text-xl font-black tracking-tight text-orange-500 flex items-center gap-2">
                                         Tiffzy

@@ -13,12 +13,14 @@ import {
     Utensils,
     Wallet,
     Truck,
+    MapPin,
 } from "lucide-react";
 import tiffzyLogo from "../../assets/tiffzy-logo.png";
 
 export const SUPER_ADMIN_MENU_ITEMS = [
     { key: "dashboard", label: "Dashboard Overview", icon: LayoutDashboard, to: "/super-admin" },
     { key: "restaurants", label: "Restaurant Management", icon: Building2, to: "/super-admin#restaurants-section" },
+    { key: "restaurant-map", label: "Restaurant Map", icon: MapPin, to: "/super-admin/restaurant-map" },
     { key: "restaurant-profile", label: "Restaurant Profile Page", icon: Utensils, to: "/super-admin/restaurant-profiles" },
     { key: "wallets", label: "Customer Wallet Ledger", icon: Wallet, to: "/super-admin/wallets" },
     { key: "categories", label: "Home Categories", icon: Menu, to: "/super-admin/categories" },

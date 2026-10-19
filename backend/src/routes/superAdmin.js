@@ -1,3 +1,4 @@
+import { getPresenceManager } from "../realtime/presenceManager.js";
 import bcrypt from "bcryptjs";
 import { requireStaffJwt } from "../services/staffAuthService.js";
 import { getPhoneVariants, isValidPhone, isValidMobilePhone, normalizePhone } from "../services/phoneService.js";
@@ -10,6 +11,8 @@ import {
   createGlobalCategoryStore,
 } from "../utils/globalCategoryStore.js";
 import { groupErrorEvents } from "../services/errorGroupingService.js";
+import { isRestaurantOpen } from "../services/restaurantLocationService.js";
+
 
 const slugify = (value) =>
   String(value || "")
@@ -303,6 +306,119 @@ export default async function superAdminRoutes(app, deps) {
     }
   });
 
+  const getRestaurantsMapHandler = async (req, reply) => {
+    try {
+      const restaurants = await prisma.restaurant.findMany({
+        select: {
+          id: true,
+          name: true,
+          legalName: true,
+          slug: true,
+          ownerName: true,
+          email: true,
+          phone: true,
+          addressLine1: true,
+          city: true,
+          state: true,
+          country: true,
+          pincode: true,
+          latitude: true,
+          longitude: true,
+          deliveryRadiusKm: true,
+          logoUrl: true,
+          bannerUrl: true,
+          brandColor: true,
+          isActive: true,
+          timezone: true,
+          breakfastStart: true,
+          breakfastEnd: true,
+          lunchStart: true,
+          lunchEnd: true,
+          dinnerStart: true,
+          dinnerEnd: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { name: "asc" },
+      });
+
+      const now = new Date();
+      let locatedRestaurants = 0;
+      let missingLocationRestaurants = 0;
+      let activeRestaurants = 0;
+      let inactiveRestaurants = 0;
+
+      const formattedRestaurants = restaurants.map((r) => {
+        const hasLat = r.latitude !== null && r.latitude !== undefined && Number.isFinite(Number(r.latitude));
+        const hasLng = r.longitude !== null && r.longitude !== undefined && Number.isFinite(Number(r.longitude));
+        const latNum = hasLat ? Number(r.latitude) : null;
+        const lngNum = hasLng ? Number(r.longitude) : null;
+
+        const isNotZeroZero = !(latNum === 0 && lngNum === 0);
+        const isValid = hasLat && hasLng && latNum >= -90 && latNum <= 90 && lngNum >= -180 && lngNum <= 180 && isNotZeroZero;
+
+        if (isValid) {
+          locatedRestaurants++;
+        } else {
+          missingLocationRestaurants++;
+        }
+
+        if (r.isActive) {
+          activeRestaurants++;
+        } else {
+          inactiveRestaurants++;
+        }
+
+        const openStatus = isRestaurantOpen(r, now);
+
+        return {
+          id: r.id,
+          name: r.name,
+          legalName: r.legalName || null,
+          slug: r.slug,
+          ownerName: r.ownerName || null,
+          email: r.email || null,
+          phone: r.phone || null,
+          addressLine1: r.addressLine1 || null,
+          city: r.city || null,
+          state: r.state || null,
+          country: r.country || "India",
+          pincode: r.pincode || null,
+          latitude: isValid ? latNum : null,
+          longitude: isValid ? lngNum : null,
+          rawLatitude: r.latitude,
+          rawLongitude: r.longitude,
+          hasValidLocation: isValid,
+          deliveryRadiusKm: Number(r.deliveryRadiusKm !== null && r.deliveryRadiusKm !== undefined ? r.deliveryRadiusKm : 5.0),
+          isActive: Boolean(r.isActive),
+          isOpen: openStatus,
+          logoUrl: r.logoUrl || null,
+          bannerUrl: r.bannerUrl || null,
+          brandColor: r.brandColor || null,
+        };
+      });
+
+      return reply.code(200).send({
+        success: true,
+        data: {
+          totalRestaurants: restaurants.length,
+          locatedRestaurants,
+          missingLocationRestaurants,
+          activeRestaurants,
+          inactiveRestaurants,
+          restaurants: formattedRestaurants,
+        },
+      });
+    } catch (err) {
+      console.error("[SuperAdmin] Failed to fetch restaurants map:", err);
+      return reply.code(500).send({ success: false, message: "Failed to fetch restaurant map locations" });
+    }
+  };
+
+  app.get("/super-admin/restaurants/map", { preHandler: requireSuperAdmin }, getRestaurantsMapHandler);
+  app.get("/api/superadmin/restaurants/map", { preHandler: requireSuperAdmin }, getRestaurantsMapHandler);
+
+
   const getStaffUsersHandler = async (req, reply) => {
     try {
       const q = String(req.query?.q || "").trim();
@@ -385,7 +501,7 @@ export default async function superAdminRoutes(app, deps) {
   app.get("/super-admin/users", { preHandler: requireSuperAdmin }, getStaffUsersHandler);
   app.get("/super-admin/staff", { preHandler: requireSuperAdmin }, getStaffUsersHandler);
 
-  app.get("/super-admin/customers", { preHandler: requireSuperAdmin }, async (req, reply) => {
+  const getCustomerAccountsHandler = async (req, reply) => {
     try {
       // Auto-purge any phoneless CustomerAccount and per-restaurant Customer records from DB
       const allAccountsForPurge = await prisma.customerAccount.findMany();
@@ -409,6 +525,7 @@ export default async function superAdminRoutes(app, deps) {
       }
 
       const q = String(req.query?.q || "").trim();
+      const statusParam = String(req.query?.status || "").trim().toUpperCase();
 
       const rawCustomerAccounts = await prisma.customerAccount.findMany({
         where: q
@@ -437,6 +554,8 @@ export default async function superAdminRoutes(app, deps) {
         customerAccounts.push(acc);
       }
 
+      const presenceManager = app.presenceManager || getPresenceManager({ prisma });
+
       const customersData = await Promise.all(
         customerAccounts.map(async (acc) => {
           const phoneVariants = acc.phone ? getPhoneVariants(acc.phone) : [];
@@ -455,6 +574,8 @@ export default async function superAdminRoutes(app, deps) {
             0
           );
 
+          const isOnline = presenceManager ? presenceManager.isCustomerOnline(acc.id) : Boolean(acc.isOnline);
+
           return {
             id: acc.id,
             name: acc.name || "Customer",
@@ -465,21 +586,106 @@ export default async function superAdminRoutes(app, deps) {
             googleId: acc.googleId,
             rewardPoints: maxPoints,
             createdAt: acc.createdAt,
+            isOnline,
+            lastSeenAt: acc.lastSeenAt || null,
           };
         })
       );
 
+      const totalCount = customersData.length;
+      const onlineCount = customersData.filter((c) => c.isOnline).length;
+      const offlineCount = Math.max(0, totalCount - onlineCount);
+
+      // Support status filtering if requested via query param (e.g. status=online or status=offline)
+      let filteredCustomers = customersData;
+      if (statusParam === "ONLINE") {
+        filteredCustomers = customersData.filter((c) => c.isOnline);
+      } else if (statusParam === "OFFLINE") {
+        filteredCustomers = customersData.filter((c) => !c.isOnline);
+      }
+
       return {
-        customers: customersData,
+        customers: filteredCustomers,
         summary: {
-          totalCustomers: customersData.length,
+          totalCustomers: totalCount,
+          onlineCustomers: onlineCount,
+          offlineCustomers: offlineCount,
         },
       };
     } catch (err) {
       console.error("[/super-admin/customers] Error:", err);
       return reply.code(500).send({ message: "Failed to fetch customer accounts" });
     }
-  });
+  };
+
+  app.get("/super-admin/customers", { preHandler: requireSuperAdmin }, getCustomerAccountsHandler);
+  app.get("/api/superadmin/customers", { preHandler: requireSuperAdmin }, getCustomerAccountsHandler);
+
+  // Aggregate presence endpoint
+  const getCustomerPresenceHandler = async (req, reply) => {
+    try {
+      const presenceManager = app.presenceManager || getPresenceManager({ prisma });
+      const counts = await presenceManager.getPresenceCounts();
+      
+      // Keep totalCustomers strictly aligned with deduplicated accounts
+      const allAccounts = await prisma.customerAccount.findMany({ select: { id: true, phone: true } });
+      const seenPhones = new Set();
+      let deduplicatedCount = 0;
+      for (const acc of allAccounts) {
+        if (!acc.phone || !isValidMobilePhone(acc.phone)) continue;
+        const norm = normalizePhone(acc.phone);
+        if (!norm || seenPhones.has(norm)) continue;
+        seenPhones.add(norm);
+        deduplicatedCount++;
+      }
+      const totalCustomers = deduplicatedCount > 0 ? deduplicatedCount : counts.totalCustomers;
+      const onlineCustomers = counts.onlineCustomers;
+      const offlineCustomers = Math.max(0, totalCustomers - onlineCustomers);
+
+      return {
+        totalCustomers,
+        onlineCustomers,
+        offlineCustomers,
+      };
+    } catch (err) {
+      console.error("[/super-admin/customers/presence] Error:", err?.message || err);
+      return reply.code(500).send({ message: "Failed to fetch customer presence metrics" });
+    }
+  };
+
+  app.get("/super-admin/customers/presence", { preHandler: requireSuperAdmin }, getCustomerPresenceHandler);
+  app.get("/api/superadmin/customers/presence", { preHandler: requireSuperAdmin }, getCustomerPresenceHandler);
+
+  // Individual customer presence endpoint
+  const getSingleCustomerPresenceHandler = async (req, reply) => {
+    try {
+      const customerId = Number(req.params.id);
+      if (!customerId) {
+        return reply.code(400).send({ message: "Invalid customer ID" });
+      }
+      const customer = await prisma.customerAccount.findUnique({
+        where: { id: customerId },
+        select: { id: true, isOnline: true, lastSeenAt: true },
+      });
+      if (!customer) {
+        return reply.code(404).send({ message: "Customer not found" });
+      }
+      const presenceManager = app.presenceManager || getPresenceManager({ prisma });
+      const isOnline = presenceManager ? presenceManager.isCustomerOnline(customerId) : Boolean(customer.isOnline);
+
+      return {
+        customerId: customer.id,
+        isOnline,
+        lastSeenAt: customer.lastSeenAt,
+      };
+    } catch (err) {
+      console.error("[/super-admin/customers/:id/presence] Error:", err?.message || err);
+      return reply.code(500).send({ message: "Failed to fetch customer presence" });
+    }
+  };
+
+  app.get("/super-admin/customers/:id/presence", { preHandler: requireSuperAdmin }, getSingleCustomerPresenceHandler);
+  app.get("/api/superadmin/customers/:id/presence", { preHandler: requireSuperAdmin }, getSingleCustomerPresenceHandler);
 
   app.get("/super-admin/all-users", { preHandler: requireSuperAdmin }, async (req, reply) => {
     try {
@@ -505,6 +711,7 @@ export default async function superAdminRoutes(app, deps) {
       }
 
       const q = String(req.query?.q || "").trim();
+      const presenceManager = app.presenceManager || getPresenceManager({ prisma });
 
       // 1. Fetch Staff/Owners/SuperAdmins
       const staffUsers = await prisma.user.findMany({
@@ -582,6 +789,8 @@ export default async function superAdminRoutes(app, deps) {
         phone: c.phone,
         role: "CUSTOMER",
         avatarUrl: c.avatarUrl || null,
+        isOnline: presenceManager ? presenceManager.isCustomerOnline(c.id) : Boolean(c.isOnline),
+        lastSeenAt: c.lastSeenAt,
         isActive: true,
         restaurant: null,
         createdAt: c.createdAt,

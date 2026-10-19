@@ -7,7 +7,11 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -20,6 +24,7 @@ import com.tiffzy.app.ui.auth.RegisterScreen
 import com.tiffzy.app.ui.auth.DeleteAccountScreen
 import com.tiffzy.app.ui.auth.OtpScreen
 import com.tiffzy.app.ui.auth.SplashScreen
+import com.tiffzy.app.ui.customer.MainScreen
 import com.tiffzy.app.ui.customer.cart.CartScreen
 import com.tiffzy.app.ui.customer.checkout.CheckoutScreen
 import com.tiffzy.app.ui.customer.details.RestaurantDetailScreen
@@ -50,10 +55,8 @@ import com.tiffzy.app.ui.payment.PaymentActivity
 import com.tiffzy.app.ui.components.PlaceholderScreen
 import com.tiffzy.app.data.repository.CartRepository
 import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -81,7 +84,6 @@ import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 
 object Routes {
-    const val Wallet = "wallet"
     const val Splash = "splash"
     const val Login = "login"
     const val Register = "register"
@@ -110,6 +112,7 @@ object Routes {
     const val Scanner = "scanner"
     const val DeleteAccount = "delete_account"
     const val CompleteProfile = "complete_profile"
+    const val Wallet = "wallet"
     const val Web = "web/{title}/{url}"
     
     fun restaurantDetail(slug: String) = "restaurant/$slug"
@@ -119,6 +122,7 @@ object Routes {
     fun orderTracking(orderId: Int) = "order_tracking/$orderId"
     fun payLaterDetail(accountId: Int) = "pay_later/$accountId"
     fun liveBill(sessionId: Int) = "live_bill/$sessionId"
+    fun home(tab: Int = 0) = "${Home}?tab=$tab"
     fun web(title: String, url: String): String {
         val encodedTitle = android.net.Uri.encode(title)
         val encodedUrl = android.util.Base64.encodeToString(url.toByteArray(), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
@@ -150,13 +154,6 @@ fun NavGraph(
     val locationViewModel: LocationViewModel = viewModel(activity)
     val homeViewModel: HomeViewModel = viewModel()
 
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
-
-    val showBottomBar = bottomNavItems.any { item ->
-        currentDestination?.hierarchy?.any { it.route == item.route } == true
-    }
-
     val navigateToLogin = {
         authViewModel.logout()
         navController.navigate(Routes.Login) {
@@ -165,60 +162,14 @@ fun NavGraph(
     }
 
     Scaffold(
-        bottomBar = {
-            if (showBottomBar) {
-                NavigationBar(
-                    modifier = Modifier.height(80.dp), // Increased for visibility
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    tonalElevation = 8.dp,
-                    windowInsets = NavigationBarDefaults.windowInsets // Properly handle system bottom bar
-                ) {
-                    bottomNavItems.forEach { item ->
-                        val isSelected = currentDestination?.hierarchy?.any { it.route == item.route } == true
-                        NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                                    contentDescription = item.label,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            },
-                            label = { 
-                                Text(
-                                    item.label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium
-                                ) 
-                            },
-                            selected = isSelected,
-                            onClick = {
-                                navController.navigate(item.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            alwaysShowLabel = true,
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color(0xFFFE5102),
-                                selectedTextColor = Color(0xFFFE5102),
-                                unselectedIconColor = Color.Gray,
-                                unselectedTextColor = Color.Gray,
-                                indicatorColor = Color(0xFFFE5102).copy(alpha = 0.1f)
-                            )
-                        )
-                    }
-                }
-            }
-        }
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         NavHost(
             navController = navController,
             startDestination = Routes.Splash,
-            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = innerPadding.calculateBottomPadding())
         ) {
         composable(Routes.Splash) {
             SplashScreen(
@@ -357,56 +308,52 @@ fun NavGraph(
         }
 
         composable(
-            route = Routes.Home
+            route = "${Routes.Home}?tab={tab}",
+            arguments = listOf(
+                navArgument("tab") {
+                    type = NavType.IntType
+                    defaultValue = 0
+                }
+            )
         ) { backStackEntry ->
+            val tab = backStackEntry.arguments?.getInt("tab") ?: 0
             val lastLocation by locationViewModel.lastSelectedLocation.collectAsState()
             val locationName = lastLocation?.addressName
 
-            // Refresh home if location changes
-            LaunchedEffect(lastLocation) {
-                if (lastLocation != null) {
-                    homeViewModel.loadRestaurants(lastLocation!!.latitude, lastLocation!!.longitude)
-                }
-            }
-
-            HomeScreen(
-                viewModel = homeViewModel,
+            MainScreen(
+                initialTab = tab,
                 authViewModel = authViewModel,
-                onLogout = navigateToLogin,
+                homeViewModel = homeViewModel,
+                locationViewModel = locationViewModel,
                 locationName = locationName,
-                onChangeLocation = {
-                    navController.navigate(Routes.Location)
-                },
-                onMapClick = {
-                    navController.navigate(Routes.Map)
-                },
-                onRestaurantClick = { slug ->
-                    navController.navigate(Routes.menu(slug))
-                },
-                onViewProfile = {
-                    navController.navigate(Routes.Profile)
-                },
-                onNotificationsClick = {
-                    navController.navigate(Routes.Notifications)
-                },
-                onScanClick = {
-                    navController.navigate(Routes.Scanner)
-                },
-                onDeleteAccount = {
-                    navController.navigate(Routes.DeleteAccount)
-                },
-                onNavigateToWeb = { title, url ->
-                    navController.navigate(Routes.web(title, url))
-                }
+                onLogout = navigateToLogin,
+                onChangeLocation = { navController.navigate(Routes.Location) },
+                onRestaurantClick = { slug -> navController.navigate(Routes.menu(slug)) },
+                onNotificationsClick = { navController.navigate(Routes.Notifications) },
+                onScanClick = { navController.navigate(Routes.Scanner) },
+                onDeleteAccount = { navController.navigate(Routes.DeleteAccount) },
+                onNavigateToWeb = { title, url -> navController.navigate(Routes.web(title, url)) },
+                onOrderClick = { orderId -> navController.navigate(Routes.orderDetail(orderId)) },
+                onCheckout = { navController.navigate(Routes.Checkout) },
+                onEditProfile = { navController.navigate(Routes.EditProfile) },
+                onFavoritesClick = { navController.navigate(Routes.Favorites) },
+                onPayLaterClick = { navController.navigate(Routes.PayLater) },
+                onSettingsClick = { navController.navigate(Routes.Settings) },
+                onMapClick = { navController.navigate(Routes.Map) },
+                onWalletClick = { navController.navigate(Routes.Wallet) }
             )
         }
 
         composable(Routes.Search) {
-            SearchScreen(
-                onRestaurantClick = { slug ->
-                    navController.navigate(Routes.menu(slug))
+            LaunchedEffect(Unit) {
+                navController.navigate("${Routes.Home}?tab=1") {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
                 }
-            )
+            }
         }
 
         composable(Routes.Scanner) {
@@ -533,29 +480,15 @@ fun NavGraph(
         }
 
         composable(Routes.Cart) {
-            CartScreen(
-                onNavigateToMenu = { slug ->
-                    if (slug.isNotEmpty()) {
-                        navController.navigate(Routes.menu(slug)) {
-                            popUpTo(Routes.Cart) { inclusive = true }
-                        }
-                    } else {
-                        navController.navigate(Routes.Home) {
-                            popUpTo(Routes.Cart) { inclusive = true }
-                        }
+            LaunchedEffect(Unit) {
+                navController.navigate("${Routes.Home}?tab=3") {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
                     }
-                },
-                onCheckout = {
-                    navController.navigate(Routes.Checkout)
+                    launchSingleTop = true
+                    restoreState = true
                 }
-            )
-        }
-
-        
-        composable(Routes.Wallet) {
-            com.tiffzy.app.ui.customer.wallet.WalletScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
+            }
         }
 
         composable(Routes.Checkout) {
@@ -632,15 +565,15 @@ fun NavGraph(
         }
 
         composable(Routes.Orders) {
-            OrdersScreen(
-                onOrderClick = { orderId ->
-                    navController.navigate(Routes.orderDetail(orderId))
-                },
-                onBack = { navController.popBackStack() },
-                onReorder = { slug ->
-                    navController.navigate(Routes.menu(slug))
+            LaunchedEffect(Unit) {
+                navController.navigate("${Routes.Home}?tab=2") {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
                 }
-            )
+            }
         }
 
         composable(
@@ -673,21 +606,20 @@ fun NavGraph(
         }
 
         composable(Routes.Profile) {
-            ProfileScreen(
-                onEditProfile = { navController.navigate(Routes.EditProfile) },
-                onOrdersClick = { navController.navigate(Routes.Orders) },
-                onFavoritesClick = { navController.navigate(Routes.Favorites) },
-                onWalletClick = { navController.navigate(Routes.Wallet) },
-                onPayLaterClick = { navController.navigate(Routes.PayLater) },
-                onNotificationsClick = { navController.navigate(Routes.Notifications) },
-                onSettingsClick = { navController.navigate(Routes.Settings) },
-                onDeleteAccount = { navController.navigate(Routes.DeleteAccount) },
-                onLogout = navigateToLogin,
-                onBack = { navController.popBackStack() },
-                onNavigateToWeb = { title, url ->
-                    navController.navigate(Routes.web(title, url))
-                },
-                authViewModel = authViewModel
+            LaunchedEffect(Unit) {
+                navController.navigate("${Routes.Home}?tab=4") {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+        }
+
+        composable(Routes.Wallet) {
+            com.tiffzy.app.ui.customer.wallet.WalletScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 

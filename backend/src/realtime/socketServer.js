@@ -1,3 +1,4 @@
+import { getPresenceManager } from "./presenceManager.js";
 import { Server as SocketIOServer } from "socket.io";
 import { createOrderByStaff, updateOrderStatus } from "../services/orderService.js";
 import { createAndDispatchNotification } from "../services/notificationService.js";
@@ -34,6 +35,14 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
   });
 
   const staff = io.of("/staff");
+
+  const presenceManager = getPresenceManager({ prisma, io, staffNamespace: staff });
+  presenceManager.startupReset().catch((err) => {
+    console.error("[socketServer] presenceManager startupReset error:", err?.message);
+  });
+  if (app) {
+    app.presenceManager = presenceManager;
+  }
 
   staff.use((socket, next) => {
     try {
@@ -72,6 +81,14 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     }
     if (rooms.length) socket.join(rooms);
 
+    if (actor.role === "SUPER_ADMIN") {
+      socket.join("superadmin");
+      socket.join("admin");
+      presenceManager.getPresenceCounts().then((counts) => {
+        socket.emit("customer:presence_updated", counts);
+      }).catch(() => {});
+    }
+
     socket.on("order:create", async (payload, ack) => {
       try {
         const order = await createOrderByStaff({ prisma, actor, input: payload });
@@ -102,8 +119,84 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     });
   });
 
+  io.use((socket, next) => {
+    try {
+      const token = socket.handshake?.auth?.token || socket.handshake?.query?.token;
+      if (token && app?.jwt) {
+        try {
+          const decoded = app.jwt.verify(String(token));
+          if (decoded) {
+            socket.data.user = decoded;
+            const cid = Number(decoded.customerAccountId || (decoded.type === "customer" ? decoded.id : 0));
+            if (cid) {
+              socket.data.customerAccountId = cid;
+            }
+            if (decoded.role === "SUPER_ADMIN") {
+              socket.data.isSuperAdmin = true;
+            }
+          }
+        } catch (jwtErr) {
+          // Non-fatal handshake token validation failure
+        }
+      }
+    } catch {
+      // ignore
+    }
+    next();
+  });
+
   // Handle root socket connections for delivery rooms and tracking
   io.on("connection", (socket) => {
+    if (socket.data?.isSuperAdmin) {
+      socket.join("superadmin");
+      socket.join("admin");
+      presenceManager.getPresenceCounts().then((counts) => {
+        socket.emit("customer:presence_updated", counts);
+      }).catch(() => {});
+    }
+
+    if (socket.data?.customerAccountId) {
+      presenceManager.handleCustomerConnected(socket.data.customerAccountId, socket);
+    }
+
+    socket.on("authenticate", async (payload, ack) => {
+      try {
+        const token = payload?.token || payload?.authToken;
+        if (!token || !app?.jwt) {
+          safeAck(ack, { ok: false, message: "Missing token" });
+          return;
+        }
+        const decoded = app.jwt.verify(String(token));
+        const cid = Number(decoded?.customerAccountId || (decoded?.type === "customer" ? decoded?.id : 0));
+        if (cid) {
+          socket.data.customerAccountId = cid;
+          await presenceManager.handleCustomerConnected(cid, socket);
+          safeAck(ack, { ok: true, customerId: cid });
+        } else if (decoded?.role === "SUPER_ADMIN") {
+          socket.join("superadmin");
+          socket.join("admin");
+          const counts = await presenceManager.getPresenceCounts();
+          socket.emit("customer:presence_updated", counts);
+          safeAck(ack, { ok: true, role: "SUPER_ADMIN" });
+        } else {
+          safeAck(ack, { ok: false, message: "Unauthorized for customer presence" });
+        }
+      } catch (err) {
+        safeAck(ack, { ok: false, message: err?.message || "auth_failed" });
+      }
+    });
+
+    socket.on("customer:logout", async (payload, ack) => {
+      const cid = socket.data?.customerAccountId || Number(payload?.customerId || 0);
+      if (cid) {
+        await presenceManager.handleCustomerLogout(cid);
+        safeAck(ack, { ok: true });
+      }
+    });
+
+    socket.on("disconnect", () => {
+      presenceManager.handleCustomerDisconnected(socket.id);
+    });
     socket.on("join_delivery_room", (payload) => {
       const did = payload?.deliveryId || payload?.id;
       const oid = payload?.orderId;
@@ -144,6 +237,21 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     });
 
     socket.on("join_customer_room", async (payload) => {
+      const token = payload?.token || payload?.authToken || socket.handshake?.auth?.token || socket.handshake?.query?.token;
+      if (token && app?.jwt) {
+        try {
+          const decoded = app.jwt.verify(String(token));
+          const cid = Number(decoded?.customerAccountId || (decoded?.type === "customer" ? decoded?.id : 0));
+          if (cid) {
+            socket.data.customerAccountId = cid;
+            await presenceManager.handleCustomerConnected(cid, socket);
+          }
+        } catch {
+          // ignore
+        }
+      } else if (socket.data?.customerAccountId) {
+        await presenceManager.handleCustomerConnected(socket.data.customerAccountId, socket);
+      }
       const cid = payload?.customerId || payload?.id;
       const ids = Array.isArray(payload?.customerIds) ? payload.customerIds : (cid ? [cid] : []);
       ids.forEach((id) => {
@@ -316,6 +424,7 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
   return {
     io,
     staff,
+    presenceManager,
     emitOrderCreated,
     emitOrderUpdated,
     emitTableSessionUpdated,

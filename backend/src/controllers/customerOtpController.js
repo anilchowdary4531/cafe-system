@@ -1,10 +1,31 @@
-import { normalizePhone, getPhoneVariants, isValidName } from "../services/phoneService.js";
-import { requestOtp, verifyOtp } from "../services/otpService.js";
+import { normalizePhone, getPhoneVariants, isValidName, isValidPhone, isValidMobilePhone } from "../services/phoneService.js";
+import { requestOtp, verifyOtp, clearOtpCooldown } from "../services/otpService.js";
 import { sendEmailOtp } from "../services/emailService.js";
-import { sendSmsOtp } from "../services/smsService.js";
 import { sendWhatsAppOtp } from "../services/msg91WhatsAppService.js";
 import { upsertCustomerAccount } from "../services/customerProfileService.js";
 import { extractVerifiedIdentifier, verifyMsg91AccessToken } from "../services/msg91OtpWidgetService.js";
+
+export const isValidEmail = (email) => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
+};
+
+export const maskEmail = (emailStr) => {
+  const str = String(emailStr || "").trim().toLowerCase();
+  if (!str || !str.includes("@")) return "";
+  const [name, domain] = str.split("@");
+  if (!name) return "";
+  const maskedName = name.length <= 2 ? `${name[0]}****` : `${name[0]}****${name[name.length - 1]}`;
+  return `${maskedName}@${domain}`;
+};
+
+export const maskPhone = (phoneStr) => {
+  const str = String(phoneStr || "").trim();
+  if (!str) return "";
+  const digits = str.replace(/[^\d]/g, "");
+  if (!digits) return "";
+  const last4 = digits.slice(-4);
+  return `******${last4}`;
+};
 
 const isPlayReviewAccount = (phone) => {
   if (String(process.env.PLAY_REVIEW_ACCOUNT_ENABLED).toLowerCase() !== "true") {
@@ -20,22 +41,44 @@ const isPlayReviewAccount = (phone) => {
 
 export const buildCustomerOtpController = ({ prisma, app }) => {
   const sendOtp = async (req, reply) => {
-    console.log("========== AUTH REQUEST ==========");
-    console.log("URL:", req.url);
-    console.log("Method:", req.method);
-    console.log("Headers:", req.headers);
-    console.log("Body:", req.body);
-    console.log("==================================");
     try {
       const body = req.body || {};
-      const rawInput = String(body.phone || "").trim();
-      let phone = normalizePhone(rawInput);
-      let email = String(body.email || "").trim().toLowerCase();
-      const phoneVariants = rawInput ? getPhoneVariants(rawInput) : (phone ? getPhoneVariants(phone) : []);
+      const rawInput = String(
+        body.identifier !== undefined && body.identifier !== null && String(body.identifier).trim() !== ""
+          ? body.identifier
+          : (body.email && !body.phone ? body.email : (body.phone || body.email || ""))
+      ).trim();
 
-      // If phone or email is provided, try resolving the registered customer account to send OTP to BOTH channels
+      if (!rawInput) {
+        return reply.code(400).send({ message: "Phone number or Email is required" });
+      }
+
+      let channel = "";
+      let destination = "";
+      let identifierType = "";
+
+      if (isValidEmail(rawInput)) {
+        channel = "EMAIL";
+        identifierType = "EMAIL";
+        destination = rawInput.toLowerCase();
+      } else if (isValidMobilePhone(rawInput) || isValidPhone(rawInput)) {
+        channel = "WHATSAPP";
+        identifierType = "MOBILE";
+        destination = normalizePhone(rawInput);
+      } else {
+        return reply.code(400).send({ message: "Please enter a valid email address or mobile phone number" });
+      }
+
+      // DO NOT use stored customer profile phone/email to override channel or destination.
+      // Lookup customer account ONLY for greeting/existingName.
       let account = null;
-      if (phone || email) {
+      let phoneVariants = [];
+      if (channel === "EMAIL") {
+        account = await prisma.customerAccount.findFirst({
+          where: { email: destination },
+        });
+      } else {
+        phoneVariants = getPhoneVariants(destination);
         account = await prisma.customerAccount.findFirst({
           where: {
             OR: [
@@ -45,26 +88,14 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
                     { username: { in: phoneVariants } },
                   ]
                 : []),
-              ...(phone ? [{ phone }, { username: phone }] : []),
-              ...(email ? [{ email: email.toLowerCase() }] : []),
+              { phone: destination },
+              { username: destination },
             ],
           },
         });
-
-        if (account) {
-          if (!phone && account.phone) phone = account.phone;
-          if (!email && account.email) email = account.email.toLowerCase();
-        }
       }
 
-      // If no phone but email is provided, we use email as the identifier
-      if (!phone && email) {
-        phone = email;
-      }
-
-      if (!phone) return reply.code(400).send({ message: "Phone number or Email is required" });
-
-      if (isPlayReviewAccount(phone)) {
+      if (channel === "WHATSAPP" && isPlayReviewAccount(destination)) {
         let existingName = null;
         if (account) {
           if (isValidName(account.name)) {
@@ -75,9 +106,14 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
         }
 
         return {
+          success: true,
+          channel: "WHATSAPP",
+          identifierType: "MOBILE",
+          destination,
+          maskedDestination: maskPhone(destination),
           message: "OTP sent",
-          phone,
-          email: email || null,
+          phone: destination,
+          email: null,
           expiresAt: new Date(Date.now() + 5 * 60 * 1000),
           hasName: Boolean(existingName),
           existingName,
@@ -89,49 +125,89 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
         };
       }
 
-      const otpRes = await requestOtp({ prisma, phone });
+      const otpRes = await requestOtp({ prisma, phone: destination });
       if (!otpRes.ok) return reply.code(otpRes.status).send(otpRes.payload);
 
       const devOtp = otpRes.devOtp || "";
       const otpToSend = otpRes.code;
-      const isEmailOnly = phone.includes("@");
 
-      // Send ONE OTP to available channels (WhatsApp, SMS, Email).
-      const [whatsAppRes, smsRes, emailRes] = await Promise.all([
-        !isEmailOnly ? sendWhatsAppOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
-        !isEmailOnly ? sendSmsOtp({ phone, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
-        email ? sendEmailOtp({ email, otp: otpToSend || devOtp, expiresAt: otpRes.expiresAt }) : Promise.resolve(null),
-      ]);
+      let whatsAppRes = null;
+      let emailRes = null;
 
-      if (process.env.NODE_ENV === "production") {
-        // eslint-disable-next-line no-console
-        console.log("[customerOtpController] otp_delivery", {
-          phone,
-          emailProvided: Boolean(email),
-          whatsAppRes: whatsAppRes ? { ok: whatsAppRes.ok !== false, status: whatsAppRes.status } : null,
-          smsRes: smsRes ? { ok: smsRes.ok !== false } : null,
-          emailRes: emailRes ? { ok: emailRes.ok !== false } : null,
+      if (channel === "EMAIL") {
+        emailRes = await sendEmailOtp({
+          email: destination,
+          otp: otpToSend || devOtp,
+          expiresAt: otpRes.expiresAt,
         });
-      }
 
-      const deliveredByWhatsApp = Boolean(whatsAppRes && whatsAppRes.ok !== false && !whatsAppRes.skipped);
-      const deliveredBySms = Boolean(smsRes && smsRes.ok !== false && !smsRes.skipped);
-      const deliveredByEmail = Boolean(emailRes && emailRes.ok !== false && !emailRes.skipped);
-      const delivered = deliveredByWhatsApp || deliveredBySms || deliveredByEmail;
+        const isAllowedEmailSimulated = Boolean(
+          emailRes?.simulated &&
+          (process.env.ALLOW_SIMULATED_OTP === "true" || process.env.NODE_ENV === "test")
+        );
 
-      if (!delivered) {
-        const waErr = whatsAppRes && whatsAppRes.ok === false ? whatsAppRes.error : null;
-        const smsErr = smsRes && smsRes.ok === false ? smsRes.error : null;
-        const emailErr = emailRes && emailErr.ok === false ? emailErr.error : null;
-        const primaryErr = waErr || smsErr || emailErr || "Failed to send OTP";
-        const hint = email
-          ? "Please retry after a moment."
-          : "Provide an email (optional) or verify WhatsApp/SMS configuration and retry.";
+        const deliveredByEmail = Boolean(
+          emailRes &&
+          emailRes.ok === true &&
+          emailRes.providerAccepted !== false &&
+          !emailRes.skipped &&
+          (!emailRes.simulated || isAllowedEmailSimulated)
+        );
 
-        return reply.code(502).send({
-          message: primaryErr,
-          hint,
+        if (!deliveredByEmail) {
+          await clearOtpCooldown({ prisma, phone: destination });
+
+          const emailErr =
+            (emailRes?.simulated && !isAllowedEmailSimulated)
+              ? "Email provider not configured (missing or invalid credentials). Message could not be sent."
+              : (emailRes?.error || "Failed to deliver OTP to email. Provider request was not accepted.");
+
+          return reply.code(502).send({
+            success: false,
+            channel: "EMAIL",
+            message: emailErr,
+            code: emailRes?.code || "EMAIL_DELIVERY_FAILED",
+            provider: emailRes?.provider || "resend",
+            hint: "Please verify your email address or retry after a moment.",
+          });
+        }
+      } else {
+        whatsAppRes = await sendWhatsAppOtp({
+          phone: destination,
+          otp: otpToSend || devOtp,
+          expiresAt: otpRes.expiresAt,
         });
+
+        const isAllowedWhatsAppSimulated = Boolean(
+          whatsAppRes?.simulated &&
+          (process.env.ALLOW_SIMULATED_OTP === "true" || process.env.NODE_ENV === "test")
+        );
+
+        const deliveredByWhatsApp = Boolean(
+          whatsAppRes &&
+          whatsAppRes.ok === true &&
+          whatsAppRes.providerAccepted !== false &&
+          !whatsAppRes.skipped &&
+          (!whatsAppRes.simulated || isAllowedWhatsAppSimulated)
+        );
+
+        if (!deliveredByWhatsApp) {
+          await clearOtpCooldown({ prisma, phone: destination });
+
+          const waErr =
+            (whatsAppRes?.simulated && !isAllowedWhatsAppSimulated)
+              ? "WhatsApp provider not configured (missing MSG91_AUTHKEY on server). Message could not be sent."
+              : (whatsAppRes?.error || "Failed to deliver WhatsApp OTP. Provider request was not accepted.");
+
+          return reply.code(502).send({
+            success: false,
+            channel: "WHATSAPP",
+            message: waErr,
+            code: whatsAppRes?.code || "WHATSAPP_DELIVERY_FAILED",
+            provider: whatsAppRes?.provider || "msg91_whatsapp",
+            hint: "Verify your WhatsApp number and retry after a moment.",
+          });
+        }
       }
 
       let existingName = null;
@@ -157,12 +233,12 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
         }
       }
 
-      if (!existingName && (phoneVariants.length > 0 || email)) {
+      if (!existingName && (phoneVariants.length > 0 || channel === "EMAIL")) {
         const lastOrderWithName = await prisma.order.findFirst({
           where: {
             OR: [
               ...(phoneVariants.length > 0 ? [{ phone: { in: phoneVariants } }] : []),
-              ...(email ? [{ email: email.toLowerCase() }] : []),
+              ...(channel === "EMAIL" ? [{ email: destination }] : []),
             ],
             customerName: { not: "" },
           },
@@ -187,25 +263,61 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
       }
 
       const hasName = Boolean(existingName);
+      const maskedDestination = channel === "EMAIL" ? maskEmail(destination) : maskPhone(destination);
+      const isSimulated = Boolean(
+        (channel === "EMAIL" && emailRes?.simulated) ||
+        (channel === "WHATSAPP" && whatsAppRes?.simulated)
+      );
+
+      const successMessage = isSimulated
+        ? `[Dev Simulation] OTP generated for ${maskedDestination}`
+        : channel === "EMAIL"
+        ? `OTP request accepted by email provider; sent to ${maskedDestination}`
+        : `OTP request accepted by WhatsApp provider; sent to ${maskedDestination}`;
 
       const payload = {
-        message: "OTP sent",
-        phone,
-        email: email || null,
+        success: true,
+        channel,
+        identifierType,
+        destination,
+        maskedDestination,
+        message: successMessage,
+        deliveryStatus: isSimulated ? "SIMULATED" : "ACCEPTED",
+        phone: channel === "WHATSAPP" ? destination : "",
+        email: channel === "EMAIL" ? destination : null,
         expiresAt: otpRes.expiresAt,
         hasName,
         existingName,
         delivery: {
-          whatsApp: whatsAppRes ? { ok: whatsAppRes.ok !== false, simulated: Boolean(whatsAppRes.simulated) } : null,
-          sms: smsRes ? { ok: smsRes.ok !== false, simulated: Boolean(smsRes.simulated) } : null,
-          email: emailRes ? { ok: emailRes.ok !== false, simulated: Boolean(emailRes.simulated), skipped: Boolean(emailRes.skipped) } : null,
+          whatsApp: whatsAppRes
+            ? {
+                ok: whatsAppRes.ok === true,
+                accepted: Boolean(whatsAppRes.providerAccepted),
+                simulated: Boolean(whatsAppRes.simulated),
+                provider: whatsAppRes.provider,
+                messageId: whatsAppRes.messageId || null,
+              }
+            : null,
+          sms: null,
+          email: emailRes
+            ? {
+                ok: emailRes.ok === true,
+                accepted: Boolean(emailRes.providerAccepted),
+                simulated: Boolean(emailRes.simulated),
+                provider: emailRes.provider,
+                messageId: emailRes.messageId || null,
+              }
+            : null,
         },
       };
       if (devOtp && process.env.NODE_ENV !== "production") payload.devOtp = devOtp;
       return payload;
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.log(err);
+      console.error("[customerOtpController.sendOtp] Error:", {
+        message: err?.message,
+        code: err?.code,
+      });
       return reply.code(500).send({ message: "Failed to send OTP" });
     }
   };
@@ -213,20 +325,48 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
   const verifyOtpHandler = async (req, reply) => {
     try {
       const body = req.body || {};
-      let phone = normalizePhone(body.phone || "");
+      const rawIdentifier = String(
+        body.identifier !== undefined && body.identifier !== null && String(body.identifier).trim() !== ""
+          ? body.identifier
+          : (body.channel === "EMAIL" ? body.email : (body.phone || body.email)) || ""
+      ).trim();
+
       const accessToken = String(body.accessToken || body.access_token || "").trim();
       const otp = String(body.otp || "").trim();
       const name = String(body.name || "").trim();
-      const email = String(body.email || "").trim().toLowerCase();
 
-      if (!phone && email) {
-        phone = email;
+      let phone = "";
+      let email = "";
+      let channel = "WHATSAPP";
+
+      if (rawIdentifier) {
+        if (isValidEmail(rawIdentifier)) {
+          channel = "EMAIL";
+          email = rawIdentifier.toLowerCase();
+          phone = email;
+        } else {
+          channel = "WHATSAPP";
+          phone = normalizePhone(rawIdentifier);
+          email = String(body.email || "").trim().toLowerCase();
+        }
+      } else {
+        const rawPhone = String(body.phone || "").trim();
+        const rawEmail = String(body.email || "").trim().toLowerCase();
+        if (rawEmail && !rawPhone) {
+          channel = "EMAIL";
+          email = rawEmail;
+          phone = rawEmail;
+        } else {
+          channel = "WHATSAPP";
+          phone = normalizePhone(rawPhone);
+          email = rawEmail;
+        }
       }
 
       if (!phone) return reply.code(400).send({ message: "Phone number or Email is required" });
       if (!accessToken && !otp) return reply.code(400).send({ message: "OTP (or accessToken) is required" });
 
-      if (isPlayReviewAccount(phone)) {
+      if (channel === "WHATSAPP" && isPlayReviewAccount(phone)) {
         const configuredOtp = String(process.env.PLAY_REVIEW_OTP || "").trim();
         if (!configuredOtp || otp !== configuredOtp) {
           return reply.code(401).send({ message: "Invalid OTP" });
@@ -266,7 +406,7 @@ export const buildCustomerOtpController = ({ prisma, app }) => {
       };
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.log(err);
+      console.error("[customerOtpController.verifyOtp] Error:", err?.message || err);
       return reply.code(500).send({ message: "Customer login failed" });
     }
   };

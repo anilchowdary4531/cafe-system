@@ -53,60 +53,15 @@ import CustomerAddressModal, {
     setStoredActiveAddress,
 } from "../components/CustomerAddressModal";
 import SeoHead from "../components/SeoHead";
+import NearbyRestaurantsSection from "../components/NearbyRestaurantsSection";
 import { buildRestaurantMenuPath } from "../utils/restaurantMenuNavigation";
 import { isVegModeItem } from "./restaurant/RestaurantMenu";
 import { getCustomerFavorites, toggleFavoriteMenuItem } from "../utils/customerFavorites";
 import { showToast } from "../utils/toast";
 
-const toRad = (deg) => (Number(deg) * Math.PI) / 180;
+// Distance calculation & delivery eligibility are authoritatively handled by the backend
+// (/api/restaurants/nearby via restaurantLocationService.js)
 
-const haversineKm = (lat1, lon1, lat2, lon2) => {
-    const R = 6371;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-    return 2 * R * Math.asin(Math.sqrt(a));
-};
-
-const hasCoords = (restaurant) => Number.isFinite(Number(restaurant?.latitude)) && Number.isFinite(Number(restaurant?.longitude));
-
-const pickNearestRestaurant = (restaurants, lat, lon) => {
-    const candidates = (restaurants || []).map((r) => {
-        if (!hasCoords(r)) return null;
-        const rLat = Number(r.latitude);
-        const rLon = Number(r.longitude);
-
-        if (!Number.isFinite(rLat) || !Number.isFinite(rLon)) return null;
-        if (rLat < -90 || rLat > 90 || rLon < -180 || rLon > 180) {
-            console.warn(`[Tiffzy] Invalid coordinate bounds for ${r.name}: lat ${rLat}, lon ${rLon}. Skipping...`);
-            return null;
-        }
-        return { ...r, latitude: rLat, longitude: rLon };
-    }).filter(Boolean);
-
-    if (!candidates.length) return null;
-
-    console.log("=== TIFFZY NEAREST RESTAURANT DEBUG ===");
-    console.log("User latitude:", lat);
-    console.log("User longitude:", lon);
-
-    let best = candidates[0];
-    let bestKm = haversineKm(lat, lon, Number(best.latitude), Number(best.longitude));
-    console.log(`Restaurant '${best.name}' lat:${best.latitude} lon:${best.longitude} dist:${bestKm.toFixed(1)}km`);
-
-    for (const r of candidates.slice(1)) {
-        const km = haversineKm(lat, lon, Number(r.latitude), Number(r.longitude));
-        console.log(`Restaurant '${r.name}' lat:${r.latitude} lon:${r.longitude} dist:${km.toFixed(1)}km`);
-        if (km < bestKm) {
-            best = r;
-            bestKm = km;
-        }
-    }
-
-    return { restaurant: best, distanceKm: bestKm };
-};
 
 const normalizeRestaurantList = (data) => {
     if (Array.isArray(data)) return data;
@@ -347,24 +302,24 @@ export default function RestaurantChooser() {
                 return;
             }
 
-            const coordsData = await cachedGet("/restaurants", {
-                params: { coordsOnly: 1 },
-                ttlMs: 5 * 60_000,
-                staleMs: 30 * 60_000,
+            const res = await api.get("/api/restaurants/nearby", {
+                params: { lat, lng: lon, radius: 5, limit: 1 },
             });
-            const allRestaurants = normalizeRestaurantList(coordsData);
-            const nearest = pickNearestRestaurant(
-                Array.isArray(allRestaurants) && allRestaurants.length ? allRestaurants : browseRestaurants,
-                lat,
-                lon
-            );
-            if (!nearest?.restaurant) {
-                setLocationHint("Restaurant coordinates not configured. Please select a restaurant.");
+            const nearest = res?.data?.restaurants?.[0];
+            if (!nearest) {
+                setLocationHint("No restaurants found within 5 km. Please select a restaurant.");
                 return;
             }
 
-            const roundedKm = Math.max(0, Math.round(nearest.distanceKm * 10) / 10);
-            setLocationHint(`Selected ${nearest.restaurant.name} (${roundedKm} km away) based on your current location.`);
+            setRestaurantContext({
+                id: nearest.id,
+                name: nearest.name,
+                slug: nearest.slug,
+                logo: nearest.logoUrl || null,
+                tableNo: null,
+            });
+
+            setLocationHint(`Selected ${nearest.name} (${nearest.distanceKm} km away) based on your current location.`);
         } catch {
             // Permission denied or timeout.
             setLocationHint("Location permission denied or unavailable. Please select a restaurant.");
@@ -394,9 +349,7 @@ export default function RestaurantChooser() {
                     <header className="relative z-10 flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
                         {/* Left: Tiffzy branding */}
                         <div className="flex shrink-0 items-center gap-3">
-                            <div className="chooser-logo-shell theme-card flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:h-13 sm:w-13 shadow-md">
-                                <BrandLogo className="h-8 w-8 sm:h-8.5 sm:w-8.5" title="Tiffzy Logo" />
-                            </div>
+                            <BrandLogo className="h-9 w-9 sm:h-10 sm:w-10 object-contain shrink-0" title="Tiffzy Logo" variant="primary" />
                             <div className="min-w-0">
                                 <h1 className="bg-gradient-to-r from-[#ff8a1f] via-[#ea580c] to-[#9a3412] bg-clip-text text-2xl font-black tracking-tight text-transparent sm:text-3xl leading-none">
                                     Tiffzy
@@ -482,6 +435,22 @@ export default function RestaurantChooser() {
                             selectedCategory={selectedCategory}
                             onSelectCategory={setSelectedCategory}
                         />
+
+                        {!search.trim() && !selectedCategory && (
+                            <NearbyRestaurantsSection
+                                activeAddress={activeAddress}
+                                onOpenAddressModal={() => setIsAddressModalOpen(true)}
+                                onSelectRestaurant={(rest) => {
+                                    setRestaurantContext({
+                                        id: rest.id,
+                                        name: rest.name,
+                                        slug: rest.slug,
+                                        logo: rest.logoUrl || null,
+                                        tableNo: null,
+                                    });
+                                }}
+                            />
+                        )}
 
                         {isTobaccoSearch && (
                             <div className="space-y-3">

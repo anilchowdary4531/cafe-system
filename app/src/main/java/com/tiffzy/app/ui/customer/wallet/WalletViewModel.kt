@@ -12,9 +12,8 @@ import kotlinx.coroutines.launch
 sealed class WalletUiState {
     object Loading : WalletUiState()
     data class Success(
-        val summary: WalletSummaryResponse,
-        val transactions: List<WalletTransactionItem> = emptyList(),
-        val ppiStatus: PpiStatusData? = null
+        val summary: CustomerWallet,
+        val transactions: List<WalletTransaction> = emptyList()
     ) : WalletUiState()
     data class Error(val message: String) : WalletUiState()
 }
@@ -26,9 +25,6 @@ class WalletViewModel(
     private val _uiState = MutableStateFlow<WalletUiState>(WalletUiState.Loading)
     val uiState: StateFlow<WalletUiState> = _uiState.asStateFlow()
 
-    private val _topupState = MutableStateFlow<Result<TopupSessionResponse>?>(null)
-    val topupState: StateFlow<Result<TopupSessionResponse>?> = _topupState.asStateFlow()
-
     init {
         loadWalletData()
     }
@@ -36,38 +32,35 @@ class WalletViewModel(
     fun loadWalletData() {
         viewModelScope.launch {
             _uiState.value = WalletUiState.Loading
-            val summaryRes = walletRepository.getWalletSummary()
-            val txnsRes = walletRepository.getWalletTransactions()
-            val ppiRes = walletRepository.getPpiStatus()
-
-            if (summaryRes.isSuccess) {
+            try {
+                val walletRes = walletRepository.getWallet()
+                val txnsRes = try {
+                    walletRepository.getWalletTransactions(page = 1, limit = 20)
+                } catch (e: Exception) {
+                    null
+                }
                 _uiState.value = WalletUiState.Success(
-                    summary = summaryRes.getOrNull() ?: WalletSummaryResponse(),
-                    transactions = txnsRes.getOrNull()?.transactions ?: emptyList(),
-                    ppiStatus = ppiRes.getOrNull()?.ppiStatus
+                    summary = walletRes.wallet,
+                    transactions = txnsRes?.transactions ?: emptyList()
                 )
-            } else {
+            } catch (e: Exception) {
                 _uiState.value = WalletUiState.Error(
-                    summaryRes.exceptionOrNull()?.message ?: "Failed to load wallet balance"
+                    e.message ?: "Failed to load wallet balance"
                 )
             }
         }
     }
 
-    fun initiateTopup(amount: Double, onSessionCreated: (TopupSessionData) -> Unit) {
+    fun initiateTopup(amount: Double, onSessionCreated: (WalletTopupCreateResponse) -> Unit) {
         viewModelScope.launch {
-            val res = walletRepository.createTopupSession(amount)
-            _topupState.value = res
-            res.getOrNull()?.session?.let { sessionData ->
-                onSessionCreated(sessionData)
+            try {
+                val res = walletRepository.createWalletTopup(
+                    WalletTopupCreateRequest(amount = amount)
+                )
+                onSessionCreated(res)
+            } catch (e: Exception) {
+                _uiState.value = WalletUiState.Error(e.message ?: "Topup failed")
             }
-        }
-    }
-
-    fun verifyTopup(topupTxnId: String, gatewayPaymentId: String? = null) {
-        viewModelScope.launch {
-            walletRepository.verifyTopup(topupTxnId = topupTxnId, gatewayPaymentId = gatewayPaymentId)
-            loadWalletData()
         }
     }
 }

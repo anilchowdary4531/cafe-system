@@ -28,6 +28,11 @@ class AuthDataStore(context: Context) {
         private val REMEMBER_SESSION = androidx.datastore.preferences.core.booleanPreferencesKey("remember_session")
         private val AUTO_DETECT_LOCATION = androidx.datastore.preferences.core.booleanPreferencesKey("auto_detect_location")
         private val NOTIFICATIONS_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("notifications_enabled")
+        private val DARK_THEME = androidx.datastore.preferences.core.booleanPreferencesKey("dark_theme")
+    }
+
+    val darkTheme: Flow<Boolean> = appContext.dataStore.data.map { preferences ->
+        preferences[DARK_THEME] ?: false
     }
 
     val authToken: Flow<String?> = appContext.dataStore.data.map { preferences ->

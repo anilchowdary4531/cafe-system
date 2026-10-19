@@ -1,6 +1,8 @@
 package com.tiffzy.app.ui.customer
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -13,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tiffzy.app.navigation.bottomNavItems
 import com.tiffzy.app.ui.auth.AuthViewModel
@@ -47,19 +50,35 @@ fun MainScreen(
     homeViewModel: HomeViewModel = viewModel(),
     initialTab: Int = 0,
     locationViewModel: LocationViewModel,
+    onMapClick: () -> Unit = {},
+    onWalletClick: () -> Unit = {}
 ) {
     val pagerState = rememberPagerState(initialPage = initialTab.coerceIn(0, bottomNavItems.size - 1)) { bottomNavItems.size }
     val scope = rememberCoroutineScope()
     val lastLocation by locationViewModel.lastSelectedLocation.collectAsState()
-    
     val cartItems by CartRepository.getInstance().cartItems.collectAsState()
 
-    // Automatically reload restaurants when location changes or on initial load
+    // Handle initialTab changes from external navigation
+    LaunchedEffect(initialTab) {
+        val target = initialTab.coerceIn(0, bottomNavItems.size - 1)
+        if (pagerState.currentPage != target) {
+            pagerState.animateScrollToPage(target)
+        }
+    }
+
+    // Hardware/System back button handler: If not on Home, go to Home tab
+    BackHandler(enabled = pagerState.currentPage != 0) {
+        scope.launch {
+            pagerState.animateScrollToPage(0)
+        }
+    }
+
+    // Automatically reload restaurants when location changes
     LaunchedEffect(lastLocation) {
         if (lastLocation != null) {
             homeViewModel.loadRestaurants(lastLocation!!.latitude, lastLocation!!.longitude)
         } else {
-            homeViewModel.loadRestaurants() // Default load if no location
+            homeViewModel.loadRestaurants()
         }
     }
 
@@ -67,14 +86,14 @@ fun MainScreen(
         bottomBar = {
             Column {
                 // Persistent Cart Bar
-                if (cartItems.isNotEmpty() && (pagerState.currentPage != 3)) {
+                if (cartItems.isNotEmpty() && pagerState.currentPage != 3) {
                     val totalAmount = cartItems.sumOf { it.menuItem.price * it.quantity }
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { 
                                 scope.launch { 
-                                    pagerState.scrollToPage(3) 
+                                    pagerState.animateScrollToPage(3) 
                                 } 
                             },
                         color = MaterialTheme.colorScheme.primary,
@@ -120,45 +139,59 @@ fun MainScreen(
                     }
                 }
                 
-                NavigationBar(
-                    modifier = Modifier.height(80.dp), // Increased height for better visibility
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    tonalElevation = 8.dp, // Added shadow for attractiveness
-                    windowInsets = NavigationBarDefaults.windowInsets // Properly handle system bottom bar
+                // Bottom Navigation Bar
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.White,
+                    shadowElevation = 6.dp
                 ) {
-                    bottomNavItems.forEachIndexed { index, item ->
-                        val isSelected = pagerState.currentPage == index
-                        NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                                    contentDescription = item.label,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            },
-                            label = { 
-                                Text(
-                                    item.label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium
-                                )
-                            },
-                            selected = isSelected,
-                            onClick = {
-                                scope.launch {
-                                    pagerState.scrollToPage(index)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            bottomNavItems.forEachIndexed { index, item ->
+                                val isSelected = pagerState.currentPage == index
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) {
+                                            scope.launch {
+                                                pagerState.animateScrollToPage(index)
+                                            }
+                                        },
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                                        contentDescription = item.label,
+                                        tint = if (isSelected) Color(0xFFFE5102) else Color(0xFF757575),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = item.label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) Color(0xFFFE5102) else Color(0xFF757575),
+                                        maxLines = 1
+                                    )
                                 }
-                            },
-                            alwaysShowLabel = true,
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                unselectedIconColor = Color.Gray,
-                                unselectedTextColor = Color.Gray,
-                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                            )
-                        )
+                            }
+                        }
                     }
                 }
             }
@@ -167,8 +200,10 @@ fun MainScreen(
     ) { innerPadding ->
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()),
-            beyondViewportPageCount = 0
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = innerPadding.calculateBottomPadding()),
+            beyondViewportPageCount = 1
         ) { page ->
             when (page) {
                 0 -> HomeScreen(
@@ -176,12 +211,16 @@ fun MainScreen(
                     onChangeLocation = onChangeLocation,
                     onRestaurantClick = onRestaurantClick,
                     onViewProfile = { 
-                        scope.launch { pagerState.scrollToPage(4) } 
+                        scope.launch { pagerState.animateScrollToPage(4) } 
                     },
                     onNotificationsClick = onNotificationsClick,
                     onScanClick = onScanClick,
                     onDeleteAccount = onDeleteAccount,
                     onNavigateToWeb = onNavigateToWeb,
+                    onSearchClick = {
+                        scope.launch { pagerState.animateScrollToPage(1) }
+                    },
+                    onMapClick = onMapClick,
                     locationName = locationName,
                     viewModel = homeViewModel,
                     authViewModel = authViewModel
@@ -192,7 +231,9 @@ fun MainScreen(
                 )
                 2 -> OrdersScreen(
                     onOrderClick = onOrderClick,
-                    onBack = { /* Not needed in pager */ },
+                    onBack = { 
+                        scope.launch { pagerState.animateScrollToPage(0) }
+                    },
                     onReorder = onRestaurantClick
                 )
                 3 -> CartScreen(
@@ -210,7 +251,10 @@ fun MainScreen(
                     onSettingsClick = onSettingsClick,
                     onDeleteAccount = onDeleteAccount,
                     onLogout = onLogout,
-                    onBack = { /* Not needed */ },
+                    onBack = { 
+                        scope.launch { pagerState.animateScrollToPage(0) }
+                    },
+                    onWalletClick = onWalletClick,
                     onNavigateToWeb = onNavigateToWeb,
                     authViewModel = authViewModel
                 )

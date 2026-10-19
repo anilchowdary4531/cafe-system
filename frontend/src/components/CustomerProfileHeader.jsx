@@ -18,10 +18,10 @@ export default function CustomerProfileHeader({
     return (
         <header className="w-full pb-3 border-b border-[color:var(--app-border)]/35">
             {isOverview ? (
-                /* Overview Page Header: [ Profile Picture ] beside [ Tiffzy Logo ] Tiffzy, Guest, phone */
+                /* Overview Page Header: [ Profile Picture ] beside [ Tiffzy Logo + Tiffzy ], Guest, phone */
                 <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3.5 min-w-0">
-                        {/* Customer profile icon on the left */}
+                    <div className="flex items-start gap-3 sm:gap-3.5 min-w-0">
+                        {/* Profile Picture / Icon on the left */}
                         <div className="flex h-12 w-12 sm:h-13 sm:w-13 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-orange-500/10 text-[var(--app-primary)] border border-orange-500/20">
                             {avatarDataUrl ? (
                                 <img src={avatarDataUrl} alt="Profile avatar" className="h-full w-full object-cover" />
@@ -30,12 +30,12 @@ export default function CustomerProfileHeader({
                             )}
                         </div>
 
-                        {/* Profile Info beside profile picture */}
-                        <div className="min-w-0 flex flex-col justify-center">
-                            {/* Tiffzy logo immediately to the right of the profile icon + "Tiffzy" brand name immediately beside the logo */}
+                        {/* Brand Block + Profile Info immediately beside profile picture */}
+                        <div className="min-w-0 flex flex-col justify-start">
+                            {/* Tiffzy logo and brand name directly beside profile picture */}
                             <Link
                                 to="/"
-                                className="inline-flex items-center gap-2 group focus:outline-none shrink-0"
+                                className="inline-flex items-center gap-1.5 sm:gap-2 group focus:outline-none shrink-0"
                                 aria-label="Tiffzy"
                                 title="Tiffzy"
                             >
@@ -50,12 +50,14 @@ export default function CustomerProfileHeader({
                                 </span>
                             </Link>
 
-                            {/* Guest/customer name and phone number */}
+                            {/* Guest/Customer Name underneath Tiffzy brand row */}
                             <h1 className="truncate text-sm sm:text-base font-bold tracking-tight text-[color:var(--app-text)] leading-tight mt-0.5">
                                 {displayTitle}
                             </h1>
+
+                            {/* Phone number underneath Guest */}
                             {displaySubtitle && (
-                                <p className="theme-muted truncate text-xs sm:text-sm font-medium leading-tight">
+                                <p className="theme-muted truncate text-xs sm:text-sm font-medium leading-tight mt-0.5">
                                     {displaySubtitle}
                                 </p>
                             )}

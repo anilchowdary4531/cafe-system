@@ -3,10 +3,7 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-async function main() {
-  const email = "jekkaramesh788@gmail.com";
-  const rawPassword = "nanda@000";
-
+async function ensureSuperAdmin(email, rawPassword) {
   console.log(`=== Checking SuperAdmin User: ${email} ===`);
 
   let user = await prisma.user.findFirst({
@@ -31,7 +28,6 @@ async function main() {
   } else {
     console.log(`Found User: ID=${user.id}, Name="${user.name}", Role="${user.role}", isActive=${user.isActive}`);
     
-    // Check password
     const isPasswordValid = await bcrypt.compare(rawPassword, user.password);
     console.log(`Password "${rawPassword}" valid?`, isPasswordValid);
 
@@ -48,6 +44,10 @@ async function main() {
       console.log(`Activating user account for ${email}...`);
       updateData.isActive = true;
     }
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      updateData.failedLoginAttempts = 0;
+      updateData.lockedUntil = null;
+    }
 
     if (Object.keys(updateData).length > 0) {
       user = await prisma.user.update({
@@ -60,9 +60,15 @@ async function main() {
     }
   }
 
-  // Double check login verification
   const checkPass = await bcrypt.compare(rawPassword, user.password);
   console.log(`Final Verification: Email=${user.email}, Role=${user.role}, Password Match=${checkPass}`);
+}
+
+async function main() {
+  const rawPassword = "nanda@000";
+  // Support both the exact email and the typo variant typed in the UI
+  await ensureSuperAdmin("jekkaramesh788@gmail.com", rawPassword);
+  await ensureSuperAdmin("jekkaramesh788@gmai.com", rawPassword);
 }
 
 main()

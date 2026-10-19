@@ -17,6 +17,16 @@ interface ApiService {
     @GET("restaurants")
     suspend fun getRestaurants(): List<Restaurant>
 
+    @GET("api/restaurants/nearby")
+    suspend fun getNearbyRestaurants(
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double,
+        @Query("radius") radius: Double = 5.0,
+        @Query("limit") limit: Int = 20,
+        @Query("offset") offset: Int = 0,
+        @Query("openOnly") openOnly: Boolean = false
+    ): NearbyRestaurantsResponse
+
     @POST("customer/send-otp")
     suspend fun sendOtp(@Body request: SendOtpRequest): SendOtpResponse
 

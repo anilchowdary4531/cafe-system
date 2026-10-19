@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tiffzy.app.data.model.MenuItem
 import com.tiffzy.app.data.model.Restaurant
+import com.tiffzy.app.data.model.NearbyRestaurant
 import com.tiffzy.app.data.model.SearchItem
 import com.tiffzy.app.data.model.SearchItemRestaurant
 import com.tiffzy.app.data.model.BannerResponse
@@ -26,6 +27,8 @@ sealed class HomeUiState {
     object Loading : HomeUiState()
     data class Success(
         val restaurants: List<Restaurant>,
+        val nearbyRestaurants: List<NearbyRestaurant> = emptyList(),
+        val nearbyRadiusKm: Double? = null,
         val items: List<SearchItem> = emptyList(),
         val categories: List<HomeCategory> = emptyList(),
         val banners: List<BannerResponse> = emptyList(),
@@ -44,6 +47,7 @@ class HomeViewModel(
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     private var allRestaurants: List<Restaurant> = emptyList()
+    private var allNearbyRestaurants: List<NearbyRestaurant> = emptyList()
     private var discoveryCategories: List<HomeCategory> = emptyList()
     private var discoveryItems: List<SearchItem> = emptyList()
     private var discoveryBanners: List<BannerResponse> = emptyList()
@@ -56,12 +60,28 @@ class HomeViewModel(
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             try {
+                // Fetch nearby restaurants from backend if coordinates are supplied
+                var nearbyList: List<NearbyRestaurant> = emptyList()
+                var radiusKm: Double? = null
+
+                if (lat != null && lon != null) {
+                    try {
+                        val nearbyResponse = repository.getNearbyRestaurants(lat, lon, 5.0)
+                        nearbyList = nearbyResponse.restaurants
+                        radiusKm = nearbyResponse.radiusKm
+                        Log.d("HomeViewModel", "Loaded ${nearbyList.size} nearby restaurants around ($lat, $lon)")
+                    } catch (e: Exception) {
+                        Log.w("HomeViewModel", "Could not fetch nearby restaurants, continuing with standard catalog", e)
+                    }
+                }
+
                 // Parallel fetch with fallback protection for optional catalog metadata
                 val restaurants = repository.getRestaurants()
                 val banners = runCatching { repository.getBanners() }.getOrDefault(emptyList())
                 val globalCategories = runCatching { repository.getGlobalCategories() }.getOrDefault(emptyList())
 
                 allRestaurants = restaurants
+                allNearbyRestaurants = nearbyList
                 discoveryBanners = banners
                 
                 // Fetch mixed items for discovery
@@ -149,6 +169,8 @@ class HomeViewModel(
 
                 _uiState.value = HomeUiState.Success(
                     restaurants = restaurants,
+                    nearbyRestaurants = nearbyList,
+                    nearbyRadiusKm = radiusKm,
                     items = discoveryItems,
                     categories = discoveryCategories,
                     banners = discoveryBanners,
@@ -165,6 +187,7 @@ class HomeViewModel(
         if (query.length < 2) {
             _uiState.value = HomeUiState.Success(
                 restaurants = allRestaurants,
+                nearbyRestaurants = allNearbyRestaurants,
                 items = discoveryItems,
                 categories = discoveryCategories,
                 groupedItems = discoveryItems.groupBy { it.category ?: "General" },

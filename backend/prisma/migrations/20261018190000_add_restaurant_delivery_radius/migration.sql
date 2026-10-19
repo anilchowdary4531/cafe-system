@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "delivery_radius_km" DOUBLE PRECISION NOT NULL DEFAULT 5.0;

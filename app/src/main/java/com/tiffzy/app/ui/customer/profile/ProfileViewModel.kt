@@ -29,11 +29,20 @@ sealed class AddressUiState {
     data class Error(val message: String) : AddressUiState()
 }
 
+sealed class WalletUiState {
+    object Idle : WalletUiState()
+    object Loading : WalletUiState()
+    data class Success(val wallet: CustomerWallet, val transactions: List<WalletTransaction>) : WalletUiState()
+    data class Error(val message: String) : WalletUiState()
+}
+
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = RestaurantRepository(RetrofitClient.apiService)
+    private val walletRepository = com.tiffzy.app.data.repository.WalletRepository()
     private val authDataStore = AuthDataStore(application)
     private val profileExtrasDataStore = ProfileExtrasDataStore(application)
     private val cartRepository = CartRepository.getInstance()
+    private val favoritesDataStore = com.tiffzy.app.data.local.FavoritesDataStore(application)
 
     private val _uiState = MutableStateFlow<ProfileUiState>(ProfileUiState.Idle)
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
@@ -55,6 +64,12 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     private val _activeOrders = MutableStateFlow(0)
     val activeOrders: StateFlow<Int> = _activeOrders.asStateFlow()
+
+    private val _walletBalance = MutableStateFlow(0.0)
+    val walletBalance: StateFlow<Double> = _walletBalance.asStateFlow()
+
+    private val _walletState = MutableStateFlow<WalletUiState>(WalletUiState.Idle)
+    val walletState: StateFlow<WalletUiState> = _walletState.asStateFlow()
 
     private val _addressState = MutableStateFlow<AddressUiState>(AddressUiState.Idle)
     val addressState: StateFlow<AddressUiState> = _addressState.asStateFlow()
@@ -84,6 +99,9 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 _totalOrders.value = ordersResponse.groups.sumOf { it.stats.totalOrders }
                 _totalSpend.value = ordersResponse.groups.sumOf { it.stats.totalSpend }
                 _activeOrders.value = ordersResponse.groups.sumOf { it.stats.activeOrders }
+
+                // Fetch real CustomerAccount wallet
+                loadWallet()
             } catch (e: Exception) {
                 if (e is retrofit2.HttpException && e.code() == 404) {
                     // Account missing in backend but app has token - session is invalid
@@ -92,6 +110,29 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 } else {
                     _uiState.value = ProfileUiState.Error(e.message ?: "Failed to load profile")
                 }
+            }
+        }
+    }
+
+    fun loadWallet() {
+        viewModelScope.launch {
+            _walletState.value = WalletUiState.Loading
+            try {
+                val walletRes = walletRepository.getWallet()
+                _walletBalance.value = walletRes.wallet.balance
+
+                val txnRes = try {
+                    walletRepository.getWalletTransactions(page = 1, limit = 20)
+                } catch (e: Exception) {
+                    null
+                }
+
+                _walletState.value = WalletUiState.Success(
+                    wallet = walletRes.wallet,
+                    transactions = txnRes?.transactions ?: emptyList()
+                )
+            } catch (e: Exception) {
+                _walletState.value = WalletUiState.Error(e.message ?: "Failed to load wallet")
             }
         }
     }
@@ -183,8 +224,20 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     fun logout(onLoggedOut: () -> Unit) {
         viewModelScope.launch {
+            try {
+                com.tiffzy.app.service.SocketManager.disconnectOnLogout()
+            } catch (e: Exception) {
+                // Ignore
+            }
+            try {
+                favoritesDataStore.clearFavorites()
+            } catch (e: Exception) {
+                // Ignore cleanup error
+            }
             authDataStore.clearAuth()
             cartRepository.clearCart()
+            _walletBalance.value = 0.0
+            _walletState.value = WalletUiState.Idle
             onLoggedOut()
         }
     }

@@ -83,6 +83,7 @@ import SuperAdminSettings from "./pages/super-admin/SuperAdminSettings";
 import SuperAdminCategories from "./pages/super-admin/SuperAdminCategories";
 import SuperAdminBanners from "./pages/super-admin/SuperAdminBanners";
 import SuperAdminRestaurantProfiles from "./pages/super-admin/SuperAdminRestaurantProfiles";
+import SuperAdminRestaurantMap from "./pages/super-admin/SuperAdminRestaurantMap";
 import SuperAdminWalletManagement from "./pages/super-admin/SuperAdminWalletManagement";
 import SupplierLogin from "./pages/supplier/SupplierLogin";
 import SupplierDashboard from "./pages/supplier/SupplierDashboard";
@@ -504,6 +505,14 @@ export default function App() {
                         element={
                             <ProtectedRoute role="SUPER_ADMIN">
                                 <SuperAdminRestaurantProfiles />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/super-admin/restaurant-map"
+                        element={
+                            <ProtectedRoute role="SUPER_ADMIN">
+                                <SuperAdminRestaurantMap />
                             </ProtectedRoute>
                         }
                     />

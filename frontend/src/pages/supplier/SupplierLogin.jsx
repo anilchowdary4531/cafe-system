@@ -143,10 +143,8 @@ export default function SupplierLogin() {
             {/* LEFT SIDE BRANDING - MATCHING CUSTOMER PAGE */}
             <div className="theme-login-brand hidden flex-col justify-center px-16 md:flex">
                 <div className="flex items-center gap-3 mb-6">
-                    <div className="theme-card flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl">
-                        <BrandLogo className="h-10 w-10" title="Brand logo" />
-                    </div>
-                    <h1 className="text-5xl font-bold tracking-tight">Tiffzy</h1>
+                    <BrandLogo className="h-12 w-12 shrink-0 object-contain" title="Tiffzy logo" variant="primary" />
+                    <h1 className="theme-brand-text text-5xl font-bold tracking-tight">Tiffzy</h1>
                 </div>
 
                 <p className="text-xl font-medium max-w-md leading-relaxed">
@@ -199,8 +197,8 @@ export default function SupplierLogin() {
 
                     {/* MOBILE LOGO */}
                     <div className="login-mobile-brand md:hidden flex items-center justify-center gap-2 mb-6">
-                        <BrandLogo className="h-7 w-7" title="Brand logo" />
-                        <h1 className="text-3xl font-bold">Tiffzy</h1>
+                        <BrandLogo className="h-8 w-8 shrink-0 object-contain" title="Tiffzy logo" variant="primary" />
+                        <h1 className="theme-brand-text text-3xl font-bold">Tiffzy</h1>
                     </div>
 
                     {/* SUPPLIER FORM HEADERS */}

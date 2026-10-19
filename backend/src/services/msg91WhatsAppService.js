@@ -18,9 +18,35 @@ export const formatWhatsAppPhone = (raw) => {
   return digits;
 };
 
+export const maskPhone = (phoneStr) => {
+  const str = String(phoneStr || "").trim();
+  if (!str) return "";
+  const digits = str.replace(/[^\d]/g, "");
+  if (!digits) return "";
+  const last4 = digits.slice(-4);
+  return `******${last4}`;
+};
+
 export const sendWhatsAppOtp = async ({ phone, otp, expiresAt } = {}) => {
   const formattedPhone = formatWhatsAppPhone(phone);
-  if (!formattedPhone) return { ok: false, skipped: true, error: "Recipient phone number is required" };
+  const maskedDestination = maskPhone(formattedPhone || phone);
+  if (!formattedPhone) return { ok: false, skipped: true, providerAccepted: false, error: "Recipient phone number is required" };
+
+  const nodeEnv = String(process.env.NODE_ENV || "development").trim() || "development";
+  const strict = String(process.env.WHATSAPP_STRICT || "").toLowerCase() === "true";
+  const forceSimulate = String(process.env.WHATSAPP_SIMULATE || process.env.ALLOW_SIMULATED_OTP || "").toLowerCase() === "true";
+
+  if (forceSimulate) {
+    // eslint-disable-next-line no-console
+    console.log(`[OTP DELIVERY]\nchannel=WHATSAPP\ndestination=${maskedDestination}\nprovider=simulated\nproviderStatus=200\nproviderMessageId=sim_${Date.now()}\nproviderAccepted=true`);
+    return {
+      ok: true,
+      simulated: true,
+      provider: "simulated",
+      providerAccepted: true,
+      messageId: `sim_${Date.now()}`,
+    };
+  }
 
   const authkey = String(
     process.env.MSG91_AUTHKEY ||
@@ -33,23 +59,36 @@ export const sendWhatsAppOtp = async ({ phone, otp, expiresAt } = {}) => {
     process.env.MSG91_WHATSAPP_INTEGRATED_NUMBER || "918143106178"
   ).trim();
 
-  // Safe server logging (NEVER log AuthKey or OTP)
-  // eslint-disable-next-line no-console
-  console.log("[msg91WhatsApp] send started");
-  // eslint-disable-next-line no-console
-  console.log(`[msg91WhatsApp] authkey configured: ${Boolean(authkey)}`);
-
   if (!authkey) {
-    if (process.env.NODE_ENV !== "production") {
+    if (nodeEnv !== "production" && !strict) {
+      // Safe diagnostic log
       // eslint-disable-next-line no-console
-      console.log("[msg91WhatsApp] MSG91_AUTHKEY missing in process.env - returning simulated dev status");
-      return { ok: true, simulated: true, reason: "msg91_authkey_missing" };
+      console.log(`[OTP DELIVERY]\nchannel=WHATSAPP\ndestination=${maskedDestination}\nprovider=simulated\nproviderStatus=200\nproviderMessageId=sim_${Date.now()}\nproviderAccepted=true\nreason=msg91_authkey_missing`);
+      return {
+        ok: true,
+        simulated: true,
+        provider: "simulated",
+        providerAccepted: true,
+        messageId: `sim_${Date.now()}`,
+        reason: "msg91_authkey_missing",
+      };
     }
-    return { ok: false, error: "MSG91_AUTHKEY is not configured on the server" };
+
+    // Safe diagnostic log
+    // eslint-disable-next-line no-console
+    console.error(`[OTP DELIVERY]\nchannel=WHATSAPP\ndestination=${maskedDestination}\nprovider=msg91_whatsapp\nproviderStatus=none\nproviderMessageId=none\nproviderAccepted=false\nerror=MSG91_AUTHKEY is not configured on the server`);
+
+    return {
+      ok: false,
+      provider: "msg91_whatsapp",
+      providerAccepted: false,
+      error: "MSG91_AUTHKEY is not configured on the server",
+      code: "PROVIDER_NOT_CONFIGURED",
+    };
   }
 
   const otpValue = String(otp || "").trim();
-  if (!otpValue) return { ok: false, error: "OTP value is required" };
+  if (!otpValue) return { ok: false, error: "OTP value is required", providerAccepted: false };
 
   const payload = {
     integrated_number: integratedNumber,
@@ -84,9 +123,6 @@ export const sendWhatsAppOtp = async ({ phone, otp, expiresAt } = {}) => {
     },
   };
 
-  // eslint-disable-next-line no-console
-  console.log("[msg91WhatsApp] MSG91 request sent");
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -107,11 +143,6 @@ export const sendWhatsAppOtp = async ({ phone, otp, expiresAt } = {}) => {
 
     clearTimeout(timeoutId);
 
-    // eslint-disable-next-line no-console
-    console.log(`[msg91WhatsApp] MSG91 HTTP status: ${res.status}`);
-    // eslint-disable-next-line no-console
-    console.log(`[msg91WhatsApp] MSG91 accepted: ${res.ok}`);
-
     const text = await res.text();
     let json = null;
     try {
@@ -120,31 +151,75 @@ export const sendWhatsAppOtp = async ({ phone, otp, expiresAt } = {}) => {
       json = null;
     }
 
-    if (!res.ok) {
+    const hasProviderError =
+      !res.ok ||
+      Boolean(
+        json &&
+        (json.type === "error" ||
+          json.status === "error" ||
+          json.hasError === true ||
+          (json.status && String(json.status).toLowerCase() === "fail"))
+      );
+
+    if (hasProviderError) {
       const msg =
         (json && (json.message || json.error || json.type)) ||
+        text ||
         `MSG91 WhatsApp API returned HTTP ${res.status}`;
+
+      // Safe diagnostic log
+      // eslint-disable-next-line no-console
+      console.error(`[OTP DELIVERY]\nchannel=WHATSAPP\ndestination=${maskedDestination}\nprovider=msg91_whatsapp\nproviderStatus=${res.status}\nproviderMessageId=none\nproviderAccepted=false\nerror=${msg}`);
+
       return {
         ok: false,
+        provider: "msg91_whatsapp",
+        providerAccepted: false,
         status: res.status,
-        error: msg,
-        simulated: false,
+        error: String(msg).slice(0, 500),
+        code: "PROVIDER_REJECTED",
       };
     }
+
+    const messageId =
+      json?.data?.id ||
+      json?.request_id ||
+      json?.message_id ||
+      json?.id ||
+      (Array.isArray(json?.data) && json.data[0]?.id) ||
+      "accepted";
+
+    // Safe diagnostic log
+    // eslint-disable-next-line no-console
+    console.log(`[OTP DELIVERY]\nchannel=WHATSAPP\ndestination=${maskedDestination}\nprovider=msg91_whatsapp\nproviderStatus=${res.status}\nproviderMessageId=${messageId}\nproviderAccepted=true`);
 
     return {
       ok: true,
       provider: "msg91_whatsapp",
+      providerAccepted: true,
       status: res.status,
+      messageId,
       json,
       simulated: false,
     };
   } catch (err) {
     clearTimeout(timeoutId);
     const isTimeout = err.name === "AbortError";
-    const errMsg = isTimeout ? "MSG91 WhatsApp request timed out after 10s" : `MSG91 WhatsApp error: ${err?.message || String(err)}`;
+    const errMsg = isTimeout
+      ? "MSG91 WhatsApp request timed out after 10s"
+      : `MSG91 WhatsApp error: ${err?.message || String(err)}`;
+
+    // Safe diagnostic log
     // eslint-disable-next-line no-console
-    console.log(`[msg91WhatsApp] Request error: ${errMsg}`);
-    return { ok: false, error: errMsg, simulated: false };
+    console.error(`[OTP DELIVERY]\nchannel=WHATSAPP\ndestination=${maskedDestination}\nprovider=msg91_whatsapp\nproviderStatus=${isTimeout ? "timeout" : "network_error"}\nproviderMessageId=none\nproviderAccepted=false\nerror=${errMsg}`);
+
+    return {
+      ok: false,
+      provider: "msg91_whatsapp",
+      providerAccepted: false,
+      status: isTimeout ? 504 : 500,
+      error: errMsg,
+      code: isTimeout ? "PROVIDER_TIMEOUT" : "NETWORK_ERROR",
+    };
   }
 };

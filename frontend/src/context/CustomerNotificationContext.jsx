@@ -131,6 +131,7 @@ export function CustomerNotificationProvider({ children }) {
     tokenRef.current = activeToken;
 
     const socket = io(API_BASE_URL || "", {
+      auth: { token: activeToken },
       transports: ["websocket", "polling"],
       withCredentials: true,
     });
@@ -139,9 +140,11 @@ export function CustomerNotificationProvider({ children }) {
     socket.on("connect", () => {
       const customerId = customer?.id || customer?.customerAccountId || null;
       const phone = customer?.phone || "";
+      socket.emit("authenticate", { token: activeToken });
       socket.emit("join_customer_room", {
         customerId,
         phone,
+        token: activeToken,
       });
     });
 

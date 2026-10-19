@@ -22,6 +22,17 @@ class RestaurantRepository(private val apiService: ApiService) {
         return apiService.getRestaurants()
     }
 
+    suspend fun getNearbyRestaurants(
+        lat: Double,
+        lng: Double,
+        radius: Double = 5.0,
+        limit: Int = 20,
+        offset: Int = 0,
+        openOnly: Boolean = false
+    ): NearbyRestaurantsResponse {
+        return apiService.getNearbyRestaurants(lat, lng, radius, limit, offset, openOnly)
+    }
+
     suspend fun searchCatalog(query: String): SearchResponse {
         return apiService.searchCatalog(query)
     }

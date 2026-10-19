@@ -18,7 +18,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.tiffzy.app.data.model.WalletTransactionItem
+import com.tiffzy.app.data.model.WalletTransaction
 import com.tiffzy.app.ui.theme.TiffzyPrimary
 
 
@@ -210,7 +210,7 @@ fun WalletScreen(
                         val amt = customAmountText.toDoubleOrNull()
                         if (amt != null && amt >= 10.0) {
                             showTopupDialog = false
-                            viewModel.initiateTopup(amt) { sessionData ->
+                            viewModel.initiateTopup(amt) { response ->
                                 // Trigger Cashfree PG SDK / Webview
                             }
                         }
@@ -229,7 +229,7 @@ fun WalletScreen(
 }
 
 @Composable
-fun TransactionRow(item: WalletTransactionItem) {
+fun TransactionRow(item: WalletTransaction) {
     val isCredit = item.direction.equals("CREDIT", ignoreCase = true)
     val statusColor = if (isCredit) Color(0xFF2E7D32) else Color(0xFFC62828)
 

@@ -64,6 +64,7 @@ export const requestOtp = async ({ prisma, phone } = {}) => {
       return {
         status: 429,
         payload: {
+          success: false,
           message: "OTP already sent recently. Please wait a moment and try again.",
         },
       };
@@ -181,3 +182,16 @@ export const verifyOtp = async ({ prisma, phone, otp } = {}) => {
 
   return { ok: true };
 };
+
+export const clearOtpCooldown = async ({ prisma, phone } = {}) => {
+  if (!phone) return;
+  try {
+    if (prisma?.customerOtp?.delete) {
+      await prisma.customerOtp.delete({ where: { phone } }).catch(() => {});
+    }
+  } catch {
+    // ignore
+  }
+  memoryOtpSessions.delete(phone);
+};
+

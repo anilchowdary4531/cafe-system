@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -190,6 +191,131 @@ fun TiffzyRestaurantSmallCard(
         }
     }
 }
+
+@Composable
+fun TiffzyNearbyRestaurantCard(
+    restaurant: com.tiffzy.app.data.model.NearbyRestaurant,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .width(200.dp)
+            .clickable { onClick() },
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column {
+            Box(modifier = Modifier.height(110.dp).fillMaxWidth()) {
+                val imageUrl = ImageUtils.resolveImageUrl(restaurant.bannerUrl ?: restaurant.logoUrl)
+                SubcomposeAsyncImage(
+                    model = imageUrl,
+                    contentDescription = restaurant.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    loading = {
+                        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
+                    },
+                    error = {
+                        RestaurantDesignPlaceholder(restaurant.name, showName = false)
+                    },
+                    success = { state ->
+                        Image(
+                            painter = state.painter,
+                            contentDescription = restaurant.name,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                )
+
+                // Distance Badge on top left
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp),
+                    color = Color.Black.copy(alpha = 0.7f),
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            contentDescription = null,
+                            modifier = Modifier.size(11.dp),
+                            tint = Color(0xFFFF8A1F)
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = "${restaurant.distanceKm} km",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                // Open / Closed Badge on top right
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp),
+                    color = if (restaurant.isOpen) Color(0xFF10B981) else Color(0xFF4B5563),
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text(
+                        text = if (restaurant.isOpen) "Open" else "Closed",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+
+                // ETA on bottom left
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(6.dp),
+                    color = Color.Black.copy(alpha = 0.65f),
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text(
+                        text = "${restaurant.estimatedDeliveryMinutes} min",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                    )
+                }
+            }
+
+            Column(modifier = Modifier.padding(8.dp)) {
+                Text(
+                    text = restaurant.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Black,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                // Deliverability status
+                Text(
+                    text = if (restaurant.canDeliver) "✓ Delivery available" else "Outside delivery area",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (restaurant.canDeliver) Color(0xFF059669) else Color(0xFFD97706),
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 fun TiffzyDiscoveryItemCard(

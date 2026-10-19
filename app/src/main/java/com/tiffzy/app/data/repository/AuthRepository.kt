@@ -56,6 +56,13 @@ class AuthRepository(
 
     private suspend fun handleCustomerAuth(response: VerifyOtpResponse) {
         saveAuthToken(response.token)
+        if (!response.token.isNullOrBlank()) {
+            try {
+                com.tiffzy.app.service.SocketManager.connectWithAuth(response.token)
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
         // Ensure customer object is not null before accessing its properties
         val customer = response.customer ?: return
         authDataStore.saveCustomerInfo(
@@ -98,6 +105,11 @@ class AuthRepository(
     }
 
     suspend fun logout() {
+        try {
+            com.tiffzy.app.service.SocketManager.disconnectOnLogout()
+        } catch (e: Exception) {
+            // Ignore
+        }
         authDataStore.clearAuth()
         RetrofitClient.setToken(null)
     }

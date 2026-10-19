@@ -561,6 +561,7 @@ test("PHASE P0 — Financial & Table-State Integrity Regression Test Suite", asy
 
   // TEST 12: Successful Wallet payment closes a fully paid session.
   await t.test("TEST 12: Wallet payment closes a fully paid session", async () => {
+    await prisma.customerAccount.deleteMany({ where: { phone: "+919999900001" } });
     const custAccount = await prisma.customerAccount.create({
       data: { phone: "+919999900001", name: "Wallet Test User" },
     });

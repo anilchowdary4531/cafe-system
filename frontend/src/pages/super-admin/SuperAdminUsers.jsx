@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     BarChart3,
     Building2,
@@ -20,15 +20,35 @@ import {
     Wallet,
     Globe,
     Filter,
-    ArrowUpRight
+    ArrowUpRight,
+    AlertCircle,
+    Loader2
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useStaffSocket } from "../../context/StaffSocketContext";
 import { api, cachedGet } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import SuperAdminSidebar from "../../components/super-admin/SuperAdminSidebar";
 import tiffzyLogo from "../../assets/tiffzy-logo.png";
+
+const formatLastSeen = (timestamp, isOnline) => {
+    if (isOnline) return "Now";
+    if (!timestamp) return "Never";
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return "Never";
+    const diffMs = Date.now() - date.getTime();
+    if (diffMs < 0 || diffMs < 60000) return "Just now";
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? "s" : ""} ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hr${diffHours > 1 ? "s" : ""} ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString();
+};
 
 const formatPhone = (raw) => {
     const s = String(raw || "").trim();
@@ -50,9 +70,19 @@ export default function SuperAdminUsers() {
 
     // Determine initial tab from pathname or query params
     const getInitialTab = () => {
+        const params = new URLSearchParams(location.search);
+        if (params.get("status") || params.get("presence")) return "customers";
         if (location.pathname.includes("/staff")) return "staff";
         if (location.pathname.includes("/customers")) return "customers";
         return "all";
+    };
+
+    const getInitialPresenceFilter = () => {
+        const params = new URLSearchParams(location.search);
+        const statusParam = (params.get("status") || params.get("presence") || "").toUpperCase();
+        if (statusParam === "ONLINE") return "ONLINE";
+        if (statusParam === "OFFLINE") return "OFFLINE";
+        return "ALL";
     };
 
     const [activeTab, setActiveTab] = useState(getInitialTab());
@@ -65,6 +95,157 @@ export default function SuperAdminUsers() {
 
     const [customers, setCustomers] = useState([]);
     const [customerSummary, setCustomerSummary] = useState(null);
+
+    const { socket: staffSocket } = useStaffSocket();
+    const [presenceFilter, setPresenceFilter] = useState(getInitialPresenceFilter());
+
+    const [presence, setPresence] = useState({
+        totalCustomers: 0,
+        onlineCustomers: 0,
+        offlineCustomers: 0,
+        loading: true,
+        error: "",
+    });
+
+    const fetchPresence = useCallback(async () => {
+        try {
+            setPresence((prev) => ({ ...prev, loading: true, error: "" }));
+            const res = await api.get("/super-admin/customers/presence");
+            const data = res.data?.data || res.data;
+            if (data && typeof data.onlineCustomers === "number") {
+                setPresence({
+                    totalCustomers: Number(data.totalCustomers || 0),
+                    onlineCustomers: Number(data.onlineCustomers || 0),
+                    offlineCustomers: Number(data.offlineCustomers || 0),
+                    loading: false,
+                    error: "",
+                });
+            } else {
+                setPresence((prev) => ({ ...prev, loading: false, error: "Invalid presence data structure" }));
+            }
+        } catch (err) {
+            setPresence((prev) => ({
+                ...prev,
+                loading: false,
+                error: err.response?.data?.message || "Failed to load customer presence",
+            }));
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchPresence();
+    }, [fetchPresence]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const statusParam = (params.get("status") || params.get("presence") || "").toUpperCase();
+        if (statusParam === "ONLINE" || statusParam === "OFFLINE") {
+            setPresenceFilter(statusParam);
+            setActiveTab("customers");
+        } else if (statusParam === "ALL") {
+            setPresenceFilter("ALL");
+            setActiveTab("customers");
+        }
+    }, [location.search]);
+
+    useEffect(() => {
+        if (!staffSocket) return;
+
+        const handlePresenceUpdated = (counts) => {
+            if (counts && typeof counts.onlineCustomers === "number") {
+                setPresence({
+                    totalCustomers: Number(counts.totalCustomers || 0),
+                    onlineCustomers: Number(counts.onlineCustomers || 0),
+                    offlineCustomers: Number(counts.offlineCustomers || 0),
+                    loading: false,
+                    error: "",
+                });
+            }
+        };
+
+        const handleCustomerOnline = (data) => {
+            if (!data?.customerId) return;
+            const cid = Number(data.customerId);
+            setCustomers((prev) => {
+                const target = prev.find((c) => c.id === cid);
+                const wasOnline = Boolean(target?.isOnline);
+                const next = prev.map((c) =>
+                    c.id === cid
+                        ? { ...c, isOnline: true, lastSeenAt: data.lastSeenAt || new Date().toISOString() }
+                        : c
+                );
+                if (!wasOnline) {
+                    setPresence((p) => {
+                        const total = p.totalCustomers || next.length;
+                        const nextOnline = p.onlineCustomers + 1;
+                        return {
+                            ...p,
+                            totalCustomers: total,
+                            onlineCustomers: nextOnline,
+                            offlineCustomers: Math.max(0, total - nextOnline),
+                        };
+                    });
+                }
+                return next;
+            });
+            setAllUsers((prev) =>
+                prev.map((u) =>
+                    (u.rawId === cid && u.userType === "CUSTOMER")
+                        ? { ...u, isOnline: true, lastSeenAt: data.lastSeenAt || new Date().toISOString() }
+                        : u
+                )
+            );
+        };
+
+        const handleCustomerOffline = (data) => {
+            if (!data?.customerId) return;
+            const cid = Number(data.customerId);
+            setCustomers((prev) => {
+                const target = prev.find((c) => c.id === cid);
+                const wasOnline = Boolean(target?.isOnline);
+                const next = prev.map((c) =>
+                    c.id === cid
+                        ? { ...c, isOnline: false, lastSeenAt: data.lastSeenAt || new Date().toISOString() }
+                        : c
+                );
+                if (wasOnline) {
+                    setPresence((p) => {
+                        const total = p.totalCustomers || next.length;
+                        const nextOnline = Math.max(0, p.onlineCustomers - 1);
+                        return {
+                            ...p,
+                            onlineCustomers: nextOnline,
+                            offlineCustomers: Math.max(0, total - nextOnline),
+                        };
+                    });
+                }
+                return next;
+            });
+            setAllUsers((prev) =>
+                prev.map((u) =>
+                    (u.rawId === cid && u.userType === "CUSTOMER")
+                        ? { ...u, isOnline: false, lastSeenAt: data.lastSeenAt || new Date().toISOString() }
+                        : u
+                )
+            );
+        };
+
+        staffSocket.on("customer:presence_updated", handlePresenceUpdated);
+        staffSocket.on("customer:online", handleCustomerOnline);
+        staffSocket.on("customer:offline", handleCustomerOffline);
+
+        return () => {
+            staffSocket.off("customer:presence_updated", handlePresenceUpdated);
+            staffSocket.off("customer:online", handleCustomerOnline);
+            staffSocket.off("customer:offline", handleCustomerOffline);
+        };
+    }, [staffSocket]);
+
+    const handlePresenceFilterChange = (filter) => {
+        setPresenceFilter(filter);
+        setActiveTab("customers");
+        navigate(`/super-admin/users?status=${filter.toLowerCase()}`, { replace: true });
+    };
 
     const [query, setQuery] = useState("");
     const [roleFilter, setRoleFilter] = useState("ALL");
@@ -178,12 +359,32 @@ export default function SuperAdminUsers() {
             setLoading(true);
             const data = await cachedGet("/super-admin/customers", {
                 params: search ? { q: search } : {},
-                ttlMs: 5_000,
-                staleMs: 30_000,
+                ttlMs: 0,
+                force: true,
                 scope: "auth",
             });
-            setCustomers(data?.customers || []);
+            const custs = data?.customers || [];
+            setCustomers(custs);
             setCustomerSummary(data?.summary || null);
+
+            const onlineFromCustomers = custs.filter((c) => c.isOnline).length;
+            const totalFromCustomers = custs.length;
+            const total = Number(data?.summary?.totalCustomers ?? (totalFromCustomers || 0));
+            const online = typeof data?.summary?.onlineCustomers === "number"
+                ? Number(data.summary.onlineCustomers)
+                : onlineFromCustomers;
+            const offline = typeof data?.summary?.offlineCustomers === "number"
+                ? Number(data.summary.offlineCustomers)
+                : Math.max(0, total - online);
+
+            setPresence((prev) => ({
+                ...prev,
+                totalCustomers: total,
+                onlineCustomers: online,
+                offlineCustomers: offline,
+                loading: false,
+                error: "",
+            }));
             setError("");
         } catch (err) {
             setError(err.response?.data?.message || "Failed to load registered customers");
@@ -254,10 +455,10 @@ export default function SuperAdminUsers() {
     };
 
     const filteredAllUsers = allUsers.filter((u) => {
-        if (u.userType === "CUSTOMER" || u.role === "CUSTOMER") {
-            if (!u.phone || u.phone === "Not set" || formatPhone(u.phone) === "Not set") {
-                return false;
-            }
+        if (presenceFilter === "ONLINE") {
+            if (u.userType !== "CUSTOMER" || !u.isOnline) return false;
+        } else if (presenceFilter === "OFFLINE") {
+            if (u.userType !== "CUSTOMER" || u.isOnline) return false;
         }
         if (roleFilter === "ALL") return true;
         return String(u.role || "").toUpperCase() === roleFilter;
@@ -324,6 +525,125 @@ export default function SuperAdminUsers() {
                         {error}
                     </div>
                 )}
+
+                {/* CUSTOMER PRESENCE SECTION */}
+                <section className="rounded-xl border theme-border px-4 py-2.5 bg-black/5 dark:bg-white/5 backdrop-blur-sm" data-testid="customer-presence-section">
+                    <div className="flex items-center justify-between gap-2 pb-2 border-b theme-border flex-wrap sm:flex-nowrap">
+                        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                            <Users className="text-emerald-500 shrink-0" size={18} />
+                            <h2 className="text-base sm:text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                                Customer Presence
+                            </h2>
+                            {staffSocket?.connected ? (
+                                <span className="inline-flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0" data-testid="presence-live-status">
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    </span>
+                                    ● Live
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0" data-testid="presence-live-status">
+                                    <span className="inline-block h-2 w-2 rounded-full bg-amber-400"></span>
+                                    ○ Reconnecting...
+                                </span>
+                            )}
+                        </div>
+
+                        {/* PRESENCE FILTER PILLS */}
+                        <div className="flex items-center gap-1 bg-black/10 dark:bg-white/5 p-0.5 rounded-lg border theme-border text-xs">
+                            <button
+                                type="button"
+                                onClick={() => handlePresenceFilterChange("ALL")}
+                                className={`px-2 py-0.5 rounded-md font-bold transition cursor-pointer ${presenceFilter === "ALL" ? "bg-amber-500 text-black shadow-sm" : "theme-muted hover:theme-text"}`}
+                            >
+                                All
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handlePresenceFilterChange("ONLINE")}
+                                className={`flex items-center gap-1 px-2 py-0.5 rounded-md font-bold transition cursor-pointer ${presenceFilter === "ONLINE" ? "bg-emerald-500 text-white shadow-sm" : "text-emerald-500/80 hover:text-emerald-400"}`}
+                            >
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                Online
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handlePresenceFilterChange("OFFLINE")}
+                                className={`flex items-center gap-1 px-2 py-0.5 rounded-md font-bold transition cursor-pointer ${presenceFilter === "OFFLINE" ? "bg-gray-600 text-white shadow-sm" : "theme-muted hover:theme-text"}`}
+                            >
+                                <span className="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
+                                Offline
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* METRICS ROW */}
+                    {presence.loading ? (
+                        <div className="flex items-center justify-center py-2 gap-2 text-xs theme-muted" data-testid="customer-presence-loading">
+                            <Sparkles className="animate-spin text-emerald-500" size={15} />
+                            <span>Loading customer presence...</span>
+                        </div>
+                    ) : presence.error ? (
+                        <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-xs" data-testid="customer-presence-error">
+                            <span className="font-semibold">{presence.error}</span>
+                            <button
+                                type="button"
+                                onClick={fetchPresence}
+                                className="px-2 py-0.5 bg-red-500 text-white rounded-md text-xs font-bold cursor-pointer"
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-6 sm:gap-10 pt-2 flex-wrap">
+                            <button
+                                type="button"
+                                onClick={() => handlePresenceFilterChange("ONLINE")}
+                                className="inline-flex items-center gap-2 cursor-pointer transition hover:opacity-80 active:scale-95 bg-transparent border-0 p-0 text-left group"
+                                title="Click to filter Online Customers"
+                            >
+                                <span className="text-base leading-none">🟢</span>
+                                <span className="text-xs font-bold uppercase tracking-wider text-emerald-500 dark:text-emerald-400">
+                                    Online
+                                </span>
+                                <span className="text-lg sm:text-xl font-black text-emerald-500 dark:text-emerald-400 leading-none ml-0.5" data-testid="online-customers-count">
+                                    {presence.onlineCustomers.toLocaleString()}
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handlePresenceFilterChange("OFFLINE")}
+                                className="inline-flex items-center gap-2 cursor-pointer transition hover:opacity-80 active:scale-95 bg-transparent border-0 p-0 text-left group"
+                                title="Click to filter Offline Customers"
+                            >
+                                <span className="text-base leading-none">⚫</span>
+                                <span className="text-xs font-bold uppercase tracking-wider theme-muted">
+                                    Offline
+                                </span>
+                                <span className="text-lg sm:text-xl font-black theme-text leading-none ml-0.5" data-testid="offline-customers-count">
+                                    {presence.offlineCustomers.toLocaleString()}
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handlePresenceFilterChange("ALL")}
+                                className="inline-flex items-center gap-2 cursor-pointer transition hover:opacity-80 active:scale-95 bg-transparent border-0 p-0 text-left group"
+                                title="Click to show All Customers"
+                            >
+                                <Users size={18} className="text-amber-500 shrink-0" />
+                                <span className="text-xs font-bold uppercase tracking-wider text-amber-500">
+                                    Total
+                                </span>
+                                <span className="text-lg sm:text-xl font-black text-amber-500 leading-none ml-0.5" data-testid="total-customers-count">
+                                    {presence.totalCustomers.toLocaleString()}
+                                </span>
+                            </button>
+                        </div>
+                    )}
+                </section>
 
                 {/* TAB SWITCHER */}
                 <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-black/10 dark:bg-white/5 border border-black/5 dark:border-white/5 max-w-2xl">
@@ -439,6 +759,8 @@ export default function SuperAdminUsers() {
                                         <tr className="theme-muted text-left border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider">
                                             <th className="px-4 py-3 font-bold">User / Name</th>
                                             <th className="px-4 py-3 font-bold">Role & Type</th>
+                                            <th className="px-4 py-3 font-bold">Status</th>
+                                            <th className="px-4 py-3 font-bold">Last Seen</th>
                                             <th className="px-4 py-3 font-bold">Affiliation</th>
                                             <th className="px-4 py-3 font-bold">Phone Number</th>
                                             <th className="px-4 py-3 font-bold">Email Address</th>
@@ -469,6 +791,37 @@ export default function SuperAdminUsers() {
                                                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] uppercase tracking-wider ${getRoleBadgeStyle(u.role)}`}>
                                                         {u.role}
                                                     </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {u.userType === "CUSTOMER" ? (
+                                                        u.isOnline ? (
+                                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-500 border border-emerald-500/20">
+                                                                <span className="relative flex h-2 w-2">
+                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                                                </span>
+                                                                Online
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-500/10 px-2.5 py-1 text-xs font-bold text-gray-400 border border-gray-500/20">
+                                                                <span className="h-2 w-2 rounded-full bg-gray-400"></span>
+                                                                Offline
+                                                            </span>
+                                                        )
+                                                    ) : (
+                                                        <span className="text-xs font-semibold text-emerald-400">Active</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-xs font-medium theme-muted">
+                                                    {u.userType === "CUSTOMER" ? (
+                                                        u.isOnline ? (
+                                                            <span className="text-emerald-500 font-semibold">Now</span>
+                                                        ) : (
+                                                            formatLastSeen(u.lastSeenAt, u.isOnline)
+                                                        )
+                                                    ) : (
+                                                        "—"
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {u.restaurant ? (
@@ -637,21 +990,53 @@ export default function SuperAdminUsers() {
                                 </p>
                             </div>
 
-                            <form
-                                onSubmit={(event) => {
-                                    event.preventDefault();
-                                    loadCustomers(query);
-                                }}
-                                className="theme-input flex items-center gap-2 rounded-2xl px-3 py-2 md:w-80"
-                            >
-                                <Search size={16} className="theme-muted" />
-                                <input
-                                    value={query}
-                                    onChange={(event) => setQuery(event.target.value)}
-                                    placeholder="Search customer by name, phone..."
-                                    className="w-full bg-transparent text-sm outline-none"
-                                />
-                            </form>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex items-center gap-1 p-1 rounded-xl bg-black/5 dark:bg-white/5 border theme-border">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPresenceFilter("ALL")}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                                            presenceFilter === "ALL" ? "bg-amber-500 text-black shadow-sm" : "theme-muted hover:theme-text"
+                                        }`}
+                                    >
+                                        All ({presence.totalCustomers || customers.length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPresenceFilter("ONLINE")}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                            presenceFilter === "ONLINE" ? "bg-emerald-500 text-white shadow-sm" : "theme-muted hover:text-emerald-400"
+                                        }`}
+                                    >
+                                        <span>🟢</span> Online ({presence.onlineCustomers})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPresenceFilter("OFFLINE")}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                            presenceFilter === "OFFLINE" ? "bg-gray-600 text-white shadow-sm" : "theme-muted hover:theme-text"
+                                        }`}
+                                    >
+                                        <span>⚫</span> Offline ({presence.offlineCustomers})
+                                    </button>
+                                </div>
+
+                                <form
+                                    onSubmit={(event) => {
+                                        event.preventDefault();
+                                        loadCustomers(query);
+                                    }}
+                                    className="theme-input flex items-center gap-2 rounded-2xl px-3 py-2 md:w-80"
+                                >
+                                    <Search size={16} className="theme-muted" />
+                                    <input
+                                        value={query}
+                                        onChange={(event) => setQuery(event.target.value)}
+                                        placeholder="Search customer by name, phone..."
+                                        className="w-full bg-transparent text-sm outline-none"
+                                    />
+                                </form>
+                            </div>
                         </div>
 
                         {loading ? (
@@ -667,6 +1052,8 @@ export default function SuperAdminUsers() {
                                             <th className="px-4 py-3 font-bold">Full Name</th>
                                             <th className="px-4 py-3 font-bold">Username</th>
                                             <th className="px-4 py-3 font-bold">Phone Number</th>
+                                            <th className="px-4 py-3 font-bold">Status</th>
+                                            <th className="px-4 py-3 font-bold">Last Seen</th>
                                             <th className="px-4 py-3 font-bold">Email Address</th>
                                             <th className="px-4 py-3 font-bold">Loyalty Balance</th>
                                             <th className="px-4 py-3 font-bold">Joined Date</th>
@@ -674,7 +1061,13 @@ export default function SuperAdminUsers() {
                                         </tr>
                                     </thead>
                                      <tbody>
-                                        {customers.filter((c) => c.phone && c.phone !== "Not set" && formatPhone(c.phone) !== "Not set").map((c) => (
+                                        {customers
+                                            .filter((c) => {
+                                                if (presenceFilter === "ONLINE") return c.isOnline;
+                                                if (presenceFilter === "OFFLINE") return !c.isOnline;
+                                                return true;
+                                            })
+                                            .map((c) => (
                                             <tr key={c.id} className="border-t theme-border hover:bg-black/5 dark:hover:bg-white/5 transition">
                                                 <td className="px-4 py-3 font-bold">
                                                     <div className="flex items-center gap-2">
@@ -694,6 +1087,29 @@ export default function SuperAdminUsers() {
                                                 </td>
                                                 <td className="px-4 py-3 text-amber-400 font-semibold">{c.username}</td>
                                                 <td className="px-4 py-3">{formatPhone(c.phone)}</td>
+                                                <td className="px-4 py-3">
+                                                    {c.isOnline ? (
+                                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-500 border border-emerald-500/20">
+                                                            <span className="relative flex h-2 w-2">
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                                            </span>
+                                                            Online
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-500/10 px-2.5 py-1 text-xs font-bold text-gray-400 border border-gray-500/20">
+                                                            <span className="h-2 w-2 rounded-full bg-gray-400"></span>
+                                                            Offline
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-xs font-medium theme-muted">
+                                                    {c.isOnline ? (
+                                                        <span className="text-emerald-500 font-semibold">Now</span>
+                                                    ) : (
+                                                        formatLastSeen(c.lastSeenAt, c.isOnline)
+                                                    )}
+                                                </td>
                                                 <td className="px-4 py-3">{c.email}</td>
                                                 <td className="px-4 py-3">
                                                     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-extrabold text-emerald-400 border border-emerald-500/20">

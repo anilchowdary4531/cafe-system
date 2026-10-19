@@ -35,9 +35,12 @@ import {
     Eye,
     Filter,
     FileText,
+    Loader2,
+    AlertCircle,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useStaffSocket } from "../../context/StaffSocketContext";
 import { api, cachedGet, invalidateGetCache } from "../../utils/apiClient";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import tiffzyLogo from "../../assets/tiffzy-logo.png";
@@ -111,6 +114,91 @@ export default function SuperAdminDashboard() {
     const [error, setError] = useState("");
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [activeMenuKey, setActiveMenuKey] = useState("dashboard");
+
+    // CUSTOMER PRESENCE REAL-TIME STATE
+    const { socket: staffSocket, connected: socketConnected } = useStaffSocket();
+    const [presence, setPresence] = useState({
+        totalCustomers: 0,
+        onlineCustomers: 0,
+        offlineCustomers: 0,
+        loading: true,
+        error: null,
+    });
+
+    const fetchPresence = useCallback(async () => {
+        try {
+            setPresence((prev) => ({ ...prev, loading: true, error: null }));
+            const res = await api.get("/super-admin/customers/presence");
+            if (res?.data) {
+                setPresence({
+                    totalCustomers: Number(res.data.totalCustomers ?? 0),
+                    onlineCustomers: Number(res.data.onlineCustomers ?? 0),
+                    offlineCustomers: Number(res.data.offlineCustomers ?? 0),
+                    loading: false,
+                    error: null,
+                });
+            }
+        } catch (err) {
+            console.error("Presence fetch error:", err);
+            setPresence((prev) => ({
+                ...prev,
+                loading: false,
+                error: err?.response?.data?.message || err?.message || "Unable to load customer presence",
+            }));
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchPresence();
+    }, [fetchPresence]);
+
+    useEffect(() => {
+        if (!staffSocket) return;
+
+        const handlePresenceUpdated = (data) => {
+            if (data) {
+                setPresence({
+                    totalCustomers: Number(data.totalCustomers ?? 0),
+                    onlineCustomers: Number(data.onlineCustomers ?? 0),
+                    offlineCustomers: Number(data.offlineCustomers ?? 0),
+                    loading: false,
+                    error: null,
+                });
+            }
+        };
+
+        const handleCustomerOnline = () => {
+            setPresence((prev) => {
+                const nextOnline = prev.onlineCustomers + 1;
+                return {
+                    ...prev,
+                    onlineCustomers: nextOnline,
+                    offlineCustomers: Math.max(0, prev.totalCustomers - nextOnline),
+                };
+            });
+        };
+
+        const handleCustomerOffline = () => {
+            setPresence((prev) => {
+                const nextOnline = Math.max(0, prev.onlineCustomers - 1);
+                return {
+                    ...prev,
+                    onlineCustomers: nextOnline,
+                    offlineCustomers: Math.max(0, prev.totalCustomers - nextOnline),
+                };
+            });
+        };
+
+        staffSocket.on("customer:presence_updated", handlePresenceUpdated);
+        staffSocket.on("customer:online", handleCustomerOnline);
+        staffSocket.on("customer:offline", handleCustomerOffline);
+
+        return () => {
+            staffSocket.off("customer:presence_updated", handlePresenceUpdated);
+            staffSocket.off("customer:online", handleCustomerOnline);
+            staffSocket.off("customer:offline", handleCustomerOffline);
+        };
+    }, [staffSocket]);
 
     // SERVER MONITORING STATE
     const [serverMetrics, setServerMetrics] = useState(null);
@@ -424,6 +512,113 @@ export default function SuperAdminDashboard() {
                         {error}
                     </div>
                 )}
+
+                {/* CUSTOMER PRESENCE SECTION */}
+                <section className="mb-4 rounded-xl border theme-border px-4 py-2.5 bg-black/5 dark:bg-white/5 backdrop-blur-sm" data-testid="customer-presence-section">
+                    <div className="flex items-center justify-between gap-2 pb-2 border-b theme-border">
+                        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                            <Users className="text-emerald-500 shrink-0" size={18} />
+                            <h2 className="text-base sm:text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                                Customer Presence
+                            </h2>
+                            {socketConnected ? (
+                                <span className="inline-flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0" data-testid="presence-live-status">
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    </span>
+                                    ● Live
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0" data-testid="presence-live-status" title="Realtime socket reconnecting">
+                                    <span className="inline-block h-2 w-2 rounded-full bg-amber-400"></span>
+                                    ○ Reconnecting...
+                                </span>
+                            )}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => navigate("/super-admin/users")}
+                            className="theme-soft-button inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold cursor-pointer transition active:scale-95 shrink-0"
+                        >
+                            <span>View Directory</span>
+                            <ChevronRight size={13} />
+                        </button>
+                    </div>
+
+                    {/* METRICS ROW / LOADING / ERROR */}
+                    {presence.loading ? (
+                        <div className="flex items-center justify-center py-2 gap-2 text-xs theme-muted" data-testid="customer-presence-loading">
+                            <Loader2 className="animate-spin text-emerald-500" size={15} />
+                            <span>Loading customer presence...</span>
+                        </div>
+                    ) : presence.error ? (
+                        <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-xs" data-testid="customer-presence-error">
+                            <div className="flex items-center gap-1.5">
+                                <AlertCircle size={14} className="shrink-0" />
+                                <span className="font-semibold">Unable to load customer presence</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={fetchPresence}
+                                className="px-2 py-0.5 rounded-md bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition active:scale-95 cursor-pointer"
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-6 sm:gap-10 pt-2 flex-wrap">
+                            {/* ONLINE INLINE METRIC */}
+                            <button
+                                type="button"
+                                onClick={() => navigate("/super-admin/users?status=online")}
+                                className="inline-flex items-center gap-2 cursor-pointer transition hover:opacity-80 active:scale-95 bg-transparent border-0 p-0 text-left group"
+                                title="Click to view Online Customers in Directory"
+                            >
+                                <span className="text-base leading-none">🟢</span>
+                                <span className="text-xs font-bold uppercase tracking-wider text-emerald-500 dark:text-emerald-400">
+                                    Online
+                                </span>
+                                <span className="text-lg sm:text-xl font-black text-emerald-500 dark:text-emerald-400 leading-none ml-0.5" data-testid="online-customers-count">
+                                    {presence.onlineCustomers.toLocaleString()}
+                                </span>
+                            </button>
+
+                            {/* OFFLINE INLINE METRIC */}
+                            <button
+                                type="button"
+                                onClick={() => navigate("/super-admin/users?status=offline")}
+                                className="inline-flex items-center gap-2 cursor-pointer transition hover:opacity-80 active:scale-95 bg-transparent border-0 p-0 text-left group"
+                                title="Click to view Offline Customers in Directory"
+                            >
+                                <span className="text-base leading-none">⚫</span>
+                                <span className="text-xs font-bold uppercase tracking-wider theme-muted">
+                                    Offline
+                                </span>
+                                <span className="text-lg sm:text-xl font-black theme-text leading-none ml-0.5" data-testid="offline-customers-count">
+                                    {presence.offlineCustomers.toLocaleString()}
+                                </span>
+                            </button>
+
+                            {/* TOTAL INLINE METRIC */}
+                            <button
+                                type="button"
+                                onClick={() => navigate("/super-admin/users?status=all")}
+                                className="inline-flex items-center gap-2 cursor-pointer transition hover:opacity-80 active:scale-95 bg-transparent border-0 p-0 text-left group"
+                                title="Click to view All Customers in Directory"
+                            >
+                                <Users size={18} className="text-amber-500 shrink-0" />
+                                <span className="text-xs font-bold uppercase tracking-wider text-amber-500">
+                                    Total
+                                </span>
+                                <span className="text-lg sm:text-xl font-black text-amber-500 leading-none ml-0.5" data-testid="total-customers-count">
+                                    {presence.totalCustomers.toLocaleString()}
+                                </span>
+                            </button>
+                        </div>
+                    )}
+                </section>
 
                 {/* SERVER MONITORING SECTION - Seamless / Borderless Style */}
                 <section className="mb-8">

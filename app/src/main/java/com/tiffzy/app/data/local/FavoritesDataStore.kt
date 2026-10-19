@@ -71,4 +71,10 @@ class FavoritesDataStore(private val context: Context) {
             }
         }
     }
+
+    suspend fun clearFavorites() {
+        context.favoritesDataStore.edit { preferences ->
+            preferences.remove(FAVORITES_JSON)
+        }
+    }
 }
