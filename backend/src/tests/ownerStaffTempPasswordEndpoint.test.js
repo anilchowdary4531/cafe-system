@@ -111,6 +111,8 @@ test("POST /owner/:restaurantId/staff/:staffId/temp-password - Secure Temporary 
     assert.ok(!foundStaff.loginLink.includes("password"));
   });
 
+  let staffSessionToken = "";
+
   await t.test("4. Temporary password successfully logs in and requires password change", async () => {
     const res = await app.inject({
       method: "POST",
@@ -124,6 +126,116 @@ test("POST /owner/:restaurantId/staff/:staffId/temp-password - Secure Temporary 
     const body = JSON.parse(res.payload);
     assert.equal(body.mustChangePassword, true);
     assert.ok(body.token);
+    staffSessionToken = body.token;
+  });
+
+  await t.test("5. JWT payload does NOT contain password or password hash", async () => {
+    const decoded = app.jwt.decode(staffSessionToken);
+    assert.ok(decoded);
+    assert.equal(decoded.password, undefined);
+    assert.equal(decoded.temporaryPassword, undefined);
+    assert.equal(decoded.passwordHash, undefined);
+  });
+
+  await t.test("6. Cross-restaurant isolation: Restaurant B cannot reset staff of Restaurant A", async () => {
+    const restaurantB = await prisma.restaurant.create({
+      data: {
+        name: `Rest B ${randSuffix}`,
+        slug: `rest-b-${randSuffix}`,
+        currency: "INR",
+      },
+    });
+    const ownerB = await prisma.user.create({
+      data: {
+        name: "Owner B",
+        email: `owner_b_${randSuffix}@test.com`,
+        phone: "+919999999993",
+        role: "OWNER",
+        restaurantId: restaurantB.id,
+        password: bcrypt.hashSync("OwnerBPass123!", 10),
+        sessionVersion: 1,
+      },
+    });
+    const ownerBToken = app.jwt.sign({
+      id: ownerB.id,
+      userId: ownerB.id,
+      email: ownerB.email,
+      role: "OWNER",
+      restaurantId: restaurantB.id,
+      sessionVersion: 1,
+    });
+
+    // Owner B tries to reset staff of Restaurant A via restaurant B URL -> 404 Staff not found
+    const res1 = await app.inject({
+      method: "POST",
+      url: `/owner/${restaurantB.id}/staff/${staff.id}/temp-password`,
+      headers: { authorization: `Bearer ${ownerBToken}` },
+    });
+    assert.equal(res1.statusCode, 404);
+
+    // Owner B tries to reset staff of Restaurant A via restaurant A URL -> 403 Forbidden
+    const res2 = await app.inject({
+      method: "POST",
+      url: `/owner/${restaurant.id}/staff/${staff.id}/temp-password`,
+      headers: { authorization: `Bearer ${ownerBToken}` },
+    });
+    assert.equal(res2.statusCode, 403);
+
+    // Cleanup Restaurant B
+    await prisma.user.deleteMany({ where: { restaurantId: restaurantB.id } });
+    await prisma.restaurant.delete({ where: { id: restaurantB.id } });
+  });
+
+  const permanentPassword = "MyNewPermanentPass123!";
+
+  await t.test("7. Staff member forces new permanent password", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/auth/change-password",
+      headers: { authorization: `Bearer ${staffSessionToken}` },
+      payload: {
+        currentPassword: issuedTempPassword,
+        newPassword: permanentPassword,
+      },
+    });
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.payload);
+    assert.equal(body.user?.mustChangePassword, false);
+
+    // Check database state
+    const staffFromDb = await prisma.user.findUnique({ where: { id: staff.id } });
+    assert.equal(staffFromDb.mustChangePassword, false);
+    assert.equal(staffFromDb.temporaryPasswordExpiresAt, null);
+    assert.ok(bcrypt.compareSync(permanentPassword, staffFromDb.password));
+    // Verify plaintext is not stored
+    assert.notEqual(staffFromDb.password, permanentPassword);
+  });
+
+  await t.test("8. New permanent password works for subsequent login", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/login",
+      payload: {
+        email: staff.email,
+        password: permanentPassword,
+      },
+    });
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.payload);
+    assert.equal(body.mustChangePassword, false);
+    assert.ok(body.token);
+  });
+
+  await t.test("9. Old temporary password no longer works", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/login",
+      payload: {
+        email: staff.email,
+        password: issuedTempPassword,
+      },
+    });
+    assert.equal(res.statusCode, 401);
   });
 
   // Cleanup

@@ -8,8 +8,9 @@ import { normalizeOrderStatus } from "../services/orderService.js";
 import { normalizePhone } from "../services/phoneService.js";
 import { logAuditEvent } from "../services/auditLogService.js";
 
-export default async function staffRoutes(app, deps) {
-  const { prisma, realtime, STAFF_ALLOWED_ROLES, normalizeDbPermissions } = deps;
+export default async function staffRoutes(app, deps = {}) {
+  const { prisma, realtime, STAFF_ALLOWED_ROLES } = deps || {};
+  const normalizeDbPermissions = deps?.normalizeDbPermissions || ((p) => (p && typeof p === "object" ? p : {}));
 
   const orderController = buildStaffOrderController({ prisma, realtime });
   const paymentController = buildPaymentController({ prisma });

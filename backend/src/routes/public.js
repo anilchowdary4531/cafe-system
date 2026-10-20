@@ -8,8 +8,9 @@ import { staffLoginRateLimiter } from "../middleware/rateLimiter.js";
 import { getLoginLockoutConfig } from "../services/staffAuthService.js";
 import { logAuditEvent } from "../services/auditLogService.js";
 
-export default async function publicRoutes(app, deps) {
-  const { prisma, normalizeDbPermissions, buildQrTargetUrl, STAFF_ACCESS_MODULES } = deps;
+export default async function publicRoutes(app, deps = {}) {
+  const { prisma, buildQrTargetUrl, STAFF_ACCESS_MODULES } = deps || {};
+  const normalizeDbPermissions = deps?.normalizeDbPermissions || ((p) => (p && typeof p === "object" ? p : {}));
 
   const parsePositiveInt = (value, fallback, max = null) => {
     const parsed = Number.parseInt(String(value ?? "").trim(), 10);
