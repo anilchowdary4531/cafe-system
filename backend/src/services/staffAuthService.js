@@ -13,8 +13,26 @@ export const getLoginLockoutConfig = () => {
 export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestaurantParam, prisma, allowPasswordChangeOnly } = {}) => {
   try {
     await req.jwtVerify();
-  } catch {
-    reply.code(401).send({ message: "Authentication required" });
+  } catch (err) {
+    const isExpired =
+      err?.code === "FST_JWT_AUTHORIZATION_TOKEN_EXPIRED" ||
+      err?.code === "FAST_JWT_EXPIRED" ||
+      err?.name === "TokenExpiredError" ||
+      String(err?.message || "").toLowerCase().includes("expired");
+    req.log?.warn?.(
+      {
+        reason: isExpired ? "TOKEN_EXPIRED" : "JWT_VERIFY_FAILED",
+        code: err?.code,
+        endpoint: req.url,
+        method: req.method,
+        pid: process.pid,
+      },
+      "staff_auth_rejected"
+    );
+    reply.code(401).send({
+      message: "Authentication required",
+      code: isExpired ? "TOKEN_EXPIRED" : "INVALID_TOKEN",
+    });
     return null;
   }
 
@@ -64,7 +82,19 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
     const currentSessionVersion = Number(user.sessionVersion || 0) || 0;
 
     if (currentSessionVersion !== tokenSessionVersion) {
-      reply.code(401).send({ message: "Session expired. Please log in again." });
+      req.log?.warn?.(
+        {
+          reason: "SESSION_VERSION_MISMATCH",
+          userId,
+          role: currentRole,
+          restaurantId: currentRestaurantId,
+          endpoint: req.url,
+          method: req.method,
+          pid: process.pid,
+        },
+        "staff_auth_session_version_mismatch"
+      );
+      reply.code(401).send({ message: "Session expired. Please log in again.", code: "SESSION_VERSION_MISMATCH" });
       return null;
     }
 

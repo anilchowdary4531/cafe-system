@@ -370,4 +370,79 @@ describe("Customer OTP Login — Delivery Channel UI & Handler Tests", () => {
             expect(screen.queryByText(/WhatsApp:/i)).not.toBeInTheDocument();
         });
     });
+
+    it("11. Successful OTP send displays GREEN success alert with checkmark, NOT red/pink", async () => {
+        renderTestLogin();
+
+        const input = screen.getByPlaceholderText(/Enter phone number or email address/i);
+        fireEvent.change(input, { target: { value: "9876543210" } });
+        fireEvent.click(screen.getByRole("button", { name: /Send OTP/i }));
+
+        await waitFor(() => {
+            // Find the OTP sent success alert
+            const alertText = screen.getByText(/^OTP sent$/i);
+            expect(alertText).toBeInTheDocument();
+
+            // Locate container element for the alert
+            const alertContainer = alertText.closest("div");
+            expect(alertContainer).toHaveClass("bg-emerald-500/10");
+            expect(alertContainer).toHaveClass("border-emerald-500/30");
+            expect(alertContainer).not.toHaveClass("bg-red-500/15");
+            expect(alertContainer).not.toHaveClass("text-red-600");
+        });
+    });
+
+    it("12. Provider failure (HTTP 502) displays RED error alert, NOT green", async () => {
+        mockPost.mockRejectedValueOnce({
+            response: {
+                status: 502,
+                data: { success: false, message: "WhatsApp provider rejected message" },
+            },
+            message: "WhatsApp provider rejected message",
+        });
+
+        renderTestLogin();
+
+        const input = screen.getByPlaceholderText(/Enter phone number or email address/i);
+        fireEvent.change(input, { target: { value: "9876543210" } });
+        fireEvent.click(screen.getByRole("button", { name: /Send OTP/i }));
+
+        await waitFor(() => {
+            const errText = screen.getByText(/WhatsApp provider rejected message/i);
+            expect(errText).toBeInTheDocument();
+
+            const alertContainer = errText.closest("div");
+            expect(alertContainer).toHaveClass("bg-red-500/15");
+            expect(alertContainer).toHaveClass("border-red-500/30");
+            expect(alertContainer).not.toHaveClass("bg-emerald-500/10");
+        });
+    });
+
+    it("13. Cooldown (HTTP 429) displays AMBER warning alert", async () => {
+        mockPost.mockRejectedValueOnce({
+            response: {
+                status: 429,
+                data: { success: false, message: "OTP already sent recently. Please wait a moment and try again." },
+            },
+            message: "OTP already sent recently. Please wait a moment and try again.",
+        });
+
+        renderTestLogin();
+
+        const input = screen.getByPlaceholderText(/Enter phone number or email address/i);
+        fireEvent.change(input, { target: { value: "9876543210" } });
+        fireEvent.click(screen.getByRole("button", { name: /Send OTP/i }));
+
+        await waitFor(() => {
+            const warnText = screen.getByText(/OTP already sent recently/i);
+            expect(warnText).toBeInTheDocument();
+
+            const alertContainer = warnText.closest("div");
+            expect(alertContainer).toHaveClass("bg-amber-500/15");
+            expect(alertContainer).toHaveClass("border-amber-500/30");
+            expect(alertContainer).not.toHaveClass("bg-red-500/15");
+            expect(alertContainer).not.toHaveClass("bg-emerald-500/10");
+        });
+    });
 });
+

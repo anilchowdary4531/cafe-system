@@ -1052,6 +1052,16 @@ export default function OwnerLayout() {
             });
         } catch (err) {
             console.error("Failed to load table overview for owner dashboard:", err);
+            const status = err?.response?.status;
+            if (status === 401) {
+                setTableOverview((prev) => ({
+                    ...prev,
+                    loading: false,
+                    error: "Session expired. Please log in again.",
+                }));
+                navigate("/login?mode=staff&sessionExpired=true", { replace: true });
+                return;
+            }
             setTableOverview((prev) => ({
                 ...prev,
                 loading: false,
@@ -1061,7 +1071,20 @@ export default function OwnerLayout() {
                     "Failed to load tables",
             }));
         }
-    }, [knownOrderIdsRef, restaurantId]);
+    }, [knownOrderIdsRef, navigate, restaurantId]);
+
+    useEffect(() => {
+        const handleAuthLogout = (e) => {
+            const scope = e?.detail?.scope;
+            if (!scope || scope === "staff") {
+                navigate("/login?mode=staff&sessionExpired=true", { replace: true });
+            }
+        };
+        window.addEventListener("auth:logout", handleAuthLogout);
+        return () => {
+            window.removeEventListener("auth:logout", handleAuthLogout);
+        };
+    }, [navigate]);
 
     useEffect(() => {
         loadTableOverview();

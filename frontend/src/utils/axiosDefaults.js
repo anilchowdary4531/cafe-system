@@ -11,6 +11,18 @@ const pathFromUrl = (url) => {
     }
 };
 
+const isCustomerPath = (path) => {
+    const p = String(path || "").toLowerCase();
+    return (
+        p.startsWith("/customer") ||
+        p.startsWith("/api/customer") ||
+        p.startsWith("/wallet") ||
+        p.startsWith("/api/wallet") ||
+        p.startsWith("/api/notifications") ||
+        p.includes("scope=customer")
+    );
+};
+
 axios.interceptors.request.use((config) => {
     const path = pathFromUrl(config?.url);
     const activeStaffSession = getActiveStaffSession();
@@ -20,10 +32,14 @@ axios.interceptors.request.use((config) => {
     config.headers = config.headers || {};
 
     if (!config.headers.Authorization) {
-        if (path.startsWith("/customer") && customerToken) {
-            config.headers.Authorization = `Bearer ${customerToken}`;
+        if (isCustomerPath(path)) {
+            if (customerToken) {
+                config.headers.Authorization = `Bearer ${customerToken}`;
+            }
         } else if (staffToken) {
             config.headers.Authorization = `Bearer ${staffToken}`;
+        } else if (customerToken) {
+            config.headers.Authorization = `Bearer ${customerToken}`;
         }
     }
 
@@ -37,8 +53,9 @@ axios.interceptors.response.use(
         if (status === 401) {
             const path = pathFromUrl(error?.config?.url);
             const activeStaffSession = getActiveStaffSession();
+            const isCustomer = isCustomerPath(path);
             try {
-                if (path.startsWith("/customer")) {
+                if (isCustomer) {
                     localStorage.removeItem("customerToken");
                     localStorage.removeItem("customer");
                 } else {
@@ -50,7 +67,7 @@ axios.interceptors.response.use(
             try {
                 window.dispatchEvent(
                     new CustomEvent("auth:logout", {
-                        detail: { scope: path.startsWith("/customer") ? "customer" : "staff" },
+                        detail: { scope: isCustomer ? "customer" : "staff" },
                     })
                 );
             } catch {

@@ -274,23 +274,46 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = AuthUiState.Idle
     }
 
-    suspend fun checkAuthStatus(): Boolean {
-        val token = repository.getAuthToken()
-        return if (token != null) {
-            _uiState.value = AuthUiState.Authenticated
-            // Refresh FCM token on every launch if authenticated to ensure backend is up to date
-            viewModelScope.launch {
-                try {
-                    val fcmToken = FirebaseMessaging.getInstance().token.await()
-                    repository.registerFcmToken(fcmToken)
-                } catch (e: Exception) {
-                    android.util.Log.e("AuthViewModel", "FCM refresh on launch failed: ${e.message}")
-                }
+    private fun isJwtExpired(jwt: String): Boolean {
+        return try {
+            val parts = jwt.split(".")
+            if (parts.size < 2) return true
+            val decodedBytes = android.util.Base64.decode(parts[1], android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
+            val payload = String(decodedBytes, Charsets.UTF_8)
+            val json = JSONObject(payload)
+            if (json.has("exp")) {
+                val expSeconds = json.getLong("exp")
+                val currentSeconds = System.currentTimeMillis() / 1000
+                currentSeconds >= expSeconds
+            } else {
+                false
             }
-            true
-        } else {
+        } catch (_: Exception) {
             false
         }
+    }
+
+    suspend fun checkAuthStatus(): Boolean {
+        val token = repository.getAuthToken()
+        if (token.isNullOrBlank()) {
+            return false
+        }
+        if (isJwtExpired(token)) {
+            android.util.Log.w("AuthViewModel", "Stored JWT token has expired. Clearing session.")
+            repository.logout()
+            return false
+        }
+        _uiState.value = AuthUiState.Authenticated
+        // Refresh FCM token on every launch if authenticated to ensure backend is up to date
+        viewModelScope.launch {
+            try {
+                val fcmToken = FirebaseMessaging.getInstance().token.await()
+                repository.registerFcmToken(fcmToken)
+            } catch (e: Exception) {
+                android.util.Log.e("AuthViewModel", "FCM refresh on launch failed: ${e.message}")
+            }
+        }
+        return true
     }
 
     fun logout() {

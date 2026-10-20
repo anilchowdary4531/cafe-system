@@ -1,15 +1,17 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
+import { getActiveStaffSession } from "../utils/staffSessionStorage";
 
 export default function ProtectedRoute({ children, role, roles }) {
     const { user, staffToken } = useAuth();
     const location = useLocation();
 
-    const token = staffToken || localStorage.getItem("token") || localStorage.getItem("supplierToken") || localStorage.getItem("staffToken");
-    const storedUser = user || (() => {
+    const activeStaffSession = getActiveStaffSession();
+    const token = staffToken || activeStaffSession?.token || localStorage.getItem("supplierToken") || null;
+    const storedUser = user || activeStaffSession?.user || (() => {
         try {
-            return JSON.parse(localStorage.getItem("user")) || JSON.parse(localStorage.getItem("supplier")) || null;
+            return JSON.parse(localStorage.getItem("supplier")) || null;
         } catch {
             return null;
         }

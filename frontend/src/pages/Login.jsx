@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Eye, EyeOff, Lock, Mail, Phone, User, UserCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Lock, Mail, Phone, User, UserCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useRestaurantContext } from "../context/RestaurantContext";
@@ -46,6 +46,8 @@ export default function Login() {
     const [customerDevOtp, setCustomerDevOtp] = useState("");
     const [customerLoading, setCustomerLoading] = useState(false);
     const [customerError, setCustomerError] = useState("");
+    const [customerErrorType, setCustomerErrorType] = useState("error"); // "error" | "warning"
+    const [customerSuccess, setCustomerSuccess] = useState("");
     const [customerSubMode] = useState("otp");
     const [deliveryInfo, setDeliveryInfo] = useState(null);
     const [otpChannel, setOtpChannel] = useState("");
@@ -300,6 +302,8 @@ export default function Login() {
         setCustomerOtpExpiresAt(null);
         setCustomerDevOtp("");
         setCustomerError("");
+        setCustomerErrorType("error");
+        setCustomerSuccess("");
         setDeliveryInfo(null);
         setResolvedPhone("");
         setResolvedEmail("");
@@ -599,7 +603,9 @@ export default function Login() {
         }
 
         if (!rawInput) {
+            setCustomerSuccess("");
             setCustomerError("Phone number or Email address is required.");
+            setCustomerErrorType("error");
             return;
         }
 
@@ -610,6 +616,8 @@ export default function Login() {
         try {
             setCustomerLoading(true);
             setCustomerError("");
+            setCustomerErrorType("error");
+            setCustomerSuccess("");
             const res = await api.post("/customer/send-otp", {
                 identifier: rawInput,
                 phone: phoneParam,
@@ -617,9 +625,16 @@ export default function Login() {
             });
 
             if (!res.data?.success) {
+                setCustomerSuccess("");
                 setCustomerError(res.data?.message || "Failed to deliver OTP");
+                setCustomerErrorType("error");
                 return;
             }
+
+            // Confirmed delivery successfully (HTTP 200 / success: true)
+            setCustomerError("");
+            setCustomerErrorType("error");
+            setCustomerSuccess(res.data?.message || "OTP sent");
 
             const rawChannel = String(res.data?.channel || (isEmail ? "EMAIL" : "WHATSAPP")).toUpperCase();
             const authoritativeChannel = rawChannel === "EMAIL" ? "EMAIL" : "WHATSAPP";
@@ -666,7 +681,11 @@ export default function Login() {
                 setHasExistingName(false);
             }
         } catch (err) {
-            setCustomerError(err.response?.data?.message || err.message || "Failed to send OTP");
+            setCustomerSuccess("");
+            const status = err.response?.status;
+            const errMsg = err.response?.data?.message || err.message || "Failed to send OTP";
+            setCustomerError(errMsg);
+            setCustomerErrorType(status === 429 ? "warning" : "error");
         } finally {
             setCustomerLoading(false);
         }
@@ -680,17 +699,22 @@ export default function Login() {
         const otp = String(customerOtp || "").trim();
 
         if (!destination) {
+            setCustomerSuccess("");
             setCustomerError(isEmailChannel ? "Email address is required." : "Phone number is required.");
+            setCustomerErrorType("error");
             return;
         }
         if (!otp) {
+            setCustomerSuccess("");
             setCustomerError("OTP is required.");
+            setCustomerErrorType("error");
             return;
         }
 
         try {
             setCustomerLoading(true);
             setCustomerError("");
+            setCustomerSuccess("");
             const res = await api.post("/customer/verify-otp", {
                 identifier: destination,
                 phone: isEmailChannel ? destination : destination,
@@ -713,7 +737,9 @@ export default function Login() {
 
             navigate(getCustomerRedirectTarget(), { replace: true });
         } catch (err) {
+            setCustomerSuccess("");
             setCustomerError(err.response?.data?.message || err.message || "Invalid OTP");
+            setCustomerErrorType("error");
         } finally {
             setCustomerLoading(false);
         }
@@ -992,8 +1018,20 @@ export default function Login() {
                             <p className="theme-muted mb-6">{t("otpSubtitle")}</p>
 
                             {customerError && (
-                                <div className="mb-5 bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl text-sm">
-                                    {customerError}
+                                <div className={`mb-5 px-4 py-3 rounded-xl text-sm flex items-start gap-2.5 font-medium ${
+                                    customerErrorType === "warning"
+                                        ? "bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300"
+                                        : "bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-300"
+                                }`}>
+                                    <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                                    <span>{customerError}</span>
+                                </div>
+                            )}
+
+                            {customerSuccess && !customerError && (
+                                <div className="mb-5 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 px-4 py-3 rounded-xl text-sm flex items-center gap-2.5 font-medium">
+                                    <CheckCircle2 size={18} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                    <span>{customerSuccess}</span>
                                 </div>
                             )}
 
@@ -1012,6 +1050,8 @@ export default function Login() {
                                                         const val = e.target.value;
                                                         setCustomerInput(val);
                                                         setCustomerError("");
+                                                        setCustomerSuccess("");
+                                                        setCustomerErrorType("error");
                                                         setOtpChannel("");
                                                         setMaskedDestination("");
                                                         setDeliveryInfo(null);
@@ -1118,6 +1158,8 @@ export default function Login() {
                                                     setResolvedEmail("");
                                                     setDeliveryInfo(null);
                                                     setCustomerError("");
+                                                    setCustomerSuccess("");
+                                                    setCustomerErrorType("error");
                                                     setCustomerInput("");
                                                     setCustomerPhone("");
                                                     setCustomerEmail("");

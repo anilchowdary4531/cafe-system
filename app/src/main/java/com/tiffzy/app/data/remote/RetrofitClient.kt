@@ -3,6 +3,7 @@ package com.tiffzy.app.data.remote
 import com.tiffzy.app.BuildConfig
 import com.tiffzy.app.data.local.AuthDataStore
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -55,6 +56,33 @@ object RetrofitClient {
         chain.proceed(requestBuilder.build())
     }
 
+    private val unauthorizedInterceptor = Interceptor { chain ->
+        val request = chain.request()
+        val response = chain.proceed(request)
+        if (response.code == 401) {
+            val path = request.url.encodedPath
+            val isAuthEndpoint = path.contains("customer/send-otp") ||
+                path.contains("customer/verify-otp") ||
+                path.contains("customer/register") ||
+                path.contains("customer/password-login") ||
+                path.contains("customer/google-login") ||
+                path.contains("login")
+            if (!isAuthEndpoint) {
+                authToken = null
+                authDataStore?.let { dataStore ->
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        try {
+                            dataStore.clearAuth()
+                        } catch (_: Exception) {
+                            // ignore
+                        }
+                    }
+                }
+            }
+        }
+        response
+    }
+
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         // ALWAYS enable basic logging for debugging production issues
         level = HttpLoggingInterceptor.Level.BASIC
@@ -64,6 +92,7 @@ object RetrofitClient {
 
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(authInterceptor)
+        .addInterceptor(unauthorizedInterceptor)
         .addInterceptor(loggingInterceptor)
         .build()
 
