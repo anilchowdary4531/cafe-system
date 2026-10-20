@@ -65,10 +65,12 @@ export const getStoredGroupCatalog = (restaurantId) => {
 export const writeStoredTableGroups = (restaurantId, tableGroups) => {
     if (!restaurantId || typeof window === "undefined") return;
     try {
-        localStorage.setItem(
-            `${TABLE_GROUPS_STORAGE_PREFIX}_${restaurantId}`,
-            JSON.stringify(tableGroups)
-        );
+        const key = `${TABLE_GROUPS_STORAGE_PREFIX}_${restaurantId}`;
+        const newRaw = JSON.stringify(tableGroups || {});
+        const currentRaw = localStorage.getItem(key);
+        if (currentRaw === newRaw) return;
+
+        localStorage.setItem(key, newRaw);
         window.dispatchEvent(
             new CustomEvent(TABLE_GROUPS_SYNC_EVENT, {
                 detail: { restaurantId, tableGroups },
@@ -83,10 +85,12 @@ export const writeStoredTableGroups = (restaurantId, tableGroups) => {
 export const writeStoredGroupCatalog = (restaurantId, catalog) => {
     if (!restaurantId || typeof window === "undefined") return;
     try {
-        localStorage.setItem(
-            `${TABLE_GROUP_CATALOG_STORAGE_PREFIX}_${restaurantId}`,
-            JSON.stringify(catalog)
-        );
+        const key = `${TABLE_GROUP_CATALOG_STORAGE_PREFIX}_${restaurantId}`;
+        const newRaw = JSON.stringify(catalog || []);
+        const currentRaw = localStorage.getItem(key);
+        if (currentRaw === newRaw) return;
+
+        localStorage.setItem(key, newRaw);
         window.dispatchEvent(
             new CustomEvent(TABLE_GROUPS_SYNC_EVENT, {
                 detail: { restaurantId, catalog },

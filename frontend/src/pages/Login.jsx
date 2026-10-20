@@ -296,6 +296,14 @@ export default function Login() {
     }, [initialMode]);
 
     useEffect(() => {
+        const urlMode = String(searchParams.get("mode") || "").trim().toLowerCase();
+        const urlEmail = String(searchParams.get("email") || "").trim();
+        if (urlMode === "staff" && urlEmail) {
+            setEmail(urlEmail);
+        }
+    }, [searchParams]);
+
+    useEffect(() => {
         if (mode !== "customer") return;
         setCustomerStep("phone");
         setCustomerOtp("");
@@ -856,6 +864,16 @@ export default function Login() {
                                         className="theme-input w-full rounded-xl px-4 py-3 outline-none transition"
                                     />
                                 </div>
+
+                                {searchParams.get("email") && (
+                                    <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3 text-xs text-blue-200 flex items-start gap-2.5">
+                                        <Lock size={15} className="shrink-0 text-blue-400 mt-0.5" />
+                                        <div className="leading-relaxed">
+                                            <span className="font-semibold text-white">Staff Login: </span>
+                                            Email is pre-filled from your login link. Please enter your password or the temporary password provided by your manager. If you haven&apos;t set a password yet, click <strong className="text-blue-300">Forgot Password?</strong> below.
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div>
                                     <div className="flex items-center justify-between mb-2">

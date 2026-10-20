@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import defaultPrisma from "../prisma.js";
 import { buildReadableOrderNo, createOrderByStaff, updateOrderStatus } from "../services/orderService.js";
 import { resolveRestaurantBillingConfig } from "../services/billingService.js";
 import { buildUploadController } from "../controllers/uploadController.js";
@@ -67,8 +68,29 @@ import { getAuditLogs, logAuditEvent } from "../services/auditLogService.js";
 import { approveCancellation, approveDiscount, approveReprint } from "../controllers/managerApprovalController.js";
 import { completeSessionAndReleaseTable } from "../services/tableSessionService.js";
 
-export default async function ownerRoutes(app, deps) {
-  const { prisma, buildQrTargetUrl, FRONTEND_URL, STAFF_ACCESS_MODULES, STAFF_ALLOWED_ROLES, normalizeAccess, normalizeDbPermissions, serializeAccess, realtime } = deps;
+export default async function ownerRoutes(app, deps = {}) {
+  const prisma = deps?.prisma || defaultPrisma;
+  const {
+    buildQrTargetUrl,
+    FRONTEND_URL,
+    STAFF_ACCESS_MODULES = [
+      "dashboard", "billing", "orders", "menu", "inventory", "tables", "kitchen",
+      "printers", "analytics", "reports", "paylater", "shifts", "supply", "delivery",
+      "delivery_partners", "customers", "discounts", "loyalty", "staff", "settings", "notifications"
+    ],
+    STAFF_ALLOWED_ROLES = ["OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STAFF"],
+    normalizeAccess = (a) => (a && typeof a === "object" ? a : {}),
+    normalizeDbPermissions = (p) => {
+      try {
+        const parsed = typeof p === "string" ? JSON.parse(p) : p;
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch {
+        return {};
+      }
+    },
+    serializeAccess = (a) => JSON.stringify(a || {}),
+    realtime,
+  } = deps || {};
   const uploadController = buildUploadController();
   const settlementController = buildSettlementController({ prisma });
   const STAFF_LOGIN_LINK_EXPIRES_IN = process.env.STAFF_LOGIN_LINK_EXPIRES_IN || "30d";
@@ -3025,6 +3047,67 @@ export default async function ownerRoutes(app, deps) {
       return reply.code(500).send({ message: "Failed to update staff status" });
     }
   });
+
+  const handleIssueStaffTempPassword = async (req, reply) => {
+    try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
+      const restaurantId = Number(req.params.restaurantId);
+      const staffId = Number(req.params.staffId);
+      if (!restaurantId || !staffId) return reply.code(400).send({ message: "Invalid id values" });
+
+      const staff = await prisma.user.findUnique({
+        where: { id: staffId },
+        include: { staffAccess: { select: { permissions: true } } },
+      });
+      if (!staff || staff.restaurantId !== restaurantId) {
+        return reply.code(404).send({ message: "Staff user not found" });
+      }
+      if (staff.role === "OWNER") {
+        return reply.code(400).send({ message: "Owner temporary password cannot be reset via this endpoint" });
+      }
+
+      const randomHex = crypto.randomBytes(4).toString("hex");
+      const temporaryPassword = `Staff#${randomHex}`;
+      const tempExpiryDays = Number(process.env.TEMP_PASSWORD_EXPIRY_DAYS || 7);
+      const hashedPassword = bcrypt.hashSync(temporaryPassword, 10);
+
+      const updated = await prisma.user.update({
+        where: { id: staffId },
+        data: {
+          password: hashedPassword,
+          mustChangePassword: true,
+          temporaryPasswordExpiresAt: new Date(Date.now() + tempExpiryDays * 86400000),
+          sessionVersion: { increment: 1 },
+        },
+        include: { staffAccess: { select: { permissions: true } } },
+      });
+
+      await logAuditEvent({
+        prisma,
+        restaurantId,
+        actor: { id: actor.userId || actor.id, name: actor.userName || actor.name, role: actor.role },
+        action: "STAFF_TEMP_PASSWORD_ISSUED",
+        entity: "STAFF",
+        entityId: staff.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        req,
+      });
+
+      return {
+        message: "Temporary password generated successfully",
+        temporaryPassword,
+        user: buildStaffUserResponse(updated),
+      };
+    } catch (err) {
+      console.log(err);
+      return reply.code(500).send({ message: "Failed to generate temporary password" });
+    }
+  };
+
+  app.post("/owner/:restaurantId/staff/:staffId/temp-password", handleIssueStaffTempPassword);
+  app.post("/api/owner/:restaurantId/staff/:staffId/temp-password", handleIssueStaffTempPassword);
 
   app.put("/owner/:restaurantId/staff/:staffId/access", async (req, reply) => {
     try {

@@ -160,7 +160,7 @@ const getStaffLoginLink = (staffUser) => {
 const buildStaffLoginShareText = (staffUser, restaurantName, loginLink) => {
     const name = String(staffUser?.name || "there").trim() || "there";
     const restaurant = String(restaurantName || "your restaurant").trim() || "your restaurant";
-    return `Hi ${name}, use this staff login link for ${restaurant}: ${loginLink}`;
+    return `Hi ${name}, use this staff login link for ${restaurant}: ${loginLink}\n\nNote: Please enter your staff password or the temporary password provided by management to log in.`;
 };
 
 const generateSecureTempPassword = () => {
@@ -190,6 +190,7 @@ export default function OwnerStaff() {
     const [openActionMenuFor, setOpenActionMenuFor] = useState(null);
     const [editingStaffId, setEditingStaffId] = useState(null);
     const [savingEditFor, setSavingEditFor] = useState(null);
+    const [generatingTempPasswordFor, setGeneratingTempPasswordFor] = useState(null);
 
     // Password visibility toggles
     const [showAddPassword, setShowAddPassword] = useState(false);
@@ -584,6 +585,43 @@ export default function OwnerStaff() {
             message: `Prepared safe login message for ${staffUser?.name || "staff"}.`,
             variant: "success",
         });
+    };
+
+    const handleGenerateTempPassword = async (staffUser) => {
+        setOpenActionMenuFor(null);
+        if (!restaurantId || !staffUser?.id) return;
+        const confirmMsg = `Generate a new temporary password for ${staffUser.name}?\n\nThis will invalidate any active sessions and require them to set a new password on login.`;
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            setGeneratingTempPasswordFor(staffUser.id);
+            const res = await axios.post(`${API}/owner/${restaurantId}/staff/${staffUser.id}/temp-password`);
+            const tempPassword = res.data?.temporaryPassword;
+            if (tempPassword) {
+                setTemporaryPasswordModal({
+                    name: staffUser.name,
+                    email: staffUser.email,
+                    temporaryPassword: tempPassword,
+                    loginLink: getStaffLoginLink(staffUser),
+                });
+            } else {
+                showToast({
+                    title: "Password Updated",
+                    message: "Temporary password generated.",
+                    variant: "success",
+                });
+            }
+            await loadStaff({ silent: true });
+        } catch (err) {
+            console.error(err);
+            showToast({
+                title: "Failed to generate password",
+                message: err?.response?.data?.message || "Failed to issue temporary password.",
+                variant: "error",
+            });
+        } finally {
+            setGeneratingTempPasswordFor(null);
+        }
     };
 
     // Filter users on client side as well for ultra-fast response
@@ -1273,6 +1311,11 @@ export default function OwnerStaff() {
                                                     <span>WhatsApp</span>
                                                 </button>
                                             </div>
+
+                                            <div className="flex items-center gap-1.5 text-[11px] text-gray-400 font-medium">
+                                                <KeyRound size={12} className="text-amber-400 shrink-0" />
+                                                <span>Password must be entered separately at login (never shared in link for security).</span>
+                                            </div>
                                         </div>
                                     )}
 
@@ -1288,6 +1331,19 @@ export default function OwnerStaff() {
                                                 <Pencil size={13} />
                                                 <span>Edit</span>
                                             </button>
+
+                                            {staffUser.role !== "OWNER" && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleGenerateTempPassword(staffUser)}
+                                                    disabled={generatingTempPasswordFor === staffUser.id}
+                                                    className="inline-flex items-center gap-1.5 rounded-xl border border-orange-500/40 bg-orange-500/15 px-3 py-1.5 text-xs font-bold text-orange-400 transition hover:bg-orange-500 hover:text-black cursor-pointer shadow-xs disabled:opacity-50"
+                                                    title="Issue / Reset Temporary Password"
+                                                >
+                                                    <KeyRound size={13} />
+                                                    <span>{generatingTempPasswordFor === staffUser.id ? "Issuing..." : "Reset Password"}</span>
+                                                </button>
+                                            )}
 
                                             <button
                                                 type="button"
@@ -1312,6 +1368,17 @@ export default function OwnerStaff() {
                                                         <Pencil size={14} />
                                                         Edit Profile
                                                     </button>
+
+                                                    {staffUser.role !== "OWNER" && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleGenerateTempPassword(staffUser)}
+                                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-orange-300 hover:bg-orange-500/10 cursor-pointer"
+                                                        >
+                                                            <KeyRound size={14} />
+                                                            Reset Password
+                                                        </button>
+                                                    )}
 
                                                     <button
                                                         type="button"

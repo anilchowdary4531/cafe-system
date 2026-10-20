@@ -1837,8 +1837,18 @@ export default function OwnerLayout() {
     useEffect(() => {
         if (!restaurantId) return;
         const load = () => {
-            setTableGroups(getStoredTableGroups(restaurantId));
-            setGroupCatalog(getStoredGroupCatalog(restaurantId));
+            const storedGroups = getStoredTableGroups(restaurantId);
+            const storedCatalog = getStoredGroupCatalog(restaurantId);
+            setTableGroups((prev) => {
+                const prevStr = JSON.stringify(prev || {});
+                const nextStr = JSON.stringify(storedGroups || {});
+                return prevStr === nextStr ? prev : storedGroups;
+            });
+            setGroupCatalog((prev) => {
+                const prevStr = JSON.stringify(prev || []);
+                const nextStr = JSON.stringify(storedCatalog || []);
+                return prevStr === nextStr ? prev : storedCatalog;
+            });
         };
         load();
         const handleSync = () => load();

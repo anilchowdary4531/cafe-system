@@ -634,8 +634,18 @@ export default function OwnerTables() {
         }
 
         const load = () => {
-            setTableGroups(getStoredTableGroups(restaurantId));
-            setGroupCatalog(getStoredGroupCatalog(restaurantId));
+            const storedGroups = getStoredTableGroups(restaurantId);
+            const storedCatalog = getStoredGroupCatalog(restaurantId);
+            setTableGroups((prev) => {
+                const prevStr = JSON.stringify(prev || {});
+                const nextStr = JSON.stringify(storedGroups || {});
+                return prevStr === nextStr ? prev : storedGroups;
+            });
+            setGroupCatalog((prev) => {
+                const prevStr = JSON.stringify(prev || []);
+                const nextStr = JSON.stringify(storedCatalog || []);
+                return prevStr === nextStr ? prev : storedCatalog;
+            });
         };
         load();
 
@@ -683,7 +693,13 @@ export default function OwnerTables() {
             .map((table) => normalizeGroupName(tableGroups[String(table.id)] || ""))
             .filter(Boolean);
         if (!usedGroups.length) return;
-        setGroupCatalog((prev) => mergeUniqueGroupNames([...prev, ...usedGroups]));
+        setGroupCatalog((prev) => {
+            const merged = mergeUniqueGroupNames([...prev, ...usedGroups]);
+            if (merged.length === prev.length && merged.every((val, idx) => val === prev[idx])) {
+                return prev;
+            }
+            return merged;
+        });
     }, [tableGroups, tables]);
 
     useEffect(() => {

@@ -12,6 +12,10 @@ import {
     Pencil,
     UserCheck,
     UserX,
+    KeyRound,
+    Check,
+    Lock,
+    AlertTriangle,
 } from "lucide-react";
 import { API } from "../config";
 import { showToast } from "../utils/toast";
@@ -24,6 +28,9 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
     const [showAddForm, setShowAddForm] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [editingStaff, setEditingStaff] = useState(null);
+    const [temporaryPasswordModal, setTemporaryPasswordModal] = useState(null);
+    const [copiedPassword, setCopiedPassword] = useState(false);
+    const [generatingTempPasswordFor, setGeneratingTempPasswordFor] = useState(null);
     const [addForm, setAddForm] = useState({
         name: "",
         phone: "",
@@ -74,8 +81,35 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
 
     const shareWhatsApp = (user) => {
         const link = `${window.location.origin}/login?mode=staff&email=${encodeURIComponent(user.email)}`;
-        const text = `Hi ${user.name}, here is your login link for Tiffzy: ${link}`;
+        const text = `Hi ${user.name}, here is your login link for Tiffzy: ${link}\n\nNote: Please enter your staff password or the temporary password provided by management to log in.`;
         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+    };
+
+    const handleGenerateTempPassword = async (user) => {
+        if (!restaurantId || !user?.id) return;
+        const confirmMsg = `Generate a new temporary password for ${user.name}?\n\nThis will invalidate active sessions and require them to set a new password on login.`;
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            setGeneratingTempPasswordFor(user.id);
+            const res = await axios.post(`${API}/owner/${restaurantId}/staff/${user.id}/temp-password`);
+            const tempPassword = res.data?.temporaryPassword;
+            if (tempPassword) {
+                setTemporaryPasswordModal({
+                    name: user.name,
+                    email: user.email,
+                    temporaryPassword: tempPassword,
+                    loginLink: `${window.location.origin}/login?mode=staff&email=${encodeURIComponent(user.email)}`,
+                });
+            } else {
+                showToast("Temporary password generated.", "success");
+            }
+            await loadStaff();
+        } catch (err) {
+            showToast(err?.response?.data?.message || "Failed to generate temporary password.", "error");
+        } finally {
+            setGeneratingTempPasswordFor(null);
+        }
     };
 
     const handleEditClick = (user) => {
@@ -100,7 +134,11 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
             });
             const tempPassword = res.data?.temporaryPassword;
             if (tempPassword) {
-                showToast(`Added ${addForm.name}! Temp Password: ${tempPassword}`, "success");
+                setTemporaryPasswordModal({
+                    name: addForm.name,
+                    email: addForm.email,
+                    temporaryPassword: tempPassword,
+                });
             } else {
                 showToast(`Added ${addForm.name} to staff directory!`, "success");
             }
@@ -221,13 +259,13 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Default Password *</label>
+                                <label className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Password (Optional)</label>
                                 <input
                                     type="text"
-                                    required
                                     value={addForm.password}
                                     onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
-                                    className="w-full p-2 bg-white rounded-lg border border-neutral-300 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
+                                    placeholder="Leave blank for auto-generated temporary password"
+                                    className="w-full p-2 bg-white rounded-lg border border-neutral-300 text-xs focus:ring-2 focus:ring-orange-500 outline-none placeholder:text-neutral-400"
                                 />
                             </div>
                             <div className="flex justify-end gap-2 pt-1">
@@ -324,6 +362,17 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                                     </button>
                                     <button
                                         type="button"
+                                        onClick={() => handleGenerateTempPassword(u)}
+                                        disabled={generatingTempPasswordFor === u.id}
+                                        className="px-2.5 py-1 text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200/60 rounded-lg transition-colors flex items-center gap-1 font-medium cursor-pointer disabled:opacity-50"
+                                        title="Generate Temporary Password"
+                                        aria-label="Reset Password"
+                                    >
+                                        <KeyRound className="w-3 h-3" />
+                                        <span>{generatingTempPasswordFor === u.id ? "Resetting..." : "Reset Password"}</span>
+                                    </button>
+                                    <button
+                                        type="button"
                                         onClick={() => copyLoginLink(u)}
                                         className="px-2.5 py-1 text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                                         title="Copy Login Link"
@@ -343,6 +392,11 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                                         <span>WhatsApp</span>
                                     </button>
                                 </div>
+
+                                <div className="flex items-center gap-1.5 text-[10px] text-neutral-500 font-medium pt-1">
+                                    <Lock className="w-3 h-3 text-neutral-400 shrink-0" />
+                                    <span>Password must be entered separately at login (never shared via link).</span>
+                                </div>
                             </div>
                         ))
                     )}
@@ -361,6 +415,90 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                         await loadStaff();
                     }}
                 />
+            )}
+
+            {/* One-Time Temporary Password Modal */}
+            {temporaryPasswordModal && (
+                <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
+                    <div className="w-full max-w-sm rounded-2xl border border-orange-200 bg-white p-5 shadow-2xl space-y-4">
+                        <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+                            <h4 className="flex items-center gap-2 text-sm font-bold text-neutral-900">
+                                <KeyRound className="w-4 h-4 text-orange-600" />
+                                Temporary Password Created
+                            </h4>
+                            <button
+                                type="button"
+                                onClick={() => setTemporaryPasswordModal(null)}
+                                className="text-neutral-400 hover:text-neutral-700 cursor-pointer"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-neutral-600 leading-relaxed">
+                            A secure temporary password was created for{" "}
+                            <strong className="text-neutral-900">{temporaryPasswordModal.name}</strong> (
+                            {temporaryPasswordModal.email}).
+                        </p>
+
+                        <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 space-y-1.5">
+                            <label className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 block">
+                                Temporary Password
+                            </label>
+                            <div className="flex items-center justify-between gap-2">
+                                <code className="font-mono text-xs font-bold text-orange-600 tracking-wide select-all">
+                                    {temporaryPasswordModal.temporaryPassword}
+                                </code>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        try {
+                                            await navigator.clipboard.writeText(temporaryPasswordModal.temporaryPassword);
+                                            setCopiedPassword(true);
+                                            setTimeout(() => setCopiedPassword(false), 2000);
+                                            showToast("Temporary password copied to clipboard!", "success");
+                                        } catch {
+                                            showToast("Clipboard access denied.", "error");
+                                        }
+                                    }}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-white border border-neutral-200 hover:bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-700 transition cursor-pointer"
+                                >
+                                    {copiedPassword ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-neutral-500" />}
+                                    <span>{copiedPassword ? "Copied" : "Copy"}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-800 flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                            <span>
+                                <strong>Notice:</strong> This password is only shown once and cannot be retrieved later. Share it securely with the staff member.
+                            </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const link = temporaryPasswordModal.loginLink || `${window.location.origin}/login?mode=staff&email=${encodeURIComponent(temporaryPasswordModal.email)}`;
+                                    const text = `Hi ${temporaryPasswordModal.name},\nHere is your Tiffzy login credential:\n• Login URL: ${link}\n• Temporary Password: ${temporaryPasswordModal.temporaryPassword}\n\nPlease log in and update your password immediately.`;
+                                    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white transition cursor-pointer"
+                            >
+                                <Send className="w-3.5 h-3.5" />
+                                <span>Share via WhatsApp</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTemporaryPasswordModal(null)}
+                                className="rounded-xl bg-orange-600 px-4 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-orange-700 transition cursor-pointer"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
