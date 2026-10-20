@@ -195,10 +195,11 @@ export default function OwnerStaff() {
     // Password visibility toggles
     const [showAddPassword, setShowAddPassword] = useState(false);
     const [showEditPassword, setShowEditPassword] = useState(false);
-    const [copiedPassword, setCopiedPassword] = useState(false);
-
-    // One-time temporary password reveal modal
+    // One-time temporary password reveal modal & memory-only card display
     const [temporaryPasswordModal, setTemporaryPasswordModal] = useState(null);
+    const [copiedPassword, setCopiedPassword] = useState(false);
+    const [temporaryPasswords, setTemporaryPasswords] = useState({});
+    const [copiedPasswordId, setCopiedPasswordId] = useState(null);
 
     // Confirmation modals
     const [confirmDeactivateUser, setConfirmDeactivateUser] = useState(null);
@@ -340,6 +341,12 @@ export default function OwnerStaff() {
             setShowAddPassword(false);
 
             if (tempPassword) {
+                if (createdUser?.id) {
+                    setTemporaryPasswords((prev) => ({
+                        ...prev,
+                        [createdUser.id]: tempPassword,
+                    }));
+                }
                 setTemporaryPasswordModal({
                     name: createdUser?.name || trimmedName,
                     email: createdUser?.email || trimmedEmail,
@@ -565,9 +572,34 @@ export default function OwnerStaff() {
         }
     };
 
+    const copyTemporaryPassword = async (staffId, password) => {
+        try {
+            await navigator.clipboard.writeText(password);
+            setCopiedPasswordId(staffId);
+            setTimeout(() => setCopiedPasswordId(null), 2000);
+            showToast({
+                title: "Password Copied",
+                message: "Temporary password copied to clipboard.",
+                variant: "success",
+            });
+        } catch {
+            showToast({
+                title: "Copy failed",
+                message: "Clipboard access was denied by your browser.",
+                variant: "error",
+            });
+        }
+    };
+
     const shareStaffLoginOnWhatsApp = (staffUser) => {
         const loginLink = getStaffLoginLink(staffUser);
-        const message = buildStaffLoginShareText(staffUser, restaurantName, loginLink);
+        const tempPass = temporaryPasswords[staffUser?.id];
+        let message;
+        if (tempPass) {
+            message = `Hi ${staffUser?.name || "there"},\nHere is your staff login for ${restaurantName}:\n• Login URL: ${loginLink}\n• Temporary Password: ${tempPass}\n\nPlease enter this temporary password at login and update it immediately.`;
+        } else {
+            message = buildStaffLoginShareText(staffUser, restaurantName, loginLink);
+        }
         const shareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
         const popup = window.open(shareUrl, "_blank", "noopener,noreferrer");
 
@@ -598,6 +630,10 @@ export default function OwnerStaff() {
             const res = await axios.post(`${API}/owner/${restaurantId}/staff/${staffUser.id}/temp-password`);
             const tempPassword = res.data?.temporaryPassword;
             if (tempPassword) {
+                setTemporaryPasswords((prev) => ({
+                    ...prev,
+                    [staffUser.id]: tempPassword,
+                }));
                 setTemporaryPasswordModal({
                     name: staffUser.name,
                     email: staffUser.email,
@@ -1310,6 +1346,44 @@ export default function OwnerStaff() {
                                                 >
                                                     <span>WhatsApp</span>
                                                 </button>
+                                            </div>
+
+                                            {/* Temporary Password Row */}
+                                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                                                <span className="text-gray-400 font-medium">Password:</span>
+                                                {temporaryPasswords[staffUser.id] ? (
+                                                    <>
+                                                        <code className="rounded bg-orange-500/10 border border-orange-500/30 px-2.5 py-1 font-mono text-[11px] font-bold text-orange-400 select-all">
+                                                            {temporaryPasswords[staffUser.id]}
+                                                        </code>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => copyTemporaryPassword(staffUser.id, temporaryPasswords[staffUser.id])}
+                                                            className="inline-flex items-center gap-1 rounded-md bg-orange-500/20 border border-orange-500/30 px-2.5 py-1 text-[11px] font-semibold text-orange-300 hover:bg-orange-500/30 transition cursor-pointer"
+                                                            title="Copy Temporary Password"
+                                                            aria-label={`Copy temporary password for ${staffUser.name}`}
+                                                        >
+                                                            {copiedPasswordId === staffUser.id ? (
+                                                                <>
+                                                                    <Check size={12} className="text-emerald-400" />
+                                                                    <span className="text-emerald-400 font-bold">Copied</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Copy size={12} />
+                                                                    <span>Copy</span>
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                        <span className="text-[11px] text-gray-400 italic">
+                                                            Temporary password — shown only after reset.
+                                                        </span>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-gray-500 italic">
+                                                        Not available
+                                                    </span>
+                                                )}
                                             </div>
 
                                             <div className="flex items-center gap-1.5 text-[11px] text-gray-400 font-medium">

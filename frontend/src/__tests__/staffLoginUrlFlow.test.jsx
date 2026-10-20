@@ -242,4 +242,163 @@ describe("Staff Login URL & Password Flow Security", () => {
             screen.getByText(/Password must be entered separately at login/i)
         ).toBeInTheDocument();
     });
+
+    it("7. OwnerStaff card shows 'Not available' initially, then shows temporary password directly after reset, and copies it", async () => {
+        window.confirm = vi.fn().mockReturnValue(true);
+        localStorage.setItem("user", JSON.stringify({ id: 1, role: "OWNER", restaurantId: 1 }));
+
+        axios.get.mockResolvedValueOnce({
+            data: {
+                users: [
+                    {
+                        id: 30,
+                        name: "Dana Waiter",
+                        email: "dana@restaurant.com",
+                        phone: "+1122334455",
+                        role: "WAITER",
+                        designation: "Server",
+                        isActive: true,
+                        loginLink: "http://localhost:5173/login?mode=staff&email=dana%40restaurant.com",
+                        createdAt: new Date().toISOString(),
+                    },
+                ],
+                modules: ["dashboard", "orders"],
+            },
+        });
+
+        const { rerender } = render(
+            <MemoryRouter initialEntries={["/owner/staff"]}>
+                <OwnerStaff />
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("Dana Waiter")).toBeInTheDocument();
+        });
+
+        // Initially, card shows "Password: Not available"
+        expect(screen.getByText("Not available")).toBeInTheDocument();
+
+        // Mock the POST reset endpoint
+        axios.post.mockResolvedValueOnce({
+            data: {
+                message: "Temporary password generated successfully",
+                temporaryPassword: "Staff#4f8c92a1",
+                user: { id: 30, name: "Dana Waiter" },
+            },
+        });
+        axios.get.mockResolvedValueOnce({
+            data: {
+                users: [
+                    {
+                        id: 30,
+                        name: "Dana Waiter",
+                        email: "dana@restaurant.com",
+                        phone: "+1122334455",
+                        role: "WAITER",
+                        designation: "Server",
+                        isActive: true,
+                        loginLink: "http://localhost:5173/login?mode=staff&email=dana%40restaurant.com",
+                        createdAt: new Date().toISOString(),
+                    },
+                ],
+                modules: ["dashboard", "orders"],
+            },
+        });
+
+        const resetBtn = screen.getByRole("button", { name: /reset password/i });
+        fireEvent.click(resetBtn);
+
+        await waitFor(() => {
+            expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/owner/1/staff/30/temp-password"));
+        });
+
+        // Verify staff card now displays the temporary password directly
+        await waitFor(() => {
+            expect(screen.getAllByText("Staff#4f8c92a1").length).toBeGreaterThanOrEqual(1);
+        });
+
+        // Verify "Temporary password — shown only after reset." note appears
+        expect(screen.getByText(/Temporary password — shown only after reset/i)).toBeInTheDocument();
+
+        // Click the card's Copy button
+        const copyTempPassBtn = screen.getByLabelText("Copy temporary password for Dana Waiter");
+        fireEvent.click(copyTempPassBtn);
+
+        await waitFor(() => {
+            expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Staff#4f8c92a1");
+            expect(screen.getByText("Copied")).toBeInTheDocument();
+        });
+    });
+
+    it("8. StaffDirectoryDrawer shows temporary password directly on staff card after reset", async () => {
+        window.confirm = vi.fn().mockReturnValue(true);
+
+        axios.get.mockResolvedValueOnce({
+            data: [
+                {
+                    id: 40,
+                    name: "Evan Cashier",
+                    email: "evan@restaurant.com",
+                    phone: "+5566778899",
+                    role: "CASHIER",
+                    isActive: true,
+                },
+            ],
+        });
+
+        render(
+            <StaffDirectoryDrawer
+                isOpen={true}
+                onClose={vi.fn()}
+                restaurantId={1}
+            />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("Evan Cashier")).toBeInTheDocument();
+        });
+
+        // Initially shows "Not available"
+        expect(screen.getByText("Not available")).toBeInTheDocument();
+
+        // Mock POST reset endpoint
+        axios.post.mockResolvedValueOnce({
+            data: {
+                message: "Temporary password generated successfully",
+                temporaryPassword: "Staff#99aa88bb",
+                user: { id: 40, name: "Evan Cashier" },
+            },
+        });
+        axios.get.mockResolvedValueOnce({
+            data: [
+                {
+                    id: 40,
+                    name: "Evan Cashier",
+                    email: "evan@restaurant.com",
+                    phone: "+5566778899",
+                    role: "CASHIER",
+                    isActive: true,
+                },
+            ],
+        });
+
+        const resetBtn = screen.getByRole("button", { name: /reset password/i });
+        fireEvent.click(resetBtn);
+
+        await waitFor(() => {
+            expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/owner/1/staff/40/temp-password"));
+        });
+
+        // Verify card displays the temporary password
+        await waitFor(() => {
+            expect(screen.getAllByText("Staff#99aa88bb").length).toBeGreaterThanOrEqual(1);
+        });
+
+        // Verify copy button on drawer card
+        const copyDrawerPassBtn = screen.getByLabelText("Copy temporary password for Evan Cashier");
+        fireEvent.click(copyDrawerPassBtn);
+
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Staff#99aa88bb");
+    });
 });

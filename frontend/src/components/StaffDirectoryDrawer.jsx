@@ -29,6 +29,8 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
     const [submitting, setSubmitting] = useState(false);
     const [editingStaff, setEditingStaff] = useState(null);
     const [temporaryPasswordModal, setTemporaryPasswordModal] = useState(null);
+    const [temporaryPasswords, setTemporaryPasswords] = useState({});
+    const [copiedPasswordId, setCopiedPasswordId] = useState(null);
     const [copiedPassword, setCopiedPassword] = useState(false);
     const [generatingTempPasswordFor, setGeneratingTempPasswordFor] = useState(null);
     const [addForm, setAddForm] = useState({
@@ -79,9 +81,26 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
         showToast(`Staff login link copied for ${user.name}!`, "success");
     };
 
+    const copyTemporaryPassword = async (staffId, password) => {
+        try {
+            await navigator.clipboard.writeText(password);
+            setCopiedPasswordId(staffId);
+            setTimeout(() => setCopiedPasswordId(null), 2000);
+            showToast("Temporary password copied to clipboard!", "success");
+        } catch {
+            showToast("Clipboard access denied.", "error");
+        }
+    };
+
     const shareWhatsApp = (user) => {
         const link = `${window.location.origin}/login?mode=staff&email=${encodeURIComponent(user.email)}`;
-        const text = `Hi ${user.name}, here is your login link for Tiffzy: ${link}\n\nNote: Please enter your staff password or the temporary password provided by management to log in.`;
+        const tempPass = temporaryPasswords[user.id];
+        let text;
+        if (tempPass) {
+            text = `Hi ${user.name},\nHere is your Tiffzy login credential:\n• Login URL: ${link}\n• Temporary Password: ${tempPass}\n\nPlease log in and update your password immediately.`;
+        } else {
+            text = `Hi ${user.name}, here is your login link for Tiffzy: ${link}\n\nNote: Please enter your staff password or the temporary password provided by management to log in.`;
+        }
         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
     };
 
@@ -95,6 +114,10 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
             const res = await axios.post(`${API}/owner/${restaurantId}/staff/${user.id}/temp-password`);
             const tempPassword = res.data?.temporaryPassword;
             if (tempPassword) {
+                setTemporaryPasswords((prev) => ({
+                    ...prev,
+                    [user.id]: tempPassword,
+                }));
                 setTemporaryPasswordModal({
                     name: user.name,
                     email: user.email,
@@ -133,7 +156,14 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                 designation: addForm.designation || undefined,
             });
             const tempPassword = res.data?.temporaryPassword;
+            const createdUser = res.data?.user;
             if (tempPassword) {
+                if (createdUser?.id) {
+                    setTemporaryPasswords((prev) => ({
+                        ...prev,
+                        [createdUser.id]: tempPassword,
+                    }));
+                }
                 setTemporaryPasswordModal({
                     name: addForm.name,
                     email: addForm.email,
@@ -332,7 +362,7 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                                     </div>
                                 </div>
 
-                                <div className="text-xs text-neutral-600 space-y-1 pt-1 border-t border-neutral-100">
+                                <div className="text-xs text-neutral-600 space-y-1.5 pt-2 border-t border-neutral-100">
                                     {u.phone && (
                                         <div className="flex items-center gap-2">
                                             <Phone className="w-3.5 h-3.5 text-neutral-400" />
@@ -345,6 +375,48 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                                             <span className="truncate">{u.email}</span>
                                         </div>
                                     )}
+                                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                        <span className="text-neutral-500 font-medium">Login URL:</span>
+                                        <code className="text-[10px] bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-700 truncate max-w-[220px]">
+                                            {`${window.location.origin}/login?mode=staff&email=${encodeURIComponent(u.email)}`}
+                                        </code>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-neutral-500 font-medium">Password:</span>
+                                        {temporaryPasswords[u.id] ? (
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                <code className="text-xs bg-orange-50 border border-orange-200 text-orange-700 px-2 py-0.5 rounded font-mono font-bold select-all">
+                                                    {temporaryPasswords[u.id]}
+                                                </code>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => copyTemporaryPassword(u.id, temporaryPasswords[u.id])}
+                                                    className="inline-flex items-center gap-1 rounded bg-orange-100 hover:bg-orange-200 text-orange-800 px-2 py-0.5 text-[11px] font-semibold transition cursor-pointer"
+                                                    title="Copy Temporary Password"
+                                                    aria-label={`Copy temporary password for ${u.name}`}
+                                                >
+                                                    {copiedPasswordId === u.id ? (
+                                                        <>
+                                                            <Check className="w-3 h-3 text-emerald-600" />
+                                                            <span className="text-emerald-700 font-bold">Copied</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Copy className="w-3 h-3" />
+                                                            <span>Copy</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                                <span className="text-[10px] text-neutral-400 italic">
+                                                    Temporary password — shown only after reset.
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-neutral-400 italic">
+                                                Not available
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Action Buttons */}
