@@ -1,10 +1,108 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import TablePaymentSettlementModal from "../components/TablePaymentSettlementModal";
-import { resolveTableActiveOrderStatus } from "../pages/Server";
+import Server, { resolveTableActiveOrderStatus, isTablePaymentPending } from "../pages/Server";
+import { LanguageProvider } from "../context/LanguageContext";
+import { RestaurantThemeProvider } from "../context/ThemeContext";
+import { RestaurantContextProvider } from "../context/RestaurantContext";
+import { CartProvider } from "../context/CartContext";
 import { api } from "../utils/apiClient";
 import * as receiptPrinter from "../utils/receiptPrinter";
+
+const mockTablesForServer = [
+    {
+        id: 1,
+        tableNo: "1",
+        seats: 2,
+        isOccupied: false,
+        isBlocked: false,
+        section: "Main Floor",
+        activeOrders: [],
+    },
+    {
+        id: 3,
+        tableNo: "3",
+        seats: 2,
+        isOccupied: true,
+        isBlocked: false,
+        section: "Main Floor",
+        assignedWaiterName: "kamalesh",
+        activeOrderCount: 1,
+        activeOrders: [
+            {
+                id: 101,
+                orderNo: "ORD-101",
+                status: "DELIVERED",
+                paymentStatus: "PENDING",
+                total: 1250,
+                items: [
+                    { itemName: "Butter Chicken", qty: 2, price: 500, total: 1000 },
+                    { itemName: "Garlic Naan", qty: 5, price: 50, total: 250 },
+                ],
+            },
+        ],
+    },
+];
+
+vi.mock("../hooks/useCachedGet", () => ({
+    default: (url) => {
+        const urlStr = String(url || "");
+        if (urlStr.includes("/tables")) {
+            return { data: { tables: mockTablesForServer }, loading: false, refresh: vi.fn() };
+        }
+        if (urlStr.includes("/menu")) {
+            return { data: { items: [] }, loading: false, refresh: vi.fn() };
+        }
+        if (urlStr.includes("/reservations")) {
+            return { data: { reservations: [] }, loading: false, refresh: vi.fn() };
+        }
+        if (urlStr.includes("/kots")) {
+            return { data: { kots: [] }, loading: false, refresh: vi.fn() };
+        }
+        if (urlStr.includes("/orders")) {
+            return { data: { orders: [] }, loading: false, refresh: vi.fn() };
+        }
+        return { data: null, loading: false, refresh: vi.fn() };
+    },
+}));
+
+vi.mock("axios", () => {
+    const mockAxiosInstance = {
+        get: vi.fn(),
+        post: vi.fn().mockResolvedValue({ data: { success: true } }),
+        put: vi.fn().mockResolvedValue({ data: { success: true } }),
+        delete: vi.fn().mockResolvedValue({ data: { success: true } }),
+        interceptors: {
+            request: { use: vi.fn() },
+            response: { use: vi.fn() },
+        },
+    };
+    mockAxiosInstance.create = vi.fn(() => mockAxiosInstance);
+    return {
+        default: mockAxiosInstance,
+        ...mockAxiosInstance,
+    };
+});
+
+vi.mock("../context/AuthContext.jsx", () => ({
+    useAuth: () => ({
+        user: { id: 1, restaurantId: 4, name: "kamalesh", role: "SERVER", restaurant: { name: "Tiffzy Cafe" } },
+        logout: vi.fn(),
+    }),
+}));
+
+vi.mock("../context/StaffSocketContext.jsx", () => ({
+    useStaffSocket: () => ({
+        socket: {
+            on: vi.fn(),
+            off: vi.fn(),
+            emit: vi.fn(),
+        },
+        isConnected: true,
+    }),
+}));
 
 vi.mock("../utils/apiClient", () => ({
     api: {
@@ -347,6 +445,66 @@ describe("Tiffzy Server Station — Cash/UPI Payment Settlement & Bill Printing"
             expect(calledArg.markup).toContain("PAID");
 
             printSpy.mockRestore();
+        });
+    });
+
+    describe("Server Station Table Card Settle Payment Button Visibility & User Flow", () => {
+        it("1 & 2: PAYMENT_PENDING table shows Settle Payment button, AVAILABLE table does not", async () => {
+            render(
+                <MemoryRouter initialEntries={["/server"]}>
+                    <LanguageProvider>
+                        <RestaurantThemeProvider>
+                            <RestaurantContextProvider>
+                                <CartProvider>
+                                    <Server />
+                                </CartProvider>
+                            </RestaurantContextProvider>
+                        </RestaurantThemeProvider>
+                    </LanguageProvider>
+                </MemoryRouter>
+            );
+
+            // Table 3 is PAYMENT_PENDING -> Settle Payment button must be visible directly on table 3 card
+            expect(screen.getByTestId("settle-payment-btn-3")).toBeInTheDocument();
+            expect(screen.getByTestId("settle-payment-btn-3")).toHaveTextContent("💳 Settle Payment");
+
+            // Table 1 is AVAILABLE -> No settle payment button
+            expect(screen.queryByTestId("settle-payment-btn-1")).toBeNull();
+        });
+
+        it("3: Clicking Settle Payment directly on Table 3 card opens the payment modal", async () => {
+            render(
+                <MemoryRouter initialEntries={["/server"]}>
+                    <LanguageProvider>
+                        <RestaurantThemeProvider>
+                            <RestaurantContextProvider>
+                                <CartProvider>
+                                    <Server />
+                                </CartProvider>
+                            </RestaurantContextProvider>
+                        </RestaurantThemeProvider>
+                    </LanguageProvider>
+                </MemoryRouter>
+            );
+
+            const settleBtn = screen.getByTestId("settle-payment-btn-3");
+            fireEvent.click(settleBtn);
+
+            await waitFor(() => {
+                expect(screen.getByTestId("settle-payment-modal")).toBeInTheDocument();
+            });
+            expect(screen.getByTestId("modal-bill-amount")).toHaveTextContent("₹1250.00");
+        });
+
+        it("isTablePaymentPending correctly identifies payment pending condition across diverse table states", () => {
+            expect(isTablePaymentPending(mockPendingTable)).toBe(true);
+            expect(isTablePaymentPending(mockAvailableTable)).toBe(false);
+            expect(isTablePaymentPending(mockReservedTable)).toBe(false);
+            expect(isTablePaymentPending(mockBlockedTable)).toBe(false);
+            expect(isTablePaymentPending(mockPaidTable)).toBe(false);
+            expect(isTablePaymentPending({ status: "PAYMENT_PENDING" })).toBe(true);
+            expect(isTablePaymentPending({ orderStatus: "PAYMENT_PENDING" })).toBe(true);
+            expect(isTablePaymentPending({ activeSession: { status: "BILLING" } })).toBe(true);
         });
     });
 });

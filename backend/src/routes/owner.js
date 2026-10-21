@@ -691,9 +691,12 @@ export default async function ownerRoutes(app, deps = {}) {
                 ],
               },
               {
-                status: "DELIVERED",
+                status: { in: ["SERVED", "DELIVERED", "COMPLETED", "PAYMENT_PENDING"] },
                 paymentStatus: { notIn: ["PAID", "SUCCESS"] },
-                tableSession: { status: { in: ["OPEN", "BILLING", "PAID"] } },
+                OR: [
+                  { tableSessionId: null },
+                  { tableSession: { status: { in: ["OPEN", "BILLING", "PAID"] } } },
+                ],
               },
             ],
           },
@@ -934,27 +937,41 @@ export default async function ownerRoutes(app, deps = {}) {
             0
           );
 
-          const isOccupied = Boolean(activeSession) || tableActiveOrders.length > 0;
+          const hasUnpaidDeliveredLatest = latestOrder && ["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(String(latestOrder.status || "").toUpperCase()) && !["PAID", "SUCCESS"].includes(String(latestOrder.paymentStatus || "").toUpperCase());
+          const isOccupied = Boolean(activeSession) || tableActiveOrders.length > 0 || Boolean(hasUnpaidDeliveredLatest);
           const isReserved = !isOccupied && Boolean(activeRes);
           const isBlocked = Boolean(table.isBlocked);
 
-            const resolveCanonicalActiveOrderStatus = (orders) => {
-              if (!Array.isArray(orders) || orders.length === 0) return null;
-              if (orders.some((o) => o.status === "READY")) return "READY";
-              if (orders.some((o) => o.status === "PREPARING")) return "PREPARING";
-              if (orders.some((o) => o.status === "ACCEPTED")) return "ACCEPTED";
-              if (orders.some((o) => o.status === "PLACED")) return "PLACED";
-              
-              const allDelivered = orders.every((o) => o.status === "DELIVERED" || o.status === "SERVED");
-              if (allDelivered) {
-                const anyUnpaid = orders.some((o) => !["PAID", "SUCCESS"].includes(String(o.paymentStatus || "").toUpperCase()));
-                if (anyUnpaid) return "PAYMENT_PENDING";
-                return "PAID";
+            const resolveCanonicalActiveOrderStatus = (orders, fallbackLatest) => {
+              if (Array.isArray(orders) && orders.length > 0) {
+                if (orders.some((o) => o.status === "READY")) return "READY";
+                if (orders.some((o) => o.status === "PREPARING")) return "PREPARING";
+                if (orders.some((o) => o.status === "ACCEPTED")) return "ACCEPTED";
+                if (orders.some((o) => o.status === "PLACED")) return "PLACED";
+                
+                const allDelivered = orders.every((o) => ["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(String(o.status || "").toUpperCase()));
+                if (allDelivered) {
+                  const anyUnpaid = orders.some((o) => !["PAID", "SUCCESS"].includes(String(o.paymentStatus || "").toUpperCase()));
+                  if (anyUnpaid) return "PAYMENT_PENDING";
+                  return "PAID";
+                }
+                return orders[orders.length - 1]?.status || null;
               }
-              return orders[orders.length - 1]?.status || null;
+
+              if (fallbackLatest) {
+                const ls = String(fallbackLatest.status || "").toUpperCase();
+                const lp = String(fallbackLatest.paymentStatus || "").toUpperCase();
+                if (["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(ls)) {
+                  if (lp !== "PAID" && lp !== "SUCCESS") return "PAYMENT_PENDING";
+                  return "PAID";
+                }
+                return ls;
+              }
+
+              return null;
             };
 
-            const activeOrderStatus = resolveCanonicalActiveOrderStatus(tableActiveOrders);
+            const activeOrderStatus = resolveCanonicalActiveOrderStatus(tableActiveOrders, latestOrder);
 
             return {
               isOccupied,
@@ -3393,7 +3410,7 @@ export default async function ownerRoutes(app, deps = {}) {
               OR: [
                 { status: { in: activeStatuses } },
                 {
-                  status: "DELIVERED",
+                  status: { in: ["SERVED", "DELIVERED", "COMPLETED", "PAYMENT_PENDING"] },
                   paymentStatus: { notIn: ["PAID", "SUCCESS"] },
                 },
               ],

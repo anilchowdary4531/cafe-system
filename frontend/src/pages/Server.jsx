@@ -118,17 +118,63 @@ export const ORDER_STATUS_CONFIG = {
     },
 };
 
+export const isTablePaymentPending = (table) => {
+    if (!table) return false;
+
+    // Explicit payment pending statuses
+    const activeStatus = String(resolveTableActiveOrderStatus(table) || "").toUpperCase();
+    if (activeStatus === "PAYMENT_PENDING") return true;
+
+    const rawActiveStatus = String(table.activeOrderStatus || table.orderStatus || "").toUpperCase();
+    if (rawActiveStatus === "PAYMENT_PENDING" || rawActiveStatus === "BILLING") return true;
+
+    const tableStatus = String(table.status || "").toUpperCase();
+    if (tableStatus === "PAYMENT_PENDING" || tableStatus === "BILLING") return true;
+
+    const sessionStatus = String(table.activeSession?.status || "").toUpperCase();
+    if (sessionStatus === "BILLING" || sessionStatus === "PAYMENT_PENDING") return true;
+
+    const payStatus = String(table.paymentStatus || "").toUpperCase();
+    if (payStatus === "PENDING" || payStatus === "PAYMENT_PENDING") return true;
+
+    const activeOrders = Array.isArray(table.activeOrders) ? table.activeOrders : [];
+    if (activeOrders.length > 0) {
+        const hasUnpaid = activeOrders.some((o) => {
+            const ps = String(o?.paymentStatus || "").toUpperCase();
+            return ps !== "PAID" && ps !== "SUCCESS";
+        });
+        const hasServedOrDelivered = activeOrders.some((o) => {
+            const st = String(o?.status || "").toUpperCase();
+            return ["DELIVERED", "SERVED", "READY", "COMPLETED", "PAYMENT_PENDING"].includes(st);
+        });
+        if (hasUnpaid && hasServedOrDelivered) return true;
+    }
+
+    if (table.lastOrderStatus) {
+        const lastSt = String(table.lastOrderStatus).toUpperCase();
+        const lastPay = String(table.lastPaymentStatus || "").toUpperCase();
+        if (["DELIVERED", "SERVED", "COMPLETED"].includes(lastSt) && lastPay !== "PAID" && lastPay !== "SUCCESS") {
+            return true;
+        }
+    }
+
+    return false;
+};
+
 export const resolveTableActiveOrderStatus = (table) => {
     if (!table) return null;
     if (table.activeOrderStatus) {
         return String(table.activeOrderStatus).toUpperCase();
+    }
+    if (table.orderStatus) {
+        return String(table.orderStatus).toUpperCase();
     }
 
     const activeOrders = Array.isArray(table.activeOrders) ? table.activeOrders : [];
     if (activeOrders.length === 0) {
         if (table.lastOrderStatus) {
             const lastStatus = String(table.lastOrderStatus).toUpperCase();
-            if (lastStatus === "DELIVERED") {
+            if (["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(lastStatus)) {
                 const lastPay = String(table.lastPaymentStatus || "").toUpperCase();
                 if (lastPay !== "PAID" && lastPay !== "SUCCESS") return "PAYMENT_PENDING";
                 return "PAID";
@@ -146,7 +192,7 @@ export const resolveTableActiveOrderStatus = (table) => {
 
     const allDelivered = activeOrders.every((o) => {
         const s = String(o?.status || "").toUpperCase();
-        return s === "DELIVERED" || s === "SERVED";
+        return s === "DELIVERED" || s === "SERVED" || s === "COMPLETED";
     });
 
     if (allDelivered) {
@@ -156,6 +202,10 @@ export const resolveTableActiveOrderStatus = (table) => {
         });
         if (anyUnpaid) return "PAYMENT_PENDING";
         return "PAID";
+    }
+
+    if (activeOrders.some((o) => ["PAYMENT_PENDING", "BILLING"].includes(String(o?.status || "").toUpperCase()))) {
+        return "PAYMENT_PENDING";
     }
 
     return String(activeOrders[activeOrders.length - 1]?.status || "").toUpperCase();
@@ -766,7 +816,7 @@ export default function Server() {
 
         tables.forEach((t) => {
             if (t.isBlocked) blocked++;
-            else if (t.isOccupied) occupied++;
+            else if (t.isOccupied || isTablePaymentPending(t)) occupied++;
             else if (t.isReserved || t.activeReservation) reserved++;
             else available++;
         });
@@ -1251,8 +1301,9 @@ export default function Server() {
                         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                             {filteredTables.map((table) => {
                                 const isBlocked = Boolean(table.isBlocked);
-                                const isOccupied = Boolean(table.isOccupied);
-                                const isReserved = !isOccupied && Boolean(table.isReserved || table.activeReservation);
+                                const hasPendingPayment = !isBlocked && isTablePaymentPending(table);
+                                const isOccupied = !isBlocked && Boolean(table.isOccupied || hasPendingPayment || table.status === "OCCUPIED" || table.activeOrderCount > 0);
+                                const isReserved = !isBlocked && !isOccupied && Boolean(table.isReserved || table.activeReservation);
 
                                 return (
                                     <div
@@ -1264,7 +1315,7 @@ export default function Server() {
                                                 : isOccupied
                                                     ? "border-sky-500/40 bg-sky-500/5 dark:bg-sky-950/20"
                                                     : isReserved
-                                                        ? "border-purple-500/40 bg-purple-500/5 dark:bg-purple-950/20"
+                                                        ? "border-purple-500/40 bg-purple-500/5 dark:purple-950/20"
                                                         : "border-gray-200 dark:border-slate-800 hover:border-orange-500/50"
                                         }`}
                                     >
@@ -1327,7 +1378,7 @@ export default function Server() {
                                                         {table.activeOrderCount || 1} Active Order(s)
                                                     </p>
                                                     {(() => {
-                                                        const activeStatus = resolveTableActiveOrderStatus(table);
+                                                        const activeStatus = hasPendingPayment ? "PAYMENT_PENDING" : resolveTableActiveOrderStatus(table);
                                                         if (!activeStatus) return null;
                                                         const cfg = ORDER_STATUS_CONFIG[activeStatus] || {
                                                             label: activeStatus,
@@ -1354,14 +1405,14 @@ export default function Server() {
                                                     ) : (
                                                         <p className="text-[10px] theme-muted italic">No server assigned</p>
                                                     )}
-                                                    {resolveTableActiveOrderStatus(table) === "PAYMENT_PENDING" && (
+                                                    {hasPendingPayment && (
                                                         <button
                                                             type="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 setSettlementTable(table);
                                                             }}
-                                                            className="w-full mt-2 py-1.5 px-3 rounded-lg bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-xs shadow-sm shadow-orange-500/25 flex items-center justify-center gap-1.5 transition"
+                                                            className="w-full mt-2 py-1.5 px-3 rounded-lg bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-xs shadow-sm shadow-orange-500/25 flex items-center justify-center gap-1.5 transition cursor-pointer"
                                                             data-testid={`settle-payment-btn-${table.id || table.tableNo}`}
                                                         >
                                                             💳 Settle Payment
@@ -1466,6 +1517,16 @@ export default function Server() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
+                                {isTablePaymentPending(selectedTable) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSettlementTable(selectedTable)}
+                                        className="rounded-xl border border-orange-500 bg-orange-500 hover:bg-orange-600 px-3 py-1 text-xs font-bold text-white shadow-sm shadow-orange-500/25 transition flex items-center gap-1 cursor-pointer"
+                                        data-testid={`settle-payment-selected-btn-${selectedTable?.id || selectedTable?.tableNo}`}
+                                    >
+                                        💳 Settle Payment
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     onClick={() => {
