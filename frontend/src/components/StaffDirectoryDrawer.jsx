@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
     X,
@@ -19,9 +19,16 @@ import {
 } from "lucide-react";
 import { API } from "../config";
 import { showToast } from "../utils/toast";
+import { useAuth } from "../context/AuthContext";
+import { resolveAuthoritativeRestaurantId } from "../utils/restaurantContext";
 import StaffEditModal from "./StaffEditModal";
 
 export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, onEditStaff }) {
+    const { user: authUser } = useAuth();
+    const effectiveRestaurantId = useMemo(() => {
+        return resolveAuthoritativeRestaurantId(authUser, restaurantId);
+    }, [authUser, restaurantId]);
+
     const [staffUsers, setStaffUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState("");
@@ -43,10 +50,10 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
     });
 
     const loadStaff = async () => {
-        if (!restaurantId) return;
+        if (!effectiveRestaurantId) return;
         setLoading(true);
         try {
-            const res = await axios.get(`${API}/owner/${restaurantId}/staff`);
+            const res = await axios.get(`${API}/owner/${effectiveRestaurantId}/staff`);
             setStaffUsers(res.data?.users || res.data || []);
         } catch {
             showToast("Failed to load staff directory", "error");
@@ -59,7 +66,7 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
         if (isOpen) {
             loadStaff();
         }
-    }, [isOpen, restaurantId]);
+    }, [isOpen, effectiveRestaurantId]);
 
     if (!isOpen) return null;
 
@@ -105,13 +112,25 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
     };
 
     const handleGenerateTempPassword = async (user) => {
-        if (!restaurantId || !user?.id) return;
+        if (!user?.id) return;
+        const targetRestaurantId = Number(
+            effectiveRestaurantId ||
+            user?.restaurantId ||
+            resolveAuthoritativeRestaurantId(authUser, restaurantId) ||
+            0
+        );
+
+        if (!targetRestaurantId || targetRestaurantId <= 0 || isNaN(targetRestaurantId)) {
+            showToast("Unable to reset password because the restaurant information is unavailable. Please refresh the page and try again.", "error");
+            return;
+        }
+
         const confirmMsg = `Generate a new temporary password for ${user.name}?\n\nThis will invalidate active sessions and require them to set a new password on login.`;
         if (!window.confirm(confirmMsg)) return;
 
         try {
             setGeneratingTempPasswordFor(user.id);
-            const res = await axios.post(`${API}/owner/${restaurantId}/staff/${user.id}/temp-password`);
+            const res = await axios.post(`${API}/owner/${targetRestaurantId}/staff/${user.id}/temp-password`);
             const tempPassword = res.data?.temporaryPassword;
             if (tempPassword) {
                 setTemporaryPasswords((prev) => ({
@@ -129,7 +148,12 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
             }
             await loadStaff();
         } catch (err) {
-            showToast(err?.response?.data?.message || "Failed to generate temporary password.", "error");
+            const rawMessage = err?.response?.data?.message || "";
+            const isRouteNotFound = rawMessage.toLowerCase().includes("not found") || err?.response?.status === 404;
+            const userMessage = isRouteNotFound
+                ? "Unable to reset password because the server endpoint was not found. Please refresh and try again."
+                : (rawMessage || "Failed to generate temporary password.");
+            showToast(userMessage, "error");
         } finally {
             setGeneratingTempPasswordFor(null);
         }
@@ -144,10 +168,10 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
 
     const handleAddPerson = async (e) => {
         e.preventDefault();
-        if (!restaurantId) return;
+        if (!effectiveRestaurantId) return;
         setSubmitting(true);
         try {
-            const res = await axios.post(`${API}/owner/${restaurantId}/staff`, {
+            const res = await axios.post(`${API}/owner/${effectiveRestaurantId}/staff`, {
                 name: addForm.name,
                 email: addForm.email,
                 phone: addForm.phone,
@@ -481,7 +505,7 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                     isOpen={Boolean(editingStaff)}
                     onClose={() => setEditingStaff(null)}
                     staffUser={editingStaff}
-                    restaurantId={restaurantId}
+                    restaurantId={effectiveRestaurantId}
                     onSaved={async () => {
                         setEditingStaff(null);
                         await loadStaff();

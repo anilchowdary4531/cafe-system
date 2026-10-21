@@ -17,10 +17,11 @@ import OwnerMenuButton from "../../components/OwnerMenuButton";
 import StaffSubNav from "../../components/StaffSubNav";
 import StaffDirectoryDrawer from "../../components/StaffDirectoryDrawer";
 import { useAuth } from "../../context/AuthContext";
+import { resolveAuthoritativeRestaurantId } from "../../utils/restaurantContext";
 
 export default function OwnerStaffAttendance() {
     const { user } = useAuth();
-    const restaurantId = Number(user?.restaurantId || 0);
+    const restaurantId = resolveAuthoritativeRestaurantId(user);
 
     const [attendanceLogs, setAttendanceLogs] = useState([]);
     const [loading, setLoading] = useState(true);

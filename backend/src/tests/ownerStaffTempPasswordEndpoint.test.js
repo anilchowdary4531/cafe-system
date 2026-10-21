@@ -46,6 +46,55 @@ test("POST /owner/:restaurantId/staff/:staffId/temp-password - Secure Temporary 
     },
   });
 
+  const chef = await prisma.user.create({
+    data: {
+      name: "Chef Staff",
+      email: `chef_${randSuffix}@test.com`,
+      phone: "+919999999993",
+      role: "CHEF",
+      restaurantId: restaurant.id,
+      password: bcrypt.hashSync("ChefPass123!", 10),
+      sessionVersion: 1,
+    },
+  });
+
+  const cashier = await prisma.user.create({
+    data: {
+      name: "Cashier Staff",
+      email: `cashier_${randSuffix}@test.com`,
+      phone: "+919999999994",
+      role: "CASHIER",
+      restaurantId: restaurant.id,
+      password: bcrypt.hashSync("CashierPass123!", 10),
+      sessionVersion: 1,
+    },
+  });
+
+  const manager = await prisma.user.create({
+    data: {
+      name: "Manager Staff",
+      email: `manager_${randSuffix}@test.com`,
+      phone: "+919999999995",
+      role: "MANAGER",
+      restaurantId: restaurant.id,
+      password: bcrypt.hashSync("ManagerPass123!", 10),
+      sessionVersion: 1,
+    },
+  });
+
+  const staff2 = await prisma.user.create({
+    data: {
+      name: "Busser Staff",
+      email: `busser_${randSuffix}@test.com`,
+      phone: "+919999999996",
+      role: "WAITER",
+      restaurantId: restaurant.id,
+      password: bcrypt.hashSync("InitialPass123!", 10),
+      mustChangePassword: false,
+      sessionVersion: 1,
+    },
+  });
+
   const ownerToken = app.jwt.sign({
     id: owner.id,
     userId: owner.id,
@@ -64,6 +113,33 @@ test("POST /owner/:restaurantId/staff/:staffId/temp-password - Secure Temporary 
     sessionVersion: 1,
   });
 
+  const chefToken = app.jwt.sign({
+    id: chef.id,
+    userId: chef.id,
+    email: chef.email,
+    role: "CHEF",
+    restaurantId: restaurant.id,
+    sessionVersion: 1,
+  });
+
+  const cashierToken = app.jwt.sign({
+    id: cashier.id,
+    userId: cashier.id,
+    email: cashier.email,
+    role: "CASHIER",
+    restaurantId: restaurant.id,
+    sessionVersion: 1,
+  });
+
+  const managerToken = app.jwt.sign({
+    id: manager.id,
+    userId: manager.id,
+    email: manager.email,
+    role: "MANAGER",
+    restaurantId: restaurant.id,
+    sessionVersion: 1,
+  });
+
   await t.test("1. WAITER cannot issue temporary passwords (403)", async () => {
     const res = await app.inject({
       method: "POST",
@@ -71,6 +147,35 @@ test("POST /owner/:restaurantId/staff/:staffId/temp-password - Secure Temporary 
       headers: { authorization: `Bearer ${staffToken}` },
     });
     assert.equal(res.statusCode, 403);
+  });
+
+  await t.test("1b. CHEF cannot issue temporary passwords (403)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: `/owner/${restaurant.id}/staff/${staff.id}/temp-password`,
+      headers: { authorization: `Bearer ${chefToken}` },
+    });
+    assert.equal(res.statusCode, 403);
+  });
+
+  await t.test("1c. CASHIER cannot issue temporary passwords (403)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: `/owner/${restaurant.id}/staff/${staff.id}/temp-password`,
+      headers: { authorization: `Bearer ${cashierToken}` },
+    });
+    assert.equal(res.statusCode, 403);
+  });
+
+  await t.test("1d. MANAGER can issue temporary passwords (200)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: `/owner/${restaurant.id}/staff/${staff2.id}/temp-password`,
+      headers: { authorization: `Bearer ${managerToken}` },
+    });
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.payload);
+    assert.ok(body.temporaryPassword);
   });
 
   let issuedTempPassword = "";

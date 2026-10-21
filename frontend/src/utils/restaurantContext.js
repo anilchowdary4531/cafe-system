@@ -1,4 +1,5 @@
 import { getStoredOrderFlowScope, ORDER_FLOW_SCOPES } from "./orderFlow";
+import { getActiveStaffSession } from "./staffSessionStorage";
 
 const STORAGE_PREFIX = "cafe_system:restaurant_context";
 const LEGACY_STORAGE_KEY = "restaurant_context";
@@ -63,3 +64,46 @@ export const resolveRestaurantName = (user, fallback = "Tiffzy") => {
 
     return fallback;
 };
+
+export const resolveAuthoritativeRestaurantId = (user, fallbackCandidate = null) => {
+    const fromCandidate = Number(fallbackCandidate || 0);
+    if (fromCandidate > 0 && !isNaN(fromCandidate)) return fromCandidate;
+
+    const fromUser = Number(user?.restaurantId || user?.restaurant?.id || 0);
+    if (fromUser > 0 && !isNaN(fromUser)) return fromUser;
+
+    try {
+        const activeUser = typeof getActiveStaffSession === "function" ? getActiveStaffSession()?.user : null;
+        const fromActive = Number(activeUser?.restaurantId || activeUser?.restaurant?.id || 0);
+        if (fromActive > 0 && !isNaN(fromActive)) return fromActive;
+    } catch {
+        // ignore
+    }
+
+    try {
+        if (typeof window !== "undefined" && window.localStorage) {
+            const stored = JSON.parse(window.localStorage.getItem("user") || "null");
+            const fromStored = Number(stored?.restaurantId || stored?.restaurant?.id || 0);
+            if (fromStored > 0 && !isNaN(fromStored)) return fromStored;
+
+            const fromStorage = Number(
+                window.localStorage.getItem("restaurantId") ||
+                window.localStorage.getItem("activeRestaurantId") ||
+                0
+            );
+            if (fromStorage > 0 && !isNaN(fromStorage)) return fromStorage;
+        }
+    } catch {
+        // ignore
+    }
+
+    try {
+        const fromContext = Number(getStoredRestaurantContext()?.id || 0);
+        if (fromContext > 0 && !isNaN(fromContext)) return fromContext;
+    } catch {
+        // ignore
+    }
+
+    return 0;
+};
+

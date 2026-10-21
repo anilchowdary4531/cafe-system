@@ -21,12 +21,13 @@ import OwnerMenuButton from "../../components/OwnerMenuButton";
 import StaffSubNav from "../../components/StaffSubNav";
 import StaffDirectoryDrawer from "../../components/StaffDirectoryDrawer";
 import { useAuth } from "../../context/AuthContext";
+import { resolveAuthoritativeRestaurantId } from "../../utils/restaurantContext";
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export default function OwnerStaffSchedules() {
     const { user } = useAuth();
-    const restaurantId = Number(user?.restaurantId || 0);
+    const restaurantId = resolveAuthoritativeRestaurantId(user);
 
     const [viewMode, setViewMode] = useState("weekly"); // "weekly" | "monthly"
     const [currentDate, setCurrentDate] = useState(() => new Date());

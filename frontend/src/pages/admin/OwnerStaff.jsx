@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import axios from "axios";
+import { useAuth } from "../../context/AuthContext";
+import { resolveAuthoritativeRestaurantId, resolveRestaurantName } from "../../utils/restaurantContext";
 import {
     MoreVertical,
     Pencil,
@@ -229,19 +232,36 @@ export default function OwnerStaff() {
         access: defaultAccessByRole("STAFF"),
     });
 
+    const { user: authUser } = useAuth();
+    let outletContext = null;
+    try {
+        outletContext = useOutletContext();
+    } catch {
+        outletContext = null;
+    }
+
     const user = useMemo(() => {
+        if (authUser && typeof authUser === "object" && Object.keys(authUser).length > 0) {
+            return authUser;
+        }
         try {
             return JSON.parse(localStorage.getItem("user")) || {};
         } catch {
             return {};
         }
-    }, []);
+    }, [authUser]);
 
-    const restaurantId = Number(user?.restaurantId);
-    const restaurantName = String(user?.restaurant?.name || user?.restaurantName || "your restaurant").trim() || "your restaurant";
+    const restaurantId = useMemo(() => {
+        return resolveAuthoritativeRestaurantId(user, outletContext?.restaurantId);
+    }, [user, outletContext?.restaurantId]);
+
+    const restaurantName = useMemo(() => {
+        return resolveRestaurantName(user, "your restaurant");
+    }, [user]);
 
     const loadStaff = async ({ silent = false } = {}) => {
-        if (!restaurantId) {
+        const effectiveRid = Number(restaurantId || resolveAuthoritativeRestaurantId(user, outletContext?.restaurantId) || 0);
+        if (!effectiveRid || effectiveRid <= 0 || isNaN(effectiveRid)) {
             setLoading(false);
             setError("Restaurant not linked to owner account.");
             return;
@@ -255,7 +275,7 @@ export default function OwnerStaff() {
             if (roleFilter !== "ALL") params.role = roleFilter;
             if (statusFilter !== "ALL") params.status = statusFilter.toLowerCase();
 
-            const res = await axios.get(`${API}/owner/${restaurantId}/staff`, { params });
+            const res = await axios.get(`${API}/owner/${effectiveRid}/staff`, { params });
             setUsers(Array.isArray(res.data?.users) ? res.data.users : []);
             setModules(Array.isArray(res.data?.modules) ? res.data.modules : Object.keys(ACCESS_LABELS));
             setError("");
@@ -621,13 +641,30 @@ export default function OwnerStaff() {
 
     const handleGenerateTempPassword = async (staffUser) => {
         setOpenActionMenuFor(null);
-        if (!restaurantId || !staffUser?.id) return;
+        if (!staffUser?.id) return;
+
+        const targetRestaurantId = Number(
+            restaurantId ||
+            staffUser?.restaurantId ||
+            resolveAuthoritativeRestaurantId(user, outletContext?.restaurantId) ||
+            0
+        );
+
+        if (!targetRestaurantId || targetRestaurantId <= 0 || isNaN(targetRestaurantId)) {
+            showToast({
+                title: "Failed to generate password",
+                message: "Unable to reset password because the restaurant information is unavailable. Please refresh the page and try again.",
+                variant: "error",
+            });
+            return;
+        }
+
         const confirmMsg = `Generate a new temporary password for ${staffUser.name}?\n\nThis will invalidate any active sessions and require them to set a new password on login.`;
         if (!window.confirm(confirmMsg)) return;
 
         try {
             setGeneratingTempPasswordFor(staffUser.id);
-            const res = await axios.post(`${API}/owner/${restaurantId}/staff/${staffUser.id}/temp-password`);
+            const res = await axios.post(`${API}/owner/${targetRestaurantId}/staff/${staffUser.id}/temp-password`);
             const tempPassword = res.data?.temporaryPassword;
             if (tempPassword) {
                 setTemporaryPasswords((prev) => ({
@@ -650,9 +687,14 @@ export default function OwnerStaff() {
             await loadStaff({ silent: true });
         } catch (err) {
             console.error(err);
+            const rawMessage = err?.response?.data?.message || "";
+            const isRouteNotFound = rawMessage.toLowerCase().includes("not found") || err?.response?.status === 404;
+            const userMessage = isRouteNotFound
+                ? "Unable to reset password because the server endpoint was not found. Please refresh and try again."
+                : (rawMessage || "Failed to issue temporary password.");
             showToast({
                 title: "Failed to generate password",
-                message: err?.response?.data?.message || "Failed to issue temporary password.",
+                message: userMessage,
                 variant: "error",
             });
         } finally {

@@ -19,10 +19,11 @@ import OwnerMenuButton from "../../components/OwnerMenuButton";
 import StaffSubNav from "../../components/StaffSubNav";
 import StaffDirectoryDrawer from "../../components/StaffDirectoryDrawer";
 import { useAuth } from "../../context/AuthContext";
+import { resolveAuthoritativeRestaurantId } from "../../utils/restaurantContext";
 
 export default function OwnerStaffTasks() {
     const { user } = useAuth();
-    const restaurantId = Number(user?.restaurantId || 0);
+    const restaurantId = resolveAuthoritativeRestaurantId(user);
 
     const [tasks, setTasks] = useState([]);
     const [staffList, setStaffList] = useState([]);

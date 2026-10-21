@@ -1,7 +1,7 @@
 import axios from "axios";
 import { API } from "../config";
 import { deleteCacheEntry, getCacheEntry, isFresh, isStaleAllowed, makeCacheEntry, pruneCache, setCacheEntry } from "./localCache";
-import { clearStaffSession, getActiveStaffSession } from "./staffSessionStorage";
+import { applyAuthHeaders, handleAuth401 } from "./authInterceptor";
 
 const stableStringify = (value) => {
     if (value === null || value === undefined) return "";
@@ -19,66 +19,8 @@ export const api = axios.create({
 // Prevent duplicate in-flight requests for the same cache key.
 const inFlight = new Map();
 
-api.interceptors.request.use((config) => {
-    const url = String(config?.url || "");
-    const activeStaffSession = getActiveStaffSession();
-    const staffToken = activeStaffSession?.token || null;
-    const customerToken = localStorage.getItem("customerToken");
-
-    config.headers = config.headers || {};
-    if (!config.headers.Authorization) {
-        const isCustomerEndpoint =
-            url.startsWith("/customer") ||
-            url.startsWith("/api/wallet") ||
-            url.includes("/wallet") ||
-            url.includes("scope=customer") ||
-            String(config.params?.scope || "").toLowerCase() === "customer" ||
-            String(config.headers?.["X-Scope"] || config.headers?.["x-scope"] || "").toLowerCase() === "customer";
-
-        if (isCustomerEndpoint) {
-            if (customerToken) {
-                config.headers.Authorization = `Bearer ${customerToken}`;
-            }
-        } else if (staffToken) {
-            config.headers.Authorization = `Bearer ${staffToken}`;
-        } else if (customerToken) {
-            config.headers.Authorization = `Bearer ${customerToken}`;
-        }
-    }
-    return config;
-});
-
-api.interceptors.response.use(
-    (res) => res,
-    (error) => {
-        // If backend says "unauthorized", drop token and let UI redirect naturally.
-        const status = error?.response?.status;
-        if (status === 401) {
-            const url = String(error?.config?.url || "");
-            const activeStaffSession = getActiveStaffSession();
-            try {
-                if (url.startsWith("/customer")) {
-                    localStorage.removeItem("customerToken");
-                    localStorage.removeItem("customer");
-                } else {
-                    clearStaffSession(activeStaffSession?.scope || "local");
-                }
-            } catch {
-                // ignore
-            }
-            try {
-                window.dispatchEvent(
-                    new CustomEvent("auth:logout", {
-                        detail: { scope: url.startsWith("/customer") ? "customer" : "staff" },
-                    })
-                );
-            } catch {
-                // ignore non-browser envs
-            }
-        }
-        return Promise.reject(error);
-    }
-);
+api.interceptors.request.use(applyAuthHeaders);
+api.interceptors.response.use((res) => res, handleAuth401);
 
 export const makeGetCacheKey = ({ url, params, scope = "public" }) => {
     return `GET:${scope}:${API}:${url}?${stableStringify(params || {})}`;

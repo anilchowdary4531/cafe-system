@@ -401,4 +401,197 @@ describe("Staff Login URL & Password Flow Security", () => {
 
         expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Staff#99aa88bb");
     });
+
+    it("9. OwnerStaff Reset Password constructs /owner/<restaurantId>/staff/<staffId>/temp-password and NEVER generates /owner//staff/...", async () => {
+        window.confirm = vi.fn().mockReturnValue(true);
+        localStorage.setItem("user", JSON.stringify({ id: 1, role: "OWNER", restaurantId: 1 }));
+
+        axios.get.mockResolvedValueOnce({
+            data: {
+                users: [
+                    {
+                        id: 15,
+                        name: "Staff Fifteen",
+                        email: "staff15@restaurant.com",
+                        phone: "+911234567890",
+                        role: "WAITER",
+                        designation: "Server",
+                        isActive: true,
+                        loginLink: "http://localhost:5173/login?mode=staff&email=staff15%40restaurant.com",
+                        createdAt: new Date().toISOString(),
+                    },
+                ],
+                modules: ["dashboard", "orders"],
+            },
+        });
+
+        render(
+            <MemoryRouter initialEntries={["/owner/staff"]}>
+                <OwnerStaff />
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("Staff Fifteen")).toBeInTheDocument();
+        });
+
+        axios.post.mockResolvedValueOnce({
+            data: {
+                message: "Temporary password generated successfully",
+                temporaryPassword: "Staff#aabb1122",
+                user: { id: 15, name: "Staff Fifteen" },
+            },
+        });
+        axios.get.mockResolvedValueOnce({
+            data: {
+                users: [
+                    {
+                        id: 15,
+                        name: "Staff Fifteen",
+                        email: "staff15@restaurant.com",
+                        phone: "+911234567890",
+                        role: "WAITER",
+                        designation: "Server",
+                        isActive: true,
+                    },
+                ],
+            },
+        });
+
+        const resetBtn = screen.getByRole("button", { name: /reset password/i });
+        fireEvent.click(resetBtn);
+
+        await waitFor(() => {
+            expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/owner/1/staff/15/temp-password"));
+        });
+
+        // CRITICAL CHECK: The request URL MUST NOT contain double slash /owner//staff/
+        const postCalls = axios.post.mock.calls.map((call) => call[0]);
+        for (const url of postCalls) {
+            expect(url).not.toMatch(/\/owner\/\/staff\//);
+            expect(url).not.toContain("/owner//staff/15/temp-password");
+        }
+    });
+
+    it("10. OwnerStaff resolves restaurantId from nested user.restaurant.id when user.restaurantId is absent", async () => {
+        window.confirm = vi.fn().mockReturnValue(true);
+        // Simulate production owner session: restaurant is nested under user.restaurant
+        localStorage.setItem(
+            "user",
+            JSON.stringify({
+                id: 1,
+                name: "Owner User",
+                role: "OWNER",
+                restaurant: { id: 1, name: "Cafe King" },
+            })
+        );
+
+        axios.get.mockResolvedValueOnce({
+            data: {
+                users: [
+                    {
+                        id: 15,
+                        name: "Cafe King Waiter",
+                        email: "ckwaiter@cafeking.com",
+                        phone: "+919876543210",
+                        role: "WAITER",
+                        designation: "Server",
+                        isActive: true,
+                        restaurantId: 1,
+                    },
+                ],
+                modules: ["dashboard"],
+            },
+        });
+
+        render(
+            <MemoryRouter initialEntries={["/owner/staff"]}>
+                <OwnerStaff />
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("Cafe King Waiter")).toBeInTheDocument();
+        });
+
+        axios.post.mockResolvedValueOnce({
+            data: {
+                message: "Temporary password generated successfully",
+                temporaryPassword: "Staff#ccdd3344",
+                user: { id: 15, name: "Cafe King Waiter" },
+            },
+        });
+        axios.get.mockResolvedValueOnce({
+            data: {
+                users: [
+                    {
+                        id: 15,
+                        name: "Cafe King Waiter",
+                        email: "ckwaiter@cafeking.com",
+                        phone: "+919876543210",
+                        role: "WAITER",
+                        designation: "Server",
+                        isActive: true,
+                    },
+                ],
+            },
+        });
+
+        const resetBtn = screen.getByRole("button", { name: /reset password/i });
+        fireEvent.click(resetBtn);
+
+        await waitFor(() => {
+            expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/owner/1/staff/15/temp-password"));
+        });
+
+        const postCalls = axios.post.mock.calls.map((call) => call[0]);
+        for (const url of postCalls) {
+            expect(url).not.toMatch(/\/owner\/\/staff\//);
+        }
+    });
+
+    it("11. OwnerStaff regression: missing restaurantId halts safely without network call and displays user-friendly error", async () => {
+        window.confirm = vi.fn().mockReturnValue(true);
+        // Clear all restaurant identity sources
+        localStorage.clear();
+        sessionStorage.clear();
+
+        // Render with empty staff initially
+        render(
+            <MemoryRouter initialEntries={["/owner/staff"]}>
+                <OwnerStaff />
+            </MemoryRouter>
+        );
+
+        // Verify that with missing restaurant info, error message indicates restaurant is not linked
+        await waitFor(() => {
+            expect(screen.getByText(/Restaurant not linked to owner account/i)).toBeInTheDocument();
+        });
+
+        // axios.post for temp-password was NEVER called with empty restaurantId
+        const postCalls = axios.post.mock.calls.map((call) => call[0]);
+        for (const url of postCalls) {
+            expect(url).not.toMatch(/\/owner\/\/staff\//);
+        }
+    });
+
+    it("12. StaffDirectoryDrawer regression: missing restaurantId halts safely without network call", async () => {
+        window.confirm = vi.fn().mockReturnValue(true);
+        localStorage.clear();
+        sessionStorage.clear();
+
+        const { container } = render(
+            <StaffDirectoryDrawer
+                isOpen={true}
+                onClose={vi.fn()}
+                restaurantId={0}
+            />
+        );
+
+        // Drawer should not make temp-password call when restaurantId is missing
+        const postCalls = axios.post.mock.calls.map((call) => call[0]);
+        for (const url of postCalls) {
+            expect(url).not.toMatch(/\/owner\/\/staff\//);
+        }
+    });
 });

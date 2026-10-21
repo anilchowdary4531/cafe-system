@@ -52,7 +52,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { resolveRestaurantName } from "../utils/restaurantContext";
+import { resolveRestaurantName, resolveAuthoritativeRestaurantId } from "../utils/restaurantContext";
 import BrandLogo from "../components/BrandLogo";
 import Footer from "../components/Footer";
 import { useAuth } from "../context/AuthContext";
@@ -716,16 +716,8 @@ export default function OwnerLayout() {
 
     const { user, logout } = useAuth();
     const restaurantId = useMemo(() => {
-        const fromUser = Number(user?.restaurantId || user?.restaurant?.id || 0);
-        if (fromUser > 0) return fromUser;
-
-        const fromStorage = Number(
-            localStorage.getItem("restaurantId") ||
-            localStorage.getItem("activeRestaurantId") ||
-            0
-        );
-        if (fromStorage > 0) return fromStorage;
-
+        const resolved = resolveAuthoritativeRestaurantId(user);
+        if (resolved > 0) return resolved;
         return 1;
     }, [user]);
 
@@ -1053,7 +1045,8 @@ export default function OwnerLayout() {
         } catch (err) {
             console.error("Failed to load table overview for owner dashboard:", err);
             const status = err?.response?.status;
-            if (status === 401) {
+            const errMsg = String(err?.response?.data?.message || err?.message || "");
+            if (status === 401 || (status === 403 && (errMsg.includes("Staff access required") || errMsg.includes("Session expired") || errMsg.includes("Authentication required")))) {
                 setTableOverview((prev) => ({
                     ...prev,
                     loading: false,
@@ -3279,7 +3272,7 @@ export default function OwnerLayout() {
                             No modules are enabled for this account.
                         </div>
                     ) : canAccessCurrentRoute ? (
-                        <Outlet context={{ setSidebarOpen, openSidebar: () => setSidebarOpen(true) }} />
+                        <Outlet context={{ setSidebarOpen, openSidebar: () => setSidebarOpen(true), restaurantId, user }} />
                     ) : null}
                 </main>
                 <Footer
