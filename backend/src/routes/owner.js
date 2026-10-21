@@ -938,54 +938,73 @@ export default async function ownerRoutes(app, deps = {}) {
           const isReserved = !isOccupied && Boolean(activeRes);
           const isBlocked = Boolean(table.isBlocked);
 
-          return {
-            isOccupied,
-            isReserved,
-            isBlocked,
-            blockReason: table.blockReason || null,
-            blockedAt: table.blockedAt || null,
-            blockedByName: table.blockedByName || null,
-            activeReservation: activeRes ? {
-              id: activeRes.id,
-              reservationNo: activeRes.reservationNo,
-              startTime: activeRes.startTime,
-              endTime: activeRes.endTime,
-              customerName: activeRes.customerName,
-              customerPhone: activeRes.customerPhone,
-              guestCount: activeRes.guestCount,
-              status: activeRes.status,
-            } : null,
-            upcomingReservation: upcomingRes ? {
-              id: upcomingRes.id,
-              reservationNo: upcomingRes.reservationNo,
-              startTime: upcomingRes.startTime,
-              endTime: upcomingRes.endTime,
-              customerName: upcomingRes.customerName,
-              guestCount: upcomingRes.guestCount,
-              status: upcomingRes.status,
-            } : null,
-            assignedWaiterId: table.assignedWaiterId || activeSession?.waiterId || null,
-            assignedWaiterName: table.assignedWaiterName || activeSession?.waiterName || null,
-            occupiedSince: activeSession?.openedAt || tableActiveOrders[0]?.createdAt || null,
-            activeOrderCount: tableActiveOrders.length,
-            activeItemCount,
-            activeOrders: tableActiveOrders,
-            activeSession: activeSession ? {
-              id: activeSession.id,
-              status: activeSession.status,
-              guestCount: activeSession.guestCount,
-              waiterId: activeSession.waiterId,
-              waiterName: activeSession.waiterName,
-              subtotal: activeSession.subtotal,
-              total: activeSession.total,
-              openedAt: activeSession.openedAt,
-            } : null,
-            lastOrderStatus: latestOrder?.status || null,
-            lastPaymentStatus: latestOrder?.paymentStatus || null,
-            lastOrderNo: latestOrder?.orderNo || null,
-            lastOrderAt: latestOrder?.updatedAt || latestOrder?.createdAt || null,
-          };
-        })(),
+            const resolveCanonicalActiveOrderStatus = (orders) => {
+              if (!Array.isArray(orders) || orders.length === 0) return null;
+              if (orders.some((o) => o.status === "READY")) return "READY";
+              if (orders.some((o) => o.status === "PREPARING")) return "PREPARING";
+              if (orders.some((o) => o.status === "ACCEPTED")) return "ACCEPTED";
+              if (orders.some((o) => o.status === "PLACED")) return "PLACED";
+              
+              const allDelivered = orders.every((o) => o.status === "DELIVERED" || o.status === "SERVED");
+              if (allDelivered) {
+                const anyUnpaid = orders.some((o) => !["PAID", "SUCCESS"].includes(String(o.paymentStatus || "").toUpperCase()));
+                if (anyUnpaid) return "PAYMENT_PENDING";
+                return "PAID";
+              }
+              return orders[orders.length - 1]?.status || null;
+            };
+
+            const activeOrderStatus = resolveCanonicalActiveOrderStatus(tableActiveOrders);
+
+            return {
+              isOccupied,
+              isReserved,
+              isBlocked,
+              blockReason: table.blockReason || null,
+              blockedAt: table.blockedAt || null,
+              blockedByName: table.blockedByName || null,
+              activeReservation: activeRes ? {
+                id: activeRes.id,
+                reservationNo: activeRes.reservationNo,
+                startTime: activeRes.startTime,
+                endTime: activeRes.endTime,
+                customerName: activeRes.customerName,
+                customerPhone: activeRes.customerPhone,
+                guestCount: activeRes.guestCount,
+                status: activeRes.status,
+              } : null,
+              upcomingReservation: upcomingRes ? {
+                id: upcomingRes.id,
+                reservationNo: upcomingRes.reservationNo,
+                startTime: upcomingRes.startTime,
+                endTime: upcomingRes.endTime,
+                customerName: upcomingRes.customerName,
+                guestCount: upcomingRes.guestCount,
+                status: upcomingRes.status,
+              } : null,
+              assignedWaiterId: table.assignedWaiterId || activeSession?.waiterId || null,
+              assignedWaiterName: table.assignedWaiterName || activeSession?.waiterName || null,
+              occupiedSince: activeSession?.openedAt || tableActiveOrders[0]?.createdAt || null,
+              activeOrderCount: tableActiveOrders.length,
+              activeItemCount,
+              activeOrders: tableActiveOrders,
+              activeOrderStatus,
+              activeSession: activeSession ? {
+                id: activeSession.id,
+                status: activeSession.status,
+                guestCount: activeSession.guestCount,
+                waiterId: activeSession.waiterId,
+                waiterName: activeSession.waiterName,
+                subtotal: activeSession.subtotal,
+                total: activeSession.total,
+                openedAt: activeSession.openedAt,
+              } : null,
+              lastOrderStatus: latestOrder?.status || null,
+              lastPaymentStatus: latestOrder?.paymentStatus || null,
+              lastOrderNo: latestOrder?.orderNo || null,
+              lastOrderAt: latestOrder?.updatedAt || latestOrder?.createdAt || null,
+            };
+          })(),
       };
       });
     } catch (err) {
@@ -3332,20 +3351,34 @@ export default async function ownerRoutes(app, deps = {}) {
       const changedByName = req.body?.changedByName ? String(req.body.changedByName).trim() : null;
       const activeStatuses = ["PLACED", "ACCEPTED", "PREPARING", "READY"];
 
+      const rawParam = String(tableParam || "").trim();
+      const strippedNumber = rawParam.replace(/^(table|tbl)[-\s]*/i, "");
+      const possibleTableNos = Array.from(new Set([
+        rawParam,
+        strippedNumber,
+        `Table ${strippedNumber}`,
+        `Table-${strippedNumber}`,
+        `Table ${rawParam}`,
+      ].filter(Boolean)));
+
+      const requestedTableId = req.body?.tableId ? Number(req.body.tableId) : null;
+
       // Resolve table by tableNo or id
       const diningTable = await prisma.diningTable.findFirst({
         where: {
           restaurantId,
           OR: [
-            { tableNo: tableParam },
-            ...(Number.isInteger(Number(tableParam)) ? [{ id: Number(tableParam) }] : []),
+            { tableNo: { in: possibleTableNos, mode: "insensitive" } },
+            ...(requestedTableId ? [{ id: requestedTableId }] : []),
+            ...(Number.isInteger(Number(rawParam)) ? [{ id: Number(rawParam) }] : []),
+            ...(Number.isInteger(Number(strippedNumber)) ? [{ id: Number(strippedNumber) }] : []),
           ],
         },
       });
 
       const effectiveTableNo = diningTable?.tableNo || tableParam;
 
-      const orderWhereOr = [{ tableNo: effectiveTableNo }];
+      const orderWhereOr = [{ tableNo: { in: possibleTableNos, mode: "insensitive" } }];
       if (diningTable) {
         orderWhereOr.push({ tableSession: { tableId: diningTable.id } });
       }
@@ -3371,6 +3404,10 @@ export default async function ownerRoutes(app, deps = {}) {
           restaurantId: true,
           branchId: true,
           tableSessionId: true,
+          total: true,
+          customerId: true,
+          orderNo: true,
+          tableNo: true,
           createdAt: true,
         },
         orderBy: { createdAt: "asc" },
@@ -3411,6 +3448,44 @@ export default async function ownerRoutes(app, deps = {}) {
             },
           });
 
+          // Create or update Payment record
+          const existingPayment = await tx.payment.findFirst({
+            where: { orderId: order.id },
+          });
+
+          if (existingPayment) {
+            await tx.payment.update({
+              where: { id: existingPayment.id },
+              data: {
+                status: "SUCCESS",
+                paymentMethod: paymentMode,
+                method: paymentMode,
+                amountReceived: existingPayment.amount || Number(order.total || 0),
+                amountDue: 0,
+                performedByName: changedByName || actor?.name || "Owner/Staff",
+                tableSessionId: order.tableSessionId || existingPayment.tableSessionId || null,
+              },
+            });
+          } else {
+            await tx.payment.create({
+              data: {
+                restaurantId: order.restaurantId,
+                orderId: order.id,
+                tableSessionId: order.tableSessionId || null,
+                customerId: order.customerId || null,
+                amount: Number(order.total || 0),
+                amountDue: 0,
+                amountReceived: Number(order.total || 0),
+                currency: "INR",
+                status: "SUCCESS",
+                paymentMethod: paymentMode,
+                method: paymentMode,
+                provider: paymentMode === "CASH" ? "CASH" : "MANUAL",
+                performedByName: changedByName || actor?.name || "Owner/Staff",
+              },
+            });
+          }
+
           results.push(updatedOrder);
         }
 
@@ -3421,6 +3496,9 @@ export default async function ownerRoutes(app, deps = {}) {
         await completeSessionAndReleaseTable({
           prisma,
           tableSessionId: order.tableSessionId,
+          tableId: diningTable?.id,
+          tableNo: effectiveTableNo,
+          restaurantId,
           orderId: order.id,
           paymentMode,
           realtime,
@@ -3430,14 +3508,28 @@ export default async function ownerRoutes(app, deps = {}) {
 
       updatedOrders.forEach((order) => {
         realtime?.emitOrderUpdated?.(order);
+        if (realtime?.io) {
+          realtime.io.to(`restaurant_${restaurantId}`).emit("order:updated", order);
+          realtime.io.to(`restaurant:${restaurantId}`).emit("order:updated", order);
+          realtime.io.to(`restaurant_${restaurantId}`).emit("order:status_updated", {
+            orderId: order.id,
+            status: order.status,
+            paymentStatus: order.paymentStatus,
+          });
+          realtime.io.to(`restaurant:${restaurantId}`).emit("order:status_updated", {
+            orderId: order.id,
+            status: order.status,
+            paymentStatus: order.paymentStatus,
+          });
+        }
       });
 
-      return {
+      return reply.send({
         message: `Table ${effectiveTableNo} bill settled`,
         orders: updatedOrders,
         cleared: true,
         paymentMode,
-      };
+      });
     } catch (err) {
       console.log(err);
       return reply.code(500).send({ message: "Failed to settle table bill" });

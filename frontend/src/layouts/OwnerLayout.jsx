@@ -444,6 +444,7 @@ const normalizeTableRows = (rows) =>
                       id: order?.id,
                       orderNo: order?.orderNo || "",
                       status: String(order?.status || "").toUpperCase(),
+                      paymentStatus: String(order?.paymentStatus || order?.payment_status || "PENDING").toUpperCase(),
                       createdAt: order?.createdAt || null,
                       total: Number(order?.total || 0),
                       items: Array.isArray(order?.items)
@@ -531,6 +532,13 @@ const resolveTableState = (table, printedTableKeys = new Set()) => {
             );
             if (hasCancelled) return TABLE_STATE_KEYS.CANCELLED;
 
+            const allPaid = activeOrders.every(
+                (o) => ["PAID", "SUCCESS"].includes(String(o?.paymentStatus || "").toUpperCase())
+            );
+            if (allPaid) {
+                return isPrinted ? TABLE_STATE_KEYS.PRINTED : TABLE_STATE_KEYS.PAID;
+            }
+
             if (isPrinted) return TABLE_STATE_KEYS.PRINTED;
             return TABLE_STATE_KEYS.DELIVERED;
         }
@@ -579,10 +587,25 @@ const resolveTableCardBadge = (table, tableStateKey, printedTableKeys) => {
             const allDelivered = activeOrders.every(
                 (o) => String(o?.status || "").toUpperCase() === "DELIVERED"
             );
+            const allPaid = activeOrders.every(
+                (o) => ["PAID", "SUCCESS"].includes(String(o?.paymentStatus || "").toUpperCase())
+            );
             const assignmentKey = String(table?.assignmentKey || table?.key || "");
             const isPrinted = printedTableKeys?.has(assignmentKey);
 
             if (allDelivered) {
+                if (allPaid) {
+                    if (isPrinted) {
+                        return {
+                            label: "Bill Printed",
+                            className: "bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/40",
+                        };
+                    }
+                    return {
+                        label: "Paid / Available",
+                        className: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/40",
+                    };
+                }
                 if (isPrinted) {
                     return {
                         label: "Bill Printed",
@@ -1102,6 +1125,9 @@ export default function OwnerLayout() {
 
         socket.on("order:created", handleNewOrder);
         socket.on("new_order", handleNewOrder);
+        socket.on("order:updated", loadTableOverview);
+        socket.on("order:status_updated", loadTableOverview);
+        socket.on("payment:updated", loadTableOverview);
         socket.on("notification:new", loadTableOverview);
         socket.on("reservation:updated", loadTableOverview);
         socket.on("table:updated", loadTableOverview);
@@ -1112,6 +1138,9 @@ export default function OwnerLayout() {
         return () => {
             socket.off("order:created", handleNewOrder);
             socket.off("new_order", handleNewOrder);
+            socket.off("order:updated", loadTableOverview);
+            socket.off("order:status_updated", loadTableOverview);
+            socket.off("payment:updated", loadTableOverview);
             socket.off("notification:new", loadTableOverview);
             socket.off("reservation:updated", loadTableOverview);
             socket.off("table:updated", loadTableOverview);
@@ -1574,10 +1603,21 @@ export default function OwnerLayout() {
         setReceiptActionError("");
 
         try {
-            await api.post(`/owner/${restaurantId}/tables/${encodeURIComponent(targetTableNo)}/settle-bill`, {
+            const res = await api.post(`/owner/${restaurantId}/tables/${encodeURIComponent(targetTableNo)}/settle-bill`, {
+                tableId: table?.id || null,
                 paymentMode,
                 changedByName: user?.name || user?.email || "Owner",
             });
+
+            if (res.data?.cleared === false) {
+                showToast({
+                    title: "Bill Settlement Notice",
+                    message: res.data?.message || `Table ${targetTableNo} has no active bill.`,
+                    variant: "info",
+                });
+                await refreshTableOverview();
+                return;
+            }
 
             if (assignmentKey) {
                 setPrintedTableKeys((prev) => {

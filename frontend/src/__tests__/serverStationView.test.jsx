@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import axios from "axios";
-import Server from "../pages/Server.jsx";
+import Server, { resolveTableActiveOrderStatus, ORDER_STATUS_CONFIG } from "../pages/Server.jsx";
 import { LanguageProvider } from "../context/LanguageContext.jsx";
 import { RestaurantThemeProvider } from "../context/ThemeContext.jsx";
 import { RestaurantContextProvider } from "../context/RestaurantContext.jsx";
@@ -270,5 +270,107 @@ describe("Server Station — Server Assignment & Table Management Audit", () => 
                 expect.objectContaining({ status: "SERVED" })
             );
         });
+    });
+
+    it("8. Table 2 card renders Order Status row with PREPARING badge", async () => {
+        renderServerStation("/server");
+
+        await waitFor(() => {
+            expect(screen.getByText(/Server Station/i)).toBeInTheDocument();
+        });
+
+        // "Order Status:" label must be present on the table card
+        expect(screen.getByText(/Order Status:/i)).toBeInTheDocument();
+
+        // The specific badge for Table 2 (id: 2) must show PREPARING
+        const badge = screen.getByTestId("order-status-2");
+        expect(badge).toBeInTheDocument();
+        expect(badge).toHaveTextContent(/PREPARING/i);
+    });
+
+    it("9. resolveTableActiveOrderStatus resolves individual active order statuses accurately", () => {
+        expect(resolveTableActiveOrderStatus({ activeOrders: [{ status: "PLACED" }] })).toBe("PLACED");
+        expect(resolveTableActiveOrderStatus({ activeOrders: [{ status: "ACCEPTED" }] })).toBe("ACCEPTED");
+        expect(resolveTableActiveOrderStatus({ activeOrders: [{ status: "PREPARING" }] })).toBe("PREPARING");
+        expect(resolveTableActiveOrderStatus({ activeOrders: [{ status: "READY" }] })).toBe("READY");
+        expect(resolveTableActiveOrderStatus({ activeOrders: [{ status: "SERVED" }] })).toBe("PAYMENT_PENDING");
+        expect(resolveTableActiveOrderStatus({ activeOrders: [{ status: "OUT_FOR_DELIVERY" }] })).toBe("OUT_FOR_DELIVERY");
+        expect(resolveTableActiveOrderStatus({ activeOrders: [{ status: "CANCELLED" }] })).toBe("CANCELLED");
+    });
+
+    it("10. resolveTableActiveOrderStatus correctly distinguishes DELIVERED with unpaid vs paid paymentStatus", () => {
+        // DELIVERED + unpaid/PENDING -> PAYMENT_PENDING
+        const unpaidTable = {
+            activeOrders: [{ status: "DELIVERED", paymentStatus: "PENDING" }],
+        };
+        expect(resolveTableActiveOrderStatus(unpaidTable)).toBe("PAYMENT_PENDING");
+
+        // DELIVERED + PAID -> PAID
+        const paidTable = {
+            activeOrders: [{ status: "DELIVERED", paymentStatus: "PAID" }],
+        };
+        expect(resolveTableActiveOrderStatus(paidTable)).toBe("PAID");
+
+        // DELIVERED + SUCCESS -> PAID
+        const successTable = {
+            activeOrders: [{ status: "DELIVERED", paymentStatus: "SUCCESS" }],
+        };
+        expect(resolveTableActiveOrderStatus(successTable)).toBe("PAID");
+    });
+
+    it("11. Multiple active orders follow canonical priority rule (READY > PREPARING > ACCEPTED > PLACED)", () => {
+        // READY beats PREPARING
+        expect(
+            resolveTableActiveOrderStatus({
+                activeOrders: [
+                    { id: 1, status: "PREPARING" },
+                    { id: 2, status: "READY" },
+                ],
+            })
+        ).toBe("READY");
+
+        // PREPARING beats ACCEPTED and PLACED
+        expect(
+            resolveTableActiveOrderStatus({
+                activeOrders: [
+                    { id: 1, status: "PLACED" },
+                    { id: 2, status: "ACCEPTED" },
+                    { id: 3, status: "PREPARING" },
+                ],
+            })
+        ).toBe("PREPARING");
+
+        // ACCEPTED beats PLACED
+        expect(
+            resolveTableActiveOrderStatus({
+                activeOrders: [
+                    { id: 1, status: "PLACED" },
+                    { id: 2, status: "ACCEPTED" },
+                ],
+            })
+        ).toBe("ACCEPTED");
+    });
+
+    it("12. Table state and Order state remain independent concepts", () => {
+        const table = {
+            id: 2,
+            isOccupied: true, // Table State = OCCUPIED
+            activeOrders: [{ id: 501, status: "PREPARING" }], // Order State = PREPARING
+        };
+
+        expect(table.isOccupied).toBe(true);
+        expect(resolveTableActiveOrderStatus(table)).toBe("PREPARING");
+        expect(ORDER_STATUS_CONFIG.PREPARING.label).toBe("PREPARING");
+    });
+
+    it("13. Authoritative activeOrderStatus provided by backend is honored directly", () => {
+        const tableFromBackend = {
+            id: 4,
+            isOccupied: true,
+            activeOrderStatus: "PREPARING",
+            activeOrders: [],
+        };
+
+        expect(resolveTableActiveOrderStatus(tableFromBackend)).toBe("PREPARING");
     });
 });

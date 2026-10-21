@@ -59,6 +59,107 @@ export const normalizeTableKey = (val) => {
     return String(val).trim().toLowerCase();
 };
 
+export const ORDER_STATUS_CONFIG = {
+    PLACED: {
+        label: "PLACED",
+        icon: "🔵",
+        className: "bg-sky-500/10 text-sky-600 dark:text-sky-300 border-sky-500/30",
+    },
+    ACCEPTED: {
+        label: "ACCEPTED",
+        icon: "🟡",
+        className: "bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/30",
+    },
+    PREPARING: {
+        label: "PREPARING",
+        icon: "🟠",
+        className: "bg-orange-500/10 text-orange-600 dark:text-orange-300 border-orange-500/30",
+    },
+    READY: {
+        label: "READY",
+        icon: "🟣",
+        className: "bg-purple-500/10 text-purple-600 dark:text-purple-300 border-purple-500/30",
+    },
+    SERVED: {
+        label: "SERVED",
+        icon: "🟢",
+        className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/30",
+    },
+    OUT_FOR_DELIVERY: {
+        label: "OUT FOR DELIVERY",
+        icon: "🚚",
+        className: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border-indigo-500/30",
+    },
+    DELIVERED: {
+        label: "DELIVERED",
+        icon: "📦",
+        className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/30",
+    },
+    PAYMENT_PENDING: {
+        label: "PAYMENT_PENDING",
+        icon: "💳",
+        className: "bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/30",
+    },
+    PAID: {
+        label: "PAID",
+        icon: "✅",
+        className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/30",
+    },
+    SETTLED: {
+        label: "SETTLED",
+        icon: "✅",
+        className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/30",
+    },
+    CANCELLED: {
+        label: "CANCELLED",
+        icon: "⚪",
+        className: "bg-slate-500/10 text-slate-500 border-slate-500/30",
+    },
+};
+
+export const resolveTableActiveOrderStatus = (table) => {
+    if (!table) return null;
+    if (table.activeOrderStatus) {
+        return String(table.activeOrderStatus).toUpperCase();
+    }
+
+    const activeOrders = Array.isArray(table.activeOrders) ? table.activeOrders : [];
+    if (activeOrders.length === 0) {
+        if (table.lastOrderStatus) {
+            const lastStatus = String(table.lastOrderStatus).toUpperCase();
+            if (lastStatus === "DELIVERED") {
+                const lastPay = String(table.lastPaymentStatus || "").toUpperCase();
+                if (lastPay !== "PAID" && lastPay !== "SUCCESS") return "PAYMENT_PENDING";
+                return "PAID";
+            }
+            return lastStatus;
+        }
+        return null;
+    }
+
+    // Canonical priority rule: In-flight kitchen action > Delivered > Paid
+    if (activeOrders.some((o) => String(o?.status || "").toUpperCase() === "READY")) return "READY";
+    if (activeOrders.some((o) => String(o?.status || "").toUpperCase() === "PREPARING")) return "PREPARING";
+    if (activeOrders.some((o) => String(o?.status || "").toUpperCase() === "ACCEPTED")) return "ACCEPTED";
+    if (activeOrders.some((o) => String(o?.status || "").toUpperCase() === "PLACED")) return "PLACED";
+
+    const allDelivered = activeOrders.every((o) => {
+        const s = String(o?.status || "").toUpperCase();
+        return s === "DELIVERED" || s === "SERVED";
+    });
+
+    if (allDelivered) {
+        const anyUnpaid = activeOrders.some((o) => {
+            const ps = String(o?.paymentStatus || "").toUpperCase();
+            return ps !== "PAID" && ps !== "SUCCESS";
+        });
+        if (anyUnpaid) return "PAYMENT_PENDING";
+        return "PAID";
+    }
+
+    return String(activeOrders[activeOrders.length - 1]?.status || "").toUpperCase();
+};
+
 export default function Server() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -416,7 +517,10 @@ export default function Server() {
         socket.on("kot:status_updated", handleRealtimeUpdate);
         socket.on("kot:item_updated", handleRealtimeUpdate);
         socket.on("order:updated", handleRealtimeUpdate);
+        socket.on("order:status_updated", handleRealtimeUpdate);
+        socket.on("order:created", handleRealtimeUpdate);
         socket.on("order_created", handleRealtimeUpdate);
+        socket.on("payment:updated", handleRealtimeUpdate);
         socket.on("new_order", handleRealtimeUpdate);
         socket.on("notification:new", handleNewNotification);
 
@@ -429,7 +533,10 @@ export default function Server() {
             socket.off("kot:status_updated", handleRealtimeUpdate);
             socket.off("kot:item_updated", handleRealtimeUpdate);
             socket.off("order:updated", handleRealtimeUpdate);
+            socket.off("order:status_updated", handleRealtimeUpdate);
+            socket.off("order:created", handleRealtimeUpdate);
             socket.off("order_created", handleRealtimeUpdate);
+            socket.off("payment:updated", handleRealtimeUpdate);
             socket.off("new_order", handleRealtimeUpdate);
             socket.off("notification:new", handleNewNotification);
         };
@@ -1163,10 +1270,31 @@ export default function Server() {
                                                     Reason: {table.blockReason || "Maintenance"}
                                                 </p>
                                             ) : isOccupied ? (
-                                                <div className="space-y-0.5">
+                                                <div className="space-y-1">
                                                     <p className="font-bold text-sky-600 dark:text-sky-400">
                                                         {table.activeOrderCount || 1} Active Order(s)
                                                     </p>
+                                                    {(() => {
+                                                        const activeStatus = resolveTableActiveOrderStatus(table);
+                                                        if (!activeStatus) return null;
+                                                        const cfg = ORDER_STATUS_CONFIG[activeStatus] || {
+                                                            label: activeStatus,
+                                                            icon: "📋",
+                                                            className: "bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/30",
+                                                        };
+                                                        return (
+                                                            <div className="flex items-center gap-1.5 text-[11px] font-semibold py-0.5">
+                                                                <span className="theme-muted text-[10px]">Order Status:</span>
+                                                                <span
+                                                                    data-testid={`order-status-${table.id || table.tableNo}`}
+                                                                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide border ${cfg.className}`}
+                                                                >
+                                                                    {cfg.icon && <span className="mr-1">{cfg.icon}</span>}
+                                                                    {cfg.label}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                     {(table.assignedWaiterName || table.activeSession?.waiterName) ? (
                                                         <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 truncate flex items-center gap-1">
                                                             <span>👤</span> Server: <span className="font-bold">{table.assignedWaiterName || table.activeSession?.waiterName}</span>

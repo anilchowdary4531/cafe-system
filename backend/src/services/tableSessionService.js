@@ -442,6 +442,9 @@ export const closeTableSession = async ({
 export const completeSessionAndReleaseTable = async ({
   prisma,
   tableSessionId,
+  tableId,
+  tableNo,
+  restaurantId,
   orderId,
   paymentMode,
   realtime,
@@ -452,32 +455,107 @@ export const completeSessionAndReleaseTable = async ({
   let sid = tableSessionId ? Number(tableSessionId) : null;
 
   // 1. Resolve tableSessionId if not provided directly
-  if (!sid && orderId) {
-    const numericOrderId = Number(orderId);
-    if (!Number.isNaN(numericOrderId)) {
-      const orderRecord = await prisma.order.findUnique({
-        where: { id: numericOrderId },
-        select: { id: true, tableSessionId: true, tableNo: true, restaurantId: true },
-      });
-      if (orderRecord?.tableSessionId) {
-        sid = orderRecord.tableSessionId;
-      } else if (orderRecord?.tableNo && orderRecord?.restaurantId) {
+  if (!sid && (tableId || orderId || tableNo)) {
+    // A. Check by tableId first if provided
+    if (tableId) {
+      const tid = Number(tableId);
+      if (!Number.isNaN(tid)) {
         const foundSession = await prisma.tableSession.findFirst({
           where: {
-            restaurantId: orderRecord.restaurantId,
-            tableNo: orderRecord.tableNo,
+            tableId: tid,
             status: { in: ACTIVE_STATUSES },
+            ...(restaurantId ? { restaurantId: Number(restaurantId) } : {}),
           },
           select: { id: true },
+          orderBy: { openedAt: "desc" },
         });
         if (foundSession) {
           sid = foundSession.id;
         }
       }
     }
+
+    // B. Check by orderId if provided
+    if (!sid && orderId) {
+      const numericOrderId = Number(orderId);
+      if (!Number.isNaN(numericOrderId)) {
+        const orderRecord = await prisma.order.findUnique({
+          where: { id: numericOrderId },
+          select: { id: true, tableSessionId: true, tableNo: true, restaurantId: true },
+        });
+        if (orderRecord?.tableSessionId) {
+          sid = orderRecord.tableSessionId;
+        } else if (orderRecord?.tableNo && (restaurantId || orderRecord?.restaurantId)) {
+          const effectiveRid = restaurantId ? Number(restaurantId) : orderRecord.restaurantId;
+          const rawNo = String(orderRecord.tableNo || "").trim();
+          const stripped = rawNo.replace(/^(table|tbl)[-\s]*/i, "");
+          const candidates = [rawNo, stripped, `Table ${stripped}`].filter(Boolean);
+          const foundSession = await prisma.tableSession.findFirst({
+            where: {
+              restaurantId: effectiveRid,
+              tableNo: { in: candidates, mode: "insensitive" },
+              status: { in: ACTIVE_STATUSES },
+            },
+            select: { id: true },
+            orderBy: { openedAt: "desc" },
+          });
+          if (foundSession) {
+            sid = foundSession.id;
+          }
+        }
+      }
+    }
+
+    // C. Check by tableNo if provided
+    if (!sid && tableNo && restaurantId) {
+      const rawNo = String(tableNo || "").trim();
+      const stripped = rawNo.replace(/^(table|tbl)[-\s]*/i, "");
+      const candidates = [rawNo, stripped, `Table ${stripped}`].filter(Boolean);
+      const foundSession = await prisma.tableSession.findFirst({
+        where: {
+          restaurantId: Number(restaurantId),
+          tableNo: { in: candidates, mode: "insensitive" },
+          status: { in: ACTIVE_STATUSES },
+        },
+        select: { id: true },
+        orderBy: { openedAt: "desc" },
+      });
+      if (foundSession) {
+        sid = foundSession.id;
+      }
+    }
   }
 
   if (!sid) {
+    if (tableId) {
+      const tid = Number(tableId);
+      await prisma.diningTable.update({
+        where: { id: tid },
+        data: {
+          assignedWaiterId: null,
+          assignedWaiterName: null,
+        },
+      }).catch(() => {});
+
+      const clearPayload = {
+        restaurantId: Number(restaurantId) || null,
+        tableId: tid,
+        tableNo: tableNo || null,
+        assignedWaiterId: null,
+        assignedWaiterName: null,
+      };
+      if (realtime?.io && restaurantId) {
+        realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", clearPayload);
+        realtime.io.to(`restaurant:${restaurantId}`).emit("table:updated", clearPayload);
+        realtime.io.to(`restaurant_${restaurantId}`).emit("table:layout_updated", { restaurantId });
+        realtime.io.to(`restaurant:${restaurantId}`).emit("table:layout_updated", { restaurantId });
+      }
+      if (realtime?.staff && restaurantId) {
+        realtime.staff.to(`restaurant_${restaurantId}`).emit("table:updated", clearPayload);
+        realtime.staff.to(`restaurant:${restaurantId}`).emit("table:updated", clearPayload);
+      }
+      return { completed: true, freedWithoutSession: true };
+    }
     return { completed: false, reason: "no_table_session" };
   }
 
@@ -537,6 +615,24 @@ export const completeSessionAndReleaseTable = async ({
         ...(paymentMode ? { paymentMode } : {}),
       },
     });
+
+    try {
+      if (tx.payment) {
+        await tx.payment.updateMany({
+          where: {
+            tableSessionId: sid,
+            status: { notIn: ["PAID", "SUCCESS"] },
+          },
+          data: {
+            status: "SUCCESS",
+            ...(paymentMode ? { paymentMethod: paymentMode, method: paymentMode } : {}),
+            performedByName: actor?.userName || actor?.name || "System/Payment",
+          },
+        });
+      }
+    } catch {
+      // non-blocking payment sync
+    }
 
     // B. Close TableSession
     const closed = await tx.tableSession.update({
@@ -622,6 +718,20 @@ export const completeSessionAndReleaseTable = async ({
     });
     io.to(`restaurant_${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
     io.to(`restaurant:${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
+    io.to(`restaurant_${effectiveRid}`).emit("payment:updated", {
+      restaurantId: effectiveRid,
+      tableId: session.tableId,
+      tableNo: session.tableNo,
+      status: "PAID",
+      paymentMode,
+    });
+    io.to(`restaurant:${effectiveRid}`).emit("payment:updated", {
+      restaurantId: effectiveRid,
+      tableId: session.tableId,
+      tableNo: session.tableNo,
+      status: "PAID",
+      paymentMode,
+    });
   }
 
   if (staff) {
@@ -640,6 +750,20 @@ export const completeSessionAndReleaseTable = async ({
       tableNo: session.tableNo,
       sessionId: session.id,
       status: "CLOSED",
+    });
+    staff.to(`restaurant_${effectiveRid}`).emit("payment:updated", {
+      restaurantId: effectiveRid,
+      tableId: session.tableId,
+      tableNo: session.tableNo,
+      status: "PAID",
+      paymentMode,
+    });
+    staff.to(`restaurant:${effectiveRid}`).emit("payment:updated", {
+      restaurantId: effectiveRid,
+      tableId: session.tableId,
+      tableNo: session.tableNo,
+      status: "PAID",
+      paymentMode,
     });
   }
 
