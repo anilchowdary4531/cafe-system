@@ -15,6 +15,15 @@ export default async function supplyMarketplaceRoutes(app) {
     const authUser = authorizeRoles("OWNER", "MANAGER", "SUPER_ADMIN", "SUPPLIER", "ADMIN", "STAFF", "USER", "CUSTOMER");
     const authSupplier = authorizeRoles("SUPPLIER", "SUPER_ADMIN", "OWNER", "MANAGER", "ADMIN", "STAFF", "USER");
 
+    const getRestaurantId = (req) => {
+        const fromParams = req.params?.restaurantId ? Number(req.params.restaurantId) : null;
+        const fromQuery = req.query?.restaurantId ? Number(req.query.restaurantId) : null;
+        const fromBody = req.body?.restaurantId ? Number(req.body.restaurantId) : null;
+        const fromUser = req.user?.restaurantId ? Number(req.user.restaurantId) : null;
+        const fromStaff = req.staffActor?.restaurantId ? Number(req.staffActor.restaurantId) : null;
+        return fromParams || fromQuery || fromBody || fromUser || fromStaff || 1;
+    };
+
     const browseProductsHandler = async (req, reply) => {
         try {
             const result = await browseMarketplaceProducts(req.query || {});
@@ -92,7 +101,7 @@ export default async function supplyMarketplaceRoutes(app) {
                 include: {
                     profile: true,
                     addresses: true,
-                    products: { where: { isAvailable: true } },
+                    products: { where: { availability: true } },
                     orders: { include: { items: true } },
                     _count: { select: { products: true, orders: true } },
                 },

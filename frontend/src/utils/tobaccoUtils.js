@@ -1,46 +1,50 @@
 export const TOBACCO_KEYWORDS = [
-    "cig",
-    "ciga",
     "cigar",
     "cigars",
     "cigarette",
     "cigarettes",
-    "tob",
-    "toba",
     "tobacco",
-    "marl",
     "marlboro",
     "gold flake",
     "goldflake",
-    "classic",
+    "classic ice burst",
+    "classic milds",
+    "classic connect",
+    "classic filter",
+    "classic regular",
+    "classic double burst",
     "vape",
     "nicotine",
     "bidi",
+    "bidis",
     "beedi",
+    "beedis",
     "hookah",
     "rolling paper",
-    "paan corner",
-    "paan",
-    "smoke",
-    "smokes",
 ];
 
-export const isTobaccoText = (text = "") => {
-    const clean = String(text || "").trim().toLowerCase();
-    if (!clean || clean.length < 2) return false;
-    return TOBACCO_KEYWORDS.some((kw) => clean.includes(kw) || (clean.length >= 3 && kw.includes(clean)));
+const TOBACCO_CATEGORY_REGEX = /\b(cigarette|cigarettes|tobacco|cigar|cigars|bidi|bidis|beedi|beedis|hookah|vape|vapes|nicotine)\b/i;
+const TOBACCO_ITEM_REGEX = /\b(marlboro|gold\s*flake|goldflake|classic\s*(ice\s*burst|milds|connect|filter|regular|double|kings|lights|blue)|cigarette|cigarettes|tobacco|cigar|cigars|bidi|bidis|beedi|beedis|hookah|rolling\s*paper|vape|nicotine)\b/i;
+
+export const isTobaccoCategory = (category = "") => {
+    const clean = String(category || "").trim();
+    if (!clean) return false;
+    return TOBACCO_CATEGORY_REGEX.test(clean) || TOBACCO_ITEM_REGEX.test(clean);
 };
 
 export const isTobaccoItem = (item) => {
     if (!item) return false;
+    const cat = String(item?.category || "");
+    if (isTobaccoCategory(cat)) return true;
     const name = String(item?.name || "");
     const description = String(item?.description || "");
-    const category = String(item?.category || "");
-    return isTobaccoText(`${name} ${description} ${category}`);
+    return TOBACCO_ITEM_REGEX.test(name) || TOBACCO_ITEM_REGEX.test(description);
 };
 
-export const isTobaccoCategory = (category = "") => {
-    return isTobaccoText(category);
+export const isTobaccoText = (text = "") => {
+    const clean = String(text || "").trim();
+    if (!clean || clean.length < 2) return false;
+    return TOBACCO_ITEM_REGEX.test(clean) || TOBACCO_CATEGORY_REGEX.test(clean);
 };
 
 export const isTobaccoAgeConfirmed = () => {
@@ -52,13 +56,21 @@ export const isTobaccoAgeConfirmed = () => {
     }
 };
 
-export const setTobaccoAgeConfirmed = () => {
+export const setTobaccoAgeConfirmed = (confirmed = true) => {
     if (typeof window === "undefined") return;
     try {
-        window.sessionStorage.setItem("tiffzy_tobacco_age_confirmed", "true");
+        if (confirmed) {
+            window.sessionStorage.setItem("tiffzy_tobacco_age_confirmed", "true");
+        } else {
+            window.sessionStorage.removeItem("tiffzy_tobacco_age_confirmed");
+        }
     } catch {
         // ignore
     }
+};
+
+export const resetTobaccoAgeConfirmed = () => {
+    setTobaccoAgeConfirmed(false);
 };
 
 export const TOBACCO_QUICK_TAGS = [

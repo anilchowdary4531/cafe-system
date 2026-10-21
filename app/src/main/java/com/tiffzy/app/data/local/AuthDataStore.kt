@@ -28,6 +28,8 @@ class AuthDataStore(context: Context) {
         private val REMEMBER_SESSION = androidx.datastore.preferences.core.booleanPreferencesKey("remember_session")
         private val AUTO_DETECT_LOCATION = androidx.datastore.preferences.core.booleanPreferencesKey("auto_detect_location")
         private val NOTIFICATIONS_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("notifications_enabled")
+        private val NOTIFICATION_SOUND_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("notification_sound_enabled")
+        private val NOTIFICATION_VIBRATION_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("notification_vibration_enabled")
         private val DARK_THEME = androidx.datastore.preferences.core.booleanPreferencesKey("dark_theme")
     }
 
@@ -53,6 +55,14 @@ class AuthDataStore(context: Context) {
 
     val notificationsEnabled: Flow<Boolean> = appContext.dataStore.data.map { preferences ->
         preferences[NOTIFICATIONS_ENABLED] ?: true
+    }
+
+    val notificationSoundEnabled: Flow<Boolean> = appContext.dataStore.data.map { preferences ->
+        preferences[NOTIFICATION_SOUND_ENABLED] ?: true
+    }
+
+    val notificationVibrationEnabled: Flow<Boolean> = appContext.dataStore.data.map { preferences ->
+        preferences[NOTIFICATION_VIBRATION_ENABLED] ?: true
     }
 
     val userRole: Flow<String?> = appContext.dataStore.data.map { preferences ->
@@ -85,11 +95,19 @@ class AuthDataStore(context: Context) {
         }
     }
 
-    suspend fun updateSettings(remember: Boolean? = null, autoDetect: Boolean? = null, notify: Boolean? = null) {
+    suspend fun updateSettings(
+        remember: Boolean? = null,
+        autoDetect: Boolean? = null,
+        notify: Boolean? = null,
+        sound: Boolean? = null,
+        vibration: Boolean? = null
+    ) {
         appContext.dataStore.edit { preferences ->
             remember?.let { preferences[REMEMBER_SESSION] = it }
             autoDetect?.let { preferences[AUTO_DETECT_LOCATION] = it }
             notify?.let { preferences[NOTIFICATIONS_ENABLED] = it }
+            sound?.let { preferences[NOTIFICATION_SOUND_ENABLED] = it }
+            vibration?.let { preferences[NOTIFICATION_VIBRATION_ENABLED] = it }
         }
     }
 

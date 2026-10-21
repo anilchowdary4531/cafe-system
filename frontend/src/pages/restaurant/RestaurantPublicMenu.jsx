@@ -21,6 +21,7 @@ import VegModeToggle from "../../components/VegModeToggle";
 import {
     TOBACCO_KEYWORDS,
     isTobaccoItem,
+    isTobaccoCategory,
     isTobaccoText,
     isTobaccoAgeConfirmed,
     setTobaccoAgeConfirmed,
@@ -74,23 +75,17 @@ export default function RestaurantPublicMenu() {
     const [cartOpen, setCartOpen] = useState(false);
     const [favorites, setFavorites] = useState(() => getCustomerFavorites());
     const [showAgeModal, setShowAgeModal] = useState(false);
-    const [pendingTobaccoItem, setPendingTobaccoItem] = useState(null);
 
-    const isTobaccoSearch = useMemo(() => {
-        return isTobaccoText(search) || activeSection === "cigarettes-tobacco";
-    }, [search, activeSection]);
-
-    const handleViewTobaccoItems = () => {
+    const handleOpenTobacco = () => {
         if (!isTobaccoAgeConfirmed()) {
             setShowAgeModal(true);
         } else {
-            scrollToSection("cigarettes-tobacco");
+            navigate(`/r/${slug}/tobacco`);
         }
     };
 
     const handleAddToCart = (item) => {
         if (isTobaccoItem(item) && !isTobaccoAgeConfirmed()) {
-            setPendingTobaccoItem(item);
             setShowAgeModal(true);
             return;
         }
@@ -98,17 +93,13 @@ export default function RestaurantPublicMenu() {
     };
 
     const handleAgeConfirm = () => {
-        setTobaccoAgeConfirmed();
+        setTobaccoAgeConfirmed(true);
         setShowAgeModal(false);
-        if (pendingTobaccoItem) {
-            addToCart(pendingTobaccoItem);
-            setPendingTobaccoItem(null);
-        }
+        navigate(`/r/${slug}/tobacco`);
     };
 
     const handleAgeCancel = () => {
         setShowAgeModal(false);
-        setPendingTobaccoItem(null);
     };
 
     const sectionRefs = useRef(new Map());
@@ -151,6 +142,11 @@ export default function RestaurantPublicMenu() {
     const filtered = useMemo(() => {
         const q = normalizeText(search);
         return menuWithMeta.filter((item) => {
+            // Strictly exclude tobacco products from the normal restaurant public menu
+            if (isTobaccoItem(item) || isTobaccoCategory(item?.category)) {
+                return false;
+            }
+
             if (vegModeEnabled && !isVegModeItem(item)) {
                 return false;
             }
@@ -578,19 +574,21 @@ export default function RestaurantPublicMenu() {
                                         </span>
                                     </button>
                                 ))}
+
+                                {/* Clearly separated Tobacco Entry */}
+                                <button
+                                    type="button"
+                                    onClick={handleOpenTobacco}
+                                    className="theme-chip inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition sm:px-4 sm:py-2 sm:text-sm bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100"
+                                >
+                                    <span>🚬 Tobacco</span>
+                                </button>
                             </div>
                         )}
                     </div>
                 </div>
 
                 <div className="space-y-3 sm:space-y-4">
-                    {isTobaccoSearch && (
-                        <TobaccoBanner
-                            onViewItems={handleViewTobaccoItems}
-                            className="mb-4"
-                        />
-                    )}
-
                     {menuSections.map((section) => (
                         <MenuSection
                             key={section.key}

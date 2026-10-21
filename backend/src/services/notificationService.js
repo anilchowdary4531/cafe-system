@@ -106,6 +106,8 @@ export const createAndDispatchNotification = async ({
         message: notification.message,
         orderId: notification.orderId,
         restaurantId: notification.restaurantId,
+        tableId: notification.data?.tableId ? Number(notification.data.tableId) : null,
+        tableNo: notification.data?.tableNo || null,
         data: notification.data,
         createdAt: notification.createdAt,
       };

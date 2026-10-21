@@ -26,6 +26,13 @@ import {
 } from "lucide-react";
 import { API } from "../../config";
 import { showToast } from "../../utils/toast";
+import {
+  isTobaccoItem,
+  isTobaccoCategory,
+  isTobaccoAgeConfirmed,
+  setTobaccoAgeConfirmed,
+} from "../../utils/tobaccoUtils";
+import TobaccoAgeVerificationModal from "../../components/tobacco/TobaccoAgeVerificationModal";
 
 export default function CustomerDigitalMenuPage() {
   const { token } = useParams();
@@ -58,6 +65,25 @@ export default function CustomerDigitalMenuPage() {
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("PAY_AT_COUNTER");
+  const [showTobaccoAgeModal, setShowTobaccoAgeModal] = useState(false);
+
+  const handleOpenTobacco = () => {
+    if (!isTobaccoAgeConfirmed()) {
+      setShowTobaccoAgeModal(true);
+    } else {
+      navigate(`/menu/${token}/tobacco`);
+    }
+  };
+
+  const handleTobaccoAgeConfirm = () => {
+    setTobaccoAgeConfirmed(true);
+    setShowTobaccoAgeModal(false);
+    navigate(`/menu/${token}/tobacco`);
+  };
+
+  const handleTobaccoAgeCancel = () => {
+    setShowTobaccoAgeModal(false);
+  };
 
   const [placingOrder, setPlacingOrder] = useState(false);
   const [placedOrder, setPlacedOrder] = useState(null);
@@ -87,16 +113,21 @@ export default function CustomerDigitalMenuPage() {
     fetchDigitalMenu();
   }, [token]);
 
-  // Categories list
+  // Categories list (strictly excludes tobacco)
   const categories = useMemo(() => {
     if (!menu.length) return ["ALL"];
-    const cats = new Set(menu.map((m) => m.category || "General"));
+    const cats = new Set(
+      menu
+        .filter((m) => !isTobaccoItem(m) && !isTobaccoCategory(m.category))
+        .map((m) => m.category || "General")
+    );
     return ["ALL", ...Array.from(cats)];
   }, [menu]);
 
-  // Filtered Menu
+  // Filtered Menu (strictly excludes tobacco)
   const filteredMenu = useMemo(() => {
     return menu.filter((item) => {
+      if (isTobaccoItem(item) || isTobaccoCategory(item.category)) return false;
       const matchCat =
         selectedCategory === "ALL" || (item.category || "General") === selectedCategory;
       const matchSearch =
@@ -380,6 +411,15 @@ export default function CustomerDigitalMenuPage() {
               {cat}
             </button>
           ))}
+
+          {/* Clearly separated Tobacco Entry */}
+          <button
+            type="button"
+            onClick={handleOpenTobacco}
+            className="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 shrink-0"
+          >
+            <span>🚬 Tobacco</span>
+          </button>
         </div>
       </div>
 
@@ -722,6 +762,12 @@ export default function CustomerDigitalMenuPage() {
           </button>
         </div>
       )}
+      {/* Age Verification Modal */}
+      <TobaccoAgeVerificationModal
+        isOpen={showTobaccoAgeModal}
+        onConfirm={handleTobaccoAgeConfirm}
+        onCancel={handleTobaccoAgeCancel}
+      />
     </div>
   );
 }

@@ -41,43 +41,43 @@ const formatAge = (minutes) => {
 };
 
 const getSlaStatus = (createdAtIso, estPrepMins = 15) => {
-    if (!createdAtIso) return { label: "ON TIME", badgeClass: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", elapsed: 0 };
+    if (!createdAtIso) return { label: "ON TIME", badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200", elapsed: 0 };
     const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(createdAtIso).getTime()) / 60000));
     const est = Math.max(1, Number(estPrepMins || 15));
     const ratio = elapsedMinutes / est;
 
     if (ratio > 1.0) {
-        return { label: "OVERDUE", badgeClass: "bg-red-500/30 text-red-300 border-red-500/50 animate-pulse", elapsed: elapsedMinutes };
+        return { label: "OVERDUE", badgeClass: "bg-red-50 text-red-700 border-red-200 font-semibold", elapsed: elapsedMinutes };
     }
     if (ratio >= 0.8) {
-        return { label: "WARNING", badgeClass: "bg-amber-500/20 text-amber-300 border-amber-500/40", elapsed: elapsedMinutes };
+        return { label: "WARNING", badgeClass: "bg-amber-50 text-amber-700 border-amber-200 font-semibold", elapsed: elapsedMinutes };
     }
-    return { label: "ON TIME", badgeClass: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", elapsed: elapsedMinutes };
+    return { label: "ON TIME", badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200", elapsed: elapsedMinutes };
 };
 
 const priorityBadgeClass = (priority) => {
     switch (String(priority || "").toUpperCase()) {
         case "URGENT":
-            return "bg-red-600 text-white font-black animate-pulse shadow-red-500/50 shadow-lg";
+            return "bg-red-50 text-red-700 border border-red-200 font-bold";
         case "HIGH":
-            return "bg-amber-500/30 text-amber-300 border border-amber-500/50 font-bold";
+            return "bg-amber-50 text-amber-700 border border-amber-200 font-semibold";
         default:
-            return "bg-slate-700/50 text-slate-300 border border-slate-600/50";
+            return "bg-slate-100 text-slate-600 border border-slate-200 font-medium";
     }
 };
 
 const sourceBadgeClass = (source) => {
     switch (String(source || "").toUpperCase()) {
         case "POS":
-            return "bg-blue-500/20 text-blue-300 border border-blue-500/30";
+            return "bg-blue-50 text-blue-700 border border-blue-200";
         case "QR":
-            return "bg-purple-500/20 text-purple-300 border border-purple-500/30";
+            return "bg-purple-50 text-purple-700 border border-purple-200";
         case "DELIVERY":
-            return "bg-amber-500/20 text-amber-300 border border-amber-500/30";
+            return "bg-amber-50 text-amber-700 border border-amber-200";
         case "TAKEAWAY":
-            return "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+            return "bg-emerald-50 text-emerald-700 border border-emerald-200";
         default:
-            return "bg-slate-700/50 text-slate-300 border border-slate-600/50";
+            return "bg-slate-100 text-slate-600 border border-slate-200";
     }
 };
 
@@ -409,61 +409,61 @@ export default function Kitchen() {
     }, [kots]);
 
     return (
-        <div className="min-h-screen bg-[#0d1117] text-[#f0f6fc] font-sans">
+        <div className="min-h-screen bg-slate-50/40 text-slate-900 font-sans">
             {/* Top Bar Header */}
-            <header className="border-b border-slate-800 bg-[#161b22] px-4 py-3 sm:px-6">
+            <header className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <div className="flex items-center gap-2">
-                            <ChefHat className="text-orange-400" size={24} />
-                            <h1 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">{titleLabel}</h1>
-                            <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-300">
+                            <ChefHat className="text-orange-500" size={22} />
+                            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{titleLabel}</h1>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
                                 {restaurantName}
                             </span>
                         </div>
-                        <p className="mt-0.5 text-xs text-slate-400">
-                            Multi-station order routing • Real-time preparation SLAs • Kitchen Display System
+                        <p className="mt-0.5 text-xs text-slate-500">
+                            Multi-station order routing · Real-time preparation SLAs · Kitchen Display System
                         </p>
                     </div>
 
                     {/* Workload Metric Chips & Actions */}
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-[#0d1117] px-3 py-1.5 text-xs">
-                            <span className="text-slate-400">NEW:</span>
-                            <strong className="text-amber-400 font-bold">{metrics.newCount}</strong>
-                            <span className="text-slate-600">|</span>
-                            <span className="text-slate-400">PREP:</span>
-                            <strong className="text-orange-400 font-bold">{metrics.prepCount}</strong>
-                            <span className="text-slate-600">|</span>
-                            <span className="text-slate-400">READY:</span>
-                            <strong className="text-emerald-400 font-bold">{metrics.readyCount}</strong>
-                            <span className="text-slate-600">|</span>
-                            <span className="text-slate-400">OVERDUE:</span>
-                            <strong className="text-red-400 font-bold">{metrics.overdueCount}</strong>
+                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs">
+                            <span className="text-slate-500 font-medium">NEW:</span>
+                            <strong className="text-slate-900 font-bold">{metrics.newCount}</strong>
+                            <span className="text-slate-300">|</span>
+                            <span className="text-slate-500 font-medium">PREP:</span>
+                            <strong className="text-orange-600 font-bold">{metrics.prepCount}</strong>
+                            <span className="text-slate-300">|</span>
+                            <span className="text-slate-500 font-medium">READY:</span>
+                            <strong className="text-emerald-600 font-bold">{metrics.readyCount}</strong>
+                            <span className="text-slate-300">|</span>
+                            <span className="text-slate-500 font-medium">OVERDUE:</span>
+                            <strong className={`font-bold ${metrics.overdueCount > 0 ? "text-red-600 font-extrabold" : "text-slate-900"}`}>{metrics.overdueCount}</strong>
                         </div>
 
                         <button
                             type="button"
                             onClick={() => loadKots({ silent: true })}
                             disabled={refreshing}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-50 transition"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition shadow-sm"
                         >
-                            <RefreshCw size={14} className={refreshing ? "animate-spin text-orange-400" : ""} />
+                            <RefreshCw size={13} className={refreshing ? "animate-spin text-orange-500" : "text-slate-500"} />
                             Refresh
                         </button>
 
                         <button
                             type="button"
                             onClick={() => setSoundModalOpen(true)}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm"
                         >
-                            {soundMuted ? <BellOff size={14} className="text-slate-400" /> : <Bell size={14} className="text-amber-400 animate-pulse" />}
+                            {soundMuted ? <BellOff size={13} className="text-slate-400" /> : <Bell size={13} className="text-orange-500" />}
                             {soundMuted ? "Muted" : "Alert On"}
                         </button>
 
                         <Link
                             to="/owner"
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm"
                         >
                             Dashboard
                         </Link>
@@ -472,18 +472,18 @@ export default function Kitchen() {
             </header>
 
             {/* Station Filter Tabs */}
-            <div className="border-b border-slate-800 bg-[#161b22]/80 px-4 py-2 sm:px-6">
+            <div className="border-b border-slate-200 bg-white px-4 py-2 sm:px-6">
                 <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 pr-1 flex items-center gap-1">
-                        <Flame size={14} className="text-orange-400" /> Stations:
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 pr-1 flex items-center gap-1">
+                        <Flame size={14} className="text-orange-500" /> Stations:
                     </span>
                     <button
                         type="button"
                         onClick={() => setSelectedStationId("ALL")}
-                        className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition shrink-0 ${
+                        className={`rounded-lg px-3 py-1 text-xs font-semibold transition shrink-0 ${
                             selectedStationId === "ALL"
-                                ? "bg-orange-500 text-black shadow-lg shadow-orange-500/20"
-                                : "bg-slate-800/80 text-slate-300 hover:bg-slate-700"
+                                ? "bg-orange-500 text-white shadow-sm"
+                                : "bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
                         }`}
                     >
                         ALL STATIONS ({kots.length})
@@ -496,10 +496,10 @@ export default function Kitchen() {
                                 key={st.id}
                                 type="button"
                                 onClick={() => setSelectedStationId(String(st.id))}
-                                className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition shrink-0 ${
+                                className={`rounded-lg px-3 py-1 text-xs font-semibold transition shrink-0 ${
                                     selectedStationId === String(st.id)
-                                        ? "bg-orange-500 text-black shadow-lg shadow-orange-500/20"
-                                        : "bg-slate-800/80 text-slate-300 hover:bg-slate-700"
+                                        ? "bg-orange-500 text-white shadow-sm"
+                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
                                 }`}
                             >
                                 {st.name} ({count})
@@ -510,60 +510,64 @@ export default function Kitchen() {
             </div>
 
             {/* Filter Bar & Search */}
-            <div className="border-b border-slate-800 bg-[#0d1117] px-4 py-2.5 sm:px-6">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="border-b border-slate-200 bg-white px-4 py-2.5 sm:px-6">
+                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <div className="flex items-center gap-1.5 text-slate-400 font-semibold">
-                            <Filter size={14} /> Priority:
+                        <div className="flex items-center gap-1 text-slate-500 font-semibold">
+                            <Filter size={13} /> Priority:
                         </div>
-                        {PRIORITIES.map((prio) => (
-                            <button
-                                key={prio}
-                                type="button"
-                                onClick={() => setSelectedPriority(prio)}
-                                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                                    selectedPriority === prio
-                                        ? "bg-slate-200 text-black"
-                                        : "bg-slate-800 text-slate-400 hover:text-white"
-                                }`}
-                            >
-                                {prio}
-                            </button>
-                        ))}
+                        <div className="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+                            {PRIORITIES.map((prio) => (
+                                <button
+                                    key={prio}
+                                    type="button"
+                                    onClick={() => setSelectedPriority(prio)}
+                                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                                        selectedPriority === prio
+                                            ? "bg-orange-500 text-white shadow-sm"
+                                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                                    }`}
+                                >
+                                    {prio}
+                                </button>
+                            ))}
+                        </div>
 
-                        <span className="text-slate-700">|</span>
+                        <span className="text-slate-300">|</span>
 
-                        <div className="flex items-center gap-1.5 text-slate-400 font-semibold">
+                        <div className="flex items-center gap-1 text-slate-500 font-semibold">
                             Status:
                         </div>
-                        {KOT_STATUSES.map((st) => (
-                            <button
-                                key={st}
-                                type="button"
-                                onClick={() => setSelectedStatus(st)}
-                                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                                    selectedStatus === st
-                                        ? "bg-slate-200 text-black"
-                                        : "bg-slate-800 text-slate-400 hover:text-white"
-                                }`}
-                            >
-                                {st}
-                            </button>
-                        ))}
+                        <div className="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+                            {KOT_STATUSES.map((st) => (
+                                <button
+                                    key={st}
+                                    type="button"
+                                    onClick={() => setSelectedStatus(st)}
+                                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                                        selectedStatus === st
+                                            ? "bg-orange-500 text-white shadow-sm"
+                                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                                    }`}
+                                >
+                                    {st}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     {/* Instant Search Input */}
-                    <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-[#161b22] px-3 py-1.5 sm:w-64">
+                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-sm sm:w-64 focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500">
                         <Search size={14} className="text-slate-400" />
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search KOT#, Table#, Order#..."
-                            className="w-full bg-transparent text-xs text-white placeholder-slate-500 outline-none"
+                            className="w-full bg-transparent text-xs text-slate-900 placeholder-slate-400 outline-none"
                         />
                         {searchQuery && (
-                            <button type="button" onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-white">
+                            <button type="button" onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600">
                                 <X size={14} />
                             </button>
                         )}
@@ -574,37 +578,37 @@ export default function Kitchen() {
             {/* Main KDS Columns View */}
             <main className="p-4 sm:p-6">
                 {error && (
-                    <div className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300">
+                    <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
                         {error}
                     </div>
                 )}
 
                 {loading ? (
-                    <div className="flex items-center justify-center gap-2 py-20 text-slate-400 text-sm">
-                        <LoaderCircle size={20} className="animate-spin text-orange-400" />
+                    <div className="flex items-center justify-center gap-2 py-20 text-slate-500 text-sm">
+                        <LoaderCircle size={20} className="animate-spin text-orange-500" />
                         Loading Kitchen Display System...
                     </div>
                 ) : filteredKots.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-800 bg-[#161b22] py-20 text-slate-400">
-                        <UtensilsCrossed size={32} className="text-slate-600" />
-                        <p className="text-sm font-semibold text-slate-300">No active kitchen tickets in this view</p>
-                        <p className="text-xs text-slate-500">Incoming tickets will split to station queues in real time.</p>
+                    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 bg-white py-16 text-slate-500 shadow-sm">
+                        <UtensilsCrossed size={32} className="text-slate-400" />
+                        <p className="text-sm font-semibold text-slate-700">No active kitchen tickets in this view</p>
+                        <p className="text-xs text-slate-400">Incoming tickets will split to station queues in real time.</p>
                     </div>
                 ) : (
-                    <div className="grid gap-6 lg:grid-cols-3">
+                    <div className="grid gap-6 lg:grid-cols-3 items-start">
                         {/* COLUMN 1: NEW / PENDING */}
-                        <div className="rounded-2xl border border-amber-500/20 bg-[#161b22] p-4">
-                            <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2.5">
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                                 <div className="flex items-center gap-2">
-                                    <span className="h-3 w-3 rounded-full bg-amber-400 animate-ping" />
-                                    <h2 className="font-bold text-sm uppercase tracking-wider text-amber-300">NEW ORDERS</h2>
+                                    <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                                    <h2 className="font-bold text-xs uppercase tracking-wider text-slate-800">NEW ORDERS</h2>
                                 </div>
-                                <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold text-amber-300 border border-amber-500/30">
+                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-200">
                                     {groupedKots.NEW.length}
                                 </span>
                             </div>
 
-                            <div className="space-y-4 max-h-[calc(100vh-250px)] overflow-y-auto pr-1">
+                            <div className="space-y-3">
                                 {groupedKots.NEW.map((kot) => (
                                     <KotCard
                                         key={kot.id}
@@ -618,24 +622,26 @@ export default function Kitchen() {
                                     />
                                 ))}
                                 {groupedKots.NEW.length === 0 && (
-                                    <p className="text-xs text-slate-500 italic py-6 text-center">No new tickets waiting</p>
+                                    <div className="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-400 italic">
+                                        No new tickets waiting
+                                    </div>
                                 )}
                             </div>
                         </div>
 
                         {/* COLUMN 2: PREPARING */}
-                        <div className="rounded-2xl border border-orange-500/20 bg-[#161b22] p-4">
-                            <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2.5">
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                                 <div className="flex items-center gap-2">
-                                    <Flame size={16} className="text-orange-400 animate-pulse" />
-                                    <h2 className="font-bold text-sm uppercase tracking-wider text-orange-300">PREPARING</h2>
+                                    <Flame size={14} className="text-orange-500" />
+                                    <h2 className="font-bold text-xs uppercase tracking-wider text-slate-800">PREPARING</h2>
                                 </div>
-                                <span className="rounded-full bg-orange-500/20 px-2.5 py-0.5 text-xs font-bold text-orange-300 border border-orange-500/30">
+                                <span className="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-700 border border-orange-200">
                                     {groupedKots.PREPARING.length}
                                 </span>
                             </div>
 
-                            <div className="space-y-4 max-h-[calc(100vh-250px)] overflow-y-auto pr-1">
+                            <div className="space-y-3">
                                 {groupedKots.PREPARING.map((kot) => (
                                     <KotCard
                                         key={kot.id}
@@ -649,24 +655,26 @@ export default function Kitchen() {
                                     />
                                 ))}
                                 {groupedKots.PREPARING.length === 0 && (
-                                    <p className="text-xs text-slate-500 italic py-6 text-center">No tickets in preparation</p>
+                                    <div className="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-400 italic">
+                                        No tickets in preparation
+                                    </div>
                                 )}
                             </div>
                         </div>
 
                         {/* COLUMN 3: READY */}
-                        <div className="rounded-2xl border border-emerald-500/20 bg-[#161b22] p-4">
-                            <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2.5">
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                                 <div className="flex items-center gap-2">
-                                    <CheckCircle2 size={16} className="text-emerald-400" />
-                                    <h2 className="font-bold text-sm uppercase tracking-wider text-emerald-300">READY FOR PASS</h2>
+                                    <CheckCircle2 size={14} className="text-emerald-600" />
+                                    <h2 className="font-bold text-xs uppercase tracking-wider text-slate-800">READY FOR PASS</h2>
                                 </div>
-                                <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-bold text-emerald-300 border border-emerald-500/30">
+                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
                                     {groupedKots.READY.length}
                                 </span>
                             </div>
 
-                            <div className="space-y-4 max-h-[calc(100vh-250px)] overflow-y-auto pr-1">
+                            <div className="space-y-3">
                                 {groupedKots.READY.map((kot) => (
                                     <KotCard
                                         key={kot.id}
@@ -680,7 +688,9 @@ export default function Kitchen() {
                                     />
                                 ))}
                                 {groupedKots.READY.length === 0 && (
-                                    <p className="text-xs text-slate-500 italic py-6 text-center">No tickets marked ready</p>
+                                    <div className="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-400 italic">
+                                        No tickets marked ready
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -691,51 +701,51 @@ export default function Kitchen() {
             {/* Sound Notification Modal */}
             {soundModalOpen ? (
                 <div
-                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 px-4 py-6 backdrop-blur-md"
+                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4 py-6 backdrop-blur-sm"
                     onClick={() => setSoundModalOpen(false)}
                     role="presentation"
                 >
                     <div
                         role="dialog"
                         aria-modal="true"
-                        className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-700 bg-[#161b22] text-[#f0f6fc] shadow-2xl"
+                        className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-6 py-4">
+                        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500/20 text-orange-400">
-                                    <Bell size={20} className="animate-pulse" />
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
+                                    <Bell size={20} />
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-bold text-white">Kitchen Order Audio Alerts</h3>
-                                    <p className="text-xs text-slate-400">Sound notification setup for new incoming tickets</p>
+                                    <h3 className="text-base font-bold text-slate-900">Kitchen Order Audio Alerts</h3>
+                                    <p className="text-xs text-slate-500">Sound notification setup for new incoming tickets</p>
                                 </div>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setSoundModalOpen(false)}
-                                className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition"
                             >
                                 <X size={16} />
                             </button>
                         </div>
 
                         <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4">
-                            <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-[#0d1117] p-4">
+                            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4">
                                 <div className="flex items-center gap-3">
-                                    {soundMuted ? <VolumeX size={20} className="text-slate-400" /> : <Volume2 size={20} className="text-orange-400" />}
+                                    {soundMuted ? <VolumeX size={20} className="text-slate-400" /> : <Volume2 size={20} className="text-orange-600" />}
                                     <div>
-                                        <p className="text-sm font-bold text-white">{soundMuted ? "Audio Chime Muted" : "Audio Chime Active"}</p>
-                                        <p className="text-xs text-slate-400">Plays automatically when KOT arrives</p>
+                                        <p className="text-sm font-bold text-slate-900">{soundMuted ? "Audio Chime Muted" : "Audio Chime Active"}</p>
+                                        <p className="text-xs text-slate-500">Plays automatically when KOT arrives</p>
                                     </div>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={toggleSoundMute}
-                                    className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
+                                    className={`rounded-lg px-4 py-2 text-xs font-bold transition ${
                                         soundMuted
-                                            ? "bg-orange-500 text-black hover:bg-orange-400"
-                                            : "bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                                            ? "bg-orange-500 text-white hover:bg-orange-600 shadow-sm"
+                                            : "bg-slate-200 text-slate-700 hover:bg-slate-300"
                                     }`}
                                 >
                                     {soundMuted ? "Unmute" : "Mute"}
@@ -770,27 +780,27 @@ function KotCard({
 
     return (
         <article
-            className={`relative rounded-2xl border transition-all ${
+            className={`relative rounded-xl border transition-all shadow-sm ${
                 isUrgent
-                    ? "border-red-500 bg-[#1c1214] shadow-red-900/30 shadow-xl"
-                    : "border-slate-800 bg-[#0d1117] hover:border-slate-700"
+                    ? "border-red-300 bg-red-50/20 ring-1 ring-red-200"
+                    : "border-slate-200 bg-white hover:border-slate-300"
             }`}
         >
             {/* Header: Ticket No, Station, Priority, Source */}
-            <div className="border-b border-slate-800/80 p-3.5 pb-2.5">
+            <div className="border-b border-slate-100 p-3.5 pb-2.5">
                 <div className="flex items-start justify-between gap-2">
                     <div>
                         <div className="flex items-center gap-2">
-                            <span className="font-mono text-base font-black text-white">{kot.kotNo}</span>
-                            <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${sourceBadgeClass(orderSource)}`}>
+                            <span className="font-mono text-base font-bold text-slate-900">{kot.kotNo}</span>
+                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${sourceBadgeClass(orderSource)}`}>
                                 {orderSource}
                             </span>
-                            <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${priorityBadgeClass(kot.priority)}`}>
+                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${priorityBadgeClass(kot.priority)}`}>
                                 {kot.priority || "NORMAL"}
                             </span>
                         </div>
-                        <p className="mt-1 text-xs text-slate-300 font-medium">
-                            Station: <strong className="text-orange-400">{kot.stationName || "MAIN KITCHEN"}</strong>
+                        <p className="mt-1 text-xs text-slate-600 font-medium">
+                            Station: <strong className="text-slate-900">{kot.stationName || "MAIN KITCHEN"}</strong>
                             {kot.tableNo ? ` • Table ${kot.tableNo}` : " • Takeaway"}
                         </p>
                     </div>
@@ -808,14 +818,14 @@ function KotCard({
                 </div>
 
                 {kot.reprintCount > 0 && (
-                    <div className="mt-2 text-[10px] font-bold text-amber-400/90 uppercase tracking-wider">
+                    <div className="mt-2 text-[10px] font-bold text-amber-700 uppercase tracking-wider">
                         *** REPRINT #{kot.reprintCount} ***
                     </div>
                 )}
             </div>
 
-            {/* Items Checklist */}
-            <div className="p-3.5 space-y-2.5">
+            {/* Items Checklist - minimal horizontal rows, no heavy nested card boxes */}
+            <div className="divide-y divide-slate-100 px-3.5 py-1">
                 {items.map((it) => {
                     const isCancelled = it.status === "CANCELLED";
                     const isReady = it.status === "READY";
@@ -824,72 +834,66 @@ function KotCard({
                     return (
                         <div
                             key={it.id}
-                            className={`rounded-xl border p-2.5 transition text-xs ${
-                                isCancelled
-                                    ? "border-red-900/50 bg-red-950/20 text-red-400 line-through"
-                                    : isReady
-                                    ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-200"
-                                    : isPrep
-                                    ? "border-orange-500/30 bg-orange-950/20 text-orange-200"
-                                    : "border-slate-800 bg-[#161b22] text-slate-200"
+                            className={`py-2 transition text-xs flex items-start justify-between gap-2 ${
+                                isCancelled ? "opacity-50" : ""
                             }`}
                         >
-                            <div className="flex items-start justify-between gap-2">
-                                <div className="space-y-0.5">
-                                    <div className="flex items-center gap-1.5 font-semibold text-sm">
-                                        <span className="text-orange-400 font-bold">{it.qty}x</span>
-                                        <span className={isCancelled ? "line-through" : ""}>{it.itemName}</span>
-                                    </div>
-
-                                    {it.variantName && (
-                                        <div className="text-[11px] text-slate-400">
-                                            Variant: <span className="text-slate-200 font-medium">{it.variantName}</span>
-                                        </div>
-                                    )}
-
-                                    {Array.isArray(it.selectedModifiers) && it.selectedModifiers.length > 0 && (
-                                        <div className="text-[11px] text-slate-400 space-y-0.5 pl-2 border-l border-orange-500/30">
-                                            {it.selectedModifiers.map((mod, idx) => (
-                                                <div key={idx}>+ {typeof mod === "string" ? mod : mod.name || mod.modifierName}</div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {it.notes && (
-                                        <div className="text-[11px] text-amber-300 font-medium italic">
-                                            Note: {it.notes}
-                                        </div>
-                                    )}
+                            <div className="space-y-0.5">
+                                <div className="flex items-center gap-1.5 text-sm">
+                                    <span className="text-orange-600 font-bold">{it.qty}×</span>
+                                    <span className={`text-slate-900 font-medium ${isCancelled ? "line-through text-slate-400" : ""}`}>
+                                        {it.itemName}
+                                    </span>
                                 </div>
 
-                                {/* Item Status Toggle Action */}
-                                <button
-                                    type="button"
-                                    disabled={isCancelled}
-                                    onClick={() => {
-                                        const next = isPrep ? "READY" : isReady ? "PENDING" : "PREPARING";
-                                        onUpdateItemStatus(kot.id, it.id, next);
-                                    }}
-                                    className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition shrink-0 ${
-                                        isCancelled
-                                            ? "bg-red-900/40 text-red-400 cursor-not-allowed"
-                                            : isReady
-                                            ? "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40"
-                                            : isPrep
-                                            ? "bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 border border-orange-500/40"
-                                            : "bg-slate-800 text-slate-400 hover:text-white border border-slate-700"
-                                    }`}
-                                >
-                                    {it.status || "PENDING"}
-                                </button>
+                                {it.variantName && (
+                                    <div className="text-[11px] text-slate-500">
+                                        Variant: <span className="text-slate-700 font-medium">{it.variantName}</span>
+                                    </div>
+                                )}
+
+                                {Array.isArray(it.selectedModifiers) && it.selectedModifiers.length > 0 && (
+                                    <div className="text-[11px] text-slate-500 space-y-0.5 pl-2 border-l border-slate-200">
+                                        {it.selectedModifiers.map((mod, idx) => (
+                                            <div key={idx}>+ {typeof mod === "string" ? mod : mod.name || mod.modifierName}</div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {it.notes && (
+                                    <div className="text-[11px] text-amber-700 font-medium italic">
+                                        Note: {it.notes}
+                                    </div>
+                                )}
                             </div>
+
+                            {/* Item Status Toggle Action */}
+                            <button
+                                type="button"
+                                disabled={isCancelled}
+                                onClick={() => {
+                                    const next = isPrep ? "READY" : isReady ? "PENDING" : "PREPARING";
+                                    onUpdateItemStatus(kot.id, it.id, next);
+                                }}
+                                className={`rounded-md px-2 py-0.5 text-[11px] font-bold transition shrink-0 ${
+                                    isCancelled
+                                        ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+                                        : isReady
+                                        ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                                        : isPrep
+                                        ? "bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200"
+                                        : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+                                }`}
+                            >
+                                {it.status || "PENDING"}
+                            </button>
                         </div>
                     );
                 })}
             </div>
 
             {/* Bottom Actions Bar */}
-            <div className="border-t border-slate-800 p-3 bg-[#161b22]/50 rounded-b-2xl space-y-2">
+            <div className="border-t border-slate-100 p-3 bg-slate-50/70 rounded-b-xl space-y-2">
                 <div className="flex items-center justify-between gap-2">
                     {/* Status Transition Action Buttons */}
                     {kot.status !== "READY" && (
@@ -900,7 +904,7 @@ function KotCard({
                                 const next = kot.status === "PREPARING" ? "READY" : "PREPARING";
                                 onUpdateKotStatus(kot.id, next);
                             }}
-                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-orange-500 px-3 py-2 text-xs font-bold text-black hover:bg-orange-400 transition disabled:opacity-50"
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white hover:bg-orange-600 transition shadow-sm disabled:opacity-50"
                         >
                             {updatingKotId === kot.id ? (
                                 <LoaderCircle size={14} className="animate-spin" />
@@ -921,7 +925,7 @@ function KotCard({
                             type="button"
                             disabled={updatingKotId === kot.id}
                             onClick={() => onUpdateKotStatus(kot.id, "SERVED")}
-                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-black hover:bg-emerald-400 transition disabled:opacity-50"
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition shadow-sm disabled:opacity-50"
                         >
                             {updatingKotId === kot.id ? <LoaderCircle size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                             SERVE / PASS
@@ -933,16 +937,16 @@ function KotCard({
                         type="button"
                         disabled={reprintingKotId === kot.id}
                         onClick={() => onReprintKot(kot.id)}
-                        className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition"
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm"
                         title="Reprint KOT Ticket"
                     >
-                        {reprintingKotId === kot.id ? <LoaderCircle size={13} className="animate-spin text-orange-400" /> : <Printer size={13} />}
+                        {reprintingKotId === kot.id ? <LoaderCircle size={13} className="animate-spin text-orange-500" /> : <Printer size={13} className="text-slate-500" />}
                         Print
                     </button>
                 </div>
 
                 {/* Priority Selector Dropdown */}
-                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800/60">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
                     <span>Change Priority:</span>
                     <div className="flex items-center gap-1">
                         {["NORMAL", "HIGH", "URGENT"].map((prio) => (
@@ -950,8 +954,10 @@ function KotCard({
                                 key={prio}
                                 type="button"
                                 onClick={() => onUpdatePriority(kot.id, prio)}
-                                className={`rounded px-1.5 py-0.5 text-[10px] font-bold transition ${
-                                    kot.priority === prio ? "bg-orange-500 text-black" : "bg-slate-800 text-slate-400 hover:text-white"
+                                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition ${
+                                    kot.priority === prio
+                                        ? "bg-orange-500 text-white shadow-sm"
+                                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
                                 }`}
                             >
                                 {prio}

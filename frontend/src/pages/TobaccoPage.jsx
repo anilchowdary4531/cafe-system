@@ -1,225 +1,436 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Search, ArrowLeft, ShoppingBag, ShieldAlert, Sparkles, Filter } from "lucide-react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { useNavigate, useParams, Link } from "react-router-dom";
+import { ArrowLeft, Search, ShoppingBag, ShieldAlert, Sparkles, X } from "lucide-react";
+import axios from "axios";
+import { API } from "../config";
 import BrandLogo from "../components/BrandLogo";
 import Footer from "../components/Footer";
 import CartDrawer from "../components/CartDrawer";
-import TobaccoBanner from "../components/tobacco/TobaccoBanner";
 import TobaccoAgeVerificationModal from "../components/tobacco/TobaccoAgeVerificationModal";
 import BlinkitTobaccoCard from "../components/tobacco/BlinkitTobaccoCard";
 import { useCart } from "../context/CartContext";
-import useCachedGet from "../hooks/useCachedGet";
 import {
-    TOBACCO_QUICK_TAGS,
     isTobaccoAgeConfirmed,
     setTobaccoAgeConfirmed,
+    isTobaccoItem,
+    isTobaccoCategory,
 } from "../utils/tobaccoUtils";
+import { showToast } from "../utils/toast";
 
 export default function TobaccoPage() {
+    const { token, slug, table } = useParams();
     const navigate = useNavigate();
-    const { addToCart, removeFromCart, cart, total } = useCart();
+
+    // Verification state
+    const [isVerified, setIsVerified] = useState(() => isTobaccoAgeConfirmed());
+    const [showAgeModal, setShowAgeModal] = useState(() => !isTobaccoAgeConfirmed());
+
+    // Search & Data
     const [search, setSearch] = useState("");
-    const [showAgeModal, setShowAgeModal] = useState(false);
-    const [cartOpen, setCartOpen] = useState(false);
-    const [pendingItem, setPendingItem] = useState(null);
-    const itemsSectionRef = React.useRef(null);
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // Verify age confirmation on initial load
-    useEffect(() => {
-        if (!isTobaccoAgeConfirmed()) {
-            setShowAgeModal(true);
+    // Global Cart for slug / standard routes
+    const { addToCart, decreaseQty, cart: globalCart, total: globalTotal } = useCart();
+    const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+
+    // QR Table Cart state (when route has token)
+    const [tableCart, setTableCart] = useState(() => {
+        if (typeof window !== "undefined" && token) {
+            try {
+                const saved = sessionStorage.getItem(`tiffzy_table_cart_${token}`);
+                if (saved) return JSON.parse(saved);
+            } catch {
+                // ignore
+            }
         }
-    }, []);
-
-    // Fetch real tobacco items from backend API
-    const { data, loading, error } = useCachedGet("/tobacco/items", {
-        params: { q: search },
-        ttlMs: 5_000,
-        staleMs: 15_000,
+        return {};
     });
 
-    const items = Array.isArray(data?.items) ? data.items : [];
+    // Sync table cart to sessionStorage
+    useEffect(() => {
+        if (token && typeof window !== "undefined") {
+            try {
+                sessionStorage.setItem(`tiffzy_table_cart_${token}`, JSON.stringify(tableCart));
+            } catch {
+                // ignore
+            }
+        }
+    }, [tableCart, token]);
 
-    const handleViewItems = () => {
-        if (!isTobaccoAgeConfirmed()) {
-            setShowAgeModal(true);
+    // Back button destination resolver
+    const handleBack = useCallback(() => {
+        if (token) {
+            // Check if this came from digital menu or QR table ordering
+            if (window.location.pathname.startsWith("/menu/")) {
+                navigate(`/menu/${token}`, { replace: true });
+            } else {
+                navigate(`/order/table/${token}`, { replace: true });
+            }
+        } else if (slug) {
+            if (table) {
+                navigate(`/m/${slug}/${table}`, { replace: true });
+            } else if (window.location.pathname.startsWith("/r/")) {
+                navigate(`/r/${slug}/menu`, { replace: true });
+            } else {
+                navigate(`/m/${slug}`, { replace: true });
+            }
         } else {
-            itemsSectionRef.current?.scrollIntoView({ behavior: "smooth" });
+            if (window.history.length > 1) {
+                navigate(-1);
+            } else {
+                navigate("/", { replace: true });
+            }
         }
+    }, [token, slug, table, navigate]);
+
+    // Age verification handlers
+    const handleConfirmAge = () => {
+        setTobaccoAgeConfirmed(true);
+        setIsVerified(true);
+        setShowAgeModal(false);
     };
 
-    const handleAgeConfirm = () => {
-        setTobaccoAgeConfirmed();
+    const handleCancelAge = () => {
         setShowAgeModal(false);
-        if (pendingItem) {
-            addToCart(pendingItem);
-            setPendingItem(null);
-        } else {
-            itemsSectionRef.current?.scrollIntoView({ behavior: "smooth" });
-        }
-    };
-
-    const handleAgeCancel = () => {
-        setShowAgeModal(false);
-        setPendingItem(null);
-        // If user cancels on initial page load without confirming age, navigate back home
         if (!isTobaccoAgeConfirmed()) {
-            navigate("/", { replace: true });
+            handleBack();
         }
     };
 
+    // Load tobacco products ONLY when verified
+    useEffect(() => {
+        if (!isVerified) {
+            setLoading(false);
+            return;
+        }
+
+        let isMounted = true;
+        const fetchTobaccoProducts = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const params = {};
+                if (search.trim()) params.q = search.trim();
+                if (token) params.token = token;
+                if (slug) params.slug = slug;
+
+                const res = await axios.get(`${API}/api/tobacco/items`, { params });
+                if (!isMounted) return;
+
+                const fetchedItems = Array.isArray(res.data?.items) ? res.data.items : [];
+                // Defensive front-end safety: ensure zero non-tobacco items are displayed
+                const strictlyTobacco = fetchedItems.filter((i) => isTobaccoItem(i) || isTobaccoCategory(i?.category));
+                setItems(strictlyTobacco);
+            } catch (err) {
+                if (!isMounted) return;
+                // Fallback attempt without /api prefix
+                try {
+                    const fallbackParams = {};
+                    if (search.trim()) fallbackParams.q = search.trim();
+                    if (token) fallbackParams.token = token;
+                    if (slug) fallbackParams.slug = slug;
+
+                    const resFallback = await axios.get(`${API}/tobacco/items`, { params: fallbackParams });
+                    if (!isMounted) return;
+                    const fetchedItems = Array.isArray(resFallback.data?.items) ? resFallback.data.items : [];
+                    const strictlyTobacco = fetchedItems.filter((i) => isTobaccoItem(i) || isTobaccoCategory(i?.category));
+                    setItems(strictlyTobacco);
+                } catch (fallbackErr) {
+                    if (!isMounted) return;
+                    setError(fallbackErr?.response?.data?.message || "Failed to load tobacco products");
+                }
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        fetchTobaccoProducts();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [isVerified, search, token, slug]);
+
+    // Filter items locally by search query as well (defensive double-check)
+    const filteredTobaccoItems = useMemo(() => {
+        const query = search.trim().toLowerCase();
+        return items.filter((item) => {
+            // Must be tobacco
+            if (!isTobaccoItem(item) && !isTobaccoCategory(item?.category)) return false;
+            if (!query) return true;
+            const name = String(item.name || "").toLowerCase();
+            const desc = String(item.description || "").toLowerCase();
+            const cat = String(item.category || "").toLowerCase();
+            return name.includes(query) || desc.includes(query) || cat.includes(query);
+        });
+    }, [items, search]);
+
+    // Cart Handlers
     const handleAddItem = (item) => {
         if (!isTobaccoAgeConfirmed()) {
-            setPendingItem(item);
             setShowAgeModal(true);
             return;
         }
-        addToCart(item);
+
+        if (token) {
+            // Table QR Cart
+            const key = `item_${item.id}`;
+            setTableCart((prev) => {
+                const existing = prev[key];
+                if (existing) {
+                    return { ...prev, [key]: { ...existing, qty: existing.qty + 1 } };
+                }
+                return {
+                    ...prev,
+                    [key]: {
+                        key,
+                        menuItemId: item.id,
+                        name: item.name,
+                        price: Number(item.price || 0),
+                        qty: 1,
+                        variantName: null,
+                        modifiers: [],
+                    },
+                };
+            });
+            showToast(`Added ${item.name}`, "success");
+        } else {
+            // Context Cart
+            addToCart(item);
+            showToast(`Added ${item.name}`, "success");
+        }
     };
 
-    const cartCount = cart.reduce((sum, item) => sum + Math.max(1, Number(item.quantity || 1)), 0);
+    const handleRemoveItem = (item) => {
+        if (token) {
+            const key = `item_${item.id}`;
+            setTableCart((prev) => {
+                const existing = prev[key];
+                if (!existing) return prev;
+                const newQty = existing.qty - 1;
+                if (newQty <= 0) {
+                    const copy = { ...prev };
+                    delete copy[key];
+                    return copy;
+                }
+                return { ...prev, [key]: { ...existing, qty: newQty } };
+            });
+        } else {
+            decreaseQty(item.id);
+        }
+    };
+
+    // Cart counts and totals
+    const { totalCartCount, totalCartAmount } = useMemo(() => {
+        if (token) {
+            const itemsList = Object.values(tableCart);
+            const count = itemsList.reduce((sum, i) => sum + (i.qty || 0), 0);
+            const amount = itemsList.reduce((sum, i) => sum + (i.price || 0) * (i.qty || 0), 0);
+            return { totalCartCount: count, totalCartAmount: amount };
+        } else {
+            const count = Array.isArray(globalCart)
+                ? globalCart.reduce((sum, i) => sum + (i.quantity || 1), 0)
+                : 0;
+            return { totalCartCount: count, totalCartAmount: Number(globalTotal || 0) };
+        }
+    }, [token, tableCart, globalCart, globalTotal]);
 
     return (
-        <div className="theme-page min-h-screen flex flex-col">
+        <div className="min-h-screen bg-slate-50 flex flex-col text-slate-800">
             {/* Header */}
-            <header className="theme-nav sticky top-0 z-30 border-b px-3 py-3 sm:px-6 md:px-8">
-                <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+            <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs px-4 py-3">
+                <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+                    {/* Back Button + Title */}
                     <div className="flex items-center gap-3">
-                        <Link
-                            to="/"
-                            className="theme-soft-button inline-flex h-10 w-10 items-center justify-center rounded-2xl"
-                            aria-label="Back to home"
+                        <button
+                            type="button"
+                            onClick={handleBack}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs sm:text-sm transition active:scale-95"
+                            aria-label="Back to menu"
                         >
-                            <ArrowLeft size={18} />
-                        </Link>
-                        <div className="flex items-center gap-2.5">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-amber-300/40 bg-white p-1 shadow-md">
-                                <BrandLogo className="h-full w-full" title="Tiffzy logo" />
-                            </div>
-                            <div>
-                                <h1 className="text-base font-extrabold text-zinc-900 dark:text-white tracking-tight sm:text-lg flex items-center gap-1.5">
-                                    <span>Tobacco Store</span>
-                                    <span className="text-[10px] font-black uppercase text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                                        18+ Only
-                                    </span>
-                                </h1>
-                            </div>
+                            <ArrowLeft size={16} />
+                            <span>Back</span>
+                        </button>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                                <span>Tobacco Products</span>
+                                <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                                    18+ Only
+                                </span>
+                            </h1>
                         </div>
                     </div>
 
-                    {/* Search Bar */}
-                    <div className="relative w-full max-w-[320px] sm:max-w-[420px]">
-                        <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
+                    {/* Cart Trigger */}
+                    {totalCartCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (token) {
+                                    handleBack();
+                                } else {
+                                    setCartDrawerOpen(true);
+                                }
+                            }}
+                            className="flex items-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3 py-1.5 shadow-xs transition active:scale-95"
+                        >
+                            <ShoppingBag size={15} />
+                            <span>Cart ({totalCartCount})</span>
+                            <span className="hidden sm:inline font-black">₹{Math.round(totalCartAmount)}</span>
+                        </button>
+                    )}
+                </div>
+
+                {/* Scoped Search Input */}
+                <div className="max-w-4xl mx-auto mt-2.5">
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input
+                            type="text"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search cigarettes, paan, tobacco..."
-                            className="w-full rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 py-2 pl-9 pr-4 text-xs sm:text-sm outline-none shadow-xs focus:ring-2 focus:ring-amber-500"
+                            placeholder="Search tobacco products..."
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-9 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-orange-500 focus:bg-white focus:ring-2 focus:ring-orange-500/20 shadow-2xs"
                         />
+                        {search && (
+                            <button
+                                type="button"
+                                onClick={() => setSearch("")}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            >
+                                <X size={15} />
+                            </button>
+                        )}
                     </div>
                 </div>
             </header>
 
-            {/* Main Content */}
-            <main className="mx-auto max-w-7xl px-3 py-6 sm:px-6 md:px-8 flex-1 w-full space-y-6">
-                {/* Quick Tag Pills */}
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {TOBACCO_QUICK_TAGS.map((tag) => (
-                        <button
-                            key={tag}
-                            type="button"
-                            onClick={() => {
-                                setSearch(tag);
-                                itemsSectionRef.current?.scrollIntoView({ behavior: "smooth" });
-                            }}
-                            className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition active:scale-95 shadow-2xs ${
-                                search.toLowerCase() === tag.toLowerCase()
-                                    ? "bg-emerald-700 text-white border-emerald-800"
-                                    : "border-rose-200/60 bg-[#fff5f5] dark:bg-zinc-900 dark:border-zinc-800 text-zinc-900 dark:text-zinc-200 hover:bg-rose-100/70"
-                            }`}
-                        >
-                            <span className="text-xs">🚬</span>
-                            <span>{tag}</span>
-                        </button>
-                    ))}
-                    {search ? (
-                        <button
-                            type="button"
-                            onClick={() => setSearch("")}
-                            className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-zinc-200 dark:bg-zinc-800 px-3 py-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300"
-                        >
-                            Clear Filter
-                        </button>
-                    ) : null}
-                </div>
-
-                {/* Section Title */}
-                <div ref={itemsSectionRef} className="flex items-center justify-between pt-2">
-                    <h2 className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white tracking-tight">
-                        {search ? `Results for "${search}"` : "Cigarettes & Tobacco Products"}
-                    </h2>
-                    <span className="text-xs font-bold text-zinc-500">
-                        {items.length} {items.length === 1 ? "product" : "products"} available
-                    </span>
-                </div>
-
-                {/* Loading / Empty / Products Grid */}
-                {loading && items.length === 0 ? (
-                    <div className="py-16 text-center text-zinc-400 flex items-center justify-center gap-2">
-                        <Sparkles className="animate-spin text-amber-500" size={20} /> Loading tobacco products...
-                    </div>
-                ) : items.length === 0 ? (
-                    <div className="py-16 text-center space-y-3 rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 p-8 shadow-xs">
-                        <ShieldAlert className="mx-auto text-amber-500" size={44} />
-                        <h3 className="text-base sm:text-lg font-bold text-zinc-800 dark:text-zinc-200">
-                            No Tobacco Products Available
-                        </h3>
-                        <p className="text-xs sm:text-sm text-zinc-500 max-w-md mx-auto leading-relaxed">
-                            No tobacco items have been added yet by Super Admin approved restaurants. Ask your local store/admin to enable tobacco sales.
+            {/* Main Content Area */}
+            <main className="max-w-4xl mx-auto w-full px-4 py-5 flex-1">
+                {/* Notice if unverified */}
+                {!isVerified ? (
+                    <div className="py-16 text-center space-y-4 rounded-3xl border border-amber-200 bg-amber-50/60 p-8 shadow-xs my-6">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-orange-100 text-orange-600 font-black text-xl border-2 border-orange-500">
+                            18+
+                        </div>
+                        <h2 className="text-lg font-black text-slate-900">
+                            Age Verification Required
+                        </h2>
+                        <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+                            Tobacco products are restricted to adult customers of legal age. Please confirm your age to view available items.
                         </p>
+                        <button
+                            type="button"
+                            onClick={() => setShowAgeModal(true)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs sm:text-sm px-5 py-2.5 shadow-md shadow-orange-500/20 transition active:scale-95"
+                        >
+                            Verify Age
+                        </button>
+                    </div>
+                ) : loading ? (
+                    <div className="py-20 text-center text-slate-400 flex items-center justify-center gap-2">
+                        <Sparkles className="animate-spin text-orange-500" size={20} />
+                        <span className="text-sm font-semibold">Loading tobacco products...</span>
+                    </div>
+                ) : error ? (
+                    <div className="py-12 text-center space-y-3 rounded-2xl border border-rose-200 bg-rose-50 p-6 my-6">
+                        <ShieldAlert className="mx-auto text-rose-500" size={36} />
+                        <h3 className="font-bold text-rose-800 text-sm">{error}</h3>
+                        <button
+                            type="button"
+                            onClick={() => window.location.reload()}
+                            className="text-xs font-bold text-rose-600 underline"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                ) : filteredTobaccoItems.length === 0 ? (
+                    <div className="py-16 text-center space-y-3 rounded-3xl border border-slate-200 bg-white p-8 shadow-xs my-6">
+                        <ShieldAlert className="mx-auto text-slate-300" size={40} />
+                        <h3 className="font-bold text-slate-700 text-base">
+                            {search ? `No tobacco products matching "${search}"` : "No Tobacco Products Available"}
+                        </h3>
+                        <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                            {search
+                                ? "Try searching for a different brand or keyword."
+                                : "No tobacco products are currently available for this menu."}
+                        </p>
+                        {search && (
+                            <button
+                                type="button"
+                                onClick={() => setSearch("")}
+                                className="text-xs font-bold text-orange-600 underline"
+                            >
+                                Clear Search
+                            </button>
+                        )}
                     </div>
                 ) : (
-                    /* Products Grid */
-                    <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                        {items.map((item) => {
-                            const cartItem = cart.find((c) => c.id === item.id);
-                            const qty = cartItem ? cartItem.quantity : 0;
-                            return (
-                                <BlinkitTobaccoCard
-                                    key={item.id}
-                                    item={item}
-                                    quantity={qty}
-                                    onAdd={handleAddItem}
-                                    onRemove={(i) => removeFromCart && removeFromCart(i.id)}
-                                />
-                            );
-                        })}
+                    <div>
+                        <div className="flex items-center justify-between mb-3 px-1">
+                            <span className="text-xs font-bold text-slate-500">
+                                {filteredTobaccoItems.length}{" "}
+                                {filteredTobaccoItems.length === 1 ? "product" : "products"} found
+                            </span>
+                        </div>
+
+                        {/* Grid of ONLY Tobacco Products */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+                            {filteredTobaccoItems.map((item) => {
+                                const qty = token
+                                    ? tableCart[`item_${item.id}`]?.qty || 0
+                                    : globalCart?.find((c) => c.id === item.id)?.quantity || 0;
+
+                                return (
+                                    <BlinkitTobaccoCard
+                                        key={item.id}
+                                        item={item}
+                                        quantity={qty}
+                                        onAdd={handleAddItem}
+                                        onRemove={handleRemoveItem}
+                                    />
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
             </main>
 
-            {/* Cart Button */}
-            {cartCount > 0 && (
-                <button
-                    type="button"
-                    onClick={() => setCartOpen(true)}
-                    className="fixed bottom-4 left-3 right-3 z-40 mx-auto flex max-w-[520px] items-center justify-between gap-3 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-3.5 shadow-2xl transition active:scale-95 sm:left-auto sm:right-6 sm:w-[320px]"
-                >
-                    <div className="flex items-center gap-2 font-bold text-sm">
-                        <ShoppingBag size={18} />
-                        <span>View Cart ({cartCount})</span>
-                    </div>
-                    <span className="font-extrabold text-base">₹{Math.round(Number(total || 0))}</span>
-                </button>
+            {/* Floating Cart Button for Mobile */}
+            {totalCartCount > 0 && (
+                <div className="sticky bottom-4 z-40 px-4 max-w-4xl mx-auto w-full">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (token) {
+                                handleBack();
+                            } else {
+                                setCartDrawerOpen(true);
+                            }
+                        }}
+                        className="w-full flex items-center justify-between rounded-2xl bg-orange-500 hover:bg-orange-600 text-white px-5 py-3.5 shadow-xl shadow-orange-500/25 transition active:scale-98"
+                    >
+                        <div className="flex items-center gap-2 font-bold text-sm">
+                            <ShoppingBag size={18} />
+                            <span>View Cart ({totalCartCount} items)</span>
+                        </div>
+                        <span className="font-extrabold text-base">₹{Math.round(totalCartAmount)}</span>
+                    </button>
+                </div>
             )}
 
-            <CartDrawer open={cartOpen} setOpen={setCartOpen} />
+            {/* Cart Drawer for standard routes */}
+            {!token && (
+                <CartDrawer open={cartDrawerOpen} setOpen={setCartDrawerOpen} />
+            )}
 
             {/* Age Verification Modal */}
             <TobaccoAgeVerificationModal
                 isOpen={showAgeModal}
-                onConfirm={handleAgeConfirm}
-                onCancel={handleAgeCancel}
+                onConfirm={handleConfirmAge}
+                onCancel={handleCancelAge}
             />
 
             <Footer />

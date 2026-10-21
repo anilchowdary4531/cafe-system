@@ -34,6 +34,13 @@ import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { getCustomerFavorites, toggleFavoriteMenuItem } from "../../utils/customerFavorites";
 import ItemCustomizationModal from "../../components/ItemCustomizationModal";
 import VegModeToggle from "../../components/VegModeToggle";
+import {
+  isTobaccoItem,
+  isTobaccoCategory,
+  isTobaccoAgeConfirmed,
+  setTobaccoAgeConfirmed,
+} from "../../utils/tobaccoUtils";
+import TobaccoAgeVerificationModal from "../../components/tobacco/TobaccoAgeVerificationModal";
 
 const FALLBACK_FOOD_IMG = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80";
 
@@ -68,8 +75,26 @@ export default function CustomerQrLandingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [isVegOnly, setIsVegOnly] = useState(false);
-  const [cart, setCart] = useState({});
+  const [cart, setCart] = useState(() => {
+    if (typeof window !== "undefined" && token) {
+      try {
+        const saved = sessionStorage.getItem(`tiffzy_table_cart_${token}`);
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {};
+  });
   const [showCheckoutDrawer, setShowCheckoutDrawer] = useState(false);
+  const [showTobaccoAgeModal, setShowTobaccoAgeModal] = useState(false);
+
+  // Sync cart to sessionStorage for table continuity
+  useEffect(() => {
+    if (token && typeof window !== "undefined") {
+      try {
+        sessionStorage.setItem(`tiffzy_table_cart_${token}`, JSON.stringify(cart));
+      } catch {}
+    }
+  }, [cart, token]);
 
   // Customization Modal State
   const [customizingItem, setCustomizingItem] = useState(null);
@@ -219,13 +244,14 @@ export default function CustomerQrLandingPage() {
     return () => clearInterval(timer);
   }, [billCooldown]);
 
-  // Categories list & dish count calculation
+  // Categories list & dish count calculation (strictly excludes tobacco)
   const categoriesWithCounts = useMemo(() => {
     if (!menu.length) return [{ name: "ALL", count: 0 }];
     const map = {};
     let total = 0;
 
     menu.forEach((item) => {
+      if (isTobaccoItem(item) || isTobaccoCategory(item.category)) return;
       if (isVegOnly && (item.isVeg === false || item.category?.toLowerCase().includes("non-veg"))) return;
       const cat = item.category || "General";
       map[cat] = (map[cat] || 0) + 1;
@@ -238,9 +264,10 @@ export default function CustomerQrLandingPage() {
     ];
   }, [menu, isVegOnly]);
 
-  // Filtered Menu Items
+  // Filtered Menu Items (strictly excludes tobacco products)
   const filteredMenu = useMemo(() => {
     return menu.filter((item) => {
+      if (isTobaccoItem(item) || isTobaccoCategory(item.category)) return false;
       // Category filter
       const matchCat = selectedCategory === "ALL" || (item.category || "General") === selectedCategory;
       // Search filter
@@ -254,6 +281,24 @@ export default function CustomerQrLandingPage() {
       return matchCat && matchSearch && matchVeg;
     });
   }, [menu, selectedCategory, searchQuery, isVegOnly]);
+
+  const handleOpenTobacco = () => {
+    if (!isTobaccoAgeConfirmed()) {
+      setShowTobaccoAgeModal(true);
+    } else {
+      navigate(`/order/table/${token}/tobacco`);
+    }
+  };
+
+  const handleTobaccoAgeConfirm = () => {
+    setTobaccoAgeConfirmed(true);
+    setShowTobaccoAgeModal(false);
+    navigate(`/order/table/${token}/tobacco`);
+  };
+
+  const handleTobaccoAgeCancel = () => {
+    setShowTobaccoAgeModal(false);
+  };
 
   // Cart Calculations
   const cartItemsList = useMemo(() => Object.values(cart), [cart]);
@@ -739,6 +784,15 @@ export default function CustomerQrLandingPage() {
                 </button>
               );
             })}
+
+            {/* Clearly separated Tobacco Entry */}
+            <button
+              type="button"
+              onClick={handleOpenTobacco}
+              className="px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all shadow-xs flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 active:scale-95 shrink-0"
+            >
+              <span>🚬 Tobacco</span>
+            </button>
           </div>
 
           {/* Veg Only Toggle Switch */}
@@ -1129,6 +1183,13 @@ export default function CustomerQrLandingPage() {
           </div>
         </div>
       )}
+
+      {/* Age Verification Modal */}
+      <TobaccoAgeVerificationModal
+        isOpen={showTobaccoAgeModal}
+        onConfirm={handleTobaccoAgeConfirm}
+        onCancel={handleTobaccoAgeCancel}
+      />
     </div>
   );
 }

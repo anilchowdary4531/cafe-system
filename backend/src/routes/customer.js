@@ -427,8 +427,8 @@ export default async function customerRoutes(app, deps = {}) {
             });
           }
 
-          const qty = Math.max(1, Number(rawItem.qty || 1));
-          const price = hasValidRawPrice ? rawPrice : Number(dbItem.price);
+          const qty = Math.max(1, Number(rawItem.qty || rawItem.quantity || 1));
+          const price = dbItem ? Number(dbItem.price) : (hasValidRawPrice ? rawPrice : 0);
           normalizedItems.push({
             menuItemId: dbItem?.id || null,
             itemName: dbItem?.name || String(rawItem.name || rawItem.itemName || "Item").trim(),
@@ -439,11 +439,11 @@ export default async function customerRoutes(app, deps = {}) {
         }
       } else {
         normalizedItems = items.map((rawItem) => {
-          const qty = Math.max(1, Number(rawItem.qty || 1));
-          const price = Number(rawItem.price);
+          const qty = Math.max(1, Number(rawItem.qty || rawItem.quantity || 1));
+          const price = Number(rawItem.price || 0);
           return {
             menuItemId: null,
-            itemName: rawItem.name,
+            itemName: String(rawItem.name || rawItem.itemName || "Item").trim(),
             qty,
             price,
             total: price * qty,
@@ -566,10 +566,24 @@ export default async function customerRoutes(app, deps = {}) {
 
       let activeTableSessionId = null;
       if (normalizedTableNo) {
+        const rawTable = String(normalizedTableNo).trim();
+        const strippedTable = rawTable.replace(/^(table|tbl)[-\s]*/i, "");
+        const possibleTableNos = Array.from(new Set([
+          rawTable,
+          strippedTable,
+          `Table ${strippedTable}`,
+          `Table-${strippedTable}`,
+          `Table ${rawTable}`,
+        ].filter(Boolean)));
+
         const diningTable = await prisma.diningTable.findFirst({
           where: {
             restaurantId: restaurant.id,
-            tableNo: normalizedTableNo,
+            OR: [
+              { tableNo: { in: possibleTableNos, mode: "insensitive" } },
+              ...(Number.isInteger(Number(rawTable)) ? [{ id: Number(rawTable) }] : []),
+              ...(Number.isInteger(Number(strippedTable)) ? [{ id: Number(strippedTable) }] : []),
+            ],
           },
         });
 

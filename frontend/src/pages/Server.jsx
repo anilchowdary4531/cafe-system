@@ -43,6 +43,7 @@ import MealShiftConfigModal from "../components/MealShiftConfigModal";
 import ReservationModal from "../components/ReservationModal";
 import OwnerMenuButton from "../components/OwnerMenuButton";
 import BrandLogo from "../components/BrandLogo";
+import TablePaymentSettlementModal from "../components/TablePaymentSettlementModal";
 import ServerProfileView from "../components/ServerProfileView";
 import ServerNotificationsView from "../components/ServerNotificationsView";
 
@@ -160,6 +161,8 @@ export const resolveTableActiveOrderStatus = (table) => {
     return String(activeOrders[activeOrders.length - 1]?.status || "").toUpperCase();
 };
 
+const globalHandledNotificationKeys = new Map();
+
 export default function Server() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -237,6 +240,7 @@ export default function Server() {
     const [waitlistSummary, setWaitlistSummary] = useState({ waitingCount: 0 });
 
     const [blockModalTable, setBlockModalTable] = useState(null);
+    const [settlementTable, setSettlementTable] = useState(null);
     const [isShiftConfigOpen, setIsShiftConfigOpen] = useState(false);
     const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
     const [editingReservation, setEditingReservation] = useState(null);
@@ -415,6 +419,8 @@ export default function Server() {
         refreshLiveOrders,
         refreshReadyKots,
         fetchUnreadCount,
+        handleViewAssignedTable: null,
+        user,
     });
     useEffect(() => {
         callbacksRef.current = {
@@ -423,6 +429,8 @@ export default function Server() {
             refreshLiveOrders,
             refreshReadyKots,
             fetchUnreadCount,
+            handleViewAssignedTable,
+            user,
         };
     });
 
@@ -464,18 +472,25 @@ export default function Server() {
         const handleNewNotification = (notif) => {
             if (!notif) return;
 
+            // Defense in depth: Verify recipient if specified in notification payload
+            const currentUid = Number(callbacksRef.current.user?.id || callbacksRef.current.user?.userId || 0);
+            const targetUid = Number(notif.recipientId || notif.data?.waiterId || notif.data?.recipientId || 0);
+            if (targetUid && currentUid && targetUid !== currentUid) {
+                return;
+            }
+
             // Defensive deduplication using stable identifier (id or idempotencyKey or table+action)
             const notifKey = notif.id
                 ? `id:${notif.id}`
                 : (notif.idempotencyKey || notif.data?.idempotencyKey)
                     ? `idem:${notif.idempotencyKey || notif.data?.idempotencyKey}`
-                    : notif.data?.tableId && notif.data?.action
-                        ? `table:${notif.data.tableId}:${notif.data.action}`
+                    : (notif.tableId || notif.data?.tableId) && (notif.data?.action || notif.notificationType)
+                        ? `table:${notif.tableId || notif.data?.tableId}:${notif.data?.action || notif.notificationType}`
                         : null;
 
             if (notifKey) {
                 const now = Date.now();
-                const lastSeen = handledNotificationIdsRef.current.get(notifKey);
+                const lastSeen = handledNotificationIdsRef.current.get(notifKey) || globalHandledNotificationKeys.get(notifKey);
 
                 // Periodic eviction of IDs older than 30s to keep map bounded
                 if (handledNotificationIdsRef.current.size > 100) {
@@ -485,12 +500,20 @@ export default function Server() {
                         }
                     }
                 }
+                if (globalHandledNotificationKeys.size > 100) {
+                    for (const [k, timestamp] of globalHandledNotificationKeys.entries()) {
+                        if (now - timestamp > 30000) {
+                            globalHandledNotificationKeys.delete(k);
+                        }
+                    }
+                }
 
                 if (lastSeen && now - lastSeen < 10000) {
                     // Duplicate event arriving within 10s dedupe window; suppress duplicate toast/sound/count
                     return;
                 }
                 handledNotificationIdsRef.current.set(notifKey, now);
+                globalHandledNotificationKeys.set(notifKey, now);
             }
 
             callbacksRef.current.fetchUnreadCount?.();
@@ -500,10 +523,20 @@ export default function Server() {
 
             if (isAssigned || isUnassigned) {
                 playNotificationSound();
+                const targetTableNo = notif.tableNo || notif.data?.tableNo || "";
+                const targetTableId = notif.tableId || notif.data?.tableId || null;
+
                 showToast({
-                    title: notif.title || (isAssigned ? "📋 Table Assigned" : "Table Unassigned"),
-                    message: notif.message || `Table ${notif.data?.tableNo || ""} assignment updated.`,
+                    title: notif.title || (isAssigned ? (targetTableNo ? `📋 Table Assigned — Table ${targetTableNo}` : "📋 Table Assigned") : "Table Unassigned"),
+                    message: notif.message || (isAssigned
+                        ? (targetTableNo ? `Table ${targetTableNo} has been assigned to you. Please check/attend Table ${targetTableNo}.` : "A table has been assigned to you.")
+                        : (targetTableNo ? `Table ${targetTableNo} assignment updated.` : "Table assignment updated.")),
                     variant: isAssigned ? "success" : "info",
+                    actionLabel: isAssigned && (targetTableNo || targetTableId) ? "View Table" : undefined,
+                    durationMs: isAssigned ? 8000 : 4000,
+                    onAction: isAssigned && (targetTableNo || targetTableId) ? () => {
+                        callbacksRef.current.handleViewAssignedTable?.(targetTableNo, targetTableId);
+                    } : undefined,
                 });
                 callbacksRef.current.refreshTables?.({ force: true });
             }
@@ -593,6 +626,25 @@ export default function Server() {
     // Auto-select table if query param ?table=X is provided
     const urlTableParam = searchParams.get("table");
     const autoSelectedRef = useRef(null);
+
+    const handleViewAssignedTable = useCallback((tableNo, tableId) => {
+        if (!tableNo && !tableId) return;
+        setViewMode("FLOOR_PLAN");
+        autoSelectedRef.current = null;
+
+        const normNo = normalizeTableKey(tableNo);
+        const matched = tables.find((t) => {
+            if (tableId && (t.id === Number(tableId) || String(t.id) === String(tableId))) return true;
+            if (tableNo && (String(t.tableNo).trim() === String(tableNo).trim() || normalizeTableKey(t.tableNo) === normNo)) return true;
+            return false;
+        });
+
+        if (matched) {
+            handleSelectTableForOrder(matched);
+        } else if (tableNo) {
+            navigate(`/server?table=${encodeURIComponent(tableNo)}`);
+        }
+    }, [tables, handleSelectTableForOrder, navigate]);
     useEffect(() => {
         if (!urlTableParam) {
             autoSelectedRef.current = null;
@@ -1302,6 +1354,19 @@ export default function Server() {
                                                     ) : (
                                                         <p className="text-[10px] theme-muted italic">No server assigned</p>
                                                     )}
+                                                    {resolveTableActiveOrderStatus(table) === "PAYMENT_PENDING" && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSettlementTable(table);
+                                                            }}
+                                                            className="w-full mt-2 py-1.5 px-3 rounded-lg bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-xs shadow-sm shadow-orange-500/25 flex items-center justify-center gap-1.5 transition"
+                                                            data-testid={`settle-payment-btn-${table.id || table.tableNo}`}
+                                                        >
+                                                            💳 Settle Payment
+                                                        </button>
+                                                    )}
                                                 </div>
                                             ) : isReserved ? (
                                                 <div className="space-y-0.5">
@@ -1636,6 +1701,19 @@ export default function Server() {
                 onSaved={() => {
                     refreshTables();
                     refreshReservations();
+                }}
+            />
+
+            <TablePaymentSettlementModal
+                isOpen={Boolean(settlementTable)}
+                onClose={() => setSettlementTable(null)}
+                table={settlementTable}
+                restaurantId={restaurantId}
+                serverName={user?.name || user?.email || "Staff"}
+                restaurantInfo={user?.restaurant || null}
+                onSettled={async () => {
+                    await refreshTables?.({ force: true });
+                    await refreshLiveOrders?.({ force: true });
                 }}
             />
         </div>

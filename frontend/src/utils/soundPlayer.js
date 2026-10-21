@@ -6,21 +6,20 @@ import sound5 from "../assets/sounds/tiffzy_notification_5.mp3";
 import sound6 from "../assets/sounds/tiffzy_notification_6.mp3";
 
 const SOUND_STORAGE_KEY = "tiffzy_notification_sound";
-
-export const BUILTIN_SOUNDS = [
-  { id: "tiffzy6", name: "6 Tiffzy Notification Sound", type: "file", src: sound6, isDefault: true },
-  { id: "tiffzy1", name: "1 Tiffzy Notification Sound", type: "file", src: sound1 },
-  { id: "tiffzy2", name: "2 Tiffzy Notification Sound", type: "file", src: sound2 },
-  { id: "tiffzy3", name: "3 Tiffzy Notification Sound", type: "file", src: sound3 },
-  { id: "tiffzy4", name: "4 Tiffzy Notification Sound", type: "file", src: sound4 },
-  { id: "tiffzy5", name: "5 Tiffzy Notification Sound", type: "file", src: sound5 },
-  { id: "chime", name: "Pop Premium Chime", type: "builtin", freq: 880 },
-  { id: "bright", name: "Bright Bell", type: "builtin", freq: 1046.5 },
-  { id: "luxury", name: "Luxury Sparkle", type: "builtin", freq: 1318.5 },
-];
+const SOUND_ENABLED_KEY = "tiffzy_notification_sound_enabled";
+const VIBRATION_ENABLED_KEY = "notification_vibration_enabled";
 
 let lastPlayTime = 0;
+let lastVibrateTime = 0;
 let isAudioUnlocked = false;
+
+/**
+ * Reset internal throttles (useful for tests)
+ */
+export const resetSoundAndVibrationState = () => {
+  lastPlayTime = 0;
+  lastVibrateTime = 0;
+};
 
 /**
  * Prime audio playback context on first user interaction
@@ -86,6 +85,18 @@ const playSynthesizedChime = (freq = 880) => {
   }
 };
 
+export const BUILTIN_SOUNDS = [
+  { id: "tiffzy6", name: "6 Tiffzy Notification Sound", type: "file", src: sound6, isDefault: true },
+  { id: "tiffzy1", name: "1 Tiffzy Notification Sound", type: "file", src: sound1 },
+  { id: "tiffzy2", name: "2 Tiffzy Notification Sound", type: "file", src: sound2 },
+  { id: "tiffzy3", name: "3 Tiffzy Notification Sound", type: "file", src: sound3 },
+  { id: "tiffzy4", name: "4 Tiffzy Notification Sound", type: "file", src: sound4 },
+  { id: "tiffzy5", name: "5 Tiffzy Notification Sound", type: "file", src: sound5 },
+  { id: "chime", name: "Pop Premium Chime", type: "builtin", freq: 880 },
+  { id: "bright", name: "Bright Bell", type: "builtin", freq: 1046.5 },
+  { id: "luxury", name: "Luxury Sparkle", type: "builtin", freq: 1318.5 },
+];
+
 /**
  * Get active notification sound config from LocalStorage (defaults to sound 6)
  */
@@ -119,9 +130,101 @@ export const saveSoundConfig = (soundConfig) => {
 };
 
 /**
- * Play current active notification sound
+ * Check if notification sound is enabled (default: true)
  */
-export const playNotificationSound = (overrideConfig = null) => {
+export const isSoundEnabled = () => {
+  try {
+    const saved = localStorage.getItem(SOUND_ENABLED_KEY);
+    if (saved !== null) {
+      return saved === "true";
+    }
+  } catch {
+    // ignore
+  }
+  return true;
+};
+
+/**
+ * Save notification sound enabled state to LocalStorage
+ */
+export const setSoundEnabled = (enabled) => {
+  try {
+    localStorage.setItem(SOUND_ENABLED_KEY, enabled ? "true" : "false");
+  } catch {
+    // ignore
+  }
+};
+
+/**
+ * Check if notification vibration is enabled (default: true)
+ */
+export const isVibrationEnabled = () => {
+  try {
+    const saved = localStorage.getItem(VIBRATION_ENABLED_KEY);
+    if (saved !== null) {
+      return saved === "true";
+    }
+  } catch {
+    // ignore
+  }
+  return true;
+};
+
+/**
+ * Save notification vibration enabled state to LocalStorage
+ */
+export const setVibrationEnabled = (enabled) => {
+  try {
+    localStorage.setItem(VIBRATION_ENABLED_KEY, enabled ? "true" : "false");
+  } catch {
+    // ignore
+  }
+};
+
+/**
+ * Trigger device vibration for notification (independent of sound)
+ */
+export const triggerNotificationVibration = (pattern = [200, 100, 200]) => {
+  const now = Date.now();
+  // Prevent duplicate vibration within 200ms
+  if (now - lastVibrateTime < 200) {
+    return false;
+  }
+  lastVibrateTime = now;
+
+  if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+    try {
+      return navigator.vibrate(pattern);
+    } catch {
+      return false;
+    }
+  }
+  return false;
+};
+
+/**
+ * Play current active notification sound & handle vibration independently
+ *
+ * Options:
+ * - forceSound: boolean (e.g. previewing sound in picker even if sound is currently toggled off)
+ * - forceVibrate: boolean (e.g. testing vibration in picker)
+ * - skipVibrate: boolean (e.g. when only testing audio preview)
+ */
+export const playNotificationSound = (overrideConfig = null, options = {}) => {
+  const { forceSound = false, forceVibrate = false, skipVibrate = false } = options;
+
+  // 1. Independent Vibration Handling
+  const shouldVibrate = !skipVibrate && (forceVibrate || isVibrationEnabled());
+  if (shouldVibrate) {
+    triggerNotificationVibration();
+  }
+
+  // 2. Independent Sound Handling
+  const soundActive = forceSound || isSoundEnabled();
+  if (!soundActive) {
+    return;
+  }
+
   const now = Date.now();
   // Prevent double audio triggers within 150ms
   if (now - lastPlayTime < 150) {

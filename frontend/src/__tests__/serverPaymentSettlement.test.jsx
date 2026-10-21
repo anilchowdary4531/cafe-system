@@ -1,0 +1,352 @@
+import React from "react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import TablePaymentSettlementModal from "../components/TablePaymentSettlementModal";
+import { resolveTableActiveOrderStatus } from "../pages/Server";
+import { api } from "../utils/apiClient";
+import * as receiptPrinter from "../utils/receiptPrinter";
+
+vi.mock("../utils/apiClient", () => ({
+    api: {
+        post: vi.fn(),
+        get: vi.fn(),
+    },
+}));
+
+describe("Tiffzy Server Station — Cash/UPI Payment Settlement & Bill Printing", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    const mockPendingTable = {
+        id: 3,
+        tableNo: "3",
+        isOccupied: true,
+        isBlocked: false,
+        assignedWaiterName: "kamalesh",
+        activeOrderCount: 1,
+        activeOrders: [
+            {
+                id: 101,
+                orderNo: "ORD-101",
+                status: "DELIVERED",
+                paymentStatus: "PENDING",
+                total: 1250,
+                items: [
+                    { itemName: "Butter Chicken", qty: 2, price: 500, total: 1000 },
+                    { itemName: "Garlic Naan", qty: 5, price: 50, total: 250 },
+                ],
+            },
+        ],
+    };
+
+    const mockAvailableTable = {
+        id: 1,
+        tableNo: "1",
+        isOccupied: false,
+        isBlocked: false,
+        activeOrders: [],
+    };
+
+    const mockReservedTable = {
+        id: 2,
+        tableNo: "2",
+        isOccupied: false,
+        isReserved: true,
+        activeOrders: [],
+    };
+
+    const mockBlockedTable = {
+        id: 4,
+        tableNo: "4",
+        isOccupied: true,
+        isBlocked: true,
+        blockReason: "Maintenance",
+        activeOrders: [],
+    };
+
+    const mockPaidTable = {
+        id: 5,
+        tableNo: "5",
+        isOccupied: true,
+        activeOrders: [
+            {
+                id: 105,
+                status: "DELIVERED",
+                paymentStatus: "PAID",
+                total: 800,
+            },
+        ],
+    };
+
+    describe("Phase 2 & 6: Order Status and Settle Button Visibility Rules", () => {
+        it("A: resolves PAYMENT_PENDING when all active orders are DELIVERED and unpaid", () => {
+            const status = resolveTableActiveOrderStatus(mockPendingTable);
+            expect(status).toBe("PAYMENT_PENDING");
+        });
+
+        it("B: does not resolve PAYMENT_PENDING for AVAILABLE table", () => {
+            const status = resolveTableActiveOrderStatus(mockAvailableTable);
+            expect(status).toBeNull();
+        });
+
+        it("does not resolve PAYMENT_PENDING for already paid table", () => {
+            const status = resolveTableActiveOrderStatus(mockPaidTable);
+            expect(status).toBe("PAID");
+        });
+    });
+
+    describe("Phase 3 & 4: Modal UI and Authoritative Bill Amount", () => {
+        it("C & D: displays Table 3, Server kamalesh, and authoritative bill amount ₹1,250.00", () => {
+            render(
+                <TablePaymentSettlementModal
+                    isOpen={true}
+                    onClose={vi.fn()}
+                    table={mockPendingTable}
+                    restaurantId={4}
+                    serverName="kamalesh"
+                />
+            );
+
+            expect(screen.getByTestId("settle-payment-modal")).toBeInTheDocument();
+            expect(screen.getByText("Settle Payment")).toBeInTheDocument();
+            expect(screen.getByText("3")).toBeInTheDocument();
+            expect(screen.getByText("kamalesh")).toBeInTheDocument();
+            expect(screen.getByTestId("modal-bill-amount")).toHaveTextContent("₹1250.00");
+        });
+
+        it("E, F, G: allows selecting CASH and UPI, with only one selected at a time", () => {
+            render(
+                <TablePaymentSettlementModal
+                    isOpen={true}
+                    onClose={vi.fn()}
+                    table={mockPendingTable}
+                    restaurantId={4}
+                    serverName="kamalesh"
+                />
+            );
+
+            const cashBtn = screen.getByTestId("payment-method-cash");
+            const upiBtn = screen.getByTestId("payment-method-upi");
+            const confirmBtn = screen.getByTestId("confirm-payment-btn");
+
+            // Initially Confirm is disabled because nothing is selected
+            expect(confirmBtn).toBeDisabled();
+
+            // Select CASH
+            fireEvent.click(cashBtn);
+            expect(screen.getByText("Confirm Payment (CASH)")).not.toBeDisabled();
+            expect(screen.getByText(/✓ Selected/i)).toBeInTheDocument();
+
+            // Select UPI
+            fireEvent.click(upiBtn);
+            expect(screen.getByText("Confirm Payment (UPI)")).not.toBeDisabled();
+            // UPI details section should now be visible
+            expect(screen.getByTestId("upi-details-section")).toBeInTheDocument();
+            expect(screen.getByTestId("upi-reference-input")).toBeInTheDocument();
+        });
+    });
+
+    describe("Phase 4, 7, 10: Cash Settlement Execution and Duplicate Protection", () => {
+        it("H, I, J, K, L: confirms Cash settlement and transitions to Success screen", async () => {
+            api.post.mockResolvedValueOnce({
+                data: {
+                    cleared: true,
+                    message: "Table 3 bill settled",
+                    orders: [
+                        {
+                            id: 101,
+                            status: "DELIVERED",
+                            paymentStatus: "SUCCESS",
+                            total: 1250,
+                            items: mockPendingTable.activeOrders[0].items,
+                        },
+                    ],
+                    paymentMode: "CASH",
+                    restaurant: { name: "Cafe King", address: "123 Main St", phone: "9876543210" },
+                },
+            });
+
+            const handleSettled = vi.fn();
+            render(
+                <TablePaymentSettlementModal
+                    isOpen={true}
+                    onClose={vi.fn()}
+                    table={mockPendingTable}
+                    restaurantId={4}
+                    serverName="kamalesh"
+                    onSettled={handleSettled}
+                />
+            );
+
+            // Select CASH
+            fireEvent.click(screen.getByTestId("payment-method-cash"));
+
+            // Click Confirm
+            fireEvent.click(screen.getByTestId("confirm-payment-btn"));
+
+            // Verify API call sent authoritative amount and changedByName
+            expect(api.post).toHaveBeenCalledWith(
+                "/owner/4/tables/3/settle-bill",
+                expect.objectContaining({
+                    tableId: 3,
+                    paymentMode: "CASH",
+                    changedByName: "kamalesh",
+                    amount: 1250,
+                })
+            );
+
+            // Wait for success view
+            await waitFor(() => {
+                expect(screen.getByTestId("settlement-success-view")).toBeInTheDocument();
+            });
+
+            expect(screen.getByText(/✓ Payment Successful/i)).toBeInTheDocument();
+            expect(screen.getByTestId("print-bill-btn")).toBeInTheDocument();
+            expect(screen.getByTestId("settlement-done-btn")).toBeInTheDocument();
+            expect(handleSettled).toHaveBeenCalledTimes(1);
+        });
+
+        it("N & O: handles double-click and prevents duplicate settlements", async () => {
+            let resolveApi;
+            api.post.mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        resolveApi = resolve;
+                    })
+            );
+
+            render(
+                <TablePaymentSettlementModal
+                    isOpen={true}
+                    onClose={vi.fn()}
+                    table={mockPendingTable}
+                    restaurantId={4}
+                    serverName="kamalesh"
+                />
+            );
+
+            // Select CASH
+            fireEvent.click(screen.getByTestId("payment-method-cash"));
+
+            const confirmBtn = screen.getByTestId("confirm-payment-btn");
+            fireEvent.click(confirmBtn);
+
+            // During submission, button must be disabled with spinner
+            expect(confirmBtn).toBeDisabled();
+            expect(screen.getByText(/Settling Payment.../i)).toBeInTheDocument();
+
+            // Clicking again must not fire another post
+            fireEvent.click(confirmBtn);
+            expect(api.post).toHaveBeenCalledTimes(1);
+
+            // Finish resolution
+            resolveApi({
+                data: {
+                    cleared: true,
+                    orders: mockPendingTable.activeOrders,
+                    paymentMode: "CASH",
+                },
+            });
+
+            await waitFor(() => {
+                expect(screen.getByTestId("settlement-success-view")).toBeInTheDocument();
+            });
+        });
+    });
+
+    describe("Phase 5: UPI Settlement with Reference & QR", () => {
+        it("F: supports UPI collection with optional reference number", async () => {
+            api.post.mockResolvedValueOnce({
+                data: {
+                    cleared: true,
+                    message: "Table 3 bill settled",
+                    orders: mockPendingTable.activeOrders,
+                    paymentMode: "UPI",
+                },
+            });
+
+            render(
+                <TablePaymentSettlementModal
+                    isOpen={true}
+                    onClose={vi.fn()}
+                    table={mockPendingTable}
+                    restaurantId={4}
+                    serverName="kamalesh"
+                    restaurantInfo={{ upiId: "cafeking@upi", name: "Cafe King" }}
+                />
+            );
+
+            // Select UPI
+            fireEvent.click(screen.getByTestId("payment-method-upi"));
+
+            // Enter reference
+            const refInput = screen.getByTestId("upi-reference-input");
+            fireEvent.change(refInput, { target: { value: "UPI-TXN-987654" } });
+
+            // Confirm
+            fireEvent.click(screen.getByTestId("confirm-payment-btn"));
+
+            expect(api.post).toHaveBeenCalledWith(
+                "/owner/4/tables/3/settle-bill",
+                expect.objectContaining({
+                    tableId: 3,
+                    paymentMode: "UPI",
+                    reference: "UPI-TXN-987654",
+                    amount: 1250,
+                })
+            );
+
+            await waitFor(() => {
+                expect(screen.getByTestId("settlement-success-view")).toBeInTheDocument();
+            });
+            expect(screen.getByText("UPI-TXN-987654")).toBeInTheDocument();
+        });
+    });
+
+    describe("Phase 11 & 12: Bill Printing", () => {
+        it("R & S: triggers printReceiptWindow with authoritative table and order information", async () => {
+            const printSpy = vi.spyOn(receiptPrinter, "printReceiptWindow").mockReturnValue(true);
+
+            api.post.mockResolvedValueOnce({
+                data: {
+                    cleared: true,
+                    orders: mockPendingTable.activeOrders,
+                    paymentMode: "CASH",
+                    restaurant: { name: "Cafe King", address: "Station Road", phone: "9876543210" },
+                },
+            });
+
+            render(
+                <TablePaymentSettlementModal
+                    isOpen={true}
+                    onClose={vi.fn()}
+                    table={mockPendingTable}
+                    restaurantId={4}
+                    serverName="kamalesh"
+                />
+            );
+
+            fireEvent.click(screen.getByTestId("payment-method-cash"));
+            fireEvent.click(screen.getByTestId("confirm-payment-btn"));
+
+            await waitFor(() => {
+                expect(screen.getByTestId("print-bill-btn")).toBeInTheDocument();
+            });
+
+            // Click Print Bill
+            fireEvent.click(screen.getByTestId("print-bill-btn"));
+
+            expect(printSpy).toHaveBeenCalled();
+            const calledArg = printSpy.mock.calls[0][0];
+            expect(calledArg.markup).toContain("Table 3");
+            expect(calledArg.markup).toContain("Butter Chicken");
+            expect(calledArg.markup).toContain("Garlic Naan");
+            expect(calledArg.markup).toContain("₹1250.00");
+            expect(calledArg.markup).toContain("CASH");
+            expect(calledArg.markup).toContain("PAID");
+
+            printSpy.mockRestore();
+        });
+    });
+});

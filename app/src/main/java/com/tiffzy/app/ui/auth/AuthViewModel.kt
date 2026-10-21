@@ -47,6 +47,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     val rememberSession = authDataStore.rememberSession
     val autoDetectLocation = authDataStore.autoDetectLocation
     val notificationsEnabled = authDataStore.notificationsEnabled
+    val notificationSoundEnabled = authDataStore.notificationSoundEnabled
+    val notificationVibrationEnabled = authDataStore.notificationVibrationEnabled
 
     private var timerJob: Job? = null
 
@@ -76,9 +78,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateSettings(remember: Boolean? = null, autoDetect: Boolean? = null, notify: Boolean? = null) {
+    fun updateSettings(
+        remember: Boolean? = null,
+        autoDetect: Boolean? = null,
+        notify: Boolean? = null,
+        sound: Boolean? = null,
+        vibration: Boolean? = null
+    ) {
         viewModelScope.launch {
-            authDataStore.updateSettings(remember, autoDetect, notify)
+            authDataStore.updateSettings(remember, autoDetect, notify, sound, vibration)
         }
     }
 

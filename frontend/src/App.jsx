@@ -482,10 +482,15 @@ export default function App() {
                     {/* ================================= */}
 
                     <Route path="/r/:slug" element={<Landing />} />
+                    <Route path="/r/:slug/tobacco" element={<TobaccoPage />} />
                     <Route path="/r/:slug/menu" element={<RestaurantPublicMenu key={`${location.pathname}${location.search}`} />} />
+                    <Route path="/m/:slug/tobacco" element={<TobaccoPage />} />
+                    <Route path="/m/:slug/:table/tobacco" element={<TobaccoPage />} />
                     <Route path="/m/:slug/:table?" element={<RestaurantMenu key={`${location.pathname}${location.search}`} />} />
                     <Route path="/debug/menu/:slug/:table?" element={<RestaurantMenu key={`${location.pathname}${location.search}`} />} />
+                    <Route path="/order/table/:token/tobacco" element={<TobaccoPage />} />
                     <Route path="/order/table/:token" element={<CustomerQrLandingPage />} />
+                    <Route path="/menu/:token/tobacco" element={<TobaccoPage />} />
                     <Route path="/menu/:token" element={<CustomerDigitalMenuPage />} />
 
                     {/* ================================= */}

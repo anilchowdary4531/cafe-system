@@ -30,6 +30,8 @@ fun SettingsScreen(
     val rememberSession by authViewModel.rememberSession.collectAsState(initial = true)
     val autoDetectLocation by authViewModel.autoDetectLocation.collectAsState(initial = true)
     val notificationsEnabled by authViewModel.notificationsEnabled.collectAsState(initial = true)
+    val notificationSoundEnabled by authViewModel.notificationSoundEnabled.collectAsState(initial = true)
+    val notificationVibrationEnabled by authViewModel.notificationVibrationEnabled.collectAsState(initial = true)
 
     Scaffold(
         topBar = {
@@ -51,6 +53,41 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(Dimens.PaddingLarge)
         ) {
+            Text(
+                text = "NOTIFICATIONS & SOUND",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 2.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+
+            SettingToggleItem(
+                icon = Icons.Default.Notifications,
+                title = "Order notifications",
+                description = "Show order status updates on this device.",
+                checked = notificationsEnabled,
+                onCheckedChange = { authViewModel.updateSettings(notify = it) }
+            )
+
+            SettingToggleItem(
+                icon = Icons.Default.VolumeUp,
+                title = "Notification Sound",
+                description = "Play alert tone when receiving order updates.",
+                checked = notificationSoundEnabled,
+                onCheckedChange = { authViewModel.updateSettings(sound = it) }
+            )
+
+            SettingToggleItem(
+                icon = Icons.Default.Vibration,
+                title = "Vibration",
+                description = "Vibrate device when receiving order updates.",
+                checked = notificationVibrationEnabled,
+                onCheckedChange = { authViewModel.updateSettings(vibration = it) }
+            )
+
+            Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))
+
             Text(
                 text = "PRIVACY",
                 style = MaterialTheme.typography.labelSmall,
@@ -74,14 +111,6 @@ fun SettingsScreen(
                 description = "Uses device location to pick the closest restaurant.",
                 checked = autoDetectLocation,
                 onCheckedChange = { authViewModel.updateSettings(autoDetect = it) }
-            )
-
-            SettingToggleItem(
-                icon = Icons.Default.Notifications,
-                title = "Order notifications",
-                description = "Show order status updates on this device.",
-                checked = notificationsEnabled,
-                onCheckedChange = { authViewModel.updateSettings(notify = it) }
             )
 
             Spacer(modifier = Modifier.height(Dimens.PaddingExtraLarge))

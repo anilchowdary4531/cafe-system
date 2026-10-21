@@ -37,6 +37,7 @@ import ItemImageCarousel from "../../components/ItemImageCarousel";
 import {
     TOBACCO_KEYWORDS,
     isTobaccoItem,
+    isTobaccoCategory,
     isTobaccoText,
     isTobaccoAgeConfirmed,
     setTobaccoAgeConfirmed,
@@ -57,7 +58,6 @@ const FEATURED_MENU_THRESHOLD = 10;
 
 export const SECTION_RULES = [
     { key: "coffee-drinks", label: "Coffee & Drinks", keywords: COFFEE_KEYWORDS, Icon: Coffee, rank: 10 },
-    { key: "cigarettes-tobacco", label: "Cigarettes & Tobacco", keywords: TOBACCO_KEYWORDS, Icon: Tags, rank: 15 },
     { key: "biryani", label: "Biryani", keywords: ["biryani"], Icon: UtensilsCrossed, rank: 20 },
     { key: "pizza", label: "Pizza", keywords: ["pizza"], Icon: Pizza, rank: 30 },
     { key: "burgers", label: "Burgers", keywords: ["burger"], Icon: Sandwich, rank: 40 },
@@ -221,24 +221,19 @@ export default function RestaurantMenu() {
     const [cartOpen, setCartOpen] = useState(false);
     const [favorites, setFavorites] = useState(() => getCustomerFavorites());
     const [showAgeModal, setShowAgeModal] = useState(false);
-    const [pendingTobaccoItem, setPendingTobaccoItem] = useState(null);
     const [selectedDetailItem, setSelectedDetailItem] = useState(null);
 
-    const isTobaccoSearch = useMemo(() => {
-        return isTobaccoText(search) || activeSection === "cigarettes-tobacco";
-    }, [search, activeSection]);
-
-    const handleViewTobaccoItems = () => {
+    const handleOpenTobacco = () => {
         if (!isTobaccoAgeConfirmed()) {
             setShowAgeModal(true);
         } else {
-            scrollToSection("cigarettes-tobacco");
+            const dest = tableNo ? `/m/${slug}/${tableNo}/tobacco` : `/m/${slug}/tobacco`;
+            navigate(dest);
         }
     };
 
     const handleOpenDetail = (item) => {
         if (isTobaccoItem(item) && !isTobaccoAgeConfirmed()) {
-            setPendingTobaccoItem(item);
             setShowAgeModal(true);
             return;
         }
@@ -247,7 +242,6 @@ export default function RestaurantMenu() {
 
     const handleAddToCart = (item) => {
         if (isTobaccoItem(item) && !isTobaccoAgeConfirmed()) {
-            setPendingTobaccoItem(item);
             setShowAgeModal(true);
             return;
         }
@@ -255,17 +249,14 @@ export default function RestaurantMenu() {
     };
 
     const handleAgeConfirm = () => {
-        setTobaccoAgeConfirmed();
+        setTobaccoAgeConfirmed(true);
         setShowAgeModal(false);
-        if (pendingTobaccoItem) {
-            addToCart(pendingTobaccoItem);
-            setPendingTobaccoItem(null);
-        }
+        const dest = tableNo ? `/m/${slug}/${tableNo}/tobacco` : `/m/${slug}/tobacco`;
+        navigate(dest);
     };
 
     const handleAgeCancel = () => {
         setShowAgeModal(false);
-        setPendingTobaccoItem(null);
     };
 
     const sectionRefs = useRef(new Map());
@@ -325,6 +316,11 @@ export default function RestaurantMenu() {
     const filtered = useMemo(() => {
         const q = normalizeText(search);
         return menuWithMeta.filter((item) => {
+            // Strictly exclude tobacco products from the normal restaurant menu
+            if (isTobaccoItem(item) || isTobaccoCategory(item?.category)) {
+                return false;
+            }
+
             if (vegModeEnabled && !isVegModeItem(item)) {
                 return false;
             }
@@ -655,18 +651,25 @@ export default function RestaurantMenu() {
                                     </button>
                                 );
                             })}
+
+                            {/* Clearly separated Tobacco Entry */}
+                            <button
+                                type="button"
+                                onClick={handleOpenTobacco}
+                                className="group flex flex-col items-center shrink-0 transition active:scale-95"
+                            >
+                                <div className="h-12 w-12 sm:h-13 sm:w-13 rounded-2xl border border-amber-300 bg-amber-50 flex items-center justify-center text-base sm:text-lg shadow-2xs hover:bg-amber-100">
+                                    🚬
+                                </div>
+                                <span className="truncate text-center text-[10px] sm:text-[11.5px] font-bold text-amber-900 mt-0.5">
+                                    Tobacco
+                                </span>
+                            </button>
                         </div>
                     </div>
                 </div>
 
                 <div className="space-y-3 sm:space-y-4">
-                    {isTobaccoSearch && (
-                        <TobaccoBanner
-                            onViewItems={handleViewTobaccoItems}
-                            className="mb-4"
-                        />
-                    )}
-
                     {menuSections.map((section) => (
                         <MenuSection
                             key={section.key}

@@ -78,7 +78,7 @@ export default async function ownerRoutes(app, deps = {}) {
       "printers", "analytics", "reports", "paylater", "shifts", "supply", "delivery",
       "delivery_partners", "customers", "discounts", "loyalty", "staff", "settings", "notifications"
     ],
-    STAFF_ALLOWED_ROLES = ["OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STAFF"],
+    STAFF_ALLOWED_ROLES = ["OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STAFF", "SERVER"],
     normalizeAccess = (a) => (a && typeof a === "object" ? a : {}),
     normalizeDbPermissions = (p) => {
       try {
@@ -3349,6 +3349,7 @@ export default async function ownerRoutes(app, deps = {}) {
 
       const paymentMode = normalizeBillPaymentMode(req.body?.paymentMode || req.body?.paymentMethod || req.body?.method);
       const changedByName = req.body?.changedByName ? String(req.body.changedByName).trim() : null;
+      const transactionId = req.body?.transactionId || req.body?.reference || req.body?.transactionRef || null;
       const activeStatuses = ["PLACED", "ACCEPTED", "PREPARING", "READY"];
 
       const rawParam = String(tableParam || "").trim();
@@ -3421,6 +3422,18 @@ export default async function ownerRoutes(app, deps = {}) {
         });
       }
 
+      // Security / Price Protection: validate authoritative total against submitted amount if provided
+      const authoritativeTotal = activeOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+      if (req.body?.amount !== undefined && req.body?.amount !== null) {
+        const submittedAmount = Number(req.body.amount);
+        if (!Number.isNaN(submittedAmount) && Math.abs(submittedAmount - authoritativeTotal) > 0.01) {
+          return reply.code(400).send({
+            message: `Payment amount mismatch. Authoritative total is ₹${authoritativeTotal.toFixed(2)}, received ₹${submittedAmount.toFixed(2)}`,
+            authoritativeTotal,
+          });
+        }
+      }
+
       const updatedOrders = await prisma.$transaction(async (tx) => {
         const results = [];
 
@@ -3437,7 +3450,7 @@ export default async function ownerRoutes(app, deps = {}) {
                   source: "STAFF",
                   changedByUserId: actor?.userId || null,
                   changedByName,
-                  notes: `Bill settled via ${paymentMode}`,
+                  notes: `Bill settled via ${paymentMode}${transactionId ? ` (Ref: ${transactionId})` : ""}`,
                 },
               },
             },
@@ -3462,17 +3475,27 @@ export default async function ownerRoutes(app, deps = {}) {
                 method: paymentMode,
                 amountReceived: existingPayment.amount || Number(order.total || 0),
                 amountDue: 0,
+                transactionId: transactionId || existingPayment.transactionId || null,
                 performedByName: changedByName || actor?.name || "Owner/Staff",
                 tableSessionId: order.tableSessionId || existingPayment.tableSessionId || null,
               },
             });
           } else {
+            let customerAccountId = null;
+            if (order.phone) {
+              const ca = await tx.customerAccount.findUnique({
+                where: { phone: order.phone },
+                select: { id: true },
+              });
+              customerAccountId = ca?.id || null;
+            }
+
             await tx.payment.create({
               data: {
                 restaurantId: order.restaurantId,
                 orderId: order.id,
                 tableSessionId: order.tableSessionId || null,
-                customerId: order.customerId || null,
+                customerId: customerAccountId,
                 amount: Number(order.total || 0),
                 amountDue: 0,
                 amountReceived: Number(order.total || 0),
@@ -3480,7 +3503,8 @@ export default async function ownerRoutes(app, deps = {}) {
                 status: "SUCCESS",
                 paymentMethod: paymentMode,
                 method: paymentMode,
-                provider: paymentMode === "CASH" ? "CASH" : "MANUAL",
+                transactionId: transactionId || null,
+                provider: paymentMode === "CASH" ? "CASH" : (paymentMode === "UPI" ? "UPI_MANUAL" : "MANUAL"),
                 performedByName: changedByName || actor?.name || "Owner/Staff",
               },
             });
@@ -3524,11 +3548,24 @@ export default async function ownerRoutes(app, deps = {}) {
         }
       });
 
+      const dbRestaurant = await prisma.restaurant.findUnique({
+        where: { id: restaurantId },
+        select: { id: true, name: true, phone: true, addressLine1: true, city: true, upiId: true, logoUrl: true, currency: true },
+      });
+      const restaurant = dbRestaurant
+        ? {
+            ...dbRestaurant,
+            address: [dbRestaurant.addressLine1, dbRestaurant.city].filter(Boolean).join(", "),
+          }
+        : null;
+
       return reply.send({
         message: `Table ${effectiveTableNo} bill settled`,
         orders: updatedOrders,
         cleared: true,
         paymentMode,
+        authoritativeTotal,
+        restaurant,
       });
     } catch (err) {
       console.log(err);

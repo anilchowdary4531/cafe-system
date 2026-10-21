@@ -441,7 +441,9 @@ export default async function publicRoutes(app, deps = {}) {
   const handleTobaccoItems = async (req, reply) => {
     try {
       const search = normalizeQuery(req.query?.q || req.query?.query || req.query?.search);
-      const isTobaccoTerm = (s = "") => /cigarette|tobacco|marlboro|gold flake|classic|cigar|pan|hookah/i.test(s);
+      const isTobaccoTerm = (s = "") => {
+        return /\b(cigarette|cigarettes|tobacco|cigar|cigars|marlboro|gold flake|goldflake|classic|bidi|bidis|beedi|beedis|hookah|nicotine|vape)\b/i.test(String(s || ""));
+      };
 
       let rawTobaccoMap = {};
       try {
@@ -456,12 +458,32 @@ export default async function publicRoutes(app, deps = {}) {
         }
       } catch {}
 
+      let resolvedRestaurantId = req.query?.restaurantId ? Number(req.query.restaurantId) : null;
+      if (!resolvedRestaurantId && req.query?.slug) {
+        const rest = await prisma.restaurant.findUnique({
+          where: { slug: String(req.query.slug).trim() },
+          select: { id: true },
+        });
+        if (rest) resolvedRestaurantId = rest.id;
+      }
+      if (!resolvedRestaurantId && req.query?.token) {
+        const tbl = await prisma.diningTable.findFirst({
+          where: { qrToken: String(req.query.token).trim() },
+          select: { restaurantId: true },
+        });
+        if (tbl) resolvedRestaurantId = tbl.restaurantId;
+      }
+
       const itemWhere = {
         isAvailable: true,
         restaurant: {
           isActive: true,
         },
       };
+
+      if (resolvedRestaurantId) {
+        itemWhere.restaurantId = resolvedRestaurantId;
+      }
 
       if (search) {
         itemWhere.OR = [
@@ -497,8 +519,18 @@ export default async function publicRoutes(app, deps = {}) {
           if (!item?.restaurant || item.restaurant.isActive === false || !isAppr) {
             return false;
           }
-          if (!search) {
-            return isTobaccoTerm(item.name) || isTobaccoTerm(item.category) || isTobaccoTerm(item.description);
+          // CRITICAL: Item must ALWAYS be a tobacco product regardless of search term
+          const isTobacco = isTobaccoTerm(item.category) || isTobaccoTerm(item.name) || isTobaccoTerm(item.description);
+          if (!isTobacco) {
+            return false;
+          }
+          if (search) {
+            const q = search.toLowerCase();
+            const matchesSearch =
+              (item.name && item.name.toLowerCase().includes(q)) ||
+              (item.description && item.description.toLowerCase().includes(q)) ||
+              (item.category && item.category.toLowerCase().includes(q));
+            if (!matchesSearch) return false;
           }
           return true;
         })
