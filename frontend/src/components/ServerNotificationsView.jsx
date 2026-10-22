@@ -40,7 +40,11 @@ export default function ServerNotificationsView({
     onNavigateToTable,
     onSelectTable,
     onUnreadCountChange,
+    onBack,
+    backLabel,
 }) {
+    const handleBack = onBack || onBackToFloorPlan;
+    const effectiveBackLabel = backLabel || "Floor Plan";
     const { user, token } = useAuth();
     const { socket } = useStaffSocket();
 
@@ -269,14 +273,15 @@ export default function ServerNotificationsView({
             {/* Header Bar - Compact Layout aligned with Owner Notifications */}
             <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[color:var(--app-border)]/40 pb-2.5">
                 <div className="flex items-center gap-2">
-                    {onBackToFloorPlan && (
+                    {handleBack && (
                         <button
                             type="button"
-                            onClick={onBackToFloorPlan}
+                            onClick={handleBack}
+                            title={`Back to ${effectiveBackLabel}`}
                             className="flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold theme-muted hover:text-[color:var(--app-text)] transition cursor-pointer mr-1"
                         >
                             <ArrowLeft className="h-4 w-4" />
-                            <span className="hidden sm:inline">Floor Plan</span>
+                            <span>{effectiveBackLabel}</span>
                         </button>
                     )}
                     <div className="rounded-xl bg-orange-500/10 p-1.5 text-orange-500 border border-orange-500/20">

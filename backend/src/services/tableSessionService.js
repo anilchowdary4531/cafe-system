@@ -546,9 +546,13 @@ export const completeSessionAndReleaseTable = async ({
         },
       }).catch(() => {});
 
+      const nowTimestamp = Date.now();
+      const nowIso = new Date(nowTimestamp).toISOString();
       const clearPayload = {
+        type: "TABLE_UPDATED",
         restaurantId: Number(restaurantId) || null,
         tableId: tid,
+        id: tid,
         tableNo: tableNo || null,
         status: "AVAILABLE",
         isOccupied: false,
@@ -558,20 +562,29 @@ export const completeSessionAndReleaseTable = async ({
         paymentStatus: null,
         occupiedSince: null,
         assignedServer: null,
+        assignedServerId: null,
+        assignedServerName: null,
         assignedWaiterId: null,
         assignedWaiterName: null,
         session: { status: "CLOSED" },
         activeSession: null,
+        version: nowTimestamp,
+        updatedAt: nowIso,
       };
       const sessionPayload = {
         restaurantId: Number(restaurantId) || null,
         tableId: tid,
+        id: tid,
         tableNo: tableNo || null,
         status: "CLOSED",
         assignedServer: null,
+        assignedServerId: null,
+        assignedServerName: null,
         assignedWaiterId: null,
         assignedWaiterName: null,
-        closedAt: new Date().toISOString(),
+        closedAt: nowIso,
+        version: nowTimestamp,
+        updatedAt: nowIso,
       };
       if (realtime?.io && restaurantId) {
         realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", clearPayload);
@@ -728,9 +741,13 @@ export const completeSessionAndReleaseTable = async ({
 
   // 5. Emit Realtime Events after successful transaction commit
   const effectiveRid = session.restaurantId;
+  const nowTimestamp = Date.now();
+  const nowIso = new Date(nowTimestamp).toISOString();
   const clearPayload = {
+    type: "TABLE_UPDATED",
     restaurantId: effectiveRid,
     tableId: session.tableId || null,
+    id: session.tableId || null,
     tableNo: session.tableNo,
     status: "AVAILABLE",
     isOccupied: false,
@@ -740,22 +757,31 @@ export const completeSessionAndReleaseTable = async ({
     paymentStatus: null,
     occupiedSince: null,
     assignedServer: null,
+    assignedServerId: null,
+    assignedServerName: null,
     assignedWaiterId: null,
     assignedWaiterName: null,
     session: { status: "CLOSED" },
     activeSession: null,
+    version: nowTimestamp,
+    updatedAt: nowIso,
   };
 
   const sessionPayload = {
     restaurantId: effectiveRid,
     tableId: session.tableId || null,
+    id: session.tableId || null,
     tableNo: session.tableNo,
     sessionId: session.id,
     status: "CLOSED",
     assignedServer: null,
+    assignedServerId: null,
+    assignedServerName: null,
     assignedWaiterId: null,
     assignedWaiterName: null,
-    closedAt: new Date().toISOString(),
+    closedAt: nowIso,
+    version: nowTimestamp,
+    updatedAt: nowIso,
   };
 
   const io = realtime?.io || null;

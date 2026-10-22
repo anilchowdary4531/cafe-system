@@ -1062,6 +1062,10 @@ export default async function ownerRoutes(app, deps = {}) {
               assignedWaiterId: table.assignedWaiterId || null,
               assignedWaiterName: table.assignedWaiterName || null,
               assignedServer: table.assignedWaiterName || null,
+              assignedServerId: table.assignedWaiterId || null,
+              assignedServerName: table.assignedWaiterName || null,
+              version: Number(table.updatedAt ? new Date(table.updatedAt).getTime() : Date.now()),
+              updatedAt: table.updatedAt ? new Date(table.updatedAt).toISOString() : new Date().toISOString(),
               occupiedSince: null,
               activeOrderCount: 0,
               activeItemCount: 0,
@@ -1076,6 +1080,9 @@ export default async function ownerRoutes(app, deps = {}) {
               lastOrderAt: null,
             };
           }
+
+          const resolvedWaiterId = activeSession?.waiterId || table.assignedWaiterId || null;
+          const resolvedWaiterName = activeSession?.waiterName || table.assignedWaiterName || null;
 
           return {
             id: table.id,
@@ -1097,9 +1104,13 @@ export default async function ownerRoutes(app, deps = {}) {
               guestCount: upcomingRes.guestCount,
               status: upcomingRes.status,
             } : null,
-            assignedWaiterId: activeSession?.waiterId || table.assignedWaiterId || null,
-            assignedWaiterName: activeSession?.waiterName || table.assignedWaiterName || null,
-            assignedServer: activeSession?.waiterName || table.assignedWaiterName || null,
+            assignedWaiterId: resolvedWaiterId,
+            assignedWaiterName: resolvedWaiterName,
+            assignedServer: resolvedWaiterName,
+            assignedServerId: resolvedWaiterId,
+            assignedServerName: resolvedWaiterName,
+            version: Number(table.updatedAt ? new Date(table.updatedAt).getTime() : Date.now()),
+            updatedAt: table.updatedAt ? new Date(table.updatedAt).toISOString() : new Date().toISOString(),
             occupiedSince: activeSession?.openedAt || tableActiveOrders[0]?.createdAt || null,
             activeOrderCount: tableActiveOrders.length,
             activeItemCount,
@@ -1504,15 +1515,21 @@ export default async function ownerRoutes(app, deps = {}) {
       });
 
       if (realtime?.io || realtime?.staff) {
+        const nowTimestamp = Date.now();
+        const nowIso = new Date(nowTimestamp).toISOString();
         const clearPayload = {
+          type: "TABLE_UPDATED",
           restaurantId: effectiveRid,
           tableId: table.id,
+          id: table.id,
           tableNo: table.tableNo,
           isOccupied: false,
           status: "AVAILABLE",
           assignedWaiterId: updatedTable?.assignedWaiterId || null,
           assignedWaiterName: updatedTable?.assignedWaiterName || null,
           assignedServer: updatedTable?.assignedWaiterName || null,
+          assignedServerId: updatedTable?.assignedWaiterId || null,
+          assignedServerName: updatedTable?.assignedWaiterName || null,
           activeOrders: [],
           activeOrderCount: 0,
           activeItemCount: 0,
@@ -1521,17 +1538,24 @@ export default async function ownerRoutes(app, deps = {}) {
           session: { status: "CLOSED" },
           activeSession: null,
           occupiedSince: null,
+          version: nowTimestamp,
+          updatedAt: nowIso,
         };
         const sessionPayload = {
           restaurantId: effectiveRid,
           tableId: table.id,
+          id: table.id,
           tableNo: table.tableNo,
           sessionId: activeSession?.id || null,
           status: "CLOSED",
           assignedServer: null,
           assignedWaiterId: null,
           assignedWaiterName: null,
-          closedAt: new Date().toISOString(),
+          assignedServerId: null,
+          assignedServerName: null,
+          closedAt: nowIso,
+          version: nowTimestamp,
+          updatedAt: nowIso,
         };
         if (realtime?.io) {
           realtime.io.to(`restaurant_${effectiveRid}`).emit("table:updated", clearPayload);
@@ -3527,7 +3551,16 @@ export default async function ownerRoutes(app, deps = {}) {
     }
 
     const effectiveTableNo = diningTable?.tableNo || tableParam;
-    const orderWhereOr = [{ tableNo: { in: possibleTableNos, mode: "insensitive" } }];
+    const targetTableNos = diningTable
+      ? Array.from(new Set([
+          diningTable.tableNo,
+          String(diningTable.tableNo).replace(/^(table|tbl)[-\s]*/i, ""),
+          `Table ${String(diningTable.tableNo).replace(/^(table|tbl)[-\s]*/i, "")}`,
+          `Table-${String(diningTable.tableNo).replace(/^(table|tbl)[-\s]*/i, "")}`,
+        ].filter(Boolean)))
+      : possibleTableNos;
+
+    const orderWhereOr = [{ tableNo: { in: targetTableNos, mode: "insensitive" } }];
     if (diningTable) {
       orderWhereOr.push({ tableSession: { tableId: diningTable.id } });
     }
@@ -3538,13 +3571,8 @@ export default async function ownerRoutes(app, deps = {}) {
         OR: orderWhereOr,
         AND: [
           {
-            OR: [
-              { status: { in: activeStatuses } },
-              {
-                status: { in: ["SERVED", "DELIVERED", "COMPLETED", "PAYMENT_PENDING"] },
-                paymentStatus: { notIn: ["PAID", "SUCCESS"] },
-              },
-            ],
+            status: { notIn: ["CANCELLED", "VOID", "REJECTED"] },
+            paymentStatus: { notIn: ["PAID", "SUCCESS"] },
           },
         ],
       },
@@ -3574,12 +3602,26 @@ export default async function ownerRoutes(app, deps = {}) {
       orderBy: { createdAt: "asc" },
     });
 
-    const authoritativeTotal = activeOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    let activeSession = null;
+    if (diningTable) {
+      activeSession = await prisma.tableSession.findFirst({
+        where: {
+          restaurantId,
+          tableId: diningTable.id,
+          status: { in: ["OPEN", "BILLING"] },
+        },
+        orderBy: { openedAt: "desc" },
+      });
+    }
+
+    const orderSum = activeOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    const authoritativeTotal = orderSum > 0 ? orderSum : (activeSession ? Number(activeSession.total || 0) : 0);
 
     return {
       diningTable,
       effectiveTableNo,
       activeOrders,
+      activeSession,
       authoritativeTotal,
     };
   };
@@ -3874,19 +3916,34 @@ export default async function ownerRoutes(app, deps = {}) {
   // FEATURE 20 — STAFF MANAGEMENT, WAITER WORKSPACE, RBAC & MANAGER APPROVALS
   // ==========================================
   const emitTableAssignmentUpdate = (restaurantId, tableId, table) => {
-    if (!realtime?.io) return;
+    if (!realtime?.io && !realtime?.staff) return;
     const rid = Number(restaurantId);
+    const tid = Number(tableId);
+    const waiterId = table?.assignedWaiterId ? Number(table.assignedWaiterId) : null;
+    const waiterName = table?.assignedWaiterName || null;
+    const version = Number(table?.updatedAt ? new Date(table.updatedAt).getTime() : Date.now());
+    const updatedAt = table?.updatedAt ? new Date(table.updatedAt).toISOString() : new Date(version).toISOString();
+
     const payload = {
+      type: "TABLE_UPDATED",
       restaurantId: rid,
-      tableId: Number(tableId),
+      tableId: tid,
+      id: tid,
       tableNo: table?.tableNo || null,
-      assignedWaiterId: table?.assignedWaiterId ? Number(table.assignedWaiterId) : null,
-      assignedWaiterName: table?.assignedWaiterName || null,
+      assignedWaiterId: waiterId,
+      assignedWaiterName: waiterName,
+      assignedServer: waiterName,
+      assignedServerId: waiterId,
+      assignedServerName: waiterName,
+      version,
+      updatedAt,
     };
-    realtime.io.to(`restaurant_${rid}`).emit("table:updated", payload);
-    realtime.io.to(`restaurant:${rid}`).emit("table:updated", payload);
-    realtime.io.to(`restaurant_${rid}`).emit("table:waiter_assigned", payload);
-    realtime.io.to(`restaurant:${rid}`).emit("table:waiter_assigned", payload);
+    if (realtime?.io) {
+      realtime.io.to(`restaurant_${rid}`).emit("table:updated", payload);
+      realtime.io.to(`restaurant:${rid}`).emit("table:updated", payload);
+      realtime.io.to(`restaurant_${rid}`).emit("table:waiter_assigned", payload);
+      realtime.io.to(`restaurant:${rid}`).emit("table:waiter_assigned", payload);
+    }
 
     if (realtime?.staff) {
       realtime.staff.to(`restaurant:${rid}`).emit("table:updated", payload);

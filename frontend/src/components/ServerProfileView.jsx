@@ -22,7 +22,15 @@ import { useAuth } from "../context/AuthContext";
 import { API } from "../config";
 import { showToast } from "../utils/toast";
 
-export default function ServerProfileView({ onBackToFloorPlan }) {
+export default function ServerProfileView({
+    onBackToFloorPlan,
+    onBack,
+    backLabel,
+    title,
+}) {
+    const handleBack = onBack || onBackToFloorPlan;
+    const effectiveBackLabel = backLabel || "Back to Floor Plan";
+    const effectiveTitle = title || "Server Profile";
     const { user, logout, token } = useAuth();
 
     const restaurantId = Number(
@@ -165,17 +173,19 @@ export default function ServerProfileView({ onBackToFloorPlan }) {
             {/* Top Navigation Bar */}
             <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-3">
                 <div className="flex items-center gap-3">
-                    <button
-                        type="button"
-                        onClick={onBackToFloorPlan}
-                        className="flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold theme-muted hover:text-[color:var(--app-text)] transition cursor-pointer"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        <span>Back to Floor Plan</span>
-                    </button>
+                    {handleBack && (
+                        <button
+                            type="button"
+                            onClick={handleBack}
+                            className="flex items-center gap-1.5 rounded-xl border border-[color:var(--app-border)]/40 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold theme-muted hover:text-[color:var(--app-text)] transition cursor-pointer"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            <span>{effectiveBackLabel}</span>
+                        </button>
+                    )}
                     <div>
                         <h1 className="text-base sm:text-lg font-black tracking-tight text-[color:var(--app-text)] flex items-center gap-2">
-                            Server Profile
+                            {effectiveTitle}
                             <span className="rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[9px] font-bold">
                                 ACTIVE STAFF
                             </span>

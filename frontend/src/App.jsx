@@ -46,6 +46,7 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import SupplierProtectedRoute from "./routes/SupplierProtectedRoute";
 import { StaffSocketProvider } from "./context/StaffSocketContext.jsx";
 import { CustomerNotificationProvider } from "./context/CustomerNotificationContext.jsx";
+import { TableStateProvider } from "./context/TableStateContext.jsx";
 
 // ============================
 // OWNER / RESTAURANT PAGES
@@ -137,8 +138,9 @@ export default function App() {
     return (
         <AuthProvider>
             <StaffSocketProvider>
-                <CustomerNotificationProvider>
-                    <div className="theme-adaptive min-h-screen">
+                <TableStateProvider>
+                    <CustomerNotificationProvider>
+                        <div className="theme-adaptive min-h-screen">
                         <Routes>
 
                     {/* ================================= */}
@@ -396,6 +398,22 @@ export default function App() {
 
                     <Route
                         path="/kitchen"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"]}>
+                                <Kitchen />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/kitchen/profile"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"]}>
+                                <Kitchen />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/kitchen/notifications"
                         element={
                             <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"]}>
                                 <Kitchen />
@@ -742,6 +760,7 @@ export default function App() {
                     </Routes>
                 </div>
                 </CustomerNotificationProvider>
+                </TableStateProvider>
             </StaffSocketProvider>
         </AuthProvider>
     );

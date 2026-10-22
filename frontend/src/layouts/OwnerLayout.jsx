@@ -1148,9 +1148,11 @@ export default function OwnerLayout() {
         };
 
         const handleTableUpdated = (payload) => {
-            if (payload && (payload.status === "AVAILABLE" || payload.isOccupied === false)) {
-                const targetId = payload.tableId || payload.id;
-                const targetNo = payload.tableNo;
+            if (!payload || typeof payload !== "object") return;
+            const targetId = payload.tableId || payload.id;
+            const targetNo = payload.tableNo;
+
+            if (payload.status === "AVAILABLE" || payload.isOccupied === false) {
                 setTableOverview((prev) => {
                     const updatedTables = (prev.tables || []).map((t) => {
                         const match =
@@ -1183,6 +1185,56 @@ export default function OwnerLayout() {
                         occupied: updatedTables.filter((t) => t.isOccupied).length,
                         tables: updatedTables,
                     };
+                });
+
+                // Immediately clear tableAssignments keys for this table
+                setTableAssignments((prev) => {
+                    const next = { ...(prev || {}) };
+                    if (targetId) delete next[`table-id-${targetId}`];
+                    if (targetNo) {
+                        const normNo = String(targetNo).trim().toLowerCase();
+                        if (restaurantId) delete next[`table-no-${restaurantId}-${normNo}`];
+                        delete next[`table-no-${normNo}`];
+                    }
+                    return next;
+                });
+            } else if (payload.assignedWaiterId !== undefined || payload.assignedWaiterName !== undefined) {
+                const wid = payload.assignedWaiterId ? String(payload.assignedWaiterId) : "";
+                const wname = payload.assignedWaiterName || null;
+                setTableOverview((prev) => {
+                    const updatedTables = (prev.tables || []).map((t) => {
+                        const match =
+                            (targetId && String(t.id) === String(targetId)) ||
+                            (targetNo && String(t.tableNo).toLowerCase() === String(targetNo).toLowerCase());
+                        if (match) {
+                            return {
+                                ...t,
+                                assignedWaiterId: wid ? Number(wid) : null,
+                                assignedWaiterName: wname,
+                                assignedServer: wname,
+                            };
+                        }
+                        return t;
+                    });
+                    return { ...prev, tables: updatedTables };
+                });
+
+                setTableAssignments((prev) => {
+                    const next = { ...(prev || {}) };
+                    if (targetId) {
+                        if (wid) next[`table-id-${targetId}`] = wid;
+                        else delete next[`table-id-${targetId}`];
+                    }
+                    if (targetNo) {
+                        const normNo = String(targetNo).trim().toLowerCase();
+                        if (restaurantId) {
+                            if (wid) next[`table-no-${restaurantId}-${normNo}`] = wid;
+                            else delete next[`table-no-${restaurantId}-${normNo}`];
+                        }
+                        if (wid) next[`table-no-${normNo}`] = wid;
+                        else delete next[`table-no-${normNo}`];
+                    }
+                    return next;
                 });
             }
             loadTableOverview();
@@ -1225,6 +1277,18 @@ export default function OwnerLayout() {
                         tables: updatedTables,
                     };
                 });
+
+                // Immediately clear tableAssignments keys
+                setTableAssignments((prev) => {
+                    const next = { ...(prev || {}) };
+                    if (targetId) delete next[`table-id-${targetId}`];
+                    if (targetNo) {
+                        const normNo = String(targetNo).trim().toLowerCase();
+                        if (restaurantId) delete next[`table-no-${restaurantId}-${normNo}`];
+                        delete next[`table-no-${normNo}`];
+                    }
+                    return next;
+                });
             }
             loadTableOverview();
         };
@@ -1238,7 +1302,7 @@ export default function OwnerLayout() {
         socket.on("reservation:updated", loadTableOverview);
         socket.on("table:updated", handleTableUpdated);
         socket.on("table:session_updated", handleSessionUpdated);
-        socket.on("table:waiter_assigned", loadTableOverview);
+        socket.on("table:waiter_assigned", handleTableUpdated);
         socket.on("table:layout_updated", loadTableOverview);
 
         return () => {
@@ -1330,75 +1394,13 @@ export default function OwnerLayout() {
             return;
         }
 
+        // Clean up legacy localStorage key so stale table assignments are never resurrected
         try {
-            const raw = localStorage.getItem(getTableStaffStorageKey(restaurantId));
-            if (!raw) {
-                setTableAssignments({});
-                setAssignmentsHydrated(true);
-                return;
-            }
+            localStorage.removeItem(getTableStaffStorageKey(restaurantId));
+        } catch (_) {}
 
-            const parsed = JSON.parse(raw);
-            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-                setTableAssignments({});
-                setAssignmentsHydrated(true);
-                return;
-            }
-
-            const normalized = Object.entries(parsed).reduce((acc, [tableKey, staffId]) => {
-                if (!tableKey) return acc;
-                // Ignore legacy ambiguous un-prefixed numeric keys (e.g. "2") to avoid ID/tableNo cross-contamination
-                if (/^\d+$/.test(tableKey)) return acc;
-                acc[String(tableKey)] = String(staffId || "");
-                return acc;
-            }, {});
-            setTableAssignments(normalized);
-            setAssignmentsHydrated(true);
-        } catch {
-            setTableAssignments({});
-            setAssignmentsHydrated(true);
-        }
-    }, [restaurantId]);
-
-    useEffect(() => {
-        if (!restaurantId || !assignmentsHydrated) return;
-        try {
-            localStorage.setItem(
-                getTableStaffStorageKey(restaurantId),
-                JSON.stringify(tableAssignments)
-            );
-        } catch {
-            // Ignore localStorage write failures.
-        }
-    }, [assignmentsHydrated, restaurantId, tableAssignments]);
-
-    useEffect(() => {
-        if (!restaurantId || typeof window === "undefined") return undefined;
-
-        const handleStorage = (event) => {
-            if (!event.key || event.key === getTableStaffStorageKey(restaurantId)) {
-                try {
-                    const raw = localStorage.getItem(getTableStaffStorageKey(restaurantId));
-                    if (raw) {
-                        const parsed = JSON.parse(raw);
-                        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-                            const normalized = Object.entries(parsed).reduce((acc, [tableKey, staffId]) => {
-                                if (!tableKey) return acc;
-                                if (/^\d+$/.test(tableKey)) return acc;
-                                acc[String(tableKey)] = String(staffId || "");
-                                return acc;
-                            }, {});
-                            setTableAssignments(normalized);
-                        }
-                    }
-                } catch {
-                    // Ignore JSON parse errors.
-                }
-            }
-        };
-
-        window.addEventListener("storage", handleStorage);
-        return () => window.removeEventListener("storage", handleStorage);
+        setTableAssignments({});
+        setAssignmentsHydrated(true);
     }, [restaurantId]);
 
     const staffById = useMemo(() => {
@@ -2631,12 +2633,15 @@ export default function OwnerLayout() {
                                                                        (noKey && tableAssignments[noKey]) ||
                                                                        (assignmentKey && tableAssignments[assignmentKey]) ||
                                                                        "";
-                                                 const assignedStaffId = String(
-                                                     table.assignedWaiterId ||
-                                                     table.activeSession?.waiterId ||
-                                                     localAssigned ||
-                                                     ""
-                                                 );
+                                                 const isExplicitlyFree = table.status === "AVAILABLE" || table.isOccupied === false;
+                                                 const assignedStaffId = isExplicitlyFree
+                                                     ? (table.assignedWaiterId ? String(table.assignedWaiterId) : "")
+                                                     : String(
+                                                         table.assignedWaiterId ||
+                                                         table.activeSession?.waiterId ||
+                                                         localAssigned ||
+                                                         ""
+                                                     );
                                                  const fallbackStaffName = table.assignedWaiterName || table.activeSession?.waiterName || (assignedStaffId ? "Server" : "");
                                                  const assignedStaff = assignedStaffId
                                                      ? staffById.get(assignedStaffId) || { id: assignedStaffId, name: fallbackStaffName || `Server`, role: "STAFF" }

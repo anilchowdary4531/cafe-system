@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import {
     AlertTriangle,
     Bell,
@@ -27,6 +27,8 @@ import NotificationSoundPicker from "../components/NotificationSoundPicker";
 import { playNotificationSound } from "../utils/soundPlayer";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
 import { showToast } from "../utils/toast";
+import ServerProfileView from "../components/ServerProfileView";
+import ServerNotificationsView from "../components/ServerNotificationsView";
 
 const KOT_STATUSES = ["ALL", "PENDING", "PREPARING", "READY", "SERVED", "CANCELLED"];
 const PRIORITIES = ["ALL", "NORMAL", "HIGH", "URGENT"];
@@ -98,6 +100,60 @@ export default function Kitchen() {
     const effectiveRole = resolveEffectiveStaffRole(user?.role, user?.designation);
     const isSeniorChef = /SENIOR/i.test(String(user?.designation || ""));
     const titleLabel = isSeniorChef ? "Senior Chef Dispatch KDS" : "Kitchen Operations KDS";
+
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Active View Mode: "KDS" | "PROFILE" | "NOTIFICATIONS"
+    const getInitialViewMode = () => {
+        if (location.pathname.endsWith("/profile")) return "PROFILE";
+        if (location.pathname.endsWith("/notifications")) return "NOTIFICATIONS";
+        return "KDS";
+    };
+    const [viewMode, setViewMode] = useState(getInitialViewMode);
+
+    useEffect(() => {
+        if (location.pathname.endsWith("/profile")) {
+            setViewMode("PROFILE");
+        } else if (location.pathname.endsWith("/notifications")) {
+            setViewMode("NOTIFICATIONS");
+        } else {
+            setViewMode("KDS");
+        }
+    }, [location.pathname]);
+
+    // Unread Notifications Badge
+    const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+    const fetchUnreadCount = useCallback(async () => {
+        try {
+            const res = await api.get("/api/notifications/unread-count");
+            if (res.data?.success) {
+                setUnreadNotificationCount(res.data.count || 0);
+                return;
+            }
+        } catch {
+            // fallback
+        }
+        try {
+            const res = await api.get("/notifications/unread-count");
+            if (res.data?.success) {
+                setUnreadNotificationCount(res.data.count || 0);
+            }
+        } catch {
+            // fallback silently
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchUnreadCount();
+    }, [fetchUnreadCount]);
+
+    const handledNotificationIdsRef = useRef(new Map());
+    const fetchUnreadCountRef = useRef(fetchUnreadCount);
+    useEffect(() => {
+        fetchUnreadCountRef.current = fetchUnreadCount;
+    }, [fetchUnreadCount]);
 
     const [kots, setKots] = useState([]);
     const [stations, setStations] = useState([]);
@@ -227,16 +283,58 @@ export default function Kitchen() {
             if (kot) onKotUpdated(kot);
         };
 
+        const handleNewNotification = (notif) => {
+            if (!notif) return;
+            const notifKey = notif.id
+                ? `id:${notif.id}`
+                : (notif.idempotencyKey || notif.data?.idempotencyKey)
+                ? `idem:${notif.idempotencyKey || notif.data?.idempotencyKey}`
+                : null;
+
+            if (notifKey) {
+                const now = Date.now();
+                const lastSeen = handledNotificationIdsRef.current.get(notifKey);
+                if (handledNotificationIdsRef.current.size > 100) {
+                    for (const [k, timestamp] of handledNotificationIdsRef.current.entries()) {
+                        if (now - timestamp > 30000) {
+                            handledNotificationIdsRef.current.delete(k);
+                        }
+                    }
+                }
+                if (lastSeen && now - lastSeen < 10000) {
+                    return;
+                }
+                handledNotificationIdsRef.current.set(notifKey, now);
+            }
+
+            fetchUnreadCountRef.current?.();
+
+            if (!soundMuted) {
+                playNotificationSound();
+            }
+
+            if (notif.title || notif.message) {
+                showToast({
+                    title: notif.title || "New Notification",
+                    message: notif.message || "",
+                    variant: "info",
+                    durationMs: 3000,
+                });
+            }
+        };
+
         socket.on("kot_created", onKotCreated);
         socket.on("kot:status_updated", onKotUpdated);
         socket.on("kot:item_updated", onKotItemUpdated);
         socket.on("kot:priority_updated", onKotUpdated);
+        socket.on("notification:new", handleNewNotification);
 
         return () => {
             socket.off("kot_created", onKotCreated);
             socket.off("kot:status_updated", onKotUpdated);
             socket.off("kot:item_updated", onKotItemUpdated);
             socket.off("kot:priority_updated", onKotUpdated);
+            socket.off("notification:new", handleNewNotification);
         };
     }, [socket, soundMuted]);
 
@@ -467,10 +565,103 @@ export default function Kitchen() {
                         >
                             Dashboard
                         </Link>
+
+                        {/* Notifications Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (viewMode === "NOTIFICATIONS") {
+                                    setViewMode("KDS");
+                                    navigate("/kitchen");
+                                } else {
+                                    setViewMode("NOTIFICATIONS");
+                                    navigate("/kitchen/notifications");
+                                }
+                            }}
+                            className={`relative flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                                viewMode === "NOTIFICATIONS"
+                                    ? "border-orange-500 bg-orange-500 text-white"
+                                    : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
+                            }`}
+                            title="Kitchen Notifications"
+                        >
+                            <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                            <span className="hidden min-[500px]:inline">Notifications</span>
+                            {unreadNotificationCount > 0 && (
+                                <span className="rounded-full bg-rose-500 text-white px-1.5 py-0.2 text-[9px] sm:text-[10px] font-black animate-pulse">
+                                    {unreadNotificationCount}
+                                </span>
+                            )}
+                        </button>
+
+                        {/* Profile Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (viewMode === "PROFILE") {
+                                    setViewMode("KDS");
+                                    navigate("/kitchen");
+                                } else {
+                                    setViewMode("PROFILE");
+                                    navigate("/kitchen/profile");
+                                }
+                            }}
+                            className={`flex items-center gap-1.5 rounded-xl border px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                                viewMode === "PROFILE"
+                                    ? "border-orange-500 bg-orange-500 text-white"
+                                    : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
+                            }`}
+                            title="My Profile"
+                        >
+                            <div className={`h-5 w-5 rounded-full flex items-center justify-center font-black text-[10px] ${
+                                viewMode === "PROFILE" ? "bg-white text-orange-600" : "bg-orange-500 text-white"
+                            }`}>
+                                {(user?.name || user?.username || "C").charAt(0).toUpperCase()}
+                            </div>
+                            <span className="hidden sm:inline font-bold">{user?.name?.split(" ")[0] || "Profile"}</span>
+                        </button>
                     </div>
                 </div>
             </header>
 
+            {/* Main Content Body */}
+            {viewMode === "PROFILE" ? (
+                <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full">
+                    <ServerProfileView
+                        onBackToFloorPlan={() => {
+                            setViewMode("KDS");
+                            navigate("/kitchen");
+                        }}
+                        onBack={() => {
+                            setViewMode("KDS");
+                            navigate("/kitchen");
+                        }}
+                        backLabel="Kitchen"
+                        title="Kitchen Profile"
+                    />
+                </div>
+            ) : viewMode === "NOTIFICATIONS" ? (
+                <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full">
+                    <ServerNotificationsView
+                        onUnreadCountChange={setUnreadNotificationCount}
+                        onNavigateToTable={(tableNo) => {
+                            setViewMode("KDS");
+                            navigate("/kitchen");
+                            if (tableNo) setSearchQuery(String(tableNo));
+                        }}
+                        onBackToFloorPlan={() => {
+                            setViewMode("KDS");
+                            navigate("/kitchen");
+                        }}
+                        onBack={() => {
+                            setViewMode("KDS");
+                            navigate("/kitchen");
+                        }}
+                        backLabel="Kitchen"
+                    />
+                </div>
+            ) : (
+                <>
             {/* Station Filter Tabs */}
             <div className="border-b border-slate-200 bg-white px-4 py-2 sm:px-6">
                 <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
@@ -697,6 +888,8 @@ export default function Kitchen() {
                     </div>
                 )}
             </main>
+                </>
+            )}
 
             {/* Sound Notification Modal */}
             {soundModalOpen ? (

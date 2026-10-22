@@ -43,6 +43,7 @@ import MealShiftConfigModal from "../components/MealShiftConfigModal";
 import ReservationModal from "../components/ReservationModal";
 import OwnerMenuButton from "../components/OwnerMenuButton";
 import BrandLogo from "../components/BrandLogo";
+import { useCanonicalTables } from "../context/TableStateContext";
 import TablePaymentSettlementModal from "../components/TablePaymentSettlementModal";
 import ServerProfileView from "../components/ServerProfileView";
 import ServerNotificationsView from "../components/ServerNotificationsView";
@@ -272,6 +273,15 @@ export default function Server() {
 
     const fetchUnreadCount = useCallback(async () => {
         try {
+            const res = await api.get("/api/notifications/unread-count");
+            if (res.data?.success) {
+                setUnreadNotificationCount(res.data.count || 0);
+                return;
+            }
+        } catch {
+            // fallback to alias
+        }
+        try {
             const res = await api.get("/notifications/unread-count");
             if (res.data?.success) {
                 setUnreadNotificationCount(res.data.count || 0);
@@ -370,6 +380,9 @@ export default function Server() {
         });
     }, []);
 
+    // Canonical Global Table State
+    const { tables: canonicalTables, refreshTables: refreshCanonicalTables } = useCanonicalTables();
+
     // Data fetching via useCachedGet
     const {
         data: tablesData,
@@ -380,6 +393,11 @@ export default function Server() {
         ttlMs: 15_000,
         scope: `server-tables:${restaurantId}`,
     });
+
+    const combinedRefreshTables = useCallback((opts) => {
+        refreshTables?.(opts);
+        refreshCanonicalTables?.(opts);
+    }, [refreshTables, refreshCanonicalTables]);
 
     const { data: menuData, loading: menuLoading } = useCachedGet(
         restaurantId ? `/owner/${restaurantId}/menu` : "/owner/_/menu",
@@ -418,7 +436,9 @@ export default function Server() {
     );
 
     const tables = useMemo(() => {
-        const rawTables = !tablesData ? [] : Array.isArray(tablesData.tables) ? tablesData.tables : Array.isArray(tablesData) ? tablesData : [];
+        const rawTables = canonicalTables.length > 0
+            ? canonicalTables
+            : (!tablesData ? [] : Array.isArray(tablesData.tables) ? tablesData.tables : Array.isArray(tablesData) ? tablesData : []);
         if (!rawTables.length) return [];
 
         return rawTables.map((t) => {
@@ -465,7 +485,7 @@ export default function Server() {
 
             return t;
         });
-    }, [tablesData, tableOverrides]);
+    }, [tablesData, tableOverrides, canonicalTables]);
 
     const menuItems = useMemo(() => {
         if (!menuData) return [];
@@ -577,7 +597,7 @@ export default function Server() {
 
     const handledNotificationIdsRef = useRef(new Map());
     const callbacksRef = useRef({
-        refreshTables,
+        refreshTables: combinedRefreshTables,
         refreshReservations,
         refreshLiveOrders,
         refreshReadyKots,
@@ -588,7 +608,7 @@ export default function Server() {
     });
     useEffect(() => {
         callbacksRef.current = {
-            refreshTables,
+            refreshTables: combinedRefreshTables,
             refreshReservations,
             refreshLiveOrders,
             refreshReadyKots,

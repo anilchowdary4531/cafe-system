@@ -35,6 +35,7 @@ import {
     resolveTableGroup,
     toTitleCase,
 } from "../../utils/tableGrouping";
+import { useCanonicalTables } from "../../context/TableStateContext";
 
 const ALL_GROUPS_FILTER = "All";
 
@@ -65,8 +66,16 @@ const formatAge = (isoDate) => {
 export default function OwnerTables() {
     const navigate = useNavigate();
     const { socket } = useStaffSocket();
+    const { tables: canonicalTables, refreshTables: refreshCanonicalTables } = useCanonicalTables();
 
     const [tables, setTables] = useState([]);
+
+    useEffect(() => {
+        if (canonicalTables && canonicalTables.length > 0) {
+            setTables(canonicalTables);
+            setLoading(false);
+        }
+    }, [canonicalTables]);
     const [activeSessions, setActiveSessions] = useState({});
     const [form, setForm] = useState(emptyForm);
     const [editingId, setEditingId] = useState(null);
@@ -668,19 +677,23 @@ export default function OwnerTables() {
         };
 
         const handleTableUpdated = (payload) => {
-            if (payload && (payload.status === "AVAILABLE" || payload.isOccupied === false)) {
-                if (payload.tableId) {
+            if (!payload || typeof payload !== "object") return;
+            const targetId = payload.tableId || payload.id;
+            const targetNo = payload.tableNo;
+
+            if (payload.status === "AVAILABLE" || payload.isOccupied === false) {
+                if (targetId) {
                     setActiveSessions((prev) => {
                         const next = { ...prev };
-                        delete next[String(payload.tableId)];
+                        delete next[String(targetId)];
                         return next;
                     });
                 }
                 setTables((prev) =>
                     prev.map((t) => {
                         const match =
-                            (payload.tableId && String(t.id) === String(payload.tableId)) ||
-                            (payload.tableNo && String(t.tableNo).trim().toLowerCase() === String(payload.tableNo).trim().toLowerCase());
+                            (targetId && String(t.id) === String(targetId)) ||
+                            (targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
                         if (match) {
                             return {
                                 ...t,
@@ -702,13 +715,32 @@ export default function OwnerTables() {
                         return t;
                     })
                 );
+            } else if (payload.assignedWaiterId !== undefined || payload.assignedWaiterName !== undefined) {
+                const wid = payload.assignedWaiterId ? Number(payload.assignedWaiterId) : null;
+                const wname = payload.assignedWaiterName || null;
+                setTables((prev) =>
+                    prev.map((t) => {
+                        const match =
+                            (targetId && String(t.id) === String(targetId)) ||
+                            (targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+                        if (match) {
+                            return {
+                                ...t,
+                                assignedWaiterId: wid,
+                                assignedWaiterName: wname,
+                                assignedServer: wname,
+                            };
+                        }
+                        return t;
+                    })
+                );
             }
             handleReservationChange();
         };
 
         socket.on("table:session_updated", onSessionUpdated);
         socket.on("table:updated", handleTableUpdated);
-        socket.on("table:waiter_assigned", handleReservationChange);
+        socket.on("table:waiter_assigned", handleTableUpdated);
         socket.on("table:layout_updated", loadTables);
         socket.on("order:created", loadActiveSessions);
         socket.on("order:updated", loadActiveSessions);

@@ -125,8 +125,8 @@ export default async function notificationRoutes(app, deps) {
     return null;
   };
 
-  // GET /api/notifications — Fetch user/customer paginated notifications
-  app.get("/api/notifications", async (req, reply) => {
+  // GET /api/notifications & /notifications — Fetch user/customer paginated notifications
+  const getNotificationsHandler = async (req, reply) => {
     const actor = await resolveActor(req);
     if (!actor) return reply.code(401).send({ message: "Authentication required" });
 
@@ -144,10 +144,12 @@ export default async function notificationRoutes(app, deps) {
     });
 
     return result;
-  });
+  };
+  app.get("/api/notifications", getNotificationsHandler);
+  app.get("/notifications", getNotificationsHandler);
 
-  // GET /api/notifications/unread-count — Unread badge count
-  app.get("/api/notifications/unread-count", async (req, reply) => {
+  // GET /api/notifications/unread-count & /notifications/unread-count — Unread badge count
+  const unreadCountHandler = async (req, reply) => {
     const actor = await resolveActor(req);
     if (!actor) return reply.code(401).send({ message: "Authentication required" });
 
@@ -178,7 +180,9 @@ export default async function notificationRoutes(app, deps) {
     }
 
     return { success: true, count, unreadCount: count };
-  });
+  };
+  app.get("/api/notifications/unread-count", unreadCountHandler);
+  app.get("/notifications/unread-count", unreadCountHandler);
 
   // PATCH & POST /api/notifications/:id/read — Mark single notification read
   const markReadHandler = async (req, reply) => {
@@ -198,6 +202,8 @@ export default async function notificationRoutes(app, deps) {
   };
   app.patch("/api/notifications/:id/read", markReadHandler);
   app.post("/api/notifications/:id/read", markReadHandler);
+  app.patch("/notifications/:id/read", markReadHandler);
+  app.post("/notifications/:id/read", markReadHandler);
 
   // PATCH & POST /api/notifications/read-all — Mark all notifications read
   const markAllReadHandler = async (req, reply) => {
@@ -215,6 +221,8 @@ export default async function notificationRoutes(app, deps) {
   };
   app.patch("/api/notifications/read-all", markAllReadHandler);
   app.post("/api/notifications/read-all", markAllReadHandler);
+  app.patch("/notifications/read-all", markAllReadHandler);
+  app.post("/notifications/read-all", markAllReadHandler);
 
   // POST /api/notifications/devices — Register/update FCM Device Token
   app.post("/api/notifications/devices", async (req, reply) => {

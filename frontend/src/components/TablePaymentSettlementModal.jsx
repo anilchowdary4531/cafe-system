@@ -50,7 +50,7 @@ export default function TablePaymentSettlementModal({
         if (initialOrders.length > 0) {
             return initialOrders.reduce((sum, order) => sum + getReceiptOrderTotal(order), 0);
         }
-        return Number(table.activeSession?.total || table.total || 0);
+        return Number(table.activeSession?.total || table.payableAmount || table.total || 0);
     }, [table, initialOrders]);
 
     // Fetch authoritative bill directly from backend to ensure 100% authoritative sync
