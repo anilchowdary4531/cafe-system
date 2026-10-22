@@ -131,12 +131,27 @@ export const ensureStaffLoginTokensTable = async (prisma) => {
         "created_by" INTEGER,
         CONSTRAINT "staff_login_tokens_pkey" PRIMARY KEY ("id")
       );
-      CREATE UNIQUE INDEX IF NOT EXISTS "staff_login_tokens_token_hash_key" ON "staff_login_tokens"("token_hash");
-      CREATE INDEX IF NOT EXISTS "staff_login_tokens_token_hash_idx" ON "staff_login_tokens"("token_hash");
-      CREATE INDEX IF NOT EXISTS "staff_login_tokens_staff_id_idx" ON "staff_login_tokens"("staff_id");
-      CREATE INDEX IF NOT EXISTS "staff_login_tokens_restaurant_id_idx" ON "staff_login_tokens"("restaurant_id");
-      CREATE INDEX IF NOT EXISTS "staff_login_tokens_expires_at_idx" ON "staff_login_tokens"("expires_at");
     `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "staff_login_tokens_token_hash_key" ON "staff_login_tokens"("token_hash");
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "staff_login_tokens_token_hash_idx" ON "staff_login_tokens"("token_hash");
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "staff_login_tokens_staff_id_idx" ON "staff_login_tokens"("staff_id");
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "staff_login_tokens_restaurant_id_idx" ON "staff_login_tokens"("restaurant_id");
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "staff_login_tokens_expires_at_idx" ON "staff_login_tokens"("expires_at");
+    `).catch(() => {});
 
     // Safe foreign key setup (tolerating differences between "users"/"restaurants" and "User"/"Restaurant")
     await prisma.$executeRawUnsafe(`
@@ -152,7 +167,11 @@ export const ensureStaffLoginTokensTable = async (prisma) => {
             END;
           END;
         END IF;
+      END $$;
+    `).catch(() => {});
 
+    await prisma.$executeRawUnsafe(`
+      DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'staff_login_tokens_restaurant_id_fkey') THEN
           BEGIN
             ALTER TABLE "staff_login_tokens" ADD CONSTRAINT "staff_login_tokens_restaurant_id_fkey" FOREIGN KEY ("restaurant_id") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
