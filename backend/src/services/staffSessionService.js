@@ -110,6 +110,67 @@ const STAFF_LOGIN_TOKEN_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 export const hashStaffLoginToken = (token) =>
   crypto.createHash("sha256").update(String(token || "").trim()).digest("hex");
 
+const isMissingTableError = (err) =>
+  err?.code === "P2021" ||
+  String(err?.message || "").includes("does not exist in the current database") ||
+  String(err?.message || "").includes("relation \"staff_login_tokens\" does not exist");
+
+export const ensureStaffLoginTokensTable = async (prisma) => {
+  if (!prisma || typeof prisma.$executeRawUnsafe !== "function") return;
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "staff_login_tokens" (
+        "id" SERIAL NOT NULL,
+        "staff_id" INTEGER NOT NULL,
+        "restaurant_id" INTEGER NOT NULL,
+        "token_hash" TEXT NOT NULL,
+        "purpose" TEXT NOT NULL DEFAULT 'STAFF_LOGIN',
+        "expires_at" TIMESTAMP(3) NOT NULL,
+        "used_at" TIMESTAMP(3),
+        "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "created_by" INTEGER,
+        CONSTRAINT "staff_login_tokens_pkey" PRIMARY KEY ("id")
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS "staff_login_tokens_token_hash_key" ON "staff_login_tokens"("token_hash");
+      CREATE INDEX IF NOT EXISTS "staff_login_tokens_token_hash_idx" ON "staff_login_tokens"("token_hash");
+      CREATE INDEX IF NOT EXISTS "staff_login_tokens_staff_id_idx" ON "staff_login_tokens"("staff_id");
+      CREATE INDEX IF NOT EXISTS "staff_login_tokens_restaurant_id_idx" ON "staff_login_tokens"("restaurant_id");
+      CREATE INDEX IF NOT EXISTS "staff_login_tokens_expires_at_idx" ON "staff_login_tokens"("expires_at");
+    `);
+
+    // Safe foreign key setup (tolerating differences between "users"/"restaurants" and "User"/"Restaurant")
+    await prisma.$executeRawUnsafe(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'staff_login_tokens_staff_id_fkey') THEN
+          BEGIN
+            ALTER TABLE "staff_login_tokens" ADD CONSTRAINT "staff_login_tokens_staff_id_fkey" FOREIGN KEY ("staff_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+          EXCEPTION WHEN OTHERS THEN
+            BEGIN
+              ALTER TABLE "staff_login_tokens" ADD CONSTRAINT "staff_login_tokens_staff_id_fkey" FOREIGN KEY ("staff_id") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+            EXCEPTION WHEN OTHERS THEN
+              NULL;
+            END;
+          END;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'staff_login_tokens_restaurant_id_fkey') THEN
+          BEGIN
+            ALTER TABLE "staff_login_tokens" ADD CONSTRAINT "staff_login_tokens_restaurant_id_fkey" FOREIGN KEY ("restaurant_id") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+          EXCEPTION WHEN OTHERS THEN
+            BEGIN
+              ALTER TABLE "staff_login_tokens" ADD CONSTRAINT "staff_login_tokens_restaurant_id_fkey" FOREIGN KEY ("restaurant_id") REFERENCES "Restaurant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+            EXCEPTION WHEN OTHERS THEN
+              NULL;
+            END;
+          END;
+        END IF;
+      END $$;
+    `).catch(() => {});
+  } catch (err) {
+    console.error("[staffSessionService] Failed to ensure staff_login_tokens table:", err?.message);
+  }
+};
+
 export const generateStaffLoginToken = async ({
   prisma,
   staffId,
@@ -134,33 +195,70 @@ export const generateStaffLoginToken = async ({
     throw err;
   }
 
-  // Invalidate any previously generated, unconsumed login tokens for this staff member
-  await prisma.staffLoginToken.updateMany({
-    where: {
-      staffId: Number(staffId),
-      restaurantId: Number(restaurantId),
-      usedAt: null,
-    },
-    data: {
-      usedAt: new Date(),
-    },
-  });
+  // Invalidate any previously generated, unconsumed login tokens for this staff member (with self-healing retry)
+  try {
+    await prisma.staffLoginToken.updateMany({
+      where: {
+        staffId: Number(staffId),
+        restaurantId: Number(restaurantId),
+        usedAt: null,
+      },
+      data: {
+        usedAt: new Date(),
+      },
+    });
+  } catch (err) {
+    if (isMissingTableError(err)) {
+      await ensureStaffLoginTokensTable(prisma);
+      await prisma.staffLoginToken.updateMany({
+        where: {
+          staffId: Number(staffId),
+          restaurantId: Number(restaurantId),
+          usedAt: null,
+        },
+        data: {
+          usedAt: new Date(),
+        },
+      });
+    } else {
+      throw err;
+    }
+  }
 
   // Generate cryptographically secure random token (256 bits entropy)
   const rawToken = crypto.randomBytes(32).toString("hex");
   const tokenHash = hashStaffLoginToken(rawToken);
   const expiresAt = new Date(Date.now() + STAFF_LOGIN_TOKEN_EXPIRY_MS);
 
-  const tokenRecord = await prisma.staffLoginToken.create({
-    data: {
-      staffId: Number(staffId),
-      restaurantId: Number(restaurantId),
-      tokenHash,
-      purpose: STAFF_LOGIN_PURPOSE,
-      expiresAt,
-      createdBy: createdBy ? Number(createdBy) : null,
-    },
-  });
+  let tokenRecord;
+  try {
+    tokenRecord = await prisma.staffLoginToken.create({
+      data: {
+        staffId: Number(staffId),
+        restaurantId: Number(restaurantId),
+        tokenHash,
+        purpose: STAFF_LOGIN_PURPOSE,
+        expiresAt,
+        createdBy: createdBy ? Number(createdBy) : null,
+      },
+    });
+  } catch (err) {
+    if (isMissingTableError(err)) {
+      await ensureStaffLoginTokensTable(prisma);
+      tokenRecord = await prisma.staffLoginToken.create({
+        data: {
+          staffId: Number(staffId),
+          restaurantId: Number(restaurantId),
+          tokenHash,
+          purpose: STAFF_LOGIN_PURPOSE,
+          expiresAt,
+          createdBy: createdBy ? Number(createdBy) : null,
+        },
+      });
+    } else {
+      throw err;
+    }
+  }
 
   const base = trimSlash(frontendUrl);
   const path = `/login?mode=staff&token=${rawToken}`;
@@ -203,17 +301,37 @@ export const consumeStaffLoginToken = async ({
   }
 
   const tokenHash = hashStaffLoginToken(rawToken);
-  const tokenRecord = await prisma.staffLoginToken.findUnique({
-    where: { tokenHash },
-    include: {
-      staff: {
-        include: {
-          restaurant: true,
-          staffAccess: { select: { permissions: true, role: true } },
+  let tokenRecord;
+  try {
+    tokenRecord = await prisma.staffLoginToken.findUnique({
+      where: { tokenHash },
+      include: {
+        staff: {
+          include: {
+            restaurant: true,
+            staffAccess: { select: { permissions: true, role: true } },
+          },
         },
       },
-    },
-  });
+    });
+  } catch (err) {
+    if (isMissingTableError(err)) {
+      await ensureStaffLoginTokensTable(prisma);
+      tokenRecord = await prisma.staffLoginToken.findUnique({
+        where: { tokenHash },
+        include: {
+          staff: {
+            include: {
+              restaurant: true,
+              staffAccess: { select: { permissions: true, role: true } },
+            },
+          },
+        },
+      });
+    } else {
+      throw err;
+    }
+  }
 
   if (!tokenRecord) {
     const err = new Error("Invalid staff login link");

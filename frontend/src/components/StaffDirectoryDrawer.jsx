@@ -84,7 +84,16 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
             showToast(`One-time login link generated for ${u.name} (valid 10 mins)`, "success");
         } catch (err) {
             console.log(err);
-            showToast(err?.response?.data?.message || "Failed to generate login link", "error");
+            const rawMsg = String(err?.response?.data?.message || err?.message || "");
+            const isInternal =
+                rawMsg.toLowerCase().includes("prisma") ||
+                rawMsg.toLowerCase().includes("invocation") ||
+                rawMsg.toLowerCase().includes("database") ||
+                rawMsg.toLowerCase().includes("table");
+            const msg = isInternal
+                ? "Unable to generate secure login link at this moment. Please use the standard login URL or reset password."
+                : (rawMsg || "Failed to generate login link");
+            showToast(msg, "error");
         } finally {
             setGeneratingLoginLinkFor(null);
         }

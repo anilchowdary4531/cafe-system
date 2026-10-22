@@ -3366,8 +3366,15 @@ export default async function ownerRoutes(app, deps = {}) {
       };
     } catch (err) {
       console.log(err);
+      const isInternalDbError =
+        String(err?.message || "").includes("prisma") ||
+        String(err?.message || "").includes("invocation") ||
+        String(err?.message || "").includes("database") ||
+        err?.code === "P2021";
       return reply.code(err?.statusCode || 500).send({
-        message: err?.message || "Failed to generate staff login link",
+        message: isInternalDbError
+          ? "Database setup in progress. Please retry generating the link in a moment, or use the standard login URL."
+          : (err?.message || "Failed to generate staff login link"),
       });
     }
   };

@@ -658,7 +658,15 @@ export default function OwnerStaff() {
             });
         } catch (err) {
             console.log(err);
-            const msg = err?.response?.data?.message || "Failed to generate login link.";
+            const rawMsg = String(err?.response?.data?.message || err?.message || "");
+            const isInternal =
+                rawMsg.toLowerCase().includes("prisma") ||
+                rawMsg.toLowerCase().includes("invocation") ||
+                rawMsg.toLowerCase().includes("database") ||
+                rawMsg.toLowerCase().includes("table");
+            const msg = isInternal
+                ? "Unable to generate secure login link at this moment. Please use the standard login URL or reset password."
+                : (rawMsg || "Failed to generate login link.");
             setError(msg);
             showToast({
                 title: "Generation Failed",
