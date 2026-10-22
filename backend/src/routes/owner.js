@@ -937,8 +937,7 @@ export default async function ownerRoutes(app, deps = {}) {
             0
           );
 
-          const hasUnpaidDeliveredLatest = latestOrder && ["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(String(latestOrder.status || "").toUpperCase()) && !["PAID", "SUCCESS"].includes(String(latestOrder.paymentStatus || "").toUpperCase());
-          const isOccupied = Boolean(activeSession) || tableActiveOrders.length > 0 || Boolean(hasUnpaidDeliveredLatest);
+          const isOccupied = Boolean(activeSession) || tableActiveOrders.length > 0;
           const isReserved = !isOccupied && Boolean(activeRes);
           const isBlocked = Boolean(table.isBlocked);
 
@@ -958,7 +957,7 @@ export default async function ownerRoutes(app, deps = {}) {
                 return orders[orders.length - 1]?.status || null;
               }
 
-              if (fallbackLatest) {
+              if (fallbackLatest && activeSession) {
                 const ls = String(fallbackLatest.status || "").toUpperCase();
                 const lp = String(fallbackLatest.paymentStatus || "").toUpperCase();
                 if (["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(ls)) {
@@ -971,7 +970,7 @@ export default async function ownerRoutes(app, deps = {}) {
               return null;
             };
 
-            const activeOrderStatus = resolveCanonicalActiveOrderStatus(tableActiveOrders, latestOrder);
+            const activeOrderStatus = resolveCanonicalActiveOrderStatus(tableActiveOrders, activeSession ? latestOrder : null);
 
             return {
               isOccupied,
@@ -1289,19 +1288,25 @@ export default async function ownerRoutes(app, deps = {}) {
           hasActivePrepOrders: activePrepOrders.length > 0,
           unpaidCount: unpaidOrders.length,
           prepCount: activePrepOrders.length,
-          message: `Table ${table.tableNo} has ${unpaidOrders.length > 0 ? `${unpaidOrders.length} unpaid order(s)` : ""}${unpaidOrders.length > 0 && activePrepOrders.length > 0 ? " and " : ""}${activePrepOrders.length > 0 ? `${activePrepOrders.length} order(s) undergoing preparation` : ""}. Please confirm to force-free this table.`,
+          message: unpaidOrders.length > 0
+            ? "Payment pending. Settle the bill before freeing this table."
+            : `Table ${table.tableNo} has ${activePrepOrders.length} order(s) undergoing preparation. Please confirm to force-free this table.`,
         });
       }
 
       // Execute session closure, order updates, waiter unassignment, and audit log atomically in a transaction
       const updatedTable = await prisma.$transaction(async (tx) => {
+        const rawNo = String(table.tableNo || "").trim();
+        const strippedNo = rawNo.replace(/^(table|tbl)[-\s]*/i, "");
+        const candidates = Array.from(new Set([rawNo, strippedNo, `Table ${strippedNo}`].filter(Boolean)));
+
         // Find all active sessions for this table to get their session IDs
         const sessionsToClose = await tx.tableSession.findMany({
           where: {
             restaurantId: effectiveRid,
             OR: [
               { tableId: table.id },
-              { tableNo: table.tableNo },
+              { tableNo: { in: candidates, mode: "insensitive" } },
             ],
             status: { in: ["OPEN", "BILLING", "PAID"] },
           },
@@ -1310,13 +1315,13 @@ export default async function ownerRoutes(app, deps = {}) {
 
         const activeSessionIds = sessionsToClose.map((s) => s.id);
 
-        // Always close all active table sessions matching tableId OR tableNo
+        // Always close all active table sessions matching tableId OR tableNo candidates
         await tx.tableSession.updateMany({
           where: {
             restaurantId: effectiveRid,
             OR: [
               { tableId: table.id },
-              { tableNo: table.tableNo },
+              { tableNo: { in: candidates, mode: "insensitive" } },
             ],
             status: { in: ["OPEN", "BILLING", "PAID"] },
           },
@@ -1328,7 +1333,7 @@ export default async function ownerRoutes(app, deps = {}) {
 
         // Mark open prep/active orders for this table as DELIVERED
         // Note: Order model uses tableNo and tableSessionId (not tableId)
-        const orderWhereOr = [{ tableNo: table.tableNo }];
+        const orderWhereOr = [{ tableNo: { in: candidates, mode: "insensitive" } }];
         if (activeSessionIds.length > 0) {
           orderWhereOr.push({ tableSessionId: { in: activeSessionIds } });
         }
@@ -1390,21 +1395,36 @@ export default async function ownerRoutes(app, deps = {}) {
           restaurantId: effectiveRid,
           tableId: table.id,
           tableNo: table.tableNo,
+          isOccupied: false,
+          status: "AVAILABLE",
           assignedWaiterId: updatedTable?.assignedWaiterId || null,
           assignedWaiterName: updatedTable?.assignedWaiterName || null,
+          activeOrders: [],
+          activeOrderCount: 0,
+          activeItemCount: 0,
+          activeSession: null,
+          occupiedSince: null,
+        };
+        const sessionPayload = {
+          restaurantId: effectiveRid,
+          tableId: table.id,
+          tableNo: table.tableNo,
+          sessionId: activeSession?.id || null,
+          status: "CLOSED",
+          closedAt: new Date().toISOString(),
         };
         realtime.io.to(`restaurant_${effectiveRid}`).emit("table:updated", clearPayload);
         realtime.io.to(`restaurant:${effectiveRid}`).emit("table:updated", clearPayload);
-        realtime.io.to(`restaurant_${effectiveRid}`).emit("table:session_updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
-        realtime.io.to(`restaurant:${effectiveRid}`).emit("table:session_updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
+        realtime.io.to(`restaurant_${effectiveRid}`).emit("table:session_updated", sessionPayload);
+        realtime.io.to(`restaurant:${effectiveRid}`).emit("table:session_updated", sessionPayload);
         realtime.io.to(`restaurant_${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
         realtime.io.to(`restaurant:${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
 
         if (realtime?.staff) {
           realtime.staff.to(`restaurant:${effectiveRid}`).emit("table:updated", clearPayload);
           realtime.staff.to(`restaurant_${effectiveRid}`).emit("table:updated", clearPayload);
-          realtime.staff.to(`restaurant:${effectiveRid}`).emit("table:session_updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
-          realtime.staff.to(`restaurant_${effectiveRid}`).emit("table:session_updated", { restaurantId: effectiveRid, tableId: table.id, tableNo: table.tableNo });
+          realtime.staff.to(`restaurant:${effectiveRid}`).emit("table:session_updated", sessionPayload);
+          realtime.staff.to(`restaurant_${effectiveRid}`).emit("table:session_updated", sessionPayload);
         }
       }
 

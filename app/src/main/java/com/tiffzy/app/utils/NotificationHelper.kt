@@ -100,7 +100,7 @@ object NotificationHelper {
                 if (vibrationEnabled) {
                     vibrationPattern = longArrayOf(0, 250, 250, 250)
                 } else {
-                    vibrationPattern = longArrayOf(0)
+                    vibrationPattern = null
                 }
 
                 if (soundEnabled) {
@@ -149,7 +149,7 @@ object NotificationHelper {
         if (vibrationEnabled) {
             notificationBuilder.setVibrate(longArrayOf(0, 250, 250, 250))
         } else {
-            notificationBuilder.setVibrate(longArrayOf(0))
+            notificationBuilder.setVibrate(null)
         }
         notificationBuilder.setDefaults(defaults)
 

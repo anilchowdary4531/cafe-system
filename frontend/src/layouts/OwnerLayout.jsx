@@ -423,23 +423,8 @@ const buildReceiptPrintMarkup = ({
 
 const normalizeTableRows = (rows) =>
     (Array.isArray(rows) ? rows : [])
-        .map((table, index) => ({
-            ...table,
-            tableNo: String(table?.tableNo || "").trim(),
-            assignedWaiterId: table?.assignedWaiterId || table?.activeSession?.waiterId || null,
-            assignedWaiterName: table?.assignedWaiterName || table?.activeSession?.waiterName || null,
-            isOccupied: Boolean(table?.isOccupied),
-            isReserved: Boolean(table?.isReserved || table?.is_reserved || table?.activeReservation || table?.upcomingReservation),
-            activeReservation: table?.activeReservation || null,
-            upcomingReservation: table?.upcomingReservation || null,
-            occupiedSince: table?.occupiedSince || null,
-            activeOrderCount: Number(table?.activeOrderCount || 0),
-            activeItemCount: Number(table?.activeItemCount || 0),
-            lastOrderStatus: String(table?.lastOrderStatus || "").toUpperCase(),
-            lastPaymentStatus: String(table?.lastPaymentStatus || "").toUpperCase(),
-            lastOrderNo: table?.lastOrderNo || "",
-            lastOrderAt: table?.lastOrderAt || null,
-            activeOrders: Array.isArray(table?.activeOrders)
+        .map((table, index) => {
+            const rawActiveOrders = Array.isArray(table?.activeOrders)
                 ? table.activeOrders.map((order) => ({
                       id: order?.id,
                       orderNo: order?.orderNo || "",
@@ -458,12 +443,41 @@ const normalizeTableRows = (rows) =>
                             }))
                           : [],
                   }))
-                : [],
-            assignmentKey: table?.id
-                ? `table-id-${table.id}`
-                : `table-no-${String(table?.tableNo || "").trim().toLowerCase() || index}`,
-            key: table?.id ? `table-id-${table.id}` : `${table?.tableNo || "table"}-${index}`,
-        }))
+                : [];
+
+            const hasActiveOrders = rawActiveOrders.length > 0;
+            const hasActiveSession = Boolean(
+                table?.activeSession &&
+                table?.activeSession?.status !== "CLOSED" &&
+                table?.activeSession?.status !== "CANCELLED"
+            );
+            const isExplicitlyFree = table?.isOccupied === false || table?.status === "AVAILABLE" || table?.activeSession?.status === "CLOSED" || table?.activeSession?.status === "CANCELLED";
+            const isOccupied = !isExplicitlyFree && Boolean(table?.isOccupied || hasActiveOrders || hasActiveSession);
+            const activeOrders = isOccupied ? rawActiveOrders : [];
+
+            return {
+                ...table,
+                tableNo: String(table?.tableNo || "").trim(),
+                assignedWaiterId: table?.assignedWaiterId || table?.activeSession?.waiterId || null,
+                assignedWaiterName: table?.assignedWaiterName || table?.activeSession?.waiterName || null,
+                isOccupied,
+                isReserved: Boolean(table?.isReserved || table?.is_reserved || table?.activeReservation || table?.upcomingReservation),
+                activeReservation: table?.activeReservation || null,
+                upcomingReservation: table?.upcomingReservation || null,
+                occupiedSince: isOccupied ? (table?.occupiedSince || table?.activeSession?.createdAt || null) : null,
+                activeOrderCount: isOccupied ? Number(table?.activeOrderCount || activeOrders.length) : 0,
+                activeItemCount: isOccupied ? Number(table?.activeItemCount || 0) : 0,
+                lastOrderStatus: String(table?.lastOrderStatus || "").toUpperCase(),
+                lastPaymentStatus: String(table?.lastPaymentStatus || "").toUpperCase(),
+                lastOrderNo: table?.lastOrderNo || "",
+                lastOrderAt: table?.lastOrderAt || null,
+                activeOrders,
+                assignmentKey: table?.id
+                    ? `table-id-${table.id}`
+                    : `table-no-${String(table?.tableNo || "").trim().toLowerCase() || index}`,
+                key: table?.id ? `table-id-${table.id}` : `${table?.tableNo || "table"}-${index}`,
+            };
+        })
         .sort((a, b) =>
             String(a.tableNo || "").localeCompare(String(b.tableNo || ""), undefined, {
                 numeric: true,
@@ -1001,6 +1015,7 @@ export default function OwnerLayout() {
 
     const [popupOrder, setPopupOrder] = useState(null);
     const knownOrderIdsRef = useState(() => new Set())[0];
+    const tableOverviewReqIdRef = useRef(0);
     const { socket } = useStaffSocket();
 
     const loadTableOverview = useCallback(async () => {
@@ -1015,8 +1030,13 @@ export default function OwnerLayout() {
             return;
         }
 
+        const reqId = ++tableOverviewReqIdRef.current;
+
         try {
             const res = await axios.get(`${API}/owner/${restaurantId}/tables`);
+            if (reqId !== tableOverviewReqIdRef.current) {
+                return;
+            }
             const tables = normalizeTableRows(res.data);
             const occupied = tables.filter((table) => table.isOccupied).length;
 
@@ -1123,6 +1143,74 @@ export default function OwnerLayout() {
             }
         };
 
+        const handleTableUpdated = (payload) => {
+            if (payload && (payload.status === "AVAILABLE" || payload.isOccupied === false)) {
+                const targetId = payload.tableId || payload.id;
+                const targetNo = payload.tableNo;
+                setTableOverview((prev) => {
+                    const updatedTables = (prev.tables || []).map((t) => {
+                        const match =
+                            (targetId && String(t.id) === String(targetId)) ||
+                            (targetNo && String(t.tableNo).toLowerCase() === String(targetNo).toLowerCase());
+                        if (match) {
+                            return {
+                                ...t,
+                                isOccupied: false,
+                                activeOrderCount: 0,
+                                activeItemCount: 0,
+                                activeOrders: [],
+                                activeSession: null,
+                                occupiedSince: null,
+                                assignedWaiterId: null,
+                                assignedWaiterName: null,
+                            };
+                        }
+                        return t;
+                    });
+                    return {
+                        ...prev,
+                        occupied: updatedTables.filter((t) => t.isOccupied).length,
+                        tables: updatedTables,
+                    };
+                });
+            }
+            loadTableOverview();
+        };
+
+        const handleSessionUpdated = (session) => {
+            if (session && (!session.status || session.status === "CLOSED" || session.status === "CANCELLED")) {
+                const targetId = session.tableId;
+                const targetNo = session.tableNo;
+                setTableOverview((prev) => {
+                    const updatedTables = (prev.tables || []).map((t) => {
+                        const match =
+                            (targetId && String(t.id) === String(targetId)) ||
+                            (targetNo && String(t.tableNo).toLowerCase() === String(targetNo).toLowerCase());
+                        if (match) {
+                            return {
+                                ...t,
+                                isOccupied: false,
+                                activeOrderCount: 0,
+                                activeItemCount: 0,
+                                activeOrders: [],
+                                activeSession: null,
+                                occupiedSince: null,
+                                assignedWaiterId: null,
+                                assignedWaiterName: null,
+                            };
+                        }
+                        return t;
+                    });
+                    return {
+                        ...prev,
+                        occupied: updatedTables.filter((t) => t.isOccupied).length,
+                        tables: updatedTables,
+                    };
+                });
+            }
+            loadTableOverview();
+        };
+
         socket.on("order:created", handleNewOrder);
         socket.on("new_order", handleNewOrder);
         socket.on("order:updated", loadTableOverview);
@@ -1130,8 +1218,8 @@ export default function OwnerLayout() {
         socket.on("payment:updated", loadTableOverview);
         socket.on("notification:new", loadTableOverview);
         socket.on("reservation:updated", loadTableOverview);
-        socket.on("table:updated", loadTableOverview);
-        socket.on("table:session_updated", loadTableOverview);
+        socket.on("table:updated", handleTableUpdated);
+        socket.on("table:session_updated", handleSessionUpdated);
         socket.on("table:waiter_assigned", loadTableOverview);
         socket.on("table:layout_updated", loadTableOverview);
 
@@ -1143,8 +1231,8 @@ export default function OwnerLayout() {
             socket.off("payment:updated", loadTableOverview);
             socket.off("notification:new", loadTableOverview);
             socket.off("reservation:updated", loadTableOverview);
-            socket.off("table:updated", loadTableOverview);
-            socket.off("table:session_updated", loadTableOverview);
+            socket.off("table:updated", handleTableUpdated);
+            socket.off("table:session_updated", handleSessionUpdated);
             socket.off("table:waiter_assigned", loadTableOverview);
             socket.off("table:layout_updated", loadTableOverview);
         };
@@ -1552,19 +1640,9 @@ export default function OwnerLayout() {
         }
     };
 
-    const refreshTableOverview = async () => {
-        if (!restaurantId) return;
-        const res = await axios.get(`${API}/owner/${restaurantId}/tables`);
-        const tables = normalizeTableRows(res.data);
-        const occupied = tables.filter((table) => table.isOccupied).length;
-        setTableOverview({
-            loading: false,
-            total: tables.length,
-            occupied,
-            tables,
-            error: null,
-        });
-    };
+    const refreshTableOverview = useCallback(async () => {
+        await loadTableOverview();
+    }, [loadTableOverview]);
 
     const handleReceiptPrint = ({ tableLabel, activeOrders, tableReceiptTotal, assignmentKey } = {}) => {
         if (assignmentKey) {
@@ -1657,6 +1735,28 @@ export default function OwnerLayout() {
         }
 
         const tableNoLabel = table?.tableNo || table?.label || "this table";
+
+        const activeOrders = Array.isArray(table?.activeOrders) ? table.activeOrders : [];
+        const hasUnpaidOrders = activeOrders.some((o) => {
+            const payStatus = String(o?.paymentStatus || o?.payment_status || "PENDING").toUpperCase();
+            return payStatus !== "PAID" && payStatus !== "SUCCESS";
+        });
+        const hasActivePrepOrders = activeOrders.some((o) => {
+            const st = String(o?.status || "").toUpperCase();
+            return st === "PENDING" || st === "CONFIRMED" || st === "PREPARING" || st === "READY";
+        });
+
+        if (!options.force && (hasUnpaidOrders || hasActivePrepOrders)) {
+            const reason = hasActivePrepOrders ? "active order(s) being prepared" : "unpaid order(s)";
+            const settleConfirm = window.confirm(
+                `Table ${tableNoLabel} has ${reason}. Settle the bill before freeing this table.\n\nClick OK to open Settle Bill, or Cancel to abort.`
+            );
+            if (settleConfirm) {
+                handleSettleBill(table, assignmentKey, "CASH");
+            }
+            return;
+        }
+
         const confirmMsg = options.force
             ? `Are you sure you want to FORCE FREE Table ${tableNoLabel}? This will close the table session immediately even if payment is pending.`
             : `Are you sure you want to free Table ${tableNoLabel}? Confirm that the customer has left and there are no outstanding orders.`;
@@ -1669,13 +1769,17 @@ export default function OwnerLayout() {
         const prevAssignments = { ...tableAssignments };
         const prevOverview = { ...tableOverview };
 
+        // Invalidate in-flight requests so a pending poll/fetch response cannot overwrite this action
+        tableOverviewReqIdRef.current++;
+
         // Optimistically update table state to Available and clear server assignment in local state
         setTableOverview((prev) => {
             const updatedTables = (prev.tables || []).map((t) => {
-                const matches = targetTableId
-                    ? String(t.id) === String(targetTableId)
-                    : (table?.tableNo && String(t.tableNo).toLowerCase() === String(table.tableNo).toLowerCase()) ||
-                      t.assignmentKey === assignmentKey;
+                const matches =
+                    (targetTableId && String(t.id) === String(targetTableId)) ||
+                    (t.tableNo && String(t.tableNo).toLowerCase() === String(tableNoLabel).toLowerCase()) ||
+                    (table?.tableNo && String(t.tableNo).toLowerCase() === String(table.tableNo).toLowerCase()) ||
+                    (assignmentKey && t.assignmentKey === assignmentKey);
                 if (matches) {
                     return {
                         ...t,
@@ -1708,8 +1812,12 @@ export default function OwnerLayout() {
                 table?.assignmentKey,
                 table?.tableNo && restaurantId
                     ? `table-no-${restaurantId}-${String(table.tableNo).trim().toLowerCase()}`
-                    : table?.tableNo
+                    : null,
+                table?.tableNo
                     ? `table-no-${String(table.tableNo).trim().toLowerCase()}`
+                    : null,
+                tableNoLabel
+                    ? `table-no-${String(tableNoLabel).trim().toLowerCase()}`
                     : null,
             ].filter(Boolean);
             keysToRemove.forEach((k) => {
@@ -1728,7 +1836,7 @@ export default function OwnerLayout() {
         try {
             // Call backend API to clear table session, reset isOccupied, clear assigned waiter, and record audit trail
             await axios.post(`${API}/owner/${restaurantId}/tables/${encodeURIComponent(targetTableId)}/clear`, {
-                force: true,
+                force: Boolean(options.force),
                 clearWaiter: true,
                 reason: options.reason || "Table cleared by Owner",
                 performedByUserId: user?.id || null,
@@ -1762,9 +1870,12 @@ export default function OwnerLayout() {
                     // Ignore storage quota errors
                 }
             }
+            console.error("Failed to free table:", err);
+            const errMsg = err?.response?.data?.message || err?.message || "Failed to free table.";
+            setReceiptActionError(errMsg);
             showToast({
-                title: "Error Clearing Table",
-                message: err.response?.data?.message || err.message || "Failed to free table.",
+                title: "Error Freeing Table",
+                message: errMsg,
                 variant: "error",
             });
         } finally {

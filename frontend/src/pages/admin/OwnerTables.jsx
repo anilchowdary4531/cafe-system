@@ -539,12 +539,42 @@ export default function OwnerTables() {
 
     const handleFreeTable = async (table) => {
         if (!table || !restaurantId) return;
+
+        const session = activeSessions[String(table.id)];
+        const orders = Array.isArray(session?.orders) ? session.orders : [];
+        const hasUnpaid = orders.some((o) => {
+            const payStatus = String(o?.paymentStatus || o?.payment_status || "PENDING").toUpperCase();
+            return payStatus !== "PAID" && payStatus !== "SUCCESS";
+        });
+        if (hasUnpaid) {
+            showToast({
+                title: "Payment Pending",
+                message: `Table ${table.tableNo} has unpaid orders. Settle the bill before freeing this table.`,
+                variant: "warning",
+            });
+            return;
+        }
+
         const confirmed = window.confirm(`Are you sure you want to free Table ${table.tableNo}? Confirm that the customer has left and there are no outstanding orders.`);
         if (!confirmed) return;
 
+        // Optimistically remove session and set table available
+        setActiveSessions((prev) => {
+            const next = { ...prev };
+            delete next[String(table.id)];
+            return next;
+        });
+        setTables((prev) =>
+            (prev || []).map((t) =>
+                t.id === table.id
+                    ? { ...t, assignedWaiterId: null, assignedWaiterName: null, isOccupied: false, status: "AVAILABLE" }
+                    : t
+            )
+        );
+
         try {
             await axios.post(`${API}/owner/${restaurantId}/tables/${table.id}/clear`, {
-                force: true,
+                force: false,
                 clearWaiter: true,
                 reason: "Table cleared by Owner via OwnerTables",
                 performedByUserId: user?.id || null,
@@ -561,6 +591,8 @@ export default function OwnerTables() {
             await loadActiveSessions();
         } catch (err) {
             console.error("Failed to free table:", err);
+            await loadTables();
+            await loadActiveSessions();
             showToast({
                 title: "Error Freeing Table",
                 message: err?.response?.data?.message || err.message || "Failed to free table.",
@@ -590,7 +622,7 @@ export default function OwnerTables() {
             if (!session || !session.tableId) return;
             setActiveSessions((prev) => {
                 const next = { ...prev };
-                if (session.status === "CLOSED" || session.status === "CANCELLED") {
+                if (!session.status || session.status === "CLOSED" || session.status === "CANCELLED") {
                     delete next[String(session.tableId)];
                 } else {
                     next[String(session.tableId)] = session;
@@ -605,8 +637,21 @@ export default function OwnerTables() {
             loadReservations();
         };
 
+        const handleTableUpdated = (payload) => {
+            if (payload && (payload.status === "AVAILABLE" || payload.isOccupied === false)) {
+                if (payload.tableId) {
+                    setActiveSessions((prev) => {
+                        const next = { ...prev };
+                        delete next[String(payload.tableId)];
+                        return next;
+                    });
+                }
+            }
+            handleReservationChange();
+        };
+
         socket.on("table:session_updated", onSessionUpdated);
-        socket.on("table:updated", handleReservationChange);
+        socket.on("table:updated", handleTableUpdated);
         socket.on("table:waiter_assigned", handleReservationChange);
         socket.on("table:layout_updated", loadTables);
         socket.on("order:created", loadActiveSessions);
@@ -616,7 +661,7 @@ export default function OwnerTables() {
         return () => {
             if (typeof socket.off === "function") {
                 socket.off("table:session_updated", onSessionUpdated);
-                socket.off("table:updated", handleReservationChange);
+                socket.off("table:updated", handleTableUpdated);
                 socket.off("table:waiter_assigned", handleReservationChange);
                 socket.off("table:layout_updated", loadTables);
                 socket.off("order:created", loadActiveSessions);

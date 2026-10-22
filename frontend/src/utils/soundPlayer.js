@@ -181,10 +181,59 @@ export const setVibrationEnabled = (enabled) => {
   }
 };
 
+export const VIBRATION_PATTERN_KEY = "notification_vibration_pattern";
+
+export const VIBRATION_PATTERNS = {
+  default: { id: "default", name: "Default", pattern: [200, 100, 200] },
+  short: { id: "short", name: "Short", pattern: [100] },
+  double: { id: "double", name: "Double", pattern: [100, 75, 100] },
+  strong: { id: "strong", name: "Strong", pattern: [400, 100, 400] },
+};
+
+/**
+ * Check if the current browser / environment supports navigator.vibrate
+ */
+export const isVibrationSupported = () => {
+  return typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
+};
+
+/**
+ * Get active vibration pattern key from LocalStorage (default: 'default')
+ */
+export const getVibrationPattern = () => {
+  try {
+    const saved = localStorage.getItem(VIBRATION_PATTERN_KEY);
+    if (saved && VIBRATION_PATTERNS[saved]) {
+      return saved;
+    }
+  } catch {
+    // ignore
+  }
+  return "default";
+};
+
+/**
+ * Save active vibration pattern key to LocalStorage
+ */
+export const setVibrationPattern = (patternId) => {
+  try {
+    if (VIBRATION_PATTERNS[patternId]) {
+      localStorage.setItem(VIBRATION_PATTERN_KEY, patternId);
+    }
+  } catch {
+    // ignore
+  }
+};
+
 /**
  * Trigger device vibration for notification (independent of sound)
  */
-export const triggerNotificationVibration = (pattern = [200, 100, 200]) => {
+export const triggerNotificationVibration = (customPattern = null, options = {}) => {
+  const { force = false } = options;
+  if (!force && !isVibrationEnabled()) {
+    return false;
+  }
+
   const now = Date.now();
   // Prevent duplicate vibration within 200ms
   if (now - lastVibrateTime < 200) {
@@ -192,8 +241,10 @@ export const triggerNotificationVibration = (pattern = [200, 100, 200]) => {
   }
   lastVibrateTime = now;
 
-  if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+  if (isVibrationSupported()) {
     try {
+      const activePatternKey = getVibrationPattern();
+      const pattern = customPattern || VIBRATION_PATTERNS[activePatternKey]?.pattern || [200, 100, 200];
       return navigator.vibrate(pattern);
     } catch {
       return false;
@@ -209,14 +260,15 @@ export const triggerNotificationVibration = (pattern = [200, 100, 200]) => {
  * - forceSound: boolean (e.g. previewing sound in picker even if sound is currently toggled off)
  * - forceVibrate: boolean (e.g. testing vibration in picker)
  * - skipVibrate: boolean (e.g. when only testing audio preview)
+ * - vibrationPattern: array (optional custom pattern)
  */
 export const playNotificationSound = (overrideConfig = null, options = {}) => {
-  const { forceSound = false, forceVibrate = false, skipVibrate = false } = options;
+  const { forceSound = false, forceVibrate = false, skipVibrate = false, vibrationPattern = null } = options;
 
   // 1. Independent Vibration Handling
   const shouldVibrate = !skipVibrate && (forceVibrate || isVibrationEnabled());
   if (shouldVibrate) {
-    triggerNotificationVibration();
+    triggerNotificationVibration(vibrationPattern, { force: forceVibrate });
   }
 
   // 2. Independent Sound Handling

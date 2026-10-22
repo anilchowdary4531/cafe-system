@@ -35,7 +35,7 @@ export default function OwnerNotifications() {
     const [notifications, setNotifications] = useState(() => getOwnerNotifications());
     const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | ORDERS | SUCCESS | INFO
     const [searchQuery, setSearchQuery] = useState("");
-    const [showSoundSettings, setShowSoundSettings] = useState(false);
+    const [showSoundSettings, setShowSoundSettings] = useState(true);
 
     const unreadCount = useMemo(
         () => notifications.reduce((sum, item) => sum + (item.read ? 0 : 1), 0),
@@ -116,7 +116,7 @@ export default function OwnerNotifications() {
                         title="Adjust Notification Sound"
                     >
                         <Volume2 className="h-3.5 w-3.5" />
-                        <span>Sound Settings</span>
+                        <span>Sound & Vibration</span>
                     </button>
 
                     <button
