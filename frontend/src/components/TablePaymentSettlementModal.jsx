@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { CheckCircle2, Printer, X, Loader2, AlertCircle, QrCode } from "lucide-react";
 import { api } from "../utils/apiClient";
 import {
@@ -29,29 +29,97 @@ export default function TablePaymentSettlementModal({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
     const [settledResult, setSettledResult] = useState(null);
+    const [backendBill, setBackendBill] = useState(null);
+    const [loadingBill, setLoadingBill] = useState(false);
 
-    // Calculate authoritative pending bill from active orders or table session
-    const activeOrders = useMemo(() => {
+    const tableNo = table?.tableNo || table?.label || "--";
+    const effectiveServerName =
+        serverName ||
+        table?.assignedWaiterName ||
+        table?.activeSession?.waiterName ||
+        "Staff";
+
+    // Fallback amount from passed table object
+    const initialOrders = useMemo(() => {
         if (!table) return [];
         return Array.isArray(table.activeOrders) ? table.activeOrders : [];
     }, [table]);
 
-    const authoritativeBillAmount = useMemo(() => {
+    const initialBillAmount = useMemo(() => {
         if (!table) return 0;
-        if (activeOrders.length > 0) {
-            return activeOrders.reduce((sum, order) => sum + getReceiptOrderTotal(order), 0);
+        if (initialOrders.length > 0) {
+            return initialOrders.reduce((sum, order) => sum + getReceiptOrderTotal(order), 0);
         }
         return Number(table.activeSession?.total || table.total || 0);
-    }, [table, activeOrders]);
+    }, [table, initialOrders]);
+
+    // Fetch authoritative bill directly from backend to ensure 100% authoritative sync
+    useEffect(() => {
+        if (!isOpen || !table || !restaurantId) {
+            setBackendBill(null);
+            setLoadingBill(false);
+            return;
+        }
+
+        let isMounted = true;
+        const fetchBill = async () => {
+            if (initialBillAmount <= 0) {
+                setLoadingBill(true);
+            }
+            try {
+                const res = await api.get(
+                    `/owner/${restaurantId}/tables/${encodeURIComponent(tableNo)}/bill`,
+                    { params: { tableId: table.id || undefined } }
+                );
+                if (!isMounted) return;
+                if (res?.data && typeof res.data === "object") {
+                    setBackendBill(res.data);
+                }
+            } catch (err) {
+                console.warn("[TablePaymentSettlementModal] Authoritative bill fetch warning:", err?.message);
+                if (isMounted) {
+                    setBackendBill({ authoritativeTotal: initialBillAmount, orders: initialOrders });
+                }
+            } finally {
+                if (isMounted) {
+                    setLoadingBill(false);
+                }
+            }
+        };
+
+        fetchBill();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [isOpen, table?.id, tableNo, restaurantId, initialBillAmount, initialOrders]);
+
+    // Canonical Authoritative Bill Amount resolution
+    const authoritativeBillAmount = useMemo(() => {
+        if (backendBill) {
+            if (backendBill.authoritativeTotal !== undefined && backendBill.authoritativeTotal !== null) {
+                return Number(backendBill.authoritativeTotal) || 0;
+            }
+            if (backendBill.total !== undefined && backendBill.total !== null) {
+                return Number(backendBill.total) || 0;
+            }
+            if (backendBill.amount !== undefined && backendBill.amount !== null) {
+                return Number(backendBill.amount) || 0;
+            }
+        }
+        return initialBillAmount;
+    }, [backendBill, initialBillAmount]);
+
+    const isBillLoading = loadingBill || (isOpen && initialBillAmount <= 0 && backendBill === null);
+
+    const activeOrders = useMemo(() => {
+        if (Array.isArray(backendBill?.orders) && backendBill.orders.length > 0) {
+            return backendBill.orders;
+        }
+        return initialOrders;
+    }, [backendBill, initialOrders]);
 
     if (!isOpen || !table) return null;
-
-    const tableNo = table.tableNo || table.label || "--";
-    const effectiveServerName =
-        serverName ||
-        table.assignedWaiterName ||
-        table.activeSession?.waiterName ||
-        "Staff";
 
     const restaurantUpiId = restaurantInfo?.upiId || "";
     const effectiveRestaurantName = restaurantInfo?.name || "Tiffzy Restaurant";
@@ -68,7 +136,12 @@ export default function TablePaymentSettlementModal({
     };
 
     const handleConfirmPayment = async () => {
-        if (!selectedMethod || isSubmitting) return;
+        if (!selectedMethod || isSubmitting || isBillLoading) return;
+
+        if (authoritativeBillAmount <= 0) {
+            setErrorMessage("Unable to load the authoritative bill amount. Please refresh and try again.");
+            return;
+        }
 
         setIsSubmitting(true);
         setErrorMessage("");
@@ -270,9 +343,16 @@ export default function TablePaymentSettlementModal({
                                     className="text-3xl font-extrabold text-slate-900 dark:text-white mt-1"
                                     data-testid="modal-bill-amount"
                                 >
-                                    {formatReceiptAmount(authoritativeBillAmount)}
+                                    {isBillLoading ? (
+                                        <span className="text-base font-medium text-slate-500 flex items-center justify-center gap-2">
+                                            <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
+                                            Loading bill amount...
+                                        </span>
+                                    ) : (
+                                        formatReceiptAmount(authoritativeBillAmount)
+                                    )}
                                 </div>
-                                {activeOrders.length > 0 && (
+                                {!isBillLoading && activeOrders.length > 0 && (
                                     <p className="text-[11px] theme-muted mt-1">
                                         {activeOrders.length} order(s) included on this bill
                                     </p>
@@ -328,6 +408,26 @@ export default function TablePaymentSettlementModal({
                                     </button>
                                 </div>
                             </div>
+
+                            {/* CASH-specific details if CASH selected */}
+                            {selectedMethod === "CASH" && (
+                                <div
+                                    className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2 animate-fadeIn"
+                                    data-testid="cash-details-section"
+                                >
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                            💵 Cash Collection
+                                        </span>
+                                        <span className="font-mono text-xs font-semibold text-orange-600 dark:text-orange-400">
+                                            {isBillLoading ? "Loading..." : formatReceiptAmount(authoritativeBillAmount)}
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] theme-muted">
+                                        Collect exact cash of <strong className="text-slate-800 dark:text-slate-200">{isBillLoading ? "..." : formatReceiptAmount(authoritativeBillAmount)}</strong> from customer, then confirm settlement below.
+                                    </p>
+                                </div>
+                            )}
 
                             {/* UPI-specific details if UPI selected */}
                             {selectedMethod === "UPI" && (
@@ -398,7 +498,7 @@ export default function TablePaymentSettlementModal({
                                 <button
                                     type="button"
                                     onClick={handleConfirmPayment}
-                                    disabled={!selectedMethod || isSubmitting}
+                                    disabled={!selectedMethod || isSubmitting || isBillLoading || authoritativeBillAmount <= 0}
                                     className="px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-xs shadow-md shadow-orange-500/25 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-orange-500"
                                     data-testid="confirm-payment-btn"
                                 >

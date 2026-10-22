@@ -121,6 +121,12 @@ export const ORDER_STATUS_CONFIG = {
 export const isTablePaymentPending = (table) => {
     if (!table) return false;
 
+    // A table that is explicitly AVAILABLE, not occupied, or has a CLOSED session cannot be PAYMENT_PENDING
+    const tableStatus = String(table.status || "").toUpperCase();
+    if (tableStatus === "AVAILABLE") return false;
+    if (table.isOccupied === false) return false;
+    if (table.session?.status === "CLOSED" || table.activeSession?.status === "CLOSED") return false;
+
     // Explicit payment pending statuses
     const activeStatus = String(resolveTableActiveOrderStatus(table) || "").toUpperCase();
     if (activeStatus === "PAYMENT_PENDING") return true;
@@ -128,10 +134,9 @@ export const isTablePaymentPending = (table) => {
     const rawActiveStatus = String(table.activeOrderStatus || table.orderStatus || "").toUpperCase();
     if (rawActiveStatus === "PAYMENT_PENDING" || rawActiveStatus === "BILLING") return true;
 
-    const tableStatus = String(table.status || "").toUpperCase();
     if (tableStatus === "PAYMENT_PENDING" || tableStatus === "BILLING") return true;
 
-    const sessionStatus = String(table.activeSession?.status || "").toUpperCase();
+    const sessionStatus = String(table.activeSession?.status || table.session?.status || "").toUpperCase();
     if (sessionStatus === "BILLING" || sessionStatus === "PAYMENT_PENDING") return true;
 
     const payStatus = String(table.paymentStatus || "").toUpperCase();
@@ -150,7 +155,8 @@ export const isTablePaymentPending = (table) => {
         if (hasUnpaid && hasServedOrDelivered) return true;
     }
 
-    if (table.lastOrderStatus) {
+    // Only inspect historical lastOrderStatus if table is actually occupied
+    if (table.isOccupied && table.lastOrderStatus) {
         const lastSt = String(table.lastOrderStatus).toUpperCase();
         const lastPay = String(table.lastPaymentStatus || "").toUpperCase();
         if (["DELIVERED", "SERVED", "COMPLETED"].includes(lastSt) && lastPay !== "PAID" && lastPay !== "SUCCESS") {
@@ -163,6 +169,12 @@ export const isTablePaymentPending = (table) => {
 
 export const resolveTableActiveOrderStatus = (table) => {
     if (!table) return null;
+
+    const tableStatus = String(table.status || "").toUpperCase();
+    if (tableStatus === "AVAILABLE") return null;
+    if (table.isOccupied === false) return null;
+    if (table.session?.status === "CLOSED" || table.activeSession?.status === "CLOSED") return null;
+
     if (table.activeOrderStatus) {
         return String(table.activeOrderStatus).toUpperCase();
     }
@@ -172,7 +184,7 @@ export const resolveTableActiveOrderStatus = (table) => {
 
     const activeOrders = Array.isArray(table.activeOrders) ? table.activeOrders : [];
     if (activeOrders.length === 0) {
-        if (table.lastOrderStatus) {
+        if (table.isOccupied && table.lastOrderStatus) {
             const lastStatus = String(table.lastOrderStatus).toUpperCase();
             if (["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(lastStatus)) {
                 const lastPay = String(table.lastPaymentStatus || "").toUpperCase();
@@ -302,6 +314,62 @@ export default function Server() {
     const [customizingItem, setCustomizingItem] = useState(null);
     const [placingOrder, setPlacingOrder] = useState(false);
 
+    // Authoritative table state overrides driven by realtime events & immediate releases
+    const [tableOverrides, setTableOverrides] = useState({});
+    const tableReleasedTimestampsRef = useRef(new Map());
+
+    const applyTableRelease = useCallback((target) => {
+        if (!target) return;
+        const targetId = target.tableId || target.id;
+        const targetNo = target.tableNo || target.table_no;
+        const now = Date.now();
+
+        const idKey = targetId ? String(targetId) : null;
+        const noKey = targetNo ? String(targetNo).trim().toLowerCase() : null;
+
+        if (idKey) tableReleasedTimestampsRef.current.set(`id:${idKey}`, now);
+        if (noKey) tableReleasedTimestampsRef.current.set(`no:${noKey}`, now);
+
+        const releasePatch = {
+            status: "AVAILABLE",
+            isOccupied: false,
+            activeOrderCount: 0,
+            activeOrders: [],
+            activeOrderStatus: null,
+            paymentStatus: null,
+            occupiedSince: null,
+            assignedServer: null,
+            assignedWaiterId: null,
+            assignedWaiterName: null,
+            session: { status: "CLOSED" },
+            activeSession: null,
+            lastOrderStatus: null,
+            lastPaymentStatus: null,
+            releasedAt: now,
+        };
+
+        setTableOverrides((prev) => {
+            const next = { ...prev };
+            if (idKey) next[idKey] = releasePatch;
+            if (noKey) next[noKey] = releasePatch;
+            return next;
+        });
+
+        setSelectedTable((prev) => {
+            if (!prev) return prev;
+            const matchesPrev =
+                (targetId && (Number(prev.id) === Number(targetId) || String(prev.id) === String(targetId))) ||
+                (targetNo && String(prev.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+            if (matchesPrev) {
+                return {
+                    ...prev,
+                    ...releasePatch,
+                };
+            }
+            return prev;
+        });
+    }, []);
+
     // Data fetching via useCachedGet
     const {
         data: tablesData,
@@ -350,9 +418,54 @@ export default function Server() {
     );
 
     const tables = useMemo(() => {
-        if (!tablesData) return [];
-        return Array.isArray(tablesData.tables) ? tablesData.tables : Array.isArray(tablesData) ? tablesData : [];
-    }, [tablesData]);
+        const rawTables = !tablesData ? [] : Array.isArray(tablesData.tables) ? tablesData.tables : Array.isArray(tablesData) ? tablesData : [];
+        if (!rawTables.length) return [];
+
+        return rawTables.map((t) => {
+            const idKey = t.id ? String(t.id) : null;
+            const noKey = t.tableNo ? String(t.tableNo).trim().toLowerCase() : null;
+            const override = (idKey && tableOverrides[idKey]) || (noKey && tableOverrides[noKey]) || null;
+
+            if (override) {
+                // Stale HTTP response rejection:
+                // Only allow HTTP response to supersede if it has a newer active session opened strictly AFTER the release timestamp
+                const incomingOpenedAt = t.activeSession?.openedAt || t.session?.openedAt || t.occupiedSince;
+                const isNewerSession = incomingOpenedAt && new Date(incomingOpenedAt).getTime() > override.releasedAt;
+
+                if (!isNewerSession) {
+                    return {
+                        ...t,
+                        ...override,
+                    };
+                }
+            }
+
+            // If canonical backend status is AVAILABLE, not occupied, or closed session:
+            // Ensure no stale occupied/order/payment/server fields leak through
+            const isExplicitlyFree = t.status === "AVAILABLE" || t.isOccupied === false || t.session?.status === "CLOSED" || t.activeSession?.status === "CLOSED";
+            if (isExplicitlyFree) {
+                return {
+                    ...t,
+                    status: "AVAILABLE",
+                    isOccupied: false,
+                    activeOrderCount: 0,
+                    activeOrders: [],
+                    activeOrderStatus: null,
+                    paymentStatus: null,
+                    occupiedSince: null,
+                    assignedServer: t.assignedServer || t.assignedWaiterName || null,
+                    assignedWaiterId: t.assignedWaiterId || null,
+                    assignedWaiterName: t.assignedWaiterName || null,
+                    session: { status: "CLOSED" },
+                    activeSession: null,
+                    lastOrderStatus: null,
+                    lastPaymentStatus: null,
+                };
+            }
+
+            return t;
+        });
+    }, [tablesData, tableOverrides]);
 
     const menuItems = useMemo(() => {
         if (!menuData) return [];
@@ -471,6 +584,7 @@ export default function Server() {
         fetchUnreadCount,
         handleViewAssignedTable: null,
         user,
+        applyTableRelease,
     });
     useEffect(() => {
         callbacksRef.current = {
@@ -481,6 +595,7 @@ export default function Server() {
             fetchUnreadCount,
             handleViewAssignedTable,
             user,
+            applyTableRelease,
         };
     });
 
@@ -488,6 +603,19 @@ export default function Server() {
     useEffect(() => {
         if (!socket) return;
         const handleRealtimeUpdate = (data) => {
+            const isReleaseEvent =
+                data &&
+                (data.status === "AVAILABLE" ||
+                    data.isOccupied === false ||
+                    data.status === "CLOSED" ||
+                    data.session?.status === "CLOSED" ||
+                    data.activeSession?.status === "CLOSED" ||
+                    (data.status === "PAID" && (data.tableId || data.tableNo)));
+
+            if (isReleaseEvent) {
+                callbacksRef.current.applyTableRelease?.(data);
+            }
+
             callbacksRef.current.refreshTables?.({ force: true });
             callbacksRef.current.refreshReservations?.({ force: true });
             callbacksRef.current.refreshLiveOrders?.({ force: true });
@@ -497,6 +625,23 @@ export default function Server() {
                 setSelectedTable((prev) => {
                     if (!prev || (prev.id !== data.tableId && String(prev.tableNo) !== String(data.tableNo))) {
                         return prev;
+                    }
+                    if (isReleaseEvent) {
+                        return {
+                            ...prev,
+                            status: "AVAILABLE",
+                            isOccupied: false,
+                            activeOrderCount: 0,
+                            activeOrders: [],
+                            activeOrderStatus: null,
+                            paymentStatus: null,
+                            assignedWaiterId: null,
+                            assignedWaiterName: null,
+                            assignedServer: null,
+                            occupiedSince: null,
+                            session: { status: "CLOSED" },
+                            activeSession: null,
+                        };
                     }
                     return {
                         ...prev,
@@ -592,6 +737,13 @@ export default function Server() {
             }
         };
 
+        const handleConnect = () => {
+            callbacksRef.current.refreshTables?.({ force: true });
+            callbacksRef.current.refreshLiveOrders?.({ force: true });
+            callbacksRef.current.refreshReadyKots?.({ force: true });
+        };
+
+        socket.on("connect", handleConnect);
         socket.on("table:updated", handleRealtimeUpdate);
         socket.on("table:waiter_assigned", handleRealtimeUpdate);
         socket.on("table:session_updated", handleRealtimeUpdate);
@@ -608,6 +760,7 @@ export default function Server() {
         socket.on("notification:new", handleNewNotification);
 
         return () => {
+            socket.off("connect", handleConnect);
             socket.off("table:updated", handleRealtimeUpdate);
             socket.off("table:waiter_assigned", handleRealtimeUpdate);
             socket.off("table:session_updated", handleRealtimeUpdate);
@@ -815,8 +968,13 @@ export default function Server() {
         let blocked = 0;
 
         tables.forEach((t) => {
-            if (t.isBlocked) blocked++;
-            else if (t.isOccupied || isTablePaymentPending(t)) occupied++;
+            const isBlocked = Boolean(t.isBlocked);
+            const isExplicitlyFree = t.status === "AVAILABLE" || t.isOccupied === false || t.session?.status === "CLOSED" || t.activeSession?.status === "CLOSED";
+            const isPendingPayment = !isBlocked && !isExplicitlyFree && isTablePaymentPending(t);
+            const isOcc = !isBlocked && !isExplicitlyFree && Boolean(t.isOccupied || isPendingPayment || t.status === "OCCUPIED" || (Array.isArray(t.activeOrders) && t.activeOrders.length > 0));
+
+            if (isBlocked) blocked++;
+            else if (isOcc) occupied++;
             else if (t.isReserved || t.activeReservation) reserved++;
             else available++;
         });
@@ -1301,8 +1459,9 @@ export default function Server() {
                         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                             {filteredTables.map((table) => {
                                 const isBlocked = Boolean(table.isBlocked);
-                                const hasPendingPayment = !isBlocked && isTablePaymentPending(table);
-                                const isOccupied = !isBlocked && Boolean(table.isOccupied || hasPendingPayment || table.status === "OCCUPIED" || table.activeOrderCount > 0);
+                                const isExplicitlyFree = table.status === "AVAILABLE" || table.isOccupied === false || table.session?.status === "CLOSED" || table.activeSession?.status === "CLOSED";
+                                const hasPendingPayment = !isBlocked && !isExplicitlyFree && isTablePaymentPending(table);
+                                const isOccupied = !isBlocked && !isExplicitlyFree && Boolean(table.isOccupied || hasPendingPayment || table.status === "OCCUPIED" || (Array.isArray(table.activeOrders) && table.activeOrders.length > 0));
                                 const isReserved = !isBlocked && !isOccupied && Boolean(table.isReserved || table.activeReservation);
 
                                 return (
@@ -1436,7 +1595,7 @@ export default function Server() {
                                             ) : (
                                                 <div className="space-y-0.5">
                                                     <p className="text-[10px] theme-muted opacity-75">Click to open table & take order</p>
-                                                    {(table.assignedWaiterName || table.activeSession?.waiterName) ? (
+                                                    {(table.assignedWaiterName || (!isExplicitlyFree && table.activeSession?.waiterName)) ? (
                                                         <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 truncate flex items-center gap-1">
                                                             <span>👤</span> Server: <span className="font-bold">{table.assignedWaiterName || table.activeSession?.waiterName}</span>
                                                         </p>
@@ -1773,6 +1932,7 @@ export default function Server() {
                 serverName={user?.name || user?.email || "Staff"}
                 restaurantInfo={user?.restaurant || null}
                 onSettled={async () => {
+                    applyTableRelease(settlementTable);
                     await refreshTables?.({ force: true });
                     await refreshLiveOrders?.({ force: true });
                 }}

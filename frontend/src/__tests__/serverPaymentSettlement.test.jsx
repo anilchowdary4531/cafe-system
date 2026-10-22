@@ -507,4 +507,155 @@ describe("Tiffzy Server Station — Cash/UPI Payment Settlement & Bill Printing"
             expect(isTablePaymentPending({ activeSession: { status: "BILLING" } })).toBe(true);
         });
     });
+
+    describe("Regression: Table 2 ₹672 Authoritative Amount and Zero-Value Settlement Protection", () => {
+        const mockTable2Stale = {
+            id: 2,
+            tableNo: "2",
+            isOccupied: true,
+            isBlocked: false,
+            assignedWaiterName: "kamalesh",
+            activeOrderCount: 0,
+            activeOrders: [], // Empty/stale active orders
+            total: 0,
+        };
+
+        it("displays 'Loading bill amount...' instead of ₹0.00 while authoritative bill is fetching, then renders ₹672.00", async () => {
+            let resolveBillPromise;
+            api.get.mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        resolveBillPromise = resolve;
+                    })
+            );
+
+            render(
+                <TablePaymentSettlementModal
+                    isOpen={true}
+                    onClose={vi.fn()}
+                    table={mockTable2Stale}
+                    restaurantId={4}
+                    serverName="kamalesh"
+                />
+            );
+
+            // Modal should display "Loading bill amount...", NOT "₹0.00"
+            expect(screen.getByTestId("modal-bill-amount")).toHaveTextContent("Loading bill amount...");
+            expect(screen.getByTestId("confirm-payment-btn")).toBeDisabled();
+
+            // Resolve authoritative bill from backend
+            resolveBillPromise({
+                data: {
+                    tableNo: "2",
+                    authoritativeTotal: 672,
+                    total: 672,
+                    orders: [
+                        {
+                            id: 201,
+                            orderNo: "ORD-TABLE2",
+                            total: 672,
+                            status: "DELIVERED",
+                            paymentStatus: "PENDING",
+                        },
+                    ],
+                },
+            });
+
+            // Once resolved, bill amount updates to ₹672.00
+            await waitFor(() => {
+                expect(screen.getByTestId("modal-bill-amount")).toHaveTextContent("₹672.00");
+            });
+
+            // Confirm button is enabled once payment method is selected
+            fireEvent.click(screen.getByTestId("payment-method-cash"));
+            expect(screen.getByTestId("confirm-payment-btn")).not.toBeDisabled();
+            expect(screen.getByTestId("cash-details-section")).toHaveTextContent("₹672.00");
+        });
+
+        it("submits the backend authoritative total ₹672.00 and NOT ₹0.00 during Cash settlement", async () => {
+            api.get.mockResolvedValueOnce({
+                data: {
+                    tableNo: "2",
+                    authoritativeTotal: 672,
+                    total: 672,
+                    orders: [{ id: 201, orderNo: "ORD-TABLE2", total: 672 }],
+                },
+            });
+
+            api.post.mockResolvedValueOnce({
+                data: {
+                    cleared: true,
+                    message: "Table 2 bill settled",
+                    orders: [{ id: 201, status: "DELIVERED", paymentStatus: "SUCCESS", total: 672 }],
+                    paymentMode: "CASH",
+                },
+            });
+
+            render(
+                <TablePaymentSettlementModal
+                    isOpen={true}
+                    onClose={vi.fn()}
+                    table={mockTable2Stale}
+                    restaurantId={4}
+                    serverName="kamalesh"
+                />
+            );
+
+            await waitFor(() => {
+                expect(screen.getByTestId("modal-bill-amount")).toHaveTextContent("₹672.00");
+            });
+
+            fireEvent.click(screen.getByTestId("payment-method-cash"));
+            fireEvent.click(screen.getByTestId("confirm-payment-btn"));
+
+            // Verify the API payload sent amount: 672, NEVER 0
+            expect(api.post).toHaveBeenCalledWith(
+                "/owner/4/tables/2/settle-bill",
+                expect.objectContaining({
+                    tableId: 2,
+                    paymentMode: "CASH",
+                    amount: 672,
+                })
+            );
+
+            await waitFor(() => {
+                expect(screen.getByTestId("settlement-success-view")).toBeInTheDocument();
+            });
+        });
+
+        it("blocks payment confirmation and prevents zero-value settlement if bill amount cannot be resolved", async () => {
+            api.get.mockResolvedValueOnce({
+                data: {
+                    tableNo: "2",
+                    authoritativeTotal: 0,
+                    total: 0,
+                    orders: [],
+                },
+            });
+
+            render(
+                <TablePaymentSettlementModal
+                    isOpen={true}
+                    onClose={vi.fn()}
+                    table={mockTable2Stale}
+                    restaurantId={4}
+                    serverName="kamalesh"
+                />
+            );
+
+            await waitFor(() => {
+                expect(screen.getByTestId("modal-bill-amount")).toHaveTextContent("₹0.00");
+            });
+
+            fireEvent.click(screen.getByTestId("payment-method-cash"));
+
+            // Confirm button must be disabled because bill amount is <= 0
+            const confirmBtn = screen.getByTestId("confirm-payment-btn");
+            expect(confirmBtn).toBeDisabled();
+
+            // Calling post must NOT happen
+            fireEvent.click(confirmBtn);
+            expect(api.post).not.toHaveBeenCalled();
+        });
+    });
 });

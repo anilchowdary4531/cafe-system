@@ -762,15 +762,29 @@ export default async function ownerRoutes(app, deps = {}) {
         }),
       ]);
 
+      const getTableKeys = (value) => {
+        const raw = String(value || "").trim().toLowerCase();
+        if (!raw) return [];
+        const stripped = raw.replace(/^(table|tbl)[-\s]*/i, "").trim();
+        const keys = new Set([raw]);
+        if (stripped) {
+          keys.add(stripped);
+          keys.add(`table ${stripped}`);
+          keys.add(`table-${stripped}`);
+        }
+        return Array.from(keys);
+      };
+
       const activeSessionsByTableId = new Map();
       const activeSessionsByTable = {};
       for (const session of activeSessions) {
         if (session.tableId) {
           activeSessionsByTableId.set(Number(session.tableId), session);
         }
-        const tableKey = String(session.tableNo || "").trim().toLowerCase();
-        if (tableKey && !activeSessionsByTable[tableKey]) {
-          activeSessionsByTable[tableKey] = session;
+        for (const k of getTableKeys(session.tableNo)) {
+          if (!activeSessionsByTable[k]) {
+            activeSessionsByTable[k] = session;
+          }
         }
       }
 
@@ -823,19 +837,22 @@ export default async function ownerRoutes(app, deps = {}) {
           activeOrdersByTableId.get(targetTableId).push(formattedOrder);
         }
 
-        const tableKey = String(order.tableNo || "").trim().toLowerCase();
-        if (tableKey) {
-          if (!activeOrdersByTable[tableKey]) activeOrdersByTable[tableKey] = [];
-          activeOrdersByTable[tableKey].push(formattedOrder);
+        for (const k of getTableKeys(order.tableNo)) {
+          if (!activeOrdersByTable[k]) activeOrdersByTable[k] = [];
+          if (!activeOrdersByTable[k].some((o) => o.id === formattedOrder.id)) {
+            activeOrdersByTable[k].push(formattedOrder);
+          }
         }
       }
 
-      const latestOrderByTable = latestTableOrders.reduce((acc, order) => {
-        const tableKey = String(order.tableNo || "").trim().toLowerCase();
-        if (!tableKey) return acc;
-        if (!acc[tableKey]) acc[tableKey] = order;
-        return acc;
-      }, {});
+      const latestOrderByTable = {};
+      for (const order of latestTableOrders) {
+        for (const k of getTableKeys(order.tableNo)) {
+          if (!latestOrderByTable[k]) {
+            latestOrderByTable[k] = order;
+          }
+        }
+      }
 
       const helperTimeToMinutes = (timeStr) => {
         if (!timeStr || typeof timeStr !== "string") return 0;
@@ -864,15 +881,38 @@ export default async function ownerRoutes(app, deps = {}) {
           qrTargetUrl: `/order/table/${token}`,
           ...(function buildTableState() {
           const tid = Number(table.id);
-          const tableKey = String(table.tableNo || "").trim().toLowerCase();
-          const tableActiveOrders = activeOrdersByTableId.has(tid)
+          let tableActiveOrders = activeOrdersByTableId.has(tid)
             ? activeOrdersByTableId.get(tid)
-            : (tableKey ? (activeOrdersByTable[tableKey] || []) : []);
-          const latestOrder = latestOrderByTable[tableKey] || null;
-          const activeSession = activeSessionsByTableId.get(tid) || (tableKey ? activeSessionsByTable[tableKey] : null) || null;
+            : [];
+          if (!tableActiveOrders.length) {
+            for (const k of getTableKeys(table.tableNo)) {
+              if (activeOrdersByTable[k]?.length) {
+                tableActiveOrders = activeOrdersByTable[k];
+                break;
+              }
+            }
+          }
+
+          let latestOrder = null;
+          for (const k of getTableKeys(table.tableNo)) {
+            if (latestOrderByTable[k]) {
+              latestOrder = latestOrderByTable[k];
+              break;
+            }
+          }
+
+          let activeSession = activeSessionsByTableId.get(tid) || null;
+          if (!activeSession) {
+            for (const k of getTableKeys(table.tableNo)) {
+              if (activeSessionsByTable[k]) {
+                activeSession = activeSessionsByTable[k];
+                break;
+              }
+            }
+          }
           
           const resById = reservationsByTableId.get(Number(table.id)) || [];
-          const resByNo = reservationsByTableNo.get(tableKey) || [];
+          const resByNo = reservationsByTableNo.get(String(table.tableNo || "").trim().toLowerCase()) || [];
           const combinedRes = [...resById, ...resByNo];
           const tableResList = Array.from(new Map(combinedRes.map((r) => [r.id, r])).values());
 
@@ -937,43 +977,64 @@ export default async function ownerRoutes(app, deps = {}) {
             0
           );
 
-          const isOccupied = Boolean(activeSession) || tableActiveOrders.length > 0;
+          const hasActiveSession = Boolean(activeSession && ["OPEN", "BILLING", "PAID"].includes(activeSession.status));
+          const hasInFlightOrders = Array.isArray(tableActiveOrders) && tableActiveOrders.some((o) =>
+            ["PLACED", "ACCEPTED", "PREPARING", "READY"].includes(String(o.status || "").toUpperCase())
+          );
+          const isOccupied = hasActiveSession || hasInFlightOrders;
           const isReserved = !isOccupied && Boolean(activeRes);
           const isBlocked = Boolean(table.isBlocked);
 
-            const resolveCanonicalActiveOrderStatus = (orders, fallbackLatest) => {
-              if (Array.isArray(orders) && orders.length > 0) {
-                if (orders.some((o) => o.status === "READY")) return "READY";
-                if (orders.some((o) => o.status === "PREPARING")) return "PREPARING";
-                if (orders.some((o) => o.status === "ACCEPTED")) return "ACCEPTED";
-                if (orders.some((o) => o.status === "PLACED")) return "PLACED";
-                
-                const allDelivered = orders.every((o) => ["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(String(o.status || "").toUpperCase()));
-                if (allDelivered) {
-                  const anyUnpaid = orders.some((o) => !["PAID", "SUCCESS"].includes(String(o.paymentStatus || "").toUpperCase()));
-                  if (anyUnpaid) return "PAYMENT_PENDING";
-                  return "PAID";
-                }
-                return orders[orders.length - 1]?.status || null;
+          const resolveCanonicalActiveOrderStatus = (orders, fallbackLatest) => {
+            if (Array.isArray(orders) && orders.length > 0) {
+              if (orders.some((o) => o.status === "READY")) return "READY";
+              if (orders.some((o) => o.status === "PREPARING")) return "PREPARING";
+              if (orders.some((o) => o.status === "ACCEPTED")) return "ACCEPTED";
+              if (orders.some((o) => o.status === "PLACED")) return "PLACED";
+              
+              const allDelivered = orders.every((o) => ["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(String(o.status || "").toUpperCase()));
+              if (allDelivered) {
+                const anyUnpaid = orders.some((o) => !["PAID", "SUCCESS"].includes(String(o.paymentStatus || "").toUpperCase()));
+                if (anyUnpaid) return "PAYMENT_PENDING";
+                return "PAID";
               }
+              return orders[orders.length - 1]?.status || null;
+            }
 
-              if (fallbackLatest && activeSession) {
-                const ls = String(fallbackLatest.status || "").toUpperCase();
-                const lp = String(fallbackLatest.paymentStatus || "").toUpperCase();
-                if (["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(ls)) {
-                  if (lp !== "PAID" && lp !== "SUCCESS") return "PAYMENT_PENDING";
-                  return "PAID";
-                }
-                return ls;
+            if (fallbackLatest && activeSession) {
+              const ls = String(fallbackLatest.status || "").toUpperCase();
+              const lp = String(fallbackLatest.paymentStatus || "").toUpperCase();
+              if (["DELIVERED", "SERVED", "COMPLETED", "PAYMENT_PENDING"].includes(ls)) {
+                if (lp !== "PAID" && lp !== "SUCCESS") return "PAYMENT_PENDING";
+                return "PAID";
               }
+              return ls;
+            }
 
-              return null;
-            };
+            return null;
+          };
 
-            const activeOrderStatus = resolveCanonicalActiveOrderStatus(tableActiveOrders, activeSession ? latestOrder : null);
+          const activeOrderStatus = resolveCanonicalActiveOrderStatus(tableActiveOrders, activeSession ? latestOrder : null);
 
+          let canonicalStatus = "AVAILABLE";
+          if (isBlocked) {
+            canonicalStatus = "BLOCKED";
+          } else if (isOccupied) {
+            canonicalStatus = activeOrderStatus === "PAYMENT_PENDING"
+              ? "PAYMENT_PENDING"
+              : activeSession?.status === "BILLING"
+              ? "BILLING"
+              : "OCCUPIED";
+          } else if (isReserved) {
+            canonicalStatus = "RESERVED";
+          }
+
+          if (!isOccupied) {
             return {
-              isOccupied,
+              id: table.id,
+              tableNo: table.tableNo,
+              status: canonicalStatus,
+              isOccupied: false,
               isReserved,
               isBlocked,
               blockReason: table.blockReason || null,
@@ -998,29 +1059,81 @@ export default async function ownerRoutes(app, deps = {}) {
                 guestCount: upcomingRes.guestCount,
                 status: upcomingRes.status,
               } : null,
-              assignedWaiterId: table.assignedWaiterId || activeSession?.waiterId || null,
-              assignedWaiterName: table.assignedWaiterName || activeSession?.waiterName || null,
-              occupiedSince: activeSession?.openedAt || tableActiveOrders[0]?.createdAt || null,
-              activeOrderCount: tableActiveOrders.length,
-              activeItemCount,
-              activeOrders: tableActiveOrders,
-              activeOrderStatus,
-              activeSession: activeSession ? {
-                id: activeSession.id,
-                status: activeSession.status,
-                guestCount: activeSession.guestCount,
-                waiterId: activeSession.waiterId,
-                waiterName: activeSession.waiterName,
-                subtotal: activeSession.subtotal,
-                total: activeSession.total,
-                openedAt: activeSession.openedAt,
-              } : null,
-              lastOrderStatus: latestOrder?.status || null,
-              lastPaymentStatus: latestOrder?.paymentStatus || null,
-              lastOrderNo: latestOrder?.orderNo || null,
-              lastOrderAt: latestOrder?.updatedAt || latestOrder?.createdAt || null,
+              assignedWaiterId: table.assignedWaiterId || null,
+              assignedWaiterName: table.assignedWaiterName || null,
+              assignedServer: table.assignedWaiterName || null,
+              occupiedSince: null,
+              activeOrderCount: 0,
+              activeItemCount: 0,
+              activeOrders: [],
+              activeOrderStatus: null,
+              paymentStatus: null,
+              session: { status: "CLOSED" },
+              activeSession: null,
+              lastOrderStatus: null,
+              lastPaymentStatus: null,
+              lastOrderNo: null,
+              lastOrderAt: null,
             };
-          })(),
+          }
+
+          return {
+            id: table.id,
+            tableNo: table.tableNo,
+            status: canonicalStatus,
+            isOccupied: true,
+            isReserved: false,
+            isBlocked: false,
+            blockReason: null,
+            blockedAt: null,
+            blockedByName: null,
+            activeReservation: null,
+            upcomingReservation: upcomingRes ? {
+              id: upcomingRes.id,
+              reservationNo: upcomingRes.reservationNo,
+              startTime: upcomingRes.startTime,
+              endTime: upcomingRes.endTime,
+              customerName: upcomingRes.customerName,
+              guestCount: upcomingRes.guestCount,
+              status: upcomingRes.status,
+            } : null,
+            assignedWaiterId: activeSession?.waiterId || table.assignedWaiterId || null,
+            assignedWaiterName: activeSession?.waiterName || table.assignedWaiterName || null,
+            assignedServer: activeSession?.waiterName || table.assignedWaiterName || null,
+            occupiedSince: activeSession?.openedAt || tableActiveOrders[0]?.createdAt || null,
+            activeOrderCount: tableActiveOrders.length,
+            activeItemCount,
+            activeOrders: tableActiveOrders,
+            activeOrderStatus,
+            paymentStatus: activeOrderStatus === "PAYMENT_PENDING" ? "PENDING" : null,
+            session: activeSession ? {
+              id: activeSession.id,
+              status: activeSession.status,
+              guestCount: activeSession.guestCount,
+              waiterId: activeSession.waiterId,
+              waiterName: activeSession.waiterName,
+              subtotal: activeSession.subtotal,
+              total: activeSession.total,
+              openedAt: activeSession.openedAt,
+            } : null,
+            activeSession: activeSession ? {
+              id: activeSession.id,
+              status: activeSession.status,
+              guestCount: activeSession.guestCount,
+              waiterId: activeSession.waiterId,
+              waiterName: activeSession.waiterName,
+              subtotal: activeSession.subtotal,
+              total: activeSession.total,
+              openedAt: activeSession.openedAt,
+            } : null,
+            total: tableActiveOrders.reduce((sum, o) => sum + Number(o.total || 0), 0) || Number(activeSession?.total || 0),
+            payableAmount: tableActiveOrders.reduce((sum, o) => sum + Number(o.total || 0), 0) || Number(activeSession?.total || 0),
+            lastOrderStatus: latestOrder?.status || null,
+            lastPaymentStatus: latestOrder?.paymentStatus || null,
+            lastOrderNo: latestOrder?.orderNo || null,
+            lastOrderAt: latestOrder?.updatedAt || latestOrder?.createdAt || null,
+          };
+        })(),
       };
       });
     } catch (err) {
@@ -1390,7 +1503,7 @@ export default async function ownerRoutes(app, deps = {}) {
         return updated;
       });
 
-      if (realtime?.io) {
+      if (realtime?.io || realtime?.staff) {
         const clearPayload = {
           restaurantId: effectiveRid,
           tableId: table.id,
@@ -1399,9 +1512,13 @@ export default async function ownerRoutes(app, deps = {}) {
           status: "AVAILABLE",
           assignedWaiterId: updatedTable?.assignedWaiterId || null,
           assignedWaiterName: updatedTable?.assignedWaiterName || null,
+          assignedServer: updatedTable?.assignedWaiterName || null,
           activeOrders: [],
           activeOrderCount: 0,
           activeItemCount: 0,
+          activeOrderStatus: null,
+          paymentStatus: null,
+          session: { status: "CLOSED" },
           activeSession: null,
           occupiedSince: null,
         };
@@ -1411,14 +1528,19 @@ export default async function ownerRoutes(app, deps = {}) {
           tableNo: table.tableNo,
           sessionId: activeSession?.id || null,
           status: "CLOSED",
+          assignedServer: null,
+          assignedWaiterId: null,
+          assignedWaiterName: null,
           closedAt: new Date().toISOString(),
         };
-        realtime.io.to(`restaurant_${effectiveRid}`).emit("table:updated", clearPayload);
-        realtime.io.to(`restaurant:${effectiveRid}`).emit("table:updated", clearPayload);
-        realtime.io.to(`restaurant_${effectiveRid}`).emit("table:session_updated", sessionPayload);
-        realtime.io.to(`restaurant:${effectiveRid}`).emit("table:session_updated", sessionPayload);
-        realtime.io.to(`restaurant_${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
-        realtime.io.to(`restaurant:${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
+        if (realtime?.io) {
+          realtime.io.to(`restaurant_${effectiveRid}`).emit("table:updated", clearPayload);
+          realtime.io.to(`restaurant:${effectiveRid}`).emit("table:updated", clearPayload);
+          realtime.io.to(`restaurant_${effectiveRid}`).emit("table:session_updated", sessionPayload);
+          realtime.io.to(`restaurant:${effectiveRid}`).emit("table:session_updated", sessionPayload);
+          realtime.io.to(`restaurant_${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
+          realtime.io.to(`restaurant:${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
+        }
 
         if (realtime?.staff) {
           realtime.staff.to(`restaurant:${effectiveRid}`).emit("table:updated", clearPayload);
@@ -3369,6 +3491,146 @@ export default async function ownerRoutes(app, deps = {}) {
     }
   });
 
+  const fetchAuthoritativeTableOrders = async ({ prisma, restaurantId, tableParam, requestedTableId }) => {
+    const activeStatuses = ["PLACED", "ACCEPTED", "PREPARING", "READY"];
+    const rawParam = String(tableParam || "").trim();
+    const strippedNumber = rawParam.replace(/^(table|tbl)[-\s]*/i, "");
+    const possibleTableNos = Array.from(new Set([
+      rawParam,
+      strippedNumber,
+      `Table ${strippedNumber}`,
+      `Table-${strippedNumber}`,
+      `Table ${rawParam}`,
+    ].filter(Boolean)));
+
+    let diningTable = null;
+    if (requestedTableId) {
+      diningTable = await prisma.diningTable.findFirst({
+        where: { id: requestedTableId, restaurantId },
+      });
+    }
+    if (!diningTable) {
+      diningTable = await prisma.diningTable.findFirst({
+        where: {
+          restaurantId,
+          tableNo: { in: possibleTableNos, mode: "insensitive" },
+        },
+      });
+    }
+    if (!diningTable && Number.isInteger(Number(rawParam))) {
+      diningTable = await prisma.diningTable.findFirst({
+        where: {
+          restaurantId,
+          id: Number(rawParam),
+        },
+      });
+    }
+
+    const effectiveTableNo = diningTable?.tableNo || tableParam;
+    const orderWhereOr = [{ tableNo: { in: possibleTableNos, mode: "insensitive" } }];
+    if (diningTable) {
+      orderWhereOr.push({ tableSession: { tableId: diningTable.id } });
+    }
+
+    const activeOrders = await prisma.order.findMany({
+      where: {
+        restaurantId,
+        OR: orderWhereOr,
+        AND: [
+          {
+            OR: [
+              { status: { in: activeStatuses } },
+              {
+                status: { in: ["SERVED", "DELIVERED", "COMPLETED", "PAYMENT_PENDING"] },
+                paymentStatus: { notIn: ["PAID", "SUCCESS"] },
+              },
+            ],
+          },
+        ],
+      },
+      select: {
+        id: true,
+        restaurantId: true,
+        branchId: true,
+        tableSessionId: true,
+        total: true,
+        customerId: true,
+        orderNo: true,
+        tableNo: true,
+        createdAt: true,
+        status: true,
+        paymentStatus: true,
+        items: {
+          select: {
+            id: true,
+            itemName: true,
+            preparedByName: true,
+            qty: true,
+            price: true,
+            total: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const authoritativeTotal = activeOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+
+    return {
+      diningTable,
+      effectiveTableNo,
+      activeOrders,
+      authoritativeTotal,
+    };
+  };
+
+  const handleGetTableBill = async (req, reply) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const tableParam = String(req.params.tableNo || req.params.tableId || "").trim();
+      if (!restaurantId || !tableParam) return reply.code(400).send({ message: "Invalid id values" });
+
+      const actor =
+        req.staffActor ||
+        (await requireStaffJwt(req, reply, {
+          prisma,
+          allowedRoles: STAFF_ALLOWED_ROLES,
+          matchRestaurantParam: "restaurantId",
+        }));
+      if (!actor) return;
+
+      const requestedTableId = req.query?.tableId
+        ? Number(req.query.tableId)
+        : Number.isInteger(Number(tableParam))
+        ? Number(tableParam)
+        : null;
+
+      const { diningTable, effectiveTableNo, activeOrders, authoritativeTotal } =
+        await fetchAuthoritativeTableOrders({
+          prisma,
+          restaurantId,
+          tableParam,
+          requestedTableId,
+        });
+
+      return reply.send({
+        tableNo: effectiveTableNo,
+        tableId: diningTable?.id || null,
+        total: authoritativeTotal,
+        authoritativeTotal,
+        amount: authoritativeTotal,
+        payableAmount: authoritativeTotal,
+        orders: activeOrders,
+        orderCount: activeOrders.length,
+        cleared: activeOrders.length === 0,
+        serverName: diningTable?.assignedWaiterName || null,
+      });
+    } catch (err) {
+      console.error("[handleGetTableBill] error:", err);
+      return reply.code(500).send({ message: "Failed to fetch table bill" });
+    }
+  };
+
   const handleSettleBill = async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
@@ -3387,69 +3649,20 @@ export default async function ownerRoutes(app, deps = {}) {
       const paymentMode = normalizeBillPaymentMode(req.body?.paymentMode || req.body?.paymentMethod || req.body?.method);
       const changedByName = req.body?.changedByName ? String(req.body.changedByName).trim() : null;
       const transactionId = req.body?.transactionId || req.body?.reference || req.body?.transactionRef || null;
-      const activeStatuses = ["PLACED", "ACCEPTED", "PREPARING", "READY"];
 
-      const rawParam = String(tableParam || "").trim();
-      const strippedNumber = rawParam.replace(/^(table|tbl)[-\s]*/i, "");
-      const possibleTableNos = Array.from(new Set([
-        rawParam,
-        strippedNumber,
-        `Table ${strippedNumber}`,
-        `Table-${strippedNumber}`,
-        `Table ${rawParam}`,
-      ].filter(Boolean)));
+      const requestedTableId = req.body?.tableId
+        ? Number(req.body.tableId)
+        : Number.isInteger(Number(tableParam))
+        ? Number(tableParam)
+        : null;
 
-      const requestedTableId = req.body?.tableId ? Number(req.body.tableId) : null;
-
-      // Resolve table by tableNo or id
-      const diningTable = await prisma.diningTable.findFirst({
-        where: {
+      const { diningTable, effectiveTableNo, activeOrders, authoritativeTotal } =
+        await fetchAuthoritativeTableOrders({
+          prisma,
           restaurantId,
-          OR: [
-            { tableNo: { in: possibleTableNos, mode: "insensitive" } },
-            ...(requestedTableId ? [{ id: requestedTableId }] : []),
-            ...(Number.isInteger(Number(rawParam)) ? [{ id: Number(rawParam) }] : []),
-            ...(Number.isInteger(Number(strippedNumber)) ? [{ id: Number(strippedNumber) }] : []),
-          ],
-        },
-      });
-
-      const effectiveTableNo = diningTable?.tableNo || tableParam;
-
-      const orderWhereOr = [{ tableNo: { in: possibleTableNos, mode: "insensitive" } }];
-      if (diningTable) {
-        orderWhereOr.push({ tableSession: { tableId: diningTable.id } });
-      }
-
-      const activeOrders = await prisma.order.findMany({
-        where: {
-          restaurantId,
-          OR: orderWhereOr,
-          AND: [
-            {
-              OR: [
-                { status: { in: activeStatuses } },
-                {
-                  status: { in: ["SERVED", "DELIVERED", "COMPLETED", "PAYMENT_PENDING"] },
-                  paymentStatus: { notIn: ["PAID", "SUCCESS"] },
-                },
-              ],
-            },
-          ],
-        },
-        select: {
-          id: true,
-          restaurantId: true,
-          branchId: true,
-          tableSessionId: true,
-          total: true,
-          customerId: true,
-          orderNo: true,
-          tableNo: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: "asc" },
-      });
+          tableParam,
+          requestedTableId,
+        });
 
       if (!activeOrders.length) {
         return reply.send({
@@ -3460,7 +3673,6 @@ export default async function ownerRoutes(app, deps = {}) {
       }
 
       // Security / Price Protection: validate authoritative total against submitted amount if provided
-      const authoritativeTotal = activeOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
       if (req.body?.amount !== undefined && req.body?.amount !== null) {
         const submittedAmount = Number(req.body.amount);
         if (!Number.isNaN(submittedAmount) && Math.abs(submittedAmount - authoritativeTotal) > 0.01) {
@@ -3610,6 +3822,10 @@ export default async function ownerRoutes(app, deps = {}) {
     }
   };
 
+  app.get("/owner/:restaurantId/tables/:tableNo/bill", handleGetTableBill);
+  app.get("/api/owner/:restaurantId/tables/:tableNo/bill", handleGetTableBill);
+  app.get("/owner/:restaurantId/table/:tableNo/bill", handleGetTableBill);
+  app.get("/api/owner/:restaurantId/table/:tableNo/bill", handleGetTableBill);
   app.post("/owner/:restaurantId/tables/:tableNo/settle-bill", handleSettleBill);
   app.post("/api/owner/:restaurantId/tables/:tableNo/settle-bill", handleSettleBill);
 

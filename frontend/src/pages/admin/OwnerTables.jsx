@@ -619,16 +619,46 @@ export default function OwnerTables() {
         if (!socket || typeof socket.on !== "function") return undefined;
 
         const onSessionUpdated = (session) => {
-            if (!session || !session.tableId) return;
-            setActiveSessions((prev) => {
-                const next = { ...prev };
-                if (!session.status || session.status === "CLOSED" || session.status === "CANCELLED") {
-                    delete next[String(session.tableId)];
-                } else {
-                    next[String(session.tableId)] = session;
-                }
-                return next;
-            });
+            if (!session) return;
+            if (session.tableId) {
+                setActiveSessions((prev) => {
+                    const next = { ...prev };
+                    if (!session.status || session.status === "CLOSED" || session.status === "CANCELLED") {
+                        delete next[String(session.tableId)];
+                    } else {
+                        next[String(session.tableId)] = session;
+                    }
+                    return next;
+                });
+            }
+            if (!session.status || session.status === "CLOSED" || session.status === "CANCELLED") {
+                setTables((prev) =>
+                    prev.map((t) => {
+                        const match =
+                            (session.tableId && String(t.id) === String(session.tableId)) ||
+                            (session.tableNo && String(t.tableNo).trim().toLowerCase() === String(session.tableNo).trim().toLowerCase());
+                        if (match) {
+                            return {
+                                ...t,
+                                isOccupied: false,
+                                status: "AVAILABLE",
+                                activeOrderCount: 0,
+                                activeItemCount: 0,
+                                activeOrders: [],
+                                activeOrderStatus: null,
+                                paymentStatus: null,
+                                session: { status: "CLOSED" },
+                                activeSession: null,
+                                occupiedSince: null,
+                                assignedWaiterId: null,
+                                assignedWaiterName: null,
+                                assignedServer: null,
+                            };
+                        }
+                        return t;
+                    })
+                );
+            }
         };
 
         const handleReservationChange = () => {
@@ -646,6 +676,32 @@ export default function OwnerTables() {
                         return next;
                     });
                 }
+                setTables((prev) =>
+                    prev.map((t) => {
+                        const match =
+                            (payload.tableId && String(t.id) === String(payload.tableId)) ||
+                            (payload.tableNo && String(t.tableNo).trim().toLowerCase() === String(payload.tableNo).trim().toLowerCase());
+                        if (match) {
+                            return {
+                                ...t,
+                                isOccupied: false,
+                                status: "AVAILABLE",
+                                activeOrderCount: 0,
+                                activeItemCount: 0,
+                                activeOrders: [],
+                                activeOrderStatus: null,
+                                paymentStatus: null,
+                                session: { status: "CLOSED" },
+                                activeSession: null,
+                                occupiedSince: null,
+                                assignedWaiterId: null,
+                                assignedWaiterName: null,
+                                assignedServer: null,
+                            };
+                        }
+                        return t;
+                    })
+                );
             }
             handleReservationChange();
         };
@@ -1681,7 +1737,7 @@ export default function OwnerTables() {
                                             </span>
                                         </div>
 
-                                        {(table.assignedWaiterName || session?.waiterName) && (
+                                        {(!isAvailable && (table.assignedWaiterName || session?.waiterName)) && (
                                             <div className="text-[9px] text-orange-400 font-semibold truncate flex items-center gap-0.5 my-0.5" title={`Assigned: ${table.assignedWaiterName || session?.waiterName}`}>
                                                 <span>👤</span>
                                                 <span className="truncate">{table.assignedWaiterName || session?.waiterName}</span>

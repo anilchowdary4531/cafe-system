@@ -529,8 +529,17 @@ export const completeSessionAndReleaseTable = async ({
   if (!sid) {
     if (tableId) {
       const tid = Number(tableId);
-      await prisma.diningTable.update({
-        where: { id: tid },
+      const rawNo = String(tableNo || "").trim();
+      const strippedNo = rawNo.replace(/^(table|tbl)[-\s]*/i, "");
+      const candidates = Array.from(new Set([rawNo, strippedNo, `Table ${strippedNo}`].filter(Boolean)));
+
+      await prisma.diningTable.updateMany({
+        where: {
+          OR: [
+            { id: tid },
+            ...(restaurantId && candidates.length ? [{ restaurantId: Number(restaurantId), tableNo: { in: candidates, mode: "insensitive" } }] : []),
+          ],
+        },
         data: {
           assignedWaiterId: null,
           assignedWaiterName: null,
@@ -541,18 +550,42 @@ export const completeSessionAndReleaseTable = async ({
         restaurantId: Number(restaurantId) || null,
         tableId: tid,
         tableNo: tableNo || null,
+        status: "AVAILABLE",
+        isOccupied: false,
+        activeOrderCount: 0,
+        activeOrders: [],
+        activeOrderStatus: null,
+        paymentStatus: null,
+        occupiedSince: null,
+        assignedServer: null,
         assignedWaiterId: null,
         assignedWaiterName: null,
+        session: { status: "CLOSED" },
+        activeSession: null,
+      };
+      const sessionPayload = {
+        restaurantId: Number(restaurantId) || null,
+        tableId: tid,
+        tableNo: tableNo || null,
+        status: "CLOSED",
+        assignedServer: null,
+        assignedWaiterId: null,
+        assignedWaiterName: null,
+        closedAt: new Date().toISOString(),
       };
       if (realtime?.io && restaurantId) {
         realtime.io.to(`restaurant_${restaurantId}`).emit("table:updated", clearPayload);
         realtime.io.to(`restaurant:${restaurantId}`).emit("table:updated", clearPayload);
+        realtime.io.to(`restaurant_${restaurantId}`).emit("table:session_updated", sessionPayload);
+        realtime.io.to(`restaurant:${restaurantId}`).emit("table:session_updated", sessionPayload);
         realtime.io.to(`restaurant_${restaurantId}`).emit("table:layout_updated", { restaurantId });
         realtime.io.to(`restaurant:${restaurantId}`).emit("table:layout_updated", { restaurantId });
       }
       if (realtime?.staff && restaurantId) {
         realtime.staff.to(`restaurant_${restaurantId}`).emit("table:updated", clearPayload);
         realtime.staff.to(`restaurant:${restaurantId}`).emit("table:updated", clearPayload);
+        realtime.staff.to(`restaurant_${restaurantId}`).emit("table:session_updated", sessionPayload);
+        realtime.staff.to(`restaurant:${restaurantId}`).emit("table:session_updated", sessionPayload);
       }
       return { completed: true, freedWithoutSession: true };
     }
@@ -649,15 +682,22 @@ export const completeSessionAndReleaseTable = async ({
     });
 
     // C. Clear waiter assignment from table
-    if (session.tableId) {
-      await tx.diningTable.update({
-        where: { id: session.tableId },
-        data: {
-          assignedWaiterId: null,
-          assignedWaiterName: null,
-        },
-      });
-    }
+    const rawNo = String(session.tableNo || "").trim();
+    const strippedNo = rawNo.replace(/^(table|tbl)[-\s]*/i, "");
+    const candidates = Array.from(new Set([rawNo, strippedNo, `Table ${strippedNo}`].filter(Boolean)));
+    await tx.diningTable.updateMany({
+      where: {
+        restaurantId: session.restaurantId,
+        OR: [
+          ...(session.tableId ? [{ id: session.tableId }] : []),
+          { tableNo: { in: candidates, mode: "insensitive" } },
+        ],
+      },
+      data: {
+        assignedWaiterId: null,
+        assignedWaiterName: null,
+      },
+    }).catch(() => {});
 
     // D. Audit log in TableOperationLog if available
     try {
@@ -690,10 +730,32 @@ export const completeSessionAndReleaseTable = async ({
   const effectiveRid = session.restaurantId;
   const clearPayload = {
     restaurantId: effectiveRid,
-    tableId: session.tableId,
+    tableId: session.tableId || null,
     tableNo: session.tableNo,
+    status: "AVAILABLE",
+    isOccupied: false,
+    activeOrderCount: 0,
+    activeOrders: [],
+    activeOrderStatus: null,
+    paymentStatus: null,
+    occupiedSince: null,
+    assignedServer: null,
     assignedWaiterId: null,
     assignedWaiterName: null,
+    session: { status: "CLOSED" },
+    activeSession: null,
+  };
+
+  const sessionPayload = {
+    restaurantId: effectiveRid,
+    tableId: session.tableId || null,
+    tableNo: session.tableNo,
+    sessionId: session.id,
+    status: "CLOSED",
+    assignedServer: null,
+    assignedWaiterId: null,
+    assignedWaiterName: null,
+    closedAt: new Date().toISOString(),
   };
 
   const io = realtime?.io || null;
@@ -702,32 +764,20 @@ export const completeSessionAndReleaseTable = async ({
   if (io) {
     io.to(`restaurant_${effectiveRid}`).emit("table:updated", clearPayload);
     io.to(`restaurant:${effectiveRid}`).emit("table:updated", clearPayload);
-    io.to(`restaurant_${effectiveRid}`).emit("table:session_updated", {
-      restaurantId: effectiveRid,
-      tableId: session.tableId,
-      tableNo: session.tableNo,
-      sessionId: session.id,
-      status: "CLOSED",
-    });
-    io.to(`restaurant:${effectiveRid}`).emit("table:session_updated", {
-      restaurantId: effectiveRid,
-      tableId: session.tableId,
-      tableNo: session.tableNo,
-      sessionId: session.id,
-      status: "CLOSED",
-    });
+    io.to(`restaurant_${effectiveRid}`).emit("table:session_updated", sessionPayload);
+    io.to(`restaurant:${effectiveRid}`).emit("table:session_updated", sessionPayload);
     io.to(`restaurant_${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
     io.to(`restaurant:${effectiveRid}`).emit("table:layout_updated", { restaurantId: effectiveRid });
     io.to(`restaurant_${effectiveRid}`).emit("payment:updated", {
       restaurantId: effectiveRid,
-      tableId: session.tableId,
+      tableId: session.tableId || null,
       tableNo: session.tableNo,
       status: "PAID",
       paymentMode,
     });
     io.to(`restaurant:${effectiveRid}`).emit("payment:updated", {
       restaurantId: effectiveRid,
-      tableId: session.tableId,
+      tableId: session.tableId || null,
       tableNo: session.tableNo,
       status: "PAID",
       paymentMode,
@@ -737,30 +787,18 @@ export const completeSessionAndReleaseTable = async ({
   if (staff) {
     staff.to(`restaurant_${effectiveRid}`).emit("table:updated", clearPayload);
     staff.to(`restaurant:${effectiveRid}`).emit("table:updated", clearPayload);
-    staff.to(`restaurant_${effectiveRid}`).emit("table:session_updated", {
-      restaurantId: effectiveRid,
-      tableId: session.tableId,
-      tableNo: session.tableNo,
-      sessionId: session.id,
-      status: "CLOSED",
-    });
-    staff.to(`restaurant:${effectiveRid}`).emit("table:session_updated", {
-      restaurantId: effectiveRid,
-      tableId: session.tableId,
-      tableNo: session.tableNo,
-      sessionId: session.id,
-      status: "CLOSED",
-    });
+    staff.to(`restaurant_${effectiveRid}`).emit("table:session_updated", sessionPayload);
+    staff.to(`restaurant:${effectiveRid}`).emit("table:session_updated", sessionPayload);
     staff.to(`restaurant_${effectiveRid}`).emit("payment:updated", {
       restaurantId: effectiveRid,
-      tableId: session.tableId,
+      tableId: session.tableId || null,
       tableNo: session.tableNo,
       status: "PAID",
       paymentMode,
     });
     staff.to(`restaurant:${effectiveRid}`).emit("payment:updated", {
       restaurantId: effectiveRid,
-      tableId: session.tableId,
+      tableId: session.tableId || null,
       tableNo: session.tableNo,
       status: "PAID",
       paymentMode,

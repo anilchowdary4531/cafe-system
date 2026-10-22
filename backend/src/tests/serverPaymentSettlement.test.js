@@ -405,4 +405,225 @@ test("Tiffzy Server Station — Payment Settlement Backend Test Suite", async (t
         await prisma.order.delete({ where: { id: order.id } });
         await prisma.tableSession.delete({ where: { id: session.id } });
     });
+
+    await t.test("Regression: Table 2 authoritative bill retrieval and zero-value settlement rejection", async () => {
+        // Create Table 2
+        const table2 = await prisma.diningTable.create({
+            data: {
+                restaurantId: restaurantA.id,
+                tableNo: "2",
+                seats: 4,
+                assignedWaiterId: serverA.id,
+                assignedWaiterName: serverA.name,
+            },
+        });
+
+        const session2 = await prisma.tableSession.create({
+            data: {
+                restaurantId: restaurantA.id,
+                tableId: table2.id,
+                tableNo: "Table 2",
+                waiterId: serverA.id,
+                waiterName: serverA.name,
+                status: "OPEN",
+                total: 672,
+            },
+        });
+
+        const order2 = await prisma.order.create({
+            data: {
+                restaurantId: restaurantA.id,
+                tableSessionId: session2.id,
+                tableNo: "Table 2",
+                orderNo: `ORD-TABLE2-${ts}`,
+                status: "DELIVERED",
+                paymentStatus: "PENDING",
+                total: 672,
+                subtotal: 672,
+            },
+        });
+
+        // 1. Test GET /owner/:restaurantId/tables/2/bill returns canonical authoritative total 672
+        const billRes = await app.inject({
+            method: "GET",
+            url: `/owner/${restaurantA.id}/tables/2/bill`,
+            headers: { authorization: `Bearer ${tokenA}` },
+        });
+
+        assert.equal(billRes.statusCode, 200);
+        const billData = JSON.parse(billRes.payload);
+        assert.equal(billData.authoritativeTotal, 672);
+        assert.equal(billData.total, 672);
+        assert.equal(billData.payableAmount, 672);
+        assert.equal(billData.orders.length, 1);
+        assert.equal(billData.orders[0].id, order2.id);
+
+        // 2. Reject zero-value settlement when authoritative total is 672
+        const zeroSettleRes = await app.inject({
+            method: "POST",
+            url: `/owner/${restaurantA.id}/tables/2/settle-bill`,
+            headers: { authorization: `Bearer ${tokenA}` },
+            payload: {
+                paymentMode: "CASH",
+                amount: 0, // Zero value!
+                changedByName: "kamalesh",
+            },
+        });
+
+        assert.equal(zeroSettleRes.statusCode, 400);
+        const zeroData = JSON.parse(zeroSettleRes.payload);
+        assert.equal(
+            zeroData.message,
+            "Payment amount mismatch. Authoritative total is ₹672.00, received ₹0.00"
+        );
+        assert.equal(zeroData.authoritativeTotal, 672);
+
+        // 3. Confirm legitimate CASH settlement with authoritative amount 672
+        const validSettleRes = await app.inject({
+            method: "POST",
+            url: `/owner/${restaurantA.id}/tables/2/settle-bill`,
+            headers: { authorization: `Bearer ${tokenA}` },
+            payload: {
+                paymentMode: "CASH",
+                amount: 672,
+                changedByName: "kamalesh",
+            },
+        });
+
+        assert.equal(validSettleRes.statusCode, 200);
+        const validData = JSON.parse(validSettleRes.payload);
+        assert.equal(validData.cleared, true);
+        assert.equal(validData.authoritativeTotal, 672);
+
+        // Verify Order is PAID/SUCCESS
+        const checkOrder = await prisma.order.findUnique({ where: { id: order2.id } });
+        assert.equal(checkOrder.paymentStatus, "SUCCESS");
+        assert.equal(checkOrder.paymentMode, "CASH");
+
+        // Verify Payment record has amountReceived 672
+        const checkPayment = await prisma.payment.findFirst({ where: { orderId: order2.id } });
+        assert.ok(checkPayment);
+        assert.equal(checkPayment.amountReceived, 672);
+
+        // Verify session is CLOSED
+        const checkSession = await prisma.tableSession.findUnique({ where: { id: session2.id } });
+        assert.equal(checkSession.status, "CLOSED");
+
+        // Clean up
+        await prisma.payment.deleteMany({ where: { orderId: order2.id } });
+        await prisma.order.delete({ where: { id: order2.id } });
+        await prisma.tableSession.delete({ where: { id: session2.id } });
+        await prisma.diningTable.delete({ where: { id: table2.id } });
+    });
+
+    await t.test("Regression: Table 2 vs Table T2 strict isolation in bill calculation and settlement", async () => {
+        // Create Table 2
+        const table2 = await prisma.diningTable.create({
+            data: {
+                restaurantId: restaurantA.id,
+                tableNo: "2",
+                seats: 4,
+            },
+        });
+
+        // Create Table T2
+        const tableT2 = await prisma.diningTable.create({
+            data: {
+                restaurantId: restaurantA.id,
+                tableNo: "T2",
+                seats: 4,
+            },
+        });
+
+        // Create session and order for Table 2 (total 672)
+        const session2 = await prisma.tableSession.create({
+            data: {
+                restaurantId: restaurantA.id,
+                tableId: table2.id,
+                tableNo: "2",
+                status: "OPEN",
+                total: 672,
+            },
+        });
+        const order2 = await prisma.order.create({
+            data: {
+                restaurantId: restaurantA.id,
+                tableSessionId: session2.id,
+                tableNo: "2",
+                orderNo: `ORD-ISO-2-${ts}`,
+                status: "DELIVERED",
+                paymentStatus: "PENDING",
+                total: 672,
+                subtotal: 672,
+            },
+        });
+
+        // Create session and order for Table T2 (total 450)
+        const sessionT2 = await prisma.tableSession.create({
+            data: {
+                restaurantId: restaurantA.id,
+                tableId: tableT2.id,
+                tableNo: "T2",
+                status: "OPEN",
+                total: 450,
+            },
+        });
+        const orderT2 = await prisma.order.create({
+            data: {
+                restaurantId: restaurantA.id,
+                tableSessionId: sessionT2.id,
+                tableNo: "T2",
+                orderNo: `ORD-ISO-T2-${ts}`,
+                status: "DELIVERED",
+                paymentStatus: "PENDING",
+                total: 450,
+                subtotal: 450,
+            },
+        });
+
+        // Fetch bill for Table 2
+        const bill2Res = await app.inject({
+            method: "GET",
+            url: `/owner/${restaurantA.id}/tables/2/bill`,
+            headers: { authorization: `Bearer ${tokenA}` },
+        });
+        assert.equal(bill2Res.statusCode, 200);
+        const bill2 = JSON.parse(bill2Res.payload);
+        assert.equal(bill2.authoritativeTotal, 672, "Table 2 must be strictly 672");
+        assert.equal(bill2.orders.length, 1);
+        assert.equal(bill2.orders[0].id, order2.id);
+
+        // Fetch bill for Table T2
+        const billT2Res = await app.inject({
+            method: "GET",
+            url: `/owner/${restaurantA.id}/tables/T2/bill`,
+            headers: { authorization: `Bearer ${tokenA}` },
+        });
+        assert.equal(billT2Res.statusCode, 200);
+        const billT2 = JSON.parse(billT2Res.payload);
+        assert.equal(billT2.authoritativeTotal, 450, "Table T2 must be strictly 450");
+        assert.equal(billT2.orders.length, 1);
+        assert.equal(billT2.orders[0].id, orderT2.id);
+
+        // Settle Table 2
+        const settle2Res = await app.inject({
+            method: "POST",
+            url: `/owner/${restaurantA.id}/tables/2/settle-bill`,
+            headers: { authorization: `Bearer ${tokenA}` },
+            payload: { paymentMode: "CASH", amount: 672 },
+        });
+        assert.equal(settle2Res.statusCode, 200);
+
+        // Verify Table T2 remains completely UNSETTLED and unpaid
+        const checkOrderT2 = await prisma.order.findUnique({ where: { id: orderT2.id } });
+        assert.equal(checkOrderT2.paymentStatus, "PENDING");
+        const checkSessionT2 = await prisma.tableSession.findUnique({ where: { id: sessionT2.id } });
+        assert.equal(checkSessionT2.status, "OPEN");
+
+        // Clean up
+        await prisma.payment.deleteMany({ where: { orderId: { in: [order2.id, orderT2.id] } } });
+        await prisma.order.deleteMany({ where: { id: { in: [order2.id, orderT2.id] } } });
+        await prisma.tableSession.deleteMany({ where: { id: { in: [session2.id, sessionT2.id] } } });
+        await prisma.diningTable.deleteMany({ where: { id: { in: [table2.id, tableT2.id] } } });
+    });
 });

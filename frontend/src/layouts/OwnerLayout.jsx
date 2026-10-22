@@ -458,8 +458,10 @@ const normalizeTableRows = (rows) =>
             return {
                 ...table,
                 tableNo: String(table?.tableNo || "").trim(),
-                assignedWaiterId: table?.assignedWaiterId || table?.activeSession?.waiterId || null,
-                assignedWaiterName: table?.assignedWaiterName || table?.activeSession?.waiterName || null,
+                status: isExplicitlyFree ? "AVAILABLE" : (table?.status || (isOccupied ? "OCCUPIED" : "AVAILABLE")),
+                assignedWaiterId: table?.assignedWaiterId || (isOccupied ? table?.activeSession?.waiterId : null) || null,
+                assignedWaiterName: table?.assignedWaiterName || (isOccupied ? table?.activeSession?.waiterName : null) || null,
+                assignedServer: table?.assignedServer || table?.assignedWaiterName || (isOccupied ? table?.activeSession?.waiterName : null) || null,
                 isOccupied,
                 isReserved: Boolean(table?.isReserved || table?.is_reserved || table?.activeReservation || table?.upcomingReservation),
                 activeReservation: table?.activeReservation || null,
@@ -467,10 +469,12 @@ const normalizeTableRows = (rows) =>
                 occupiedSince: isOccupied ? (table?.occupiedSince || table?.activeSession?.createdAt || null) : null,
                 activeOrderCount: isOccupied ? Number(table?.activeOrderCount || activeOrders.length) : 0,
                 activeItemCount: isOccupied ? Number(table?.activeItemCount || 0) : 0,
-                lastOrderStatus: String(table?.lastOrderStatus || "").toUpperCase(),
-                lastPaymentStatus: String(table?.lastPaymentStatus || "").toUpperCase(),
-                lastOrderNo: table?.lastOrderNo || "",
-                lastOrderAt: table?.lastOrderAt || null,
+                activeOrderStatus: isOccupied ? (table?.activeOrderStatus || null) : null,
+                paymentStatus: isOccupied ? (table?.paymentStatus || null) : null,
+                lastOrderStatus: isOccupied ? String(table?.lastOrderStatus || "").toUpperCase() : null,
+                lastPaymentStatus: isOccupied ? String(table?.lastPaymentStatus || "").toUpperCase() : null,
+                lastOrderNo: isOccupied ? (table?.lastOrderNo || "") : "",
+                lastOrderAt: isOccupied ? (table?.lastOrderAt || null) : null,
                 activeOrders,
                 assignmentKey: table?.id
                     ? `table-id-${table.id}`
@@ -1155,14 +1159,21 @@ export default function OwnerLayout() {
                         if (match) {
                             return {
                                 ...t,
+                                status: "AVAILABLE",
                                 isOccupied: false,
                                 activeOrderCount: 0,
                                 activeItemCount: 0,
                                 activeOrders: [],
+                                activeOrderStatus: null,
+                                paymentStatus: null,
+                                lastOrderStatus: null,
+                                lastPaymentStatus: null,
+                                session: { status: "CLOSED" },
                                 activeSession: null,
                                 occupiedSince: null,
                                 assignedWaiterId: null,
                                 assignedWaiterName: null,
+                                assignedServer: null,
                             };
                         }
                         return t;
@@ -1189,14 +1200,21 @@ export default function OwnerLayout() {
                         if (match) {
                             return {
                                 ...t,
+                                status: "AVAILABLE",
                                 isOccupied: false,
                                 activeOrderCount: 0,
                                 activeItemCount: 0,
                                 activeOrders: [],
+                                activeOrderStatus: null,
+                                paymentStatus: null,
+                                lastOrderStatus: null,
+                                lastPaymentStatus: null,
+                                session: { status: "CLOSED" },
                                 activeSession: null,
                                 occupiedSince: null,
                                 assignedWaiterId: null,
                                 assignedWaiterName: null,
+                                assignedServer: null,
                             };
                         }
                         return t;
