@@ -9,6 +9,7 @@ import LanguageSelector from "../components/LanguageSelector";
 import { useLanguage } from "../context/LanguageContext";
 import { ORDER_FLOW_SCOPES, setStoredOrderFlowScope, isTableOrMenuPath } from "../utils/orderFlow";
 import { resolveEffectiveStaffRole } from "../utils/staffRole";
+import { clearStaffSession } from "../utils/staffSessionStorage";
 
 export default function Login() {
     const { login, loginSession, loginCustomer, customer } = useAuth();
@@ -18,9 +19,14 @@ export default function Login() {
     const [searchParams, setSearchParams] = useSearchParams();
     const { restaurantContext, setRestaurantContext } = useRestaurantContext();
 
+    const staffLoginToken = useMemo(() => {
+        return String(searchParams.get("token") || searchParams.get("staffLink") || "").trim();
+    }, [searchParams]);
+
     const initialMode = useMemo(() => {
         const mode = String(searchParams.get("mode") || "").trim().toLowerCase();
-        return mode === "supplier" ? "supplier" : mode === "staff" ? "staff" : mode === "register" ? "register" : "customer";
+        const hasToken = Boolean(searchParams.get("token") || searchParams.get("staffLink"));
+        return mode === "supplier" ? "supplier" : mode === "staff" || hasToken ? "staff" : mode === "register" ? "register" : "customer";
     }, [searchParams]);
 
     const [mode, setMode] = useState(initialMode);
@@ -56,7 +62,7 @@ export default function Login() {
     const [resolvedEmail, setResolvedEmail] = useState("");
     const [resendTimer, setResendTimer] = useState(0);
     const autoLoginTokenRef = useRef("");
-    const staffLink = String(searchParams.get("staffLink") || "").trim();
+    const staffLink = staffLoginToken;
 
     // Registration states (staff/restaurant registration)
     const [registerRestaurantName, setRegisterRestaurantName] = useState("");
@@ -274,9 +280,7 @@ export default function Login() {
             return "/owner";
         }
         if (normalizedRole === "CHEF") {
-            if (isSeniorChef) return "/kitchen";
-            const chefId = String(userId || "").trim();
-            return chefId ? `/kitchen/chef/${chefId}` : "/kitchen";
+            return "/kitchen";
         }
         if (normalizedRole === "WAITER") {
             return "/server";
@@ -334,22 +338,55 @@ export default function Login() {
 
         let cancelled = false;
 
+        // Clear any conflicting existing session before establishing token-authenticated session
+        clearStaffSession("local");
+        clearStaffSession("session");
+        try {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            localStorage.removeItem("auth_token");
+            sessionStorage.clear();
+        } catch {
+            // ignore storage removal errors
+        }
+
+        // Clean raw token from address bar and browser history immediately so it cannot be inspected or shared
+        if (typeof window !== "undefined" && window.history && typeof window.history.replaceState === "function") {
+            try {
+                const cleanParams = new URLSearchParams(window.location.search);
+                cleanParams.delete("token");
+                cleanParams.delete("staffLink");
+                cleanParams.set("mode", "staff");
+                const cleanSearch = cleanParams.toString();
+                const cleanUrl = window.location.pathname + (cleanSearch ? `?${cleanSearch}` : "");
+                window.history.replaceState({}, document.title, cleanUrl);
+            } catch {
+                // ignore replaceState error
+            }
+        }
+
         const consumeStaffLink = async () => {
             try {
                 setLoading(true);
                 setError("");
+                setPassword("");
 
-                const res = await api.post("/auth/staff-link/consume", { token: staffLink });
+                const res = await api.post("/auth/staff-login-link", { token: staffLink });
                 if (cancelled) return;
+
+                if (!res.data?.user || !res.data?.token) {
+                    throw new Error("Invalid response from login server");
+                }
+
                 handleSuccessfulStaffLogin(res.data, { session: true });
             } catch (err) {
                 if (cancelled) return;
+                const backendMsg = err.response?.data?.message;
                 setError(
-                    err.response?.data?.message ||
-                    (err.message === "Network Error"
-                        ? "Backend is unreachable. Check your API URL configuration (VITE_API_URL)."
-                        : err.message || "Failed to open staff login link")
+                    backendMsg ||
+                    "This staff login link is invalid, expired, or has already been used. Please contact your manager for a new link."
                 );
+                setPassword("");
             } finally {
                 if (!cancelled) {
                     setLoading(false);

@@ -72,7 +72,7 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
             setGeneratingLoginLinkFor(u.id);
             const res = await axios.post(`${API}/owner/${effectiveRestaurantId}/staff/${u.id}/login-link`);
             const { loginUrl, token, expiresAt } = res.data;
-            const link = loginUrl || `${window.location.origin}/staff-login?token=${token}`;
+            const link = loginUrl || `${window.location.origin}/login?mode=staff&token=${token}`;
             setLoginLinks((prev) => ({
                 ...prev,
                 [u.id]: {

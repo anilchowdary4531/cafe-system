@@ -204,6 +204,7 @@ export default function OwnerStaff() {
     const [copiedPassword, setCopiedPassword] = useState(false);
     const [temporaryPasswords, setTemporaryPasswords] = useState({});
     const [copiedPasswordId, setCopiedPasswordId] = useState(null);
+    const [showCardPassword, setShowCardPassword] = useState({});
     const [loginLinks, setLoginLinks] = useState({});
     const [generatingLoginLinkFor, setGeneratingLoginLinkFor] = useState(null);
     const [copiedLoginLinkId, setCopiedLoginLinkId] = useState(null);
@@ -615,13 +616,33 @@ export default function OwnerStaff() {
         }
     };
 
+    const toggleShowCardPassword = (staffId) => {
+        setShowCardPassword((prev) => ({
+            ...prev,
+            [staffId]: !prev[staffId],
+        }));
+    };
+
+    const handleCopyCardPassword = async (staffUser) => {
+        const pass = temporaryPasswords[staffUser?.id];
+        if (pass) {
+            await copyTemporaryPassword(staffUser.id, pass);
+        } else {
+            showToast({
+                title: "Password Protected",
+                message: "No temporary password in memory. Click Reset Password to generate one.",
+                variant: "info",
+            });
+        }
+    };
+
     const handleGenerateStaffLoginLink = async (staffUser) => {
         try {
             setGeneratingLoginLinkFor(staffUser.id);
             setError("");
             const res = await axios.post(`${API}/owner/${restaurantId}/staff/${staffUser.id}/login-link`);
             const { loginUrl, token, expiresAt } = res.data;
-            const link = loginUrl || `${window.location.origin}/staff-login?token=${token}`;
+            const link = loginUrl || `${window.location.origin}/login?mode=staff&token=${token}`;
             setLoginLinks((prev) => ({
                 ...prev,
                 [staffUser.id]: {

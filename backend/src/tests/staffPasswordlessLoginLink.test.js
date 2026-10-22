@@ -73,6 +73,34 @@ test("Secure Passwordless Staff Login Link System — Complete Scenarios (A - P)
     },
   });
 
+  const seniorChefA = await prisma.user.create({
+    data: {
+      name: "Senior Chef A",
+      email: `sr_chef_${rand}@test.com`,
+      phone: `+9198${rand}6`,
+      role: "CHEF",
+      designation: "Senior Chef",
+      restaurantId: restaurantA.id,
+      password: bcrypt.hashSync("SrChefPass123!", 10),
+      sessionVersion: 1,
+      isActive: true,
+    },
+  });
+
+  const managerA = await prisma.user.create({
+    data: {
+      name: "Manager A",
+      email: `manager_${rand}@test.com`,
+      phone: `+9198${rand}7`,
+      role: "MANAGER",
+      designation: "Manager",
+      restaurantId: restaurantA.id,
+      password: bcrypt.hashSync("ManagerPass123!", 10),
+      sessionVersion: 1,
+      isActive: true,
+    },
+  });
+
   // Setup Users in Restaurant B
   const ownerB = await prisma.user.create({
     data: {
@@ -132,7 +160,7 @@ test("Secure Passwordless Staff Login Link System — Complete Scenarios (A - P)
         where: { restaurantId: { in: [restaurantA.id, restaurantB.id] } },
       });
       await prisma.user.deleteMany({
-        where: { id: { in: [ownerA.id, staffA.id, chefA.id, ownerB.id, staffB.id] } },
+        where: { id: { in: [ownerA.id, staffA.id, chefA.id, seniorChefA.id, managerA.id, ownerB.id, staffB.id] } },
       });
       await prisma.restaurant.deleteMany({
         where: { id: { in: [restaurantA.id, restaurantB.id] } },
@@ -433,14 +461,71 @@ test("Secure Passwordless Staff Login Link System — Complete Scenarios (A - P)
       url: `/owner/${restaurantA.id}/staff/${chefA.id}/login-link`,
       headers: { authorization: `Bearer ${ownerAToken}` },
     });
-    const chefToken = JSON.parse(chefGen.body).token;
+    const chefBody = JSON.parse(chefGen.body);
+    const chefToken = chefBody.token;
+    assert.ok(chefBody.loginUrl.includes("/login?mode=staff&token="));
+    assert.ok(!chefBody.loginUrl.includes("password"));
 
     const chefRes = await app.inject({
       method: "POST",
       url: "/auth/staff-login-link",
       payload: { token: chefToken },
     });
-    assert.equal(JSON.parse(chefRes.body).redirectPath, "/kitchen");
+    assert.equal(chefRes.statusCode, 200);
+    const chefAuth = JSON.parse(chefRes.body);
+    assert.equal(chefAuth.redirectPath, "/kitchen");
+    assert.equal(chefAuth.user.role, "CHEF");
+    assert.equal(chefAuth.user.id, chefA.id);
+    assert.equal(chefAuth.user.restaurantId, restaurantA.id);
+
+    // Generate for Senior Chef -> /kitchen
+    const srChefGen = await app.inject({
+      method: "POST",
+      url: `/owner/${restaurantA.id}/staff/${seniorChefA.id}/login-link`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    });
+    const srChefBody = JSON.parse(srChefGen.body);
+    const srChefToken = srChefBody.token;
+    assert.ok(srChefBody.loginUrl.includes("/login?mode=staff&token="));
+
+    const srChefRes = await app.inject({
+      method: "POST",
+      url: "/auth/staff-login-link",
+      payload: { token: srChefToken },
+    });
+    assert.equal(srChefRes.statusCode, 200);
+    const srChefAuth = JSON.parse(srChefRes.body);
+    assert.equal(srChefAuth.redirectPath, "/kitchen");
+    assert.equal(srChefAuth.user.role, "CHEF");
+    assert.equal(srChefAuth.user.designation, "Senior Chef");
+
+    // Generate for Manager -> /owner/staff
+    const managerGen = await app.inject({
+      method: "POST",
+      url: `/owner/${restaurantA.id}/staff/${managerA.id}/login-link`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    });
+    const managerBody = JSON.parse(managerGen.body);
+    const managerToken = managerBody.token;
+    assert.ok(managerBody.loginUrl.includes("/login?mode=staff&token="));
+
+    const managerRes = await app.inject({
+      method: "POST",
+      url: "/auth/staff-login-link",
+      payload: { token: managerToken },
+    });
+    assert.equal(managerRes.statusCode, 200);
+    const managerAuth = JSON.parse(managerRes.body);
+    assert.equal(managerAuth.redirectPath, "/owner/staff");
+    assert.equal(managerAuth.user.role, "MANAGER");
+
+    // Attempt to alter token -> must fail
+    const tamperedRes = await app.inject({
+      method: "POST",
+      url: "/auth/staff-login-link",
+      payload: { token: managerToken.slice(0, -6) + "ffffff" },
+    });
+    assert.equal(tamperedRes.statusCode, 401, "Altered token must be rejected");
 
     // Generate for Owner -> /owner/staff
     const ownerGen = await app.inject({
@@ -455,6 +540,7 @@ test("Secure Passwordless Staff Login Link System — Complete Scenarios (A - P)
       url: "/auth/staff-login-link",
       payload: { token: ownerToken },
     });
+    assert.equal(ownerRes.statusCode, 200);
     assert.equal(JSON.parse(ownerRes.body).redirectPath, "/owner/staff");
   });
 });

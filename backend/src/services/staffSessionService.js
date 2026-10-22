@@ -163,7 +163,7 @@ export const generateStaffLoginToken = async ({
   });
 
   const base = trimSlash(frontendUrl);
-  const path = `/staff-login?token=${rawToken}`;
+  const path = `/login?mode=staff&token=${rawToken}`;
   const loginUrl = base ? `${base}${path}` : path;
 
   return {
@@ -183,6 +183,7 @@ export const generateStaffLoginToken = async ({
 export const resolveStaffRedirectPath = (effectiveRole) => {
   const role = String(effectiveRole || "").toUpperCase();
   if (role === "CHEF") return "/kitchen";
+  if (role === "CASHIER") return "/owner/orders";
   if (["OWNER", "MANAGER", "SUPER_ADMIN"].includes(role)) return "/owner/staff";
   return "/server";
 };
