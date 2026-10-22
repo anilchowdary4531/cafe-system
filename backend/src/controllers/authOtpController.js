@@ -8,6 +8,7 @@ import { upsertCustomerAccount } from "../services/customerProfileService.js";
 import { extractVerifiedIdentifier, verifyMsg91AccessToken } from "../services/msg91OtpWidgetService.js";
 import {
   buildStaffLoginPayload,
+  consumeStaffLoginToken,
   consumeStaffMagicLink,
   issueStaffSession,
 } from "../services/staffSessionService.js";
@@ -228,6 +229,54 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions, on
       // eslint-disable-next-line no-console
       console.log(err);
       return reply.code(500).send({ message: "OTP verification failed" });
+    }
+  };
+
+
+  const consumeStaffLoginLink = async (req, reply) => {
+    try {
+      const body = req.body || {};
+      const token = String(body.token || body.loginToken || "").trim();
+      if (!token) return reply.code(400).send({ message: "Staff login link token is required" });
+
+      const payload = await consumeStaffLoginToken({
+        prisma,
+        app,
+        token,
+        normalizeDbPermissions,
+        req,
+      });
+
+      await logAuditEvent({
+        prisma,
+        restaurantId: payload.restaurantId,
+        actor: { id: payload.user.id, name: payload.user.name, role: payload.user.role },
+        action: "STAFF_LOGIN_LINK_SUCCESS",
+        entity: "STAFF",
+        entityId: payload.user.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        details: { role: payload.user.role, tokenId: payload.tokenId },
+        req,
+      });
+
+      return payload;
+    } catch (err) {
+      const statusCode = err?.statusCode || 500;
+      if (statusCode === 401 || statusCode === 403) {
+        await logAuditEvent({
+          prisma,
+          action: "STAFF_LOGIN_LINK_REJECTED",
+          entity: "STAFF",
+          status: "FAILED",
+          severity: "WARN",
+          details: { error: err?.message, statusCode },
+          req,
+        });
+      }
+      return reply.code(statusCode).send({
+        message: err?.message || "Failed to authenticate with staff login link",
+      });
     }
   };
 
@@ -549,6 +598,7 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions, on
     sendOtp,
     verifyOtp: verifyOtpHandler,
     consumeStaffLink,
+    consumeStaffLoginLink,
     forgotPassword,
     verifyForgotPasswordOtp,
     resetPasswordWithToken,

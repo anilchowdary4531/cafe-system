@@ -140,6 +140,7 @@ model Restaurant {
   stockTransfers       StockTransfer[]
   physicalStockCounts  PhysicalStockCount[]
   supplierNegotiations SupplierNegotiation[]
+  staffLoginTokens     StaffLoginToken[]
 
   @@map("restaurants")
 }
@@ -200,6 +201,7 @@ model User {
   stockCountsAssigned  PhysicalStockCount[]   @relation("StockCountAssignedTo")
   stockCountsCreated   PhysicalStockCount[]   @relation("StockCountCreatedBy")
   stockCountsApproved  PhysicalStockCount[]   @relation("StockCountApprovedBy")
+  staffLoginTokens     StaffLoginToken[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -3129,3 +3131,25 @@ model NegotiationMessage {
 
 
 
+
+
+model StaffLoginToken {
+  id           Int       @id @default(autoincrement())
+  staffId      Int       @map("staff_id")
+  restaurantId Int       @map("restaurant_id")
+  tokenHash    String    @unique @map("token_hash")
+  purpose      String    @default("STAFF_LOGIN")
+  expiresAt    DateTime  @map("expires_at")
+  usedAt       DateTime? @map("used_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  createdBy    Int?      @map("created_by")
+
+  staff        User       @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([staffId])
+  @@index([restaurantId])
+  @@index([expiresAt])
+  @@map("staff_login_tokens")
+}

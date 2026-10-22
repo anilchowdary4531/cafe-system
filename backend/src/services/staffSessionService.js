@@ -1,3 +1,4 @@
+import crypto from "crypto";
 const DEFAULT_STAFF_LINK_EXPIRES_IN = process.env.STAFF_LOGIN_LINK_EXPIRES_IN || "30d";
 const STAFF_MAGIC_LINK_PURPOSE = "STAFF_MAGIC_LINK";
 
@@ -38,7 +39,7 @@ export const buildStaffLoginPayload = ({ user, normalizeDbPermissions }) => {
 
   let access = null;
   if (effectiveRole !== "SUPER_ADMIN" && !mustChangePassword) {
-    access = normalizeDbPermissions(user?.staffAccess?.permissions, effectiveRole);
+    access = typeof normalizeDbPermissions === "function" ? normalizeDbPermissions(user?.staffAccess?.permissions, effectiveRole) : (user?.staffAccess?.permissions || null);
   }
 
   const userPayload = { ...user, role: effectiveRole, access, mustChangePassword };
@@ -100,4 +101,199 @@ export const consumeStaffMagicLink = async () => {
   const err = new Error("Passwordless login is disabled. Please log in with your email and password.");
   err.statusCode = 403;
   throw err;
+};
+
+
+const STAFF_LOGIN_PURPOSE = "STAFF_LOGIN";
+const STAFF_LOGIN_TOKEN_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+
+export const hashStaffLoginToken = (token) =>
+  crypto.createHash("sha256").update(String(token || "").trim()).digest("hex");
+
+export const generateStaffLoginToken = async ({
+  prisma,
+  staffId,
+  restaurantId,
+  createdBy = null,
+  frontendUrl = "",
+}) => {
+  const staff = await prisma.user.findUnique({
+    where: { id: Number(staffId) },
+    select: { id: true, restaurantId: true, isActive: true, role: true, name: true, email: true },
+  });
+
+  if (!staff || Number(staff.restaurantId) !== Number(restaurantId)) {
+    const err = new Error("Staff user not found in this restaurant");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (staff.isActive === false) {
+    const err = new Error("Cannot generate login link for disabled staff member");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Invalidate any previously generated, unconsumed login tokens for this staff member
+  await prisma.staffLoginToken.updateMany({
+    where: {
+      staffId: Number(staffId),
+      restaurantId: Number(restaurantId),
+      usedAt: null,
+    },
+    data: {
+      usedAt: new Date(),
+    },
+  });
+
+  // Generate cryptographically secure random token (256 bits entropy)
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashStaffLoginToken(rawToken);
+  const expiresAt = new Date(Date.now() + STAFF_LOGIN_TOKEN_EXPIRY_MS);
+
+  const tokenRecord = await prisma.staffLoginToken.create({
+    data: {
+      staffId: Number(staffId),
+      restaurantId: Number(restaurantId),
+      tokenHash,
+      purpose: STAFF_LOGIN_PURPOSE,
+      expiresAt,
+      createdBy: createdBy ? Number(createdBy) : null,
+    },
+  });
+
+  const base = trimSlash(frontendUrl);
+  const path = `/staff-login?token=${rawToken}`;
+  const loginUrl = base ? `${base}${path}` : path;
+
+  return {
+    rawToken,
+    loginUrl,
+    expiresAt: tokenRecord.expiresAt,
+    expiresInMinutes: 10,
+    singleUse: true,
+    staff: {
+      id: staff.id,
+      name: staff.name,
+      email: staff.email,
+    },
+  };
+};
+
+export const resolveStaffRedirectPath = (effectiveRole) => {
+  const role = String(effectiveRole || "").toUpperCase();
+  if (role === "CHEF") return "/kitchen";
+  if (["OWNER", "MANAGER", "SUPER_ADMIN"].includes(role)) return "/owner/staff";
+  return "/server";
+};
+
+export const consumeStaffLoginToken = async ({
+  prisma,
+  app,
+  token,
+  normalizeDbPermissions,
+  req = null,
+}) => {
+  const rawToken = String(token || "").trim();
+  if (!rawToken) {
+    const err = new Error("Staff login link token is required");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const tokenHash = hashStaffLoginToken(rawToken);
+  const tokenRecord = await prisma.staffLoginToken.findUnique({
+    where: { tokenHash },
+    include: {
+      staff: {
+        include: {
+          restaurant: true,
+          staffAccess: { select: { permissions: true, role: true } },
+        },
+      },
+    },
+  });
+
+  if (!tokenRecord) {
+    const err = new Error("Invalid staff login link");
+    err.statusCode = 401;
+    throw err;
+  }
+
+  if (tokenRecord.purpose !== STAFF_LOGIN_PURPOSE) {
+    const err = new Error("Invalid staff login link purpose");
+    err.statusCode = 401;
+    throw err;
+  }
+
+  // Check if token has already been used
+  if (tokenRecord.usedAt !== null) {
+    const err = new Error("This staff login link has already been used");
+    err.statusCode = 401;
+    throw err;
+  }
+
+  // Check if token has expired
+  if (new Date() > new Date(tokenRecord.expiresAt)) {
+    const err = new Error("This staff login link has expired");
+    err.statusCode = 401;
+    throw err;
+  }
+
+  const user = tokenRecord.staff;
+  if (!user) {
+    const err = new Error("Associated staff account not found");
+    err.statusCode = 401;
+    throw err;
+  }
+
+  // Restaurant isolation: check that user belongs to the expected restaurant
+  if (!user.restaurantId || Number(user.restaurantId) !== Number(tokenRecord.restaurantId)) {
+    const err = new Error("Staff login link is not valid for this restaurant");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  // Disabled staff rejection: a disabled staff account must never authenticate
+  if (user.isActive === false) {
+    const err = new Error("Account is disabled. Contact owner/admin.");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  // Atomically mark token as consumed to prevent replay or race conditions
+  const updateResult = await prisma.staffLoginToken.updateMany({
+    where: {
+      id: tokenRecord.id,
+      usedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    data: {
+      usedAt: new Date(),
+    },
+  });
+
+  if (updateResult.count === 0) {
+    const err = new Error("This staff login link has already been used or expired");
+    err.statusCode = 401;
+    throw err;
+  }
+
+  // Issue standard staff session using established project architecture
+  const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
+  const { token: sessionToken, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
+  userPayload.sessionVersion = sessionVersion;
+
+  const redirectPath = resolveStaffRedirectPath(effectiveRole);
+
+  return {
+    message: "Login success",
+    actorType: "STAFF",
+    token: sessionToken,
+    user: userPayload,
+    redirectPath,
+    offlineMode: false,
+    tokenId: tokenRecord.id,
+    restaurantId: user.restaurantId,
+  };
 };

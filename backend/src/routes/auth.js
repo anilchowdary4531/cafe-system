@@ -13,6 +13,8 @@ export default async function authRoutes(app, deps) {
   app.post("/auth/send-otp", controller.sendOtp);
   app.post("/auth/verify-otp", controller.verifyOtp);
   app.post("/auth/staff-link/consume", controller.consumeStaffLink);
+  app.post("/auth/staff-login-link", controller.consumeStaffLoginLink);
+  app.post("/api/auth/staff-login-link", controller.consumeStaffLoginLink);
 
   // Phase 3B-2: Staff & Owner Forgot Password / OTP Recovery Endpoints
   const forgotOpts = { preHandler: [staffForgotPasswordRateLimiter] };

@@ -16,6 +16,8 @@ import {
     Check,
     Lock,
     AlertTriangle,
+    Link2,
+    ShieldCheck,
 } from "lucide-react";
 import { API } from "../config";
 import { showToast } from "../utils/toast";
@@ -40,6 +42,9 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
     const [copiedPasswordId, setCopiedPasswordId] = useState(null);
     const [copiedPassword, setCopiedPassword] = useState(false);
     const [generatingTempPasswordFor, setGeneratingTempPasswordFor] = useState(null);
+    const [loginLinks, setLoginLinks] = useState({});
+    const [generatingLoginLinkFor, setGeneratingLoginLinkFor] = useState(null);
+    const [copiedLoginLinkId, setCopiedLoginLinkId] = useState(null);
     const [addForm, setAddForm] = useState({
         name: "",
         phone: "",
@@ -59,6 +64,40 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
             showToast("Failed to load staff directory", "error");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleGenerateStaffLoginLink = async (u) => {
+        try {
+            setGeneratingLoginLinkFor(u.id);
+            const res = await axios.post(`${API}/owner/${effectiveRestaurantId}/staff/${u.id}/login-link`);
+            const { loginUrl, token, expiresAt } = res.data;
+            const link = loginUrl || `${window.location.origin}/staff-login?token=${token}`;
+            setLoginLinks((prev) => ({
+                ...prev,
+                [u.id]: {
+                    loginUrl: link,
+                    token,
+                    expiresAt,
+                },
+            }));
+            showToast(`One-time login link generated for ${u.name} (valid 10 mins)`, "success");
+        } catch (err) {
+            console.log(err);
+            showToast(err?.response?.data?.message || "Failed to generate login link", "error");
+        } finally {
+            setGeneratingLoginLinkFor(null);
+        }
+    };
+
+    const copyGeneratedLoginLink = async (staffId, url) => {
+        try {
+            await navigator.clipboard.writeText(url);
+            setCopiedLoginLinkId(staffId);
+            showToast("Login link copied to clipboard", "success");
+            setTimeout(() => setCopiedLoginLinkId(null), 2500);
+        } catch {
+            showToast("Browser blocked clipboard access", "error");
         }
     };
 
@@ -436,11 +475,49 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                                                 </span>
                                             </div>
                                         ) : (
-                                            <span className="text-neutral-400 italic">
-                                                Not available
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono tracking-widest text-neutral-400 select-none text-xs">
+                                                    ••••••••••
+                                                </span>
+                                                {u.role !== "OWNER" && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleGenerateStaffLoginLink(u)}
+                                                        disabled={generatingLoginLinkFor === u.id || !u.isActive}
+                                                        className="px-2 py-0.5 text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200/60 rounded text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                                        title="Generate 10-minute single-use login link"
+                                                    >
+                                                        <Link2 className="w-3 h-3" />
+                                                        <span>{generatingLoginLinkFor === u.id ? "Generating..." : "Generate Login Link"}</span>
+                                                    </button>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
+
+                                    {loginLinks[u.id] && (
+                                        <div className="mt-2 p-2 rounded-lg bg-orange-50/80 border border-orange-200 text-xs space-y-1.5">
+                                            <div className="flex items-center justify-between text-[11px]">
+                                                <span className="font-bold text-orange-800 flex items-center gap-1">
+                                                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                                    Staff Login Link
+                                                </span>
+                                                <span className="text-[10px] text-amber-700 font-medium">Expires in 10 mins • Single use</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <code className="text-[10px] bg-white border border-neutral-200 rounded px-1.5 py-0.5 font-mono text-neutral-800 break-all flex-1">
+                                                    {loginLinks[u.id].loginUrl}
+                                                </code>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => copyGeneratedLoginLink(u.id, loginLinks[u.id].loginUrl)}
+                                                    className="px-2 py-0.5 bg-orange-500 text-white rounded text-[10px] font-bold hover:bg-orange-600 transition shrink-0 cursor-pointer"
+                                                >
+                                                    {copiedLoginLinkId === u.id ? "Copied" : "Copy Link"}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Action Buttons */}

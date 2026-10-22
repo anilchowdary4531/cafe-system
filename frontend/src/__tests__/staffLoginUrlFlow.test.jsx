@@ -277,7 +277,7 @@ describe("Staff Login URL & Password Flow Security", () => {
         });
 
         // Initially, card shows "Password: Not available"
-        expect(screen.getByText("Not available")).toBeInTheDocument();
+        expect(screen.getByText("••••••••••")).toBeInTheDocument();
 
         // Mock the POST reset endpoint
         axios.post.mockResolvedValueOnce({
@@ -360,7 +360,7 @@ describe("Staff Login URL & Password Flow Security", () => {
         });
 
         // Initially shows "Not available"
-        expect(screen.getByText("Not available")).toBeInTheDocument();
+        expect(screen.getByText("••••••••••")).toBeInTheDocument();
 
         // Mock POST reset endpoint
         axios.post.mockResolvedValueOnce({

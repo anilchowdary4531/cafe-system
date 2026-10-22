@@ -26,6 +26,7 @@ import TobaccoPage from "./pages/TobaccoPage";
 
 import Cart from "./pages/Cart";
 import Login from "./pages/Login";
+import StaffLoginLink from "./pages/StaffLoginLink";
 import Profile from "./pages/Profile";
 import ThankYou from "./pages/ThankYou";
 
@@ -194,6 +195,7 @@ export default function App() {
                         }
                     />
 
+                    <Route path="/staff-login" element={<StaffLoginLink />} />
                     <Route path="/profile" element={<Navigate to={`/profile/overview${location.search || ""}`} replace />} />
                     <Route
                         path="/profile/overview"

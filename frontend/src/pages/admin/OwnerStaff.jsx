@@ -24,6 +24,7 @@ import {
     Building2,
     Shield,
     Users,
+    Link2,
 } from "lucide-react";
 import { API } from "../../config";
 import { showToast } from "../../utils/toast";
@@ -203,6 +204,9 @@ export default function OwnerStaff() {
     const [copiedPassword, setCopiedPassword] = useState(false);
     const [temporaryPasswords, setTemporaryPasswords] = useState({});
     const [copiedPasswordId, setCopiedPasswordId] = useState(null);
+    const [loginLinks, setLoginLinks] = useState({});
+    const [generatingLoginLinkFor, setGeneratingLoginLinkFor] = useState(null);
+    const [copiedLoginLinkId, setCopiedLoginLinkId] = useState(null);
 
     // Confirmation modals
     const [confirmDeactivateUser, setConfirmDeactivateUser] = useState(null);
@@ -611,13 +615,70 @@ export default function OwnerStaff() {
         }
     };
 
+    const handleGenerateStaffLoginLink = async (staffUser) => {
+        try {
+            setGeneratingLoginLinkFor(staffUser.id);
+            setError("");
+            const res = await axios.post(`${API}/owner/${restaurantId}/staff/${staffUser.id}/login-link`);
+            const { loginUrl, token, expiresAt } = res.data;
+            const link = loginUrl || `${window.location.origin}/staff-login?token=${token}`;
+            setLoginLinks((prev) => ({
+                ...prev,
+                [staffUser.id]: {
+                    loginUrl: link,
+                    token,
+                    expiresAt,
+                },
+            }));
+            showToast({
+                title: "Login Link Generated",
+                message: `One-time login link for ${staffUser.name} expires in 10 minutes.`,
+                variant: "success",
+            });
+        } catch (err) {
+            console.log(err);
+            const msg = err?.response?.data?.message || "Failed to generate login link.";
+            setError(msg);
+            showToast({
+                title: "Generation Failed",
+                message: msg,
+                variant: "error",
+            });
+        } finally {
+            setGeneratingLoginLinkFor(null);
+        }
+    };
+
+    const copyGeneratedLoginLink = async (staffId, url) => {
+        try {
+            await navigator.clipboard.writeText(url);
+            setCopiedLoginLinkId(staffId);
+            showToast({
+                title: "Login link copied",
+                message: "Single-use link copied to clipboard.",
+                variant: "success",
+            });
+            setTimeout(() => setCopiedLoginLinkId(null), 2500);
+        } catch {
+            showToast({
+                title: "Copy failed",
+                message: "Your browser blocked clipboard access.",
+                variant: "error",
+            });
+        }
+    };
+
     const shareStaffLoginOnWhatsApp = (staffUser) => {
-        const loginLink = getStaffLoginLink(staffUser);
+        const generatedLink = loginLinks[staffUser?.id]?.loginUrl;
         const tempPass = temporaryPasswords[staffUser?.id];
         let message;
-        if (tempPass) {
+        if (generatedLink) {
+            message = `Hi ${staffUser?.name || "there"},\nHere is your secure passwordless login link for ${restaurantName}:\n${generatedLink}\n\n(Single-use, expires in 10 minutes)`;
+        } else if (tempPass) {
+            const loginLink = getStaffLoginLink(staffUser);
             message = `Hi ${staffUser?.name || "there"},\nHere is your staff login for ${restaurantName}:\n• Login URL: ${loginLink}\n• Temporary Password: ${tempPass}\n\nPlease enter this temporary password at login and update it immediately.`;
         } else {
+            const loginLink = getStaffLoginLink(staffUser);
             message = buildStaffLoginShareText(staffUser, restaurantName, loginLink);
         }
         const shareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
@@ -1422,11 +1483,79 @@ export default function OwnerStaff() {
                                                         </span>
                                                     </>
                                                 ) : (
-                                                    <span className="text-gray-500 italic">
-                                                        Not available
-                                                    </span>
+                                                    <div className="flex items-center gap-2.5">
+                                                        <span className="font-mono tracking-widest text-gray-400 select-none text-xs">
+                                                            ••••••••••
+                                                        </span>
+                                                        {staffUser.role !== "OWNER" && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleGenerateStaffLoginLink(staffUser)}
+                                                                disabled={generatingLoginLinkFor === staffUser.id || !staffUser.isActive}
+                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-orange-500/40 bg-orange-500/15 px-2.5 py-1 text-[11px] font-bold text-orange-400 transition hover:bg-orange-500 hover:text-black cursor-pointer shadow-xs disabled:opacity-50"
+                                                                title="Generate a secure 10-minute, single-use passwordless login link"
+                                                                data-testid={`generate-login-link-${staffUser.id}`}
+                                                            >
+                                                                <Link2 size={12} />
+                                                                <span>{generatingLoginLinkFor === staffUser.id ? "Generating..." : "Generate Login Link"}</span>
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
+
+                                            {/* Generated One-Time Login Link Card */}
+                                            {loginLinks[staffUser.id] && (
+                                                <div className="mt-2.5 rounded-xl border border-orange-500/30 bg-orange-500/10 p-3 text-xs space-y-2" data-testid={`login-link-container-${staffUser.id}`}>
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <span className="font-bold text-orange-400 flex items-center gap-1.5">
+                                                            <ShieldCheck size={14} className="text-emerald-400" />
+                                                            Staff Login Link
+                                                        </span>
+                                                        <span className="text-[11px] text-amber-300 font-medium">
+                                                            Expires in 10 minutes • Single use
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="text-gray-400 font-medium">Login Link:</span>
+                                                        <code className="rounded bg-black/40 border border-white/10 px-2 py-1 text-[11px] text-orange-300 select-all font-mono break-all flex-1 min-w-[200px]">
+                                                            {loginLinks[staffUser.id].loginUrl}
+                                                        </code>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => copyGeneratedLoginLink(staffUser.id, loginLinks[staffUser.id].loginUrl)}
+                                                            className="inline-flex items-center gap-1 rounded-md bg-orange-500 px-3 py-1 text-[11px] font-bold text-black hover:bg-orange-400 transition cursor-pointer"
+                                                            data-testid={`copy-login-link-${staffUser.id}`}
+                                                        >
+                                                            {copiedLoginLinkId === staffUser.id ? (
+                                                                <>
+                                                                    <Check size={12} />
+                                                                    <span>Copied</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Copy size={12} />
+                                                                    <span>Copy Link</span>
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => shareStaffLoginOnWhatsApp(staffUser)}
+                                                            className="inline-flex items-center gap-1 rounded-md bg-emerald-600/30 border border-emerald-500/40 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-600/40 transition cursor-pointer"
+                                                        >
+                                                            <span>WhatsApp</span>
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-400">
+                                                        <span>Status: <strong className="text-emerald-400 font-semibold">Single-use login link</strong></span>
+                                                        <span>•</span>
+                                                        <span>Expires: <strong className="text-amber-400 font-semibold">10 minutes</strong></span>
+                                                        <span>•</span>
+                                                        <span className="text-gray-500">No password in link</span>
+                                                    </div>
+                                                </div>
+                                            )}
 
                                             <div className="flex items-center gap-1.5 text-[11px] text-gray-400 font-medium">
                                                 <KeyRound size={12} className="text-amber-400 shrink-0" />

@@ -8,6 +8,7 @@ import { deleteAssetByKey, uploadRestaurantAsset } from "../services/storageServ
 import { requireStaffJwt } from "../services/staffAuthService.js";
 import {
   inferRoleFromDesignation,
+  generateStaffLoginToken,
 } from "../services/staffSessionService.js";
 import { resolveMenuPricing } from "../services/menuPricingService.js";
 import { buildPayLaterController } from "../controllers/payLaterController.js";
@@ -3310,6 +3311,71 @@ export default async function ownerRoutes(app, deps = {}) {
 
   app.post("/owner/:restaurantId/staff/:staffId/temp-password", handleIssueStaffTempPassword);
   app.post("/api/owner/:restaurantId/staff/:staffId/temp-password", handleIssueStaffTempPassword);
+
+  const handleGenerateStaffLoginLink = async (req, reply) => {
+    try {
+      const actor = await requireOwnerManagementActor(req, reply);
+      if (!actor) return;
+      const restaurantId = Number(req.params.restaurantId || req.staffActor?.restaurantId);
+      const staffId = Number(req.params.staffId);
+      if (!restaurantId || !staffId) return reply.code(400).send({ message: "Invalid id values" });
+
+      if (actor.role !== "SUPER_ADMIN" && Number(actor.restaurantId) !== restaurantId) {
+        return reply.code(403).send({ message: "Forbidden: cross-restaurant access denied" });
+      }
+
+      const staff = await prisma.user.findUnique({
+        where: { id: staffId },
+        select: { id: true, restaurantId: true, isActive: true, role: true, name: true, email: true },
+      });
+      if (!staff || staff.restaurantId !== restaurantId) {
+        return reply.code(404).send({ message: "Staff user not found" });
+      }
+      if (staff.isActive === false) {
+        return reply.code(400).send({ message: "Cannot generate login link for disabled staff member" });
+      }
+
+      const linkResult = await generateStaffLoginToken({
+        prisma,
+        staffId,
+        restaurantId,
+        createdBy: actor.userId || actor.id,
+        frontendUrl: FRONTEND_URL,
+      });
+
+      await logAuditEvent({
+        prisma,
+        restaurantId,
+        actor: { id: actor.userId || actor.id, name: actor.userName || actor.name, role: actor.role },
+        action: "STAFF_LOGIN_LINK_GENERATED",
+        entity: "STAFF",
+        entityId: staff.id,
+        status: "SUCCESS",
+        severity: "INFO",
+        details: { staffId: staff.id, staffEmail: staff.email },
+        req,
+      });
+
+      return {
+        message: "Staff login link generated successfully",
+        loginUrl: linkResult.loginUrl,
+        token: linkResult.rawToken,
+        expiresAt: linkResult.expiresAt,
+        expiresInMinutes: linkResult.expiresInMinutes,
+        singleUse: true,
+      };
+    } catch (err) {
+      console.log(err);
+      return reply.code(err?.statusCode || 500).send({
+        message: err?.message || "Failed to generate staff login link",
+      });
+    }
+  };
+
+  app.post("/owner/:restaurantId/staff/:staffId/login-link", handleGenerateStaffLoginLink);
+  app.post("/api/owner/:restaurantId/staff/:staffId/login-link", handleGenerateStaffLoginLink);
+  app.post("/api/owner/staff/:staffId/login-link", handleGenerateStaffLoginLink);
+
 
   app.put("/owner/:restaurantId/staff/:staffId/access", async (req, reply) => {
     try {
