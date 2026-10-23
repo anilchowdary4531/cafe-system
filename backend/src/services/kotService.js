@@ -251,11 +251,14 @@ export const syncParentOrderStatusFromKots = async ({ prisma, orderId }) => {
         return updatedOrder;
     }
 
-    const allReadyOrServed = activeKots.every((k) => k.status === "READY" || k.status === "SERVED");
+    const allServed = activeKots.length > 0 && activeKots.every((k) => k.status === "SERVED" || k.status === "DELIVERED");
+    const allReadyOrServed = activeKots.length > 0 && activeKots.every((k) => k.status === "READY" || k.status === "SERVED" || k.status === "DELIVERED");
     const anyPreparing = activeKots.some((k) => k.status === "PREPARING" || k.status === "READY");
 
     let nextOrderStatus = null;
-    if (allReadyOrServed) {
+    if (allServed) {
+        nextOrderStatus = "DELIVERED";
+    } else if (allReadyOrServed) {
         nextOrderStatus = "READY";
     } else if (anyPreparing) {
         nextOrderStatus = "PREPARING";
@@ -347,20 +350,32 @@ export const updateKotItemStatus = async ({ prisma, kotId, itemId, restaurantId,
         where: { id: iId },
         data: {
             status,
+            ...(status === "PREPARING" ? { startedAt: new Date() } : {}),
+            ...(status === "READY" ? { readyAt: new Date() } : {}),
             ...(status === "READY" && actor ? { preparedByUserId: actor.userId || null, preparedByName: actor.userName || null } : {}),
         },
     });
+
+    // Also sync preparedByName to the parent order item if linked
+    if (itemExists.orderItemId && (status === "READY" || status === "PREPARING") && actor?.userName) {
+        await prisma.orderItem.update({
+            where: { id: itemExists.orderItemId },
+            data: { preparedByName: actor.userName },
+        }).catch(() => {});
+    }
 
     const reloadedKot = await prisma.kitchenOrderTicket.findUnique({
         where: { id: kId },
         include: { items: true, station: { include: { printer: true } } },
     });
 
-    // Check if all non-cancelled items in KOT are now READY
+    // Check if all non-cancelled items in KOT are now SERVED or READY
     const activeItems = reloadedKot.items.filter((it) => it.status !== "CANCELLED");
     let autoKotStatus = reloadedKot.status;
 
-    if (activeItems.length > 0 && activeItems.every((it) => it.status === "READY")) {
+    if (activeItems.length > 0 && activeItems.every((it) => it.status === "SERVED")) {
+        autoKotStatus = "SERVED";
+    } else if (activeItems.length > 0 && activeItems.every((it) => it.status === "READY" || it.status === "SERVED")) {
         autoKotStatus = "READY";
     } else if (activeItems.some((it) => it.status === "PREPARING" || it.status === "READY")) {
         if (reloadedKot.status === "PENDING" || reloadedKot.status === "ACCEPTED" || reloadedKot.status === "PRINTED") {

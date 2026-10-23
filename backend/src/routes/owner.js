@@ -60,6 +60,19 @@ import {
   updateStatus as updateKotStatusController,
 } from "../controllers/kot.controller.js";
 import {
+  getKitchenConfigController,
+  updateKitchenConfigController,
+  getKitchenWorkloadController,
+  assignItemController,
+  bulkAssignItemsController,
+  assignKotController,
+  reassignItemController,
+  getChefAssignedItemsController,
+  selfPickItemController,
+  selfPickKotController,
+  getAvailableKitchenWorkController,
+} from "../controllers/kitchenAssignmentController.js";
+import {
   moveTable,
   mergeTables,
   splitTableOrTransferItems,
@@ -79,7 +92,7 @@ export default async function ownerRoutes(app, deps = {}) {
       "printers", "analytics", "reports", "paylater", "shifts", "supply", "delivery",
       "delivery_partners", "customers", "discounts", "loyalty", "staff", "settings", "notifications"
     ],
-    STAFF_ALLOWED_ROLES = ["OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STAFF", "SERVER"],
+    STAFF_ALLOWED_ROLES = ["OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STAFF", "SERVER", "STEWARD", "CLEANER", "SWIPER"],
     normalizeAccess = (a) => (a && typeof a === "object" ? a : {}),
     normalizeDbPermissions = (p) => {
       try {
@@ -2801,6 +2814,17 @@ export default async function ownerRoutes(app, deps = {}) {
         })() : undefined,
         isActive: body.isActive,
       };
+
+      // Security boundary: Managers cannot modify banking details, UPI, or tax registration
+      if (String(actor?.role || "").toUpperCase() === "MANAGER") {
+        delete updates.bankAccountNumber;
+        delete updates.bankIfscCode;
+        delete updates.bankAccountName;
+        delete updates.bankName;
+        delete updates.upiId;
+        delete updates.gstNumber;
+      }
+
       const filteredData = Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== undefined));
       if (filteredData.defaultTaxPercent !== undefined) filteredData.defaultTaxPercent = Number(filteredData.defaultTaxPercent);
       if (filteredData.serviceChargePercent !== undefined) filteredData.serviceChargePercent = Number(filteredData.serviceChargePercent);
@@ -2947,6 +2971,10 @@ export default async function ownerRoutes(app, deps = {}) {
         return reply.code(400).send({ message: `Invalid role: ${normalizedRole}` });
       }
 
+      if (String(actor?.role || "").toUpperCase() === "MANAGER" && normalizedRole === "OWNER") {
+        return reply.code(403).send({ message: "Managers cannot create Owner accounts" });
+      }
+
       const normalizedEmail = String(email).trim().toLowerCase();
       const normalizedPhone = String(phone).trim();
       const normalizedDesignation = normalizeDesignation(designation);
@@ -3068,6 +3096,16 @@ export default async function ownerRoutes(app, deps = {}) {
       if (role && !STAFF_ALLOWED_ROLES.includes(String(role).toUpperCase())) {
         return reply.code(400).send({ message: `Invalid role: ${String(role).toUpperCase()}` });
       }
+
+      if (String(actor?.role || "").toUpperCase() === "MANAGER") {
+        if (staff.role === "OWNER") {
+          return reply.code(403).send({ message: "Managers cannot modify Owner accounts" });
+        }
+        if (role && String(role).toUpperCase() === "OWNER") {
+          return reply.code(403).send({ message: "Managers cannot assign Owner role" });
+        }
+      }
+
       if (staff.role === "OWNER" && role && String(role).toUpperCase() !== "OWNER") {
         return reply.code(400).send({ message: "Owner role cannot be changed from staff management" });
       }
@@ -3984,6 +4022,40 @@ export default async function ownerRoutes(app, deps = {}) {
   app.post("/owner/:restaurantId/stations", createStation);
   app.post("/owner/:restaurantId/kitchen-stations", createStation);
   app.put("/owner/:restaurantId/stations/:stationId", updateStation);
+
+  // ==========================================
+  // KITCHEN DISPATCHER & SELF-PICK ASSIGNMENT ROUTES
+  // ==========================================
+  app.get("/owner/:restaurantId/kitchen/config", getKitchenConfigController);
+  app.get("/api/owner/:restaurantId/kitchen/config", getKitchenConfigController);
+  app.put("/owner/:restaurantId/kitchen/config", updateKitchenConfigController);
+  app.put("/api/owner/:restaurantId/kitchen/config", updateKitchenConfigController);
+
+  app.get("/owner/:restaurantId/kitchen/workload", getKitchenWorkloadController);
+  app.get("/api/owner/:restaurantId/kitchen/workload", getKitchenWorkloadController);
+
+  app.get("/owner/:restaurantId/kitchen/available-work", getAvailableKitchenWorkController);
+  app.get("/api/owner/:restaurantId/kitchen/available-work", getAvailableKitchenWorkController);
+
+  app.get("/owner/:restaurantId/kitchen/chef/:chefId/assigned-items", getChefAssignedItemsController);
+  app.get("/api/owner/:restaurantId/kitchen/chef/:chefId/assigned-items", getChefAssignedItemsController);
+
+  app.post("/owner/:restaurantId/kitchen/items/:itemId/assign", assignItemController);
+  app.post("/api/owner/:restaurantId/kitchen/items/:itemId/assign", assignItemController);
+  app.post("/owner/:restaurantId/kitchen/items/bulk-assign", bulkAssignItemsController);
+  app.post("/api/owner/:restaurantId/kitchen/items/bulk-assign", bulkAssignItemsController);
+  app.post("/owner/:restaurantId/kitchen/kots/:kotId/assign", assignKotController);
+  app.post("/api/owner/:restaurantId/kitchen/kots/:kotId/assign", assignKotController);
+  app.post("/owner/:restaurantId/kitchen/items/:itemId/reassign", reassignItemController);
+  app.post("/api/owner/:restaurantId/kitchen/items/:itemId/reassign", reassignItemController);
+
+  app.post("/owner/:restaurantId/kitchen/items/:itemId/self-pick", selfPickItemController);
+  app.post("/api/owner/:restaurantId/kitchen/items/:itemId/self-pick", selfPickItemController);
+  app.post("/owner/:restaurantId/kitchen/kots/:kotId/self-pick", selfPickKotController);
+  app.post("/api/owner/:restaurantId/kitchen/kots/:kotId/self-pick", selfPickKotController);
+
+  app.put("/owner/:restaurantId/kitchen/items/:itemId/status", updateKotItemStatusController);
+  app.put("/api/owner/:restaurantId/kitchen/items/:itemId/status", updateKotItemStatusController);
 
   // ==========================================
   // FEATURE 20 — STAFF MANAGEMENT, WAITER WORKSPACE, RBAC & MANAGER APPROVALS

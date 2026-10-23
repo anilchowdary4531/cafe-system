@@ -62,6 +62,7 @@ vi.mock("../routes/ProtectedRoute", () => ({
 
 vi.mock("../context/StaffSocketContext.jsx", () => ({
     StaffSocketProvider: ({ children }) => <>{children}</>,
+    useStaffSocket: () => ({ socket: null, connected: false }),
 }));
 
 vi.mock("../pages/admin/OwnerDashboard", () => ({

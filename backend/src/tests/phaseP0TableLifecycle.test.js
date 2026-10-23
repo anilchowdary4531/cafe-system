@@ -750,6 +750,10 @@ test("PHASE P0 — Financial & Table-State Integrity Regression Test Suite", asy
     // Cleanup
     await prisma.order.delete({ where: { id: order.id } });
     await prisma.tableSession.delete({ where: { id: session.id } });
+    await prisma.diningTable.updateMany({
+      where: { restaurantId: restaurantA.id },
+      data: { cleaningStatus: "CLEAN" },
+    });
   });
 
   // TEST 22: QR dine-in order creates/uses an active TableSession.
@@ -803,7 +807,13 @@ test("PHASE P0 — Financial & Table-State Integrity Regression Test Suite", asy
       });
       assert.equal(closeRes.completed, true, "Session should close when orders are paid");
 
-      // 4. Third QR order after session closed
+      // Table is cleaned after checkout
+      await prisma.diningTable.updateMany({
+        where: { restaurantId: restaurantA.id, tableNo: "1" },
+        data: { cleaningStatus: "CLEAN" },
+      });
+
+      // 4. Third QR order after session closed and table cleaned
       const res3 = await app.inject({
         method: "POST",
         url: `/r/${restaurantA.slug}/order`,

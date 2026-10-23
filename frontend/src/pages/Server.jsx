@@ -460,6 +460,24 @@ export default function Server() {
                 }
             }
 
+            // Check for strict sanitation DIRTY state
+            const isDirty = t.cleaningStatus === "DIRTY" || t.status === "DIRTY";
+            if (isDirty) {
+                return {
+                    ...t,
+                    status: "DIRTY",
+                    cleaningStatus: "DIRTY",
+                    isOccupied: false,
+                    activeOrderCount: 0,
+                    activeOrders: [],
+                    activeOrderStatus: null,
+                    paymentStatus: null,
+                    occupiedSince: null,
+                    session: { status: "CLOSED" },
+                    activeSession: null,
+                };
+            }
+
             // If canonical backend status is AVAILABLE, not occupied, or closed session:
             // Ensure no stale occupied/order/payment/server fields leak through
             const isExplicitlyFree = t.status === "AVAILABLE" || t.isOccupied === false || t.session?.status === "CLOSED" || t.activeSession?.status === "CLOSED";
@@ -467,6 +485,7 @@ export default function Server() {
                 return {
                     ...t,
                     status: "AVAILABLE",
+                    cleaningStatus: "CLEAN",
                     isOccupied: false,
                     activeOrderCount: 0,
                     activeOrders: [],
@@ -525,8 +544,11 @@ export default function Server() {
                     readyAt: kot.updatedAt || kot.createdAt,
                     isPartial: !isKotReady && readyItemsInKot.length > 0,
                     itemsList: itemsToShow.map((it) => ({
-                        name: it.itemName,
-                        qty: it.qty,
+                        id: it.id,
+                        orderItemId: it.orderItemId,
+                        name: it.itemName || it.name,
+                        itemName: it.itemName || it.name,
+                        qty: it.qty || it.quantity || 1,
                         notes: it.notes,
                         status: it.status,
                     })),
@@ -810,6 +832,15 @@ export default function Server() {
             return;
         }
 
+        if (table.cleaningStatus === "DIRTY" || table.status === "DIRTY") {
+            showToast({
+                title: "Table Needs Cleaning 🧹",
+                message: `Table ${table.tableNo} is awaiting sanitation. Cleaner has been alerted. Please wait until table is cleaned.`,
+                variant: "warning",
+            });
+            return;
+        }
+
         const serverId = user?.id || user?.userId;
         const serverName = user?.name || user?.username || "Server";
 
@@ -912,9 +943,19 @@ export default function Server() {
     const handleMarkItemServed = async (item) => {
         try {
             if (item.type === "KOT") {
-                await api.put(`/owner/${restaurantId}/kots/${item.id}/status`, {
-                    status: "SERVED",
-                });
+                if (item.isPartial && Array.isArray(item.itemsList) && item.itemsList.length > 0) {
+                    await Promise.all(
+                        item.itemsList.map((it) =>
+                            api.put(`/owner/${restaurantId}/kitchen/items/${it.id}/status`, {
+                                status: "SERVED",
+                            })
+                        )
+                    );
+                } else {
+                    await api.put(`/owner/${restaurantId}/kots/${item.id}/status`, {
+                        status: "SERVED",
+                    });
+                }
             } else {
                 await api.put(`/owner/${restaurantId}/orders/${item.id}/status`, {
                     status: "DELIVERED",
@@ -986,20 +1027,23 @@ export default function Server() {
         let occupied = 0;
         let reserved = 0;
         let blocked = 0;
+        let dirty = 0;
 
         tables.forEach((t) => {
             const isBlocked = Boolean(t.isBlocked);
-            const isExplicitlyFree = t.status === "AVAILABLE" || t.isOccupied === false || t.session?.status === "CLOSED" || t.activeSession?.status === "CLOSED";
-            const isPendingPayment = !isBlocked && !isExplicitlyFree && isTablePaymentPending(t);
-            const isOcc = !isBlocked && !isExplicitlyFree && Boolean(t.isOccupied || isPendingPayment || t.status === "OCCUPIED" || (Array.isArray(t.activeOrders) && t.activeOrders.length > 0));
+            const isDirty = t.cleaningStatus === "DIRTY" || t.status === "DIRTY";
+            const isExplicitlyFree = !isDirty && (t.status === "AVAILABLE" || t.isOccupied === false || t.session?.status === "CLOSED" || t.activeSession?.status === "CLOSED");
+            const isPendingPayment = !isBlocked && !isExplicitlyFree && !isDirty && isTablePaymentPending(t);
+            const isOcc = !isBlocked && !isExplicitlyFree && !isDirty && Boolean(t.isOccupied || isPendingPayment || t.status === "OCCUPIED" || (Array.isArray(t.activeOrders) && t.activeOrders.length > 0));
 
             if (isBlocked) blocked++;
+            else if (isDirty) dirty++;
             else if (isOcc) occupied++;
             else if (t.isReserved || t.activeReservation) reserved++;
             else available++;
         });
 
-        return { total: tables.length, available, occupied, reserved, blocked };
+        return { total: tables.length, available, occupied, reserved, blocked, dirty };
     }, [tables]);
 
     const handleAddToCart = (item) => {
@@ -1459,6 +1503,11 @@ export default function Server() {
                             <span className="flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium whitespace-nowrap">
                                 <span className="h-2.5 w-2.5 rounded-full bg-sky-500"></span> Occupied ({statusCounts.occupied})
                             </span>
+                            {statusCounts.dirty > 0 && (
+                                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold whitespace-nowrap">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse"></span> Cleaning Needed ({statusCounts.dirty})
+                                </span>
+                            )}
                             <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
                                 <span className="h-2.5 w-2.5 rounded-full bg-slate-500"></span> Blocked 🔒 ({statusCounts.blocked})
                             </span>
@@ -1479,10 +1528,11 @@ export default function Server() {
                         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                             {filteredTables.map((table) => {
                                 const isBlocked = Boolean(table.isBlocked);
-                                const isExplicitlyFree = table.status === "AVAILABLE" || table.isOccupied === false || table.session?.status === "CLOSED" || table.activeSession?.status === "CLOSED";
-                                const hasPendingPayment = !isBlocked && !isExplicitlyFree && isTablePaymentPending(table);
-                                const isOccupied = !isBlocked && !isExplicitlyFree && Boolean(table.isOccupied || hasPendingPayment || table.status === "OCCUPIED" || (Array.isArray(table.activeOrders) && table.activeOrders.length > 0));
-                                const isReserved = !isBlocked && !isOccupied && Boolean(table.isReserved || table.activeReservation);
+                                const isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
+                                const isExplicitlyFree = !isDirty && (table.status === "AVAILABLE" || table.isOccupied === false || table.session?.status === "CLOSED" || table.activeSession?.status === "CLOSED");
+                                const hasPendingPayment = !isBlocked && !isExplicitlyFree && !isDirty && isTablePaymentPending(table);
+                                const isOccupied = !isBlocked && !isExplicitlyFree && !isDirty && Boolean(table.isOccupied || hasPendingPayment || table.status === "OCCUPIED" || (Array.isArray(table.activeOrders) && table.activeOrders.length > 0));
+                                const isReserved = !isBlocked && !isOccupied && !isDirty && Boolean(table.isReserved || table.activeReservation);
 
                                 return (
                                     <div
@@ -1491,11 +1541,13 @@ export default function Server() {
                                         className={`group relative flex flex-col justify-between rounded-2xl border p-3 cursor-pointer transition-all duration-200 shadow-xs hover:-translate-y-0.5 min-h-[155px] sm:min-h-[165px] h-full text-xs bg-white dark:bg-slate-900 ${
                                             isBlocked
                                                 ? "border-slate-500/40 bg-slate-500/10 dark:bg-slate-950/40 opacity-75"
-                                                : isOccupied
-                                                    ? "border-sky-500/40 bg-sky-500/5 dark:bg-sky-950/20"
-                                                    : isReserved
-                                                        ? "border-purple-500/40 bg-purple-500/5 dark:purple-950/20"
-                                                        : "border-gray-200 dark:border-slate-800 hover:border-orange-500/50"
+                                                : isDirty
+                                                    ? "border-amber-500/50 bg-amber-500/5 dark:bg-amber-950/20 shadow-xs shadow-amber-500/10"
+                                                    : isOccupied
+                                                        ? "border-sky-500/40 bg-sky-500/5 dark:bg-sky-950/20"
+                                                        : isReserved
+                                                            ? "border-purple-500/40 bg-purple-500/5 dark:purple-950/20"
+                                                            : "border-gray-200 dark:border-slate-800 hover:border-orange-500/50"
                                         }`}
                                     >
                                         {/* Table Header: Table # & Seats */}
@@ -1511,6 +1563,10 @@ export default function Server() {
                                             {isBlocked ? (
                                                 <span className="flex items-center gap-1 rounded-full bg-slate-700 text-white px-2 py-0.5 text-[9px] font-bold shrink-0">
                                                     <Lock className="h-2.5 w-2.5" /> BLOCKED
+                                                </span>
+                                            ) : isDirty ? (
+                                                <span className="rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 text-[9px] font-bold border border-amber-500/30 shrink-0 flex items-center gap-1 animate-pulse">
+                                                    <Sparkles className="h-2.5 w-2.5" /> CLEANING
                                                 </span>
                                             ) : isOccupied ? (
                                                 <span className="rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-400 px-2 py-0.5 text-[9px] font-bold border border-sky-500/30 shrink-0">
@@ -1553,9 +1609,25 @@ export default function Server() {
                                                 </p>
                                             ) : isOccupied ? (
                                                 <div className="space-y-1">
-                                                    <p className="font-bold text-sky-600 dark:text-sky-400">
-                                                        {table.activeOrderCount || 1} Active Order(s)
-                                                    </p>
+                                                    {Array.isArray(table.activeOrders) && table.activeOrders.length > 0 ? (
+                                                        <div className="space-y-0.5">
+                                                            <p className="font-bold text-sky-600 dark:text-sky-400">
+                                                                {table.activeOrders.length} Active Order(s)
+                                                            </p>
+                                                            {table.activeOrders.slice(0, 1).map((ord) => (
+                                                                <p key={ord.id || ord.orderNo} className="text-[10px] text-slate-600 dark:text-slate-300 truncate">
+                                                                    <span className="font-bold text-slate-700 dark:text-slate-200">#{ord.orderNo || ord.id}:</span>{" "}
+                                                                    {Array.isArray(ord.items) && ord.items.length > 0
+                                                                        ? ord.items.map((it) => `${it.qty || 1}x ${it.itemName}`).join(", ")
+                                                                        : `${ord.status}`}
+                                                                </p>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="font-bold text-sky-600 dark:text-sky-400">
+                                                            {table.activeOrderCount || 1} Active Order(s)
+                                                        </p>
+                                                    )}
                                                     {(() => {
                                                         const activeStatus = hasPendingPayment ? "PAYMENT_PENDING" : resolveTableActiveOrderStatus(table);
                                                         if (!activeStatus) return null;
@@ -1597,6 +1669,40 @@ export default function Server() {
                                                             💳 Settle Payment
                                                         </button>
                                                     )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            try {
+                                                                await axios.post(
+                                                                    `${API}/api/v1/staff/tasks/request`,
+                                                                    {
+                                                                        restaurantId,
+                                                                        tableId: table.id,
+                                                                        tableNo: table.tableNo,
+                                                                        title: `Service Assistance - Table ${table.tableNo}`,
+                                                                        description: "Water, cutlery, or guest assistance requested by server",
+                                                                        category: "SERVICE",
+                                                                        taskType: "SERVICE",
+                                                                        roleTarget: "STEWARD",
+                                                                        priority: "MEDIUM",
+                                                                    },
+                                                                    { headers: { Authorization: `Bearer ${token}` } }
+                                                                );
+                                                                showToast({
+                                                                    title: "Steward Called 🛎️",
+                                                                    message: `Service request dispatched for Table ${table.tableNo}.`,
+                                                                    variant: "success",
+                                                                });
+                                                            } catch (err) {
+                                                                showToast({ title: "Error", message: "Failed to dispatch steward request", variant: "error" });
+                                                            }
+                                                        }}
+                                                        className="w-full mt-1.5 py-1 px-2 rounded-lg bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[10px] border border-slate-300 dark:border-slate-700 flex items-center justify-center gap-1 transition"
+                                                        title="Call floor steward for water, cutlery or table assistance"
+                                                    >
+                                                        🛎️ Call Steward
+                                                    </button>
                                                 </div>
                                             ) : isReserved ? (
                                                 <div className="space-y-0.5">
@@ -1611,6 +1717,13 @@ export default function Server() {
                                                             <span>👤</span> Server: <span className="font-bold">{table.assignedWaiterName || table.activeSession?.waiterName}</span>
                                                         </p>
                                                     )}
+                                                </div>
+                                            ) : isDirty ? (
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] text-amber-500 font-bold">Needs cleaning before seating</p>
+                                                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-400">
+                                                        <Sparkles className="h-3 w-3" /> Cleaner alerted
+                                                    </span>
                                                 </div>
                                             ) : (
                                                 <div className="space-y-0.5">
@@ -1828,6 +1941,39 @@ export default function Server() {
                                     </p>
                                 )}
                             </div>
+
+                            {Array.isArray(selectedTable?.activeOrders) && selectedTable.activeOrders.length > 0 && (
+                                <div className="rounded-xl border border-sky-200 dark:border-sky-900/60 bg-sky-50/50 dark:bg-sky-950/20 p-2.5 space-y-2">
+                                    <div className="flex justify-between items-center text-xs font-bold text-sky-800 dark:text-sky-300">
+                                        <span>Active Placed Order(s)</span>
+                                        <span className="text-[10px] bg-sky-200/80 dark:bg-sky-800 text-sky-900 dark:text-sky-100 px-1.5 py-0.2 rounded-full font-mono">
+                                            {selectedTable.activeOrders.length}
+                                        </span>
+                                    </div>
+                                    <div className="space-y-1.5 max-h-[25vh] overflow-y-auto">
+                                        {selectedTable.activeOrders.map((ord) => (
+                                            <div key={ord.id || ord.orderNo} className="text-xs bg-white dark:bg-slate-800/80 p-2 rounded-lg border border-sky-100 dark:border-sky-900/40">
+                                                <div className="flex justify-between items-center font-bold text-[11px]">
+                                                    <span className="text-slate-900 dark:text-white">#{ord.orderNo || ord.id}</span>
+                                                    <span className="text-sky-600 dark:text-sky-400 font-extrabold">{ord.status}</span>
+                                                </div>
+                                                {Array.isArray(ord.items) && ord.items.length > 0 && (
+                                                    <ul className="mt-1 space-y-0.5 text-[10px] text-slate-600 dark:text-slate-300">
+                                                        {ord.items.map((it) => (
+                                                            <li key={it.id} className="flex justify-between items-center">
+                                                                <span>{it.qty || 1}× {it.itemName}</span>
+                                                                {it.preparedByName && (
+                                                                    <span className="text-emerald-600 dark:text-emerald-400 text-[9px]">Chef: {it.preparedByName}</span>
+                                                                )}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="space-y-2 max-h-[40vh] sm:max-h-[50vh] overflow-y-auto">
                                 {Object.values(cart).length === 0 ? (

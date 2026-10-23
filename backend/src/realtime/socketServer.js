@@ -42,6 +42,8 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
   });
   if (app) {
     app.presenceManager = presenceManager;
+    app.io = io;
+    app.staff = staff;
   }
 
   staff.use((socket, next) => {
@@ -421,6 +423,10 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     }
   };
 
+  const emitToKitchenRoom = ({ restaurantId, event, payload, targetUserIds = [] } = {}) => {
+    emitToKitchen({ io, staff, restaurantId, event, payload, targetUserIds });
+  };
+
   return {
     io,
     staff,
@@ -431,7 +437,53 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     emitTableAssignmentUpdated,
     emitReservationUpdated,
     emitInventoryUpdated,
+    emitToKitchen: emitToKitchenRoom,
   };
+};
+
+export const emitToKitchen = ({ io, staff, restaurantId, event, payload, targetUserIds = [] } = {}) => {
+  const rid = Number(restaurantId || 0);
+  if (!rid) return;
+  const targetIds = Array.isArray(targetUserIds) ? targetUserIds.filter(Boolean) : (targetUserIds ? [targetUserIds] : []);
+
+  // 1. Emit to /staff namespace (primary for staff frontend)
+  if (staff) {
+    try {
+      staff.to(restaurantRoom(rid)).emit(event, payload);
+      staff.to(`restaurant_${rid}`).emit(event, payload);
+      for (const uid of targetIds) {
+        staff.to(`user:${uid}`).emit(event, payload);
+        staff.to(`user_${uid}`).emit(event, payload);
+      }
+    } catch (e) {
+      console.error("[emitToKitchen staff error]", e?.message);
+    }
+  }
+
+  // 2. Also emit to root io namespace for compatibility
+  if (io) {
+    try {
+      if (typeof io.of === "function") {
+        try {
+          const s = io.of("/staff");
+          s.to(restaurantRoom(rid)).emit(event, payload);
+          s.to(`restaurant_${rid}`).emit(event, payload);
+          for (const uid of targetIds) {
+            s.to(`user:${uid}`).emit(event, payload);
+            s.to(`user_${uid}`).emit(event, payload);
+          }
+        } catch {}
+      }
+      io.to(restaurantRoom(rid)).emit(event, payload);
+      io.to(`restaurant_${rid}`).emit(event, payload);
+      for (const uid of targetIds) {
+        io.to(`user:${uid}`).emit(event, payload);
+        io.to(`user_${uid}`).emit(event, payload);
+      }
+    } catch (e) {
+      console.error("[emitToKitchen io error]", e?.message);
+    }
+  }
 };
 
 export const emitInventoryUpdated = (io, restaurantId, data = {}) => {

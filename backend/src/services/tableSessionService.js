@@ -30,7 +30,7 @@ export const getOrCreateActiveSession = async ({
   return prisma.$transaction(async (tx) => {
     const table = await tx.diningTable.findUnique({
       where: { id: tid },
-      select: { id: true, tableNo: true, restaurantId: true, seats: true, assignedWaiterId: true, assignedWaiterName: true, isBlocked: true, blockReason: true },
+      select: { id: true, tableNo: true, restaurantId: true, seats: true, assignedWaiterId: true, assignedWaiterName: true, isBlocked: true, blockReason: true, cleaningStatus: true },
     });
 
     if (!table || Number(table.restaurantId) !== rid) {
@@ -63,6 +63,12 @@ export const getOrCreateActiveSession = async ({
     });
 
     if (!session) {
+      if (table.cleaningStatus === "DIRTY") {
+        const err = new Error(`Table ${table.tableNo} is DIRTY and awaiting sanitation. Cannot seat guests until cleaned.`);
+        err.code = "table_dirty";
+        throw err;
+      }
+
       const finalWaiterId = waiterId ? Number(waiterId) : table.assignedWaiterId || null;
       const finalWaiterName = waiterName ? String(waiterName).trim() : table.assignedWaiterName || null;
 
@@ -709,8 +715,30 @@ export const completeSessionAndReleaseTable = async ({
       data: {
         assignedWaiterId: null,
         assignedWaiterName: null,
+        cleaningStatus: "DIRTY",
       },
     }).catch(() => {});
+
+    // Create cleaning task for Cleaner / Steward station
+    try {
+      if (tx.staffTask) {
+        await tx.staffTask.create({
+          data: {
+            restaurantId: session.restaurantId,
+            tableId: session.tableId || null,
+            title: `Clean Table ${session.tableNo}`,
+            description: `Dining session completed for Table ${session.tableNo}. Thorough sanitation and busing required before new seating.`,
+            category: "CLEANING",
+            taskType: "TABLE_BUS_AND_SANITIZE",
+            roleTarget: "CLEANER",
+            priority: "HIGH",
+            status: "PENDING",
+          },
+        });
+      }
+    } catch {
+      // Non-blocking task creation
+    }
 
     // D. Audit log in TableOperationLog if available
     try {
@@ -749,7 +777,8 @@ export const completeSessionAndReleaseTable = async ({
     tableId: session.tableId || null,
     id: session.tableId || null,
     tableNo: session.tableNo,
-    status: "AVAILABLE",
+    status: "DIRTY",
+    cleaningStatus: "DIRTY",
     isOccupied: false,
     activeOrderCount: 0,
     activeOrders: [],
@@ -828,6 +857,32 @@ export const completeSessionAndReleaseTable = async ({
       tableNo: session.tableNo,
       status: "PAID",
       paymentMode,
+    });
+    staff.to(`restaurant_${effectiveRid}`).emit("cleaner:table_dirty", {
+      restaurantId: effectiveRid,
+      tableId: session.tableId || null,
+      tableNo: session.tableNo,
+      timestamp: nowIso,
+    });
+    staff.to(`restaurant:${effectiveRid}`).emit("cleaner:table_dirty", {
+      restaurantId: effectiveRid,
+      tableId: session.tableId || null,
+      tableNo: session.tableNo,
+      timestamp: nowIso,
+    });
+    staff.to(`restaurant_${effectiveRid}`).emit("cleaner:task_created", {
+      restaurantId: effectiveRid,
+      tableId: session.tableId || null,
+      tableNo: session.tableNo,
+      taskType: "TABLE_BUS_AND_SANITIZE",
+      status: "PENDING",
+    });
+    staff.to(`restaurant:${effectiveRid}`).emit("cleaner:task_created", {
+      restaurantId: effectiveRid,
+      tableId: session.tableId || null,
+      tableNo: session.tableNo,
+      taskType: "TABLE_BUS_AND_SANITIZE",
+      status: "PENDING",
     });
   }
 

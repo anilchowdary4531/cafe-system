@@ -67,6 +67,10 @@ model Restaurant {
   nextInvoiceNumber Int     @default(1001) @map("next_invoice_number")
   nextKotNumber     Int     @default(101)  @map("next_kot_number")
 
+  // KITCHEN DISPATCH & SELF-PICK CONFIGURATION
+  kitchenAssignmentMode String @default("DISPATCHER") @map("kitchen_assignment_mode") // DISPATCHER / SELF_PICK
+  kitchenSelfPickScope  String @default("ITEMS")      @map("kitchen_self_pick_scope")  // ITEMS / KOTS / BOTH
+
   // STATUS & PUBLIC DIGITAL MENU CONFIGURATION
   isActive Boolean @default(true) @map("is_active")
   tobaccoApproved Boolean @default(false) @map("tobacco_approved")
@@ -187,6 +191,7 @@ model User {
   staffAttendances     StaffAttendance[]
   attendanceCorrections AttendanceCorrection[] @relation("CorrectionUser")
   assignedTasks        StaffTask[]            @relation("AssignedTasks")
+  requestedTasks       StaffTask[]            @relation("RequestedTasks")
   prRequested          PurchaseRequest[]      @relation("PRRequestedBy")
   prApproved           PurchaseRequest[]      @relation("PRApprovedBy")
   grnReceived          GoodsReceiptNote[]     @relation("GRNReceivedBy")
@@ -202,6 +207,7 @@ model User {
   stockCountsCreated   PhysicalStockCount[]   @relation("StockCountCreatedBy")
   stockCountsApproved  PhysicalStockCount[]   @relation("StockCountApprovedBy")
   staffLoginTokens     StaffLoginToken[]
+  assignedKitchenItems KitchenOrderTicketItem[] @relation("ChefAssignedKitchenItems")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -664,6 +670,7 @@ model DiningTable {
   assignedWaiterName String? @map("assigned_waiter_name")
 
   isActive  Boolean @default(true) @map("is_active")
+  cleaningStatus String? @default("CLEAN") @map("cleaning_status") // CLEAN | DIRTY | IN_PROGRESS
 
   // BLOCKED STATUS FOR MAINTENANCE / PRIVATE EVENTS
   isBlocked     Boolean   @default(false) @map("is_blocked")
@@ -677,10 +684,12 @@ model DiningTable {
   tableSessions TableSession[]
   reservations  Reservation[]
   waitlists     Waitlist[]
+  staffTasks    StaffTask[]
 
   @@unique([restaurantId, tableNo])
   @@index([restaurantId, isActive])
   @@index([restaurantId, section])
+  @@index([restaurantId, cleaningStatus])
   @@map("dining_tables")
 }
 
@@ -1848,8 +1857,24 @@ model KitchenOrderTicketItem {
   preparedByUserId Int?    @map("prepared_by_user_id")
   preparedByName   String? @map("prepared_by_name")
 
+  // PERSISTENT ITEM-LEVEL CHEF ASSIGNMENT
+  assignedChefId    Int?      @map("assigned_chef_id")
+  assignedChefName  String?   @map("assigned_chef_name")
+  assignedByUserId  Int?      @map("assigned_by_user_id")
+  assignedByName    String?   @map("assigned_by_name")
+  assignmentSource  String?   @default("DISPATCHED") @map("assignment_source") // DISPATCHED | SELF_PICKED
+  assignedAt        DateTime? @map("assigned_at")
+
+  // PREPARATION LIFECYCLE TIMESTAMPS
+  startedAt         DateTime? @map("started_at")
+  readyAt           DateTime? @map("ready_at")
+
+  assignedChef      User?     @relation("ChefAssignedKitchenItems", fields: [assignedChefId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now()) @map("created_at")
 
+  @@index([assignedChefId, status])
+  @@index([kotId, assignedChefId])
   @@map("kitchen_order_ticket_items")
 }
 
@@ -2609,18 +2634,25 @@ model StaffTask {
   category     String     @default("CHECKLIST")
   assignedTo   Int?       @map("assigned_to")
   roleTarget   String?    @map("role_target")
-  priority     String     @default("MEDIUM")
-  dueDate      DateTime?  @map("due_date")
-  isCompleted  Boolean    @default(false) @map("is_completed")
-  completedAt  DateTime?  @map("completed_at")
-  completedBy  Int?       @map("completed_by")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at")
+  priority          String       @default("MEDIUM")
+  dueDate           DateTime?    @map("due_date")
+  tableId           Int?         @map("table_id")
+  status            String       @default("PENDING") // PENDING, ACCEPTED, IN_PROGRESS, COMPLETED, CANCELLED
+  taskType          String?      @map("task_type")
+  requestedByUserId Int?         @map("requested_by_user_id")
+  isCompleted       Boolean      @default(false) @map("is_completed")
+  completedAt       DateTime?    @map("completed_at")
+  completedBy       Int?         @map("completed_by")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @default(now()) @updatedAt @map("updated_at")
 
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  assignedUser User?      @relation("AssignedTasks", fields: [assignedTo], references: [id], onDelete: SetNull)
+  restaurant        Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  assignedUser      User?        @relation("AssignedTasks", fields: [assignedTo], references: [id], onDelete: SetNull)
+  requestedByUser   User?        @relation("RequestedTasks", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  table             DiningTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
 
   @@index([restaurantId, category])
+  @@index([restaurantId, status])
   @@index([assignedTo, isCompleted])
   @@map("staff_tasks")
 }

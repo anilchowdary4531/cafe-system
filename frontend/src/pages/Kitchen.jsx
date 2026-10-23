@@ -19,6 +19,10 @@ import {
     Volume2,
     VolumeX,
     X,
+    Sliders,
+    Layers,
+    UserCheck,
+    ArrowRight,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
@@ -29,6 +33,8 @@ import { resolveEffectiveStaffRole } from "../utils/staffRole";
 import { showToast } from "../utils/toast";
 import ServerProfileView from "../components/ServerProfileView";
 import ServerNotificationsView from "../components/ServerNotificationsView";
+import ChefWorkloadPanel from "../components/ChefWorkloadPanel";
+import KitchenAssignmentDrawer from "../components/KitchenAssignmentDrawer";
 
 const KOT_STATUSES = ["ALL", "PENDING", "PREPARING", "READY", "SERVED", "CANCELLED"];
 const PRIORITIES = ["ALL", "NORMAL", "HIGH", "URGENT"];
@@ -98,8 +104,8 @@ export default function Kitchen() {
 
     const restaurantName = String(user?.restaurant?.name || "Restaurant").trim() || "Restaurant";
     const effectiveRole = resolveEffectiveStaffRole(user?.role, user?.designation);
-    const isSeniorChef = /SENIOR/i.test(String(user?.designation || ""));
-    const titleLabel = isSeniorChef ? "Senior Chef Dispatch KDS" : "Kitchen Operations KDS";
+    const isSeniorChef = /SENIOR|HEAD|EXECUTIVE/i.test(String(user?.designation || "")) || /OWNER|MANAGER/i.test(String(user?.role || ""));
+    const titleLabel = "Senior Chef Command Center";
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -161,6 +167,17 @@ export default function Kitchen() {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState("");
     const [lastSyncAt, setLastSyncAt] = useState(null);
+
+    // Kitchen Config & Workload
+    const [kitchenConfig, setKitchenConfig] = useState({ mode: "DISPATCHER", scope: "ITEMS" });
+    const [workload, setWorkload] = useState({ chefs: [] });
+    const [selectedChefFilter, setSelectedChefFilter] = useState("ALL"); // "ALL" | "UNASSIGNED" | chefId
+    const [updatingConfig, setUpdatingConfig] = useState(false);
+
+    // Assignment Drawer State
+    const [drawerKot, setDrawerKot] = useState(null);
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [isSubmittingAssignment, setIsSubmittingAssignment] = useState(false);
 
     // Filters
     const [selectedStationId, setSelectedStationId] = useState("ALL");
@@ -233,11 +250,71 @@ export default function Kitchen() {
         }
     }, [restaurantId]);
 
+    // Load Kitchen Config (Mode & Scope)
+    const loadKitchenConfig = useCallback(async () => {
+        if (!restaurantId) return;
+        try {
+            const res = await api.get(`/owner/${restaurantId}/kitchen/config`);
+            if (res.data?.ok) {
+                setKitchenConfig({ mode: res.data.mode, scope: res.data.scope });
+            }
+        } catch (err) {
+            console.error("Failed to load kitchen config:", err);
+        }
+    }, [restaurantId]);
+
+    // Load Kitchen Workload
+    const loadWorkload = useCallback(async () => {
+        if (!restaurantId) return;
+        try {
+            const res = await api.get(`/owner/${restaurantId}/kitchen/workload`);
+            if (res.data?.ok) {
+                setWorkload({ chefs: res.data.chefs || [] });
+            }
+        } catch (err) {
+            console.error("Failed to load kitchen workload:", err);
+        }
+    }, [restaurantId]);
+
     useEffect(() => {
         if (!restaurantId) return;
         loadStations();
         loadKots();
-    }, [loadStations, loadKots, restaurantId]);
+        loadKitchenConfig();
+        loadWorkload();
+    }, [loadStations, loadKots, loadKitchenConfig, loadWorkload, restaurantId]);
+
+    // Change Assignment Mode (DISPATCHER | SELF_PICK)
+    const handleUpdateMode = async (newMode) => {
+        setUpdatingConfig(true);
+        try {
+            const res = await api.put(`/owner/${restaurantId}/kitchen/config`, { mode: newMode });
+            if (res.data?.ok) {
+                setKitchenConfig((prev) => ({ ...prev, mode: res.data.mode }));
+                showToast(`Kitchen mode changed to ${newMode}`, "success");
+            }
+        } catch (err) {
+            showToast(err?.response?.data?.message || "Failed to update kitchen mode", "error");
+        } finally {
+            setUpdatingConfig(false);
+        }
+    };
+
+    // Change Self-Pick Scope (ITEMS | KOTS | BOTH)
+    const handleUpdateScope = async (newScope) => {
+        setUpdatingConfig(true);
+        try {
+            const res = await api.put(`/owner/${restaurantId}/kitchen/config`, { scope: newScope });
+            if (res.data?.ok) {
+                setKitchenConfig((prev) => ({ ...prev, scope: res.data.scope }));
+                showToast(`Self-Pick scope changed to ${newScope}`, "success");
+            }
+        } catch (err) {
+            showToast(err?.response?.data?.message || "Failed to update self-pick scope", "error");
+        } finally {
+            setUpdatingConfig(false);
+        }
+    };
 
     // Socket Event Handlers
     useEffect(() => {
@@ -263,6 +340,7 @@ export default function Kitchen() {
                 variant: "info",
                 durationMs: 2200,
             });
+            loadWorkload();
         };
 
         const onKotUpdated = (kot) => {
@@ -281,6 +359,24 @@ export default function Kitchen() {
 
         const onKotItemUpdated = ({ kot }) => {
             if (kot) onKotUpdated(kot);
+        };
+
+        const handleKitchenConfigUpdated = (cfg) => {
+            if (cfg?.ok) {
+                setKitchenConfig({ mode: cfg.mode, scope: cfg.scope });
+                showToast(`Kitchen config updated: ${cfg.mode}`, "info");
+            }
+        };
+
+        const handleKitchenWorkloadUpdated = (data) => {
+            if (data?.ok && Array.isArray(data.chefs)) {
+                setWorkload({ chefs: data.chefs });
+            }
+        };
+
+        const handleKitchenAssignmentEvent = () => {
+            loadKots({ silent: true });
+            loadWorkload();
         };
 
         const handleNewNotification = (notif) => {
@@ -329,14 +425,28 @@ export default function Kitchen() {
         socket.on("kot:priority_updated", onKotUpdated);
         socket.on("notification:new", handleNewNotification);
 
+        socket.on("kitchen:config_updated", handleKitchenConfigUpdated);
+        socket.on("kitchen:workload_updated", handleKitchenWorkloadUpdated);
+        socket.on("kitchen:item_assigned", handleKitchenAssignmentEvent);
+        socket.on("kitchen:item_reassigned", handleKitchenAssignmentEvent);
+        socket.on("kitchen:item_self_picked", handleKitchenAssignmentEvent);
+        socket.on("kitchen:item_status_updated", handleKitchenAssignmentEvent);
+
         return () => {
             socket.off("kot_created", onKotCreated);
             socket.off("kot:status_updated", onKotUpdated);
             socket.off("kot:item_updated", onKotItemUpdated);
             socket.off("kot:priority_updated", onKotUpdated);
             socket.off("notification:new", handleNewNotification);
+
+            socket.off("kitchen:config_updated", handleKitchenConfigUpdated);
+            socket.off("kitchen:workload_updated", handleKitchenWorkloadUpdated);
+            socket.off("kitchen:item_assigned", handleKitchenAssignmentEvent);
+            socket.off("kitchen:item_reassigned", handleKitchenAssignmentEvent);
+            socket.off("kitchen:item_self_picked", handleKitchenAssignmentEvent);
+            socket.off("kitchen:item_status_updated", handleKitchenAssignmentEvent);
         };
-    }, [socket, soundMuted]);
+    }, [socket, soundMuted, loadWorkload, loadKots]);
 
     // Update KOT Status
     const handleUpdateKotStatus = async (kotId, status) => {
@@ -349,13 +459,13 @@ export default function Kitchen() {
                     title: `Ticket ${res.data.kot.kotNo}`,
                     message: `Status updated to ${status}`,
                     variant: "success",
-                    durationMs: 1800,
                 });
+                loadWorkload();
             }
         } catch (err) {
             showToast({
                 title: "Status Update Failed",
-                message: err?.response?.data?.message || err?.message,
+                message: err?.response?.data?.message || err?.message || "Failed to update KOT status",
                 variant: "error",
             });
         } finally {
@@ -363,17 +473,18 @@ export default function Kitchen() {
         }
     };
 
-    // Update Item-level Status
+    // Update KOT Item Status
     const handleUpdateItemStatus = async (kotId, itemId, status) => {
         try {
             const res = await api.put(`/owner/${restaurantId}/kots/${kotId}/items/${itemId}/status`, { status });
             if (res.data?.ok && res.data.kot) {
                 setKots((prev) => prev.map((k) => (k.id === kotId ? res.data.kot : k)));
+                loadWorkload();
             }
         } catch (err) {
             showToast({
-                title: "Item Status Error",
-                message: err?.response?.data?.message || err?.message,
+                title: "Item Update Failed",
+                message: err?.response?.data?.message || err?.message || "Failed to update item status",
                 variant: "error",
             });
         }
@@ -386,15 +497,15 @@ export default function Kitchen() {
             if (res.data?.ok && res.data.kot) {
                 setKots((prev) => prev.map((k) => (k.id === kotId ? res.data.kot : k)));
                 showToast({
-                    title: `Priority updated`,
-                    message: `KOT set to ${priority}`,
+                    title: `Ticket ${res.data.kot.kotNo}`,
+                    message: `Priority set to ${priority}`,
                     variant: "info",
                 });
             }
         } catch (err) {
             showToast({
-                title: "Priority Error",
-                message: err?.response?.data?.message || err?.message,
+                title: "Priority Update Failed",
+                message: err?.response?.data?.message || err?.message || "Failed to update priority",
                 variant: "error",
             });
         }
@@ -407,16 +518,16 @@ export default function Kitchen() {
             const res = await api.post(`/owner/${restaurantId}/kots/${kotId}/reprint`);
             if (res.data?.ok) {
                 showToast({
-                    title: "Reprint Dispatched",
-                    message: res.data.result?.ok ? "Sent to station thermal printer" : res.data.result?.message || "Print queued",
-                    variant: res.data.result?.ok ? "success" : "warning",
+                    title: "Print Dispatched",
+                    message: `KOT #${kotId} print job sent to station printer`,
+                    variant: "success",
                 });
                 loadKots({ silent: true });
             }
         } catch (err) {
             showToast({
-                title: "Reprint Error",
-                message: err?.response?.data?.message || err?.message,
+                title: "Reprint Failed",
+                message: err?.response?.data?.message || err?.message || "Thermal printer communication failed",
                 variant: "error",
             });
         } finally {
@@ -424,85 +535,186 @@ export default function Kitchen() {
         }
     };
 
+    // Drawer Assignment Handlers
+    const handleOpenAssignDrawer = (kot) => {
+        setDrawerKot(kot);
+        setIsDrawerOpen(true);
+    };
+
+    const handleAssignItem = async (itemId, chefId) => {
+        setIsSubmittingAssignment(true);
+        try {
+            const res = await api.post(`/owner/${restaurantId}/kitchen/items/${itemId}/assign`, { chefId });
+            if (res.data?.ok) {
+                showToast("Item assigned successfully", "success");
+                await Promise.all([loadKots({ silent: true }), loadWorkload()]);
+                // Update active drawer kot items
+                setDrawerKot((prev) => {
+                    if (!prev) return prev;
+                    const items = (prev.items || []).map((it) =>
+                        it.id === itemId
+                            ? { ...it, assignedChefId: chefId, assignedChefName: res.data.item?.assignedChefName }
+                            : it
+                    );
+                    return { ...prev, items };
+                });
+            }
+        } catch (err) {
+            showToast(err?.response?.data?.message || "Failed to assign item", "error");
+        } finally {
+            setIsSubmittingAssignment(false);
+        }
+    };
+
+    const handleBulkAssign = async (itemIds, chefId) => {
+        setIsSubmittingAssignment(true);
+        try {
+            const res = await api.post(`/owner/${restaurantId}/kitchen/items/bulk-assign`, { itemIds, chefId });
+            if (res.data?.ok) {
+                showToast(`Assigned ${res.data.count} items`, "success");
+                await Promise.all([loadKots({ silent: true }), loadWorkload()]);
+                setIsDrawerOpen(false);
+            }
+        } catch (err) {
+            showToast(err?.response?.data?.message || "Failed to assign items", "error");
+        } finally {
+            setIsSubmittingAssignment(false);
+        }
+    };
+
+    const handleAssignKot = async (kotId, chefId, overwrite) => {
+        setIsSubmittingAssignment(true);
+        try {
+            const res = await api.post(`/owner/${restaurantId}/kitchen/kots/${kotId}/assign`, { chefId, overwriteAssigned: overwrite });
+            if (res.data?.ok) {
+                showToast(`Assigned ${res.data.count} items in KOT`, "success");
+                await Promise.all([loadKots({ silent: true }), loadWorkload()]);
+                setIsDrawerOpen(false);
+            }
+        } catch (err) {
+            showToast(err?.response?.data?.message || "Failed to assign KOT", "error");
+        } finally {
+            setIsSubmittingAssignment(false);
+        }
+    };
+
+    const handleReassignItem = async (itemId, newChefId) => {
+        setIsSubmittingAssignment(true);
+        try {
+            const res = await api.post(`/owner/${restaurantId}/kitchen/items/${itemId}/reassign`, { newChefId });
+            if (res.data?.ok) {
+                showToast("Item reassigned successfully", "success");
+                await Promise.all([loadKots({ silent: true }), loadWorkload()]);
+                setIsDrawerOpen(false);
+            }
+        } catch (err) {
+            showToast(err?.response?.data?.message || "Failed to reassign item", "error");
+        } finally {
+            setIsSubmittingAssignment(false);
+        }
+    };
+
+    // Calculate unassigned items count
+    const unassignedItemsCount = useMemo(() => {
+        let count = 0;
+        (kots || []).forEach((k) => {
+            if (k.status !== "CANCELLED" && k.status !== "SERVED") {
+                (k.items || []).forEach((it) => {
+                    if (!it.assignedChefId && it.status !== "CANCELLED" && it.status !== "SERVED") {
+                        count += 1;
+                    }
+                });
+            }
+        });
+        return count;
+    }, [kots]);
+
     // Filter KOTs
     const filteredKots = useMemo(() => {
-        return kots.filter((kot) => {
-            // Station Filter
-            if (selectedStationId !== "ALL" && Number(kot.stationId) !== Number(selectedStationId)) {
-                return false;
-            }
-            // Status Filter
-            if (selectedStatus !== "ALL" && String(kot.status).toUpperCase() !== selectedStatus) {
-                return false;
-            }
-            // Priority Filter
-            if (selectedPriority !== "ALL" && String(kot.priority || "NORMAL").toUpperCase() !== selectedPriority) {
-                return false;
-            }
-            // Search Query
-            if (searchQuery.trim()) {
-                const q = searchQuery.toLowerCase().trim();
-                const kotNo = String(kot.kotNo || "").toLowerCase();
-                const tableNo = String(kot.tableNo || "").toLowerCase();
-                const orderNo = String(kot.order?.orderNo || "").toLowerCase();
-                const waiter = String(kot.waiterName || "").toLowerCase();
-                const itemMatch = Array.isArray(kot.items) && kot.items.some((it) => String(it.itemName).toLowerCase().includes(q));
-                if (!kotNo.includes(q) && !tableNo.includes(q) && !orderNo.includes(q) && !waiter.includes(q) && !itemMatch) {
-                    return false;
-                }
-            }
-            return true;
-        });
-    }, [kots, selectedStationId, selectedStatus, selectedPriority, searchQuery]);
+        let list = Array.isArray(kots) ? kots : [];
 
-    // Grouping KOTs by status column
+        // Station Filter
+        if (selectedStationId !== "ALL") {
+            list = list.filter((k) => String(k.stationId || "") === String(selectedStationId));
+        }
+
+        // Priority Filter
+        if (selectedPriority !== "ALL") {
+            list = list.filter((k) => String(k.priority || "NORMAL").toUpperCase() === selectedPriority);
+        }
+
+        // Status Filter
+        if (selectedStatus !== "ALL") {
+            list = list.filter((k) => String(k.status || "").toUpperCase() === selectedStatus);
+        }
+
+        // Chef Filter (ALL | UNASSIGNED | specific chefId)
+        if (selectedChefFilter === "UNASSIGNED") {
+            list = list.filter((k) =>
+                (k.items || []).some((it) => !it.assignedChefId && it.status !== "CANCELLED" && it.status !== "SERVED")
+            );
+        } else if (selectedChefFilter !== "ALL") {
+            list = list.filter((k) =>
+                (k.items || []).some((it) => String(it.assignedChefId) === String(selectedChefFilter))
+            );
+        }
+
+        // Search Query
+        if (searchQuery.trim()) {
+            const q = searchQuery.trim().toLowerCase();
+            list = list.filter((k) => {
+                const matchNo = String(k.kotNo || "").toLowerCase().includes(q);
+                const matchTable = String(k.tableNo || "").toLowerCase().includes(q);
+                const matchOrder = String(k.orderId || "").toLowerCase().includes(q);
+                const matchItem = Array.isArray(k.items) && k.items.some((it) =>
+                    String(it.itemName || it.name || "").toLowerCase().includes(q) ||
+                    String(it.assignedChefName || "").toLowerCase().includes(q)
+                );
+                return matchNo || matchTable || matchOrder || matchItem;
+            });
+        }
+
+        return list;
+    }, [kots, selectedStationId, selectedPriority, selectedStatus, selectedChefFilter, searchQuery]);
+
+    // Group filtered KOTs into NEW, PREPARING, READY columns
     const groupedKots = useMemo(() => {
-        const groups = {
-            NEW: [],
-            PREPARING: [],
-            READY: [],
-        };
-
+        const groups = { NEW: [], PREPARING: [], READY: [] };
         filteredKots.forEach((kot) => {
-            const st = String(kot.status || "PENDING").toUpperCase();
-            if (st === "PENDING" || st === "ACCEPTED" || st === "PRINTED" || st === "PRINT_FAILED") {
+            const status = String(kot.status || "").toUpperCase();
+            if (status === "PENDING" || status === "ACCEPTED" || status === "PRINTED" || status === "PRINT_FAILED") {
                 groups.NEW.push(kot);
-            } else if (st === "PREPARING") {
+            } else if (status === "PREPARING") {
                 groups.PREPARING.push(kot);
-            } else if (st === "READY") {
+            } else if (status === "READY") {
                 groups.READY.push(kot);
             }
         });
-
         return groups;
     }, [filteredKots]);
 
-    // Workload Metrics
+    // Quick Metrics
     const metrics = useMemo(() => {
-        const activeKots = kots.filter((k) => k.status !== "SERVED" && k.status !== "CANCELLED");
-        const newCount = activeKots.filter((k) => ["PENDING", "ACCEPTED", "PRINTED", "PRINT_FAILED"].includes(k.status)).length;
-        const prepCount = activeKots.filter((k) => k.status === "PREPARING").length;
-        const readyCount = activeKots.filter((k) => k.status === "READY").length;
-        const urgentCount = activeKots.filter((k) => k.priority === "URGENT" || k.priority === "HIGH").length;
+        const list = Array.isArray(kots) ? kots : [];
+        const newCount = list.filter((k) => ["PENDING", "ACCEPTED", "PRINTED"].includes(k.status)).length;
+        const prepCount = list.filter((k) => k.status === "PREPARING").length;
+        const readyCount = list.filter((k) => k.status === "READY").length;
+        const urgentCount = list.filter((k) => k.priority === "URGENT" && k.status !== "SERVED" && k.status !== "CANCELLED").length;
 
         let overdueCount = 0;
-        let totalElapsed = 0;
-        activeKots.forEach((k) => {
-            const sla = getSlaStatus(k.createdAt, k.estimatedPrepTimeMinutes);
-            if (k.status !== "READY" && sla.label === "OVERDUE") overdueCount++;
-            totalElapsed += sla.elapsed;
+        list.forEach((k) => {
+            if (k.status !== "SERVED" && k.status !== "CANCELLED") {
+                const sla = getSlaStatus(k.createdAt, k.estimatedPrepTimeMinutes);
+                if (sla.label === "OVERDUE") overdueCount += 1;
+            }
         });
 
-        const avgPrepMins = activeKots.length > 0 ? Math.round(totalElapsed / activeKots.length) : 0;
-
         return {
-            totalActive: activeKots.length,
             newCount,
             prepCount,
             readyCount,
             urgentCount,
             overdueCount,
-            avgPrepMins,
         };
     }, [kots]);
 
@@ -514,35 +726,76 @@ export default function Kitchen() {
                     <div>
                         <div className="flex items-center gap-2">
                             <ChefHat className="text-orange-500" size={22} />
-                            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{titleLabel}</h1>
+                            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                                {titleLabel} <span className="text-xs font-normal text-slate-500">(Kitchen Operations KDS)</span>
+                            </h1>
                             <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
                                 {restaurantName}
                             </span>
                         </div>
                         <p className="mt-0.5 text-xs text-slate-500">
-                            Multi-station order routing · Real-time preparation SLAs · Kitchen Display System
+                            Authoritative Chef Dispatcher · Dynamic Self-Pick · Live Workloads & SLAs
                         </p>
                     </div>
 
-                    {/* Workload Metric Chips & Actions */}
+                    {/* Mode Toggle & Header Actions */}
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs">
-                            <span className="text-slate-500 font-medium">NEW:</span>
-                            <strong className="text-slate-900 font-bold">{metrics.newCount}</strong>
-                            <span className="text-slate-300">|</span>
-                            <span className="text-slate-500 font-medium">PREP:</span>
-                            <strong className="text-orange-600 font-bold">{metrics.prepCount}</strong>
-                            <span className="text-slate-300">|</span>
-                            <span className="text-slate-500 font-medium">READY:</span>
-                            <strong className="text-emerald-600 font-bold">{metrics.readyCount}</strong>
-                            <span className="text-slate-300">|</span>
-                            <span className="text-slate-500 font-medium">OVERDUE:</span>
-                            <strong className={`font-bold ${metrics.overdueCount > 0 ? "text-red-600 font-extrabold" : "text-slate-900"}`}>{metrics.overdueCount}</strong>
+                        {/* Assignment Mode Controls */}
+                        <div className="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-100 text-xs">
+                            <button
+                                type="button"
+                                disabled={updatingConfig}
+                                onClick={() => handleUpdateMode("DISPATCHER")}
+                                className={`rounded-md px-2.5 py-1 text-xs font-bold transition ${
+                                    kitchenConfig.mode === "DISPATCHER"
+                                        ? "bg-orange-500 text-white shadow-xs"
+                                        : "text-slate-600 hover:text-slate-900"
+                                }`}
+                            >
+                                DISPATCHER
+                            </button>
+                            <button
+                                type="button"
+                                disabled={updatingConfig}
+                                onClick={() => handleUpdateMode("SELF_PICK")}
+                                className={`rounded-md px-2.5 py-1 text-xs font-bold transition ${
+                                    kitchenConfig.mode === "SELF_PICK"
+                                        ? "bg-emerald-600 text-white shadow-xs"
+                                        : "text-slate-600 hover:text-slate-900"
+                                }`}
+                            >
+                                SELF-PICK
+                            </button>
                         </div>
+
+                        {/* Scope Controls when SELF_PICK */}
+                        {kitchenConfig.mode === "SELF_PICK" && (
+                            <div className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50/60 p-0.5 text-xs animate-fade-in">
+                                <span className="text-[10px] font-bold text-emerald-800 px-1.5 uppercase">Scope:</span>
+                                {["ITEMS", "KOTS", "BOTH"].map((scp) => (
+                                    <button
+                                        key={scp}
+                                        type="button"
+                                        disabled={updatingConfig}
+                                        onClick={() => handleUpdateScope(scp)}
+                                        className={`rounded-md px-2 py-0.5 text-[11px] font-extrabold transition ${
+                                            kitchenConfig.scope === scp
+                                                ? "bg-emerald-600 text-white shadow-xs"
+                                                : "text-emerald-700 hover:bg-emerald-200/50"
+                                        }`}
+                                    >
+                                        {scp}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
 
                         <button
                             type="button"
-                            onClick={() => loadKots({ silent: true })}
+                            onClick={() => {
+                                loadKots({ silent: true });
+                                loadWorkload();
+                            }}
                             disabled={refreshing}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition shadow-sm"
                         >
@@ -559,13 +812,6 @@ export default function Kitchen() {
                             {soundMuted ? "Muted" : "Alert On"}
                         </button>
 
-                        <Link
-                            to="/owner"
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm"
-                        >
-                            Dashboard
-                        </Link>
-
                         {/* Notifications Button */}
                         <button
                             type="button"
@@ -581,7 +827,7 @@ export default function Kitchen() {
                             className={`relative flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
                                 viewMode === "NOTIFICATIONS"
                                     ? "border-orange-500 bg-orange-500 text-white"
-                                    : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
+                                    : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                             }`}
                             title="Kitchen Notifications"
                         >
@@ -609,7 +855,7 @@ export default function Kitchen() {
                             className={`flex items-center gap-1.5 rounded-xl border px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
                                 viewMode === "PROFILE"
                                     ? "border-orange-500 bg-orange-500 text-white"
-                                    : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
+                                    : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                             }`}
                             title="My Profile"
                         >
@@ -662,234 +908,270 @@ export default function Kitchen() {
                 </div>
             ) : (
                 <>
-            {/* Station Filter Tabs */}
-            <div className="border-b border-slate-200 bg-white px-4 py-2 sm:px-6">
-                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 pr-1 flex items-center gap-1">
-                        <Flame size={14} className="text-orange-500" /> Stations:
-                    </span>
-                    <button
-                        type="button"
-                        onClick={() => setSelectedStationId("ALL")}
-                        className={`rounded-lg px-3 py-1 text-xs font-semibold transition shrink-0 ${
-                            selectedStationId === "ALL"
-                                ? "bg-orange-500 text-white shadow-sm"
-                                : "bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
-                        }`}
-                    >
-                        ALL STATIONS ({kots.length})
-                    </button>
-
-                    {stations.map((st) => {
-                        const count = kots.filter((k) => Number(k.stationId) === Number(st.id)).length;
-                        return (
-                            <button
-                                key={st.id}
-                                type="button"
-                                onClick={() => setSelectedStationId(String(st.id))}
-                                className={`rounded-lg px-3 py-1 text-xs font-semibold transition shrink-0 ${
-                                    selectedStationId === String(st.id)
-                                        ? "bg-orange-500 text-white shadow-sm"
-                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
-                                }`}
-                            >
-                                {st.name} ({count})
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* Filter Bar & Search */}
-            <div className="border-b border-slate-200 bg-white px-4 py-2.5 sm:px-6">
-                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <div className="flex items-center gap-1 text-slate-500 font-semibold">
-                            <Filter size={13} /> Priority:
-                        </div>
-                        <div className="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50">
-                            {PRIORITIES.map((prio) => (
-                                <button
-                                    key={prio}
-                                    type="button"
-                                    onClick={() => setSelectedPriority(prio)}
-                                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
-                                        selectedPriority === prio
-                                            ? "bg-orange-500 text-white shadow-sm"
-                                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
-                                    }`}
-                                >
-                                    {prio}
-                                </button>
-                            ))}
-                        </div>
-
-                        <span className="text-slate-300">|</span>
-
-                        <div className="flex items-center gap-1 text-slate-500 font-semibold">
-                            Status:
-                        </div>
-                        <div className="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50">
-                            {KOT_STATUSES.map((st) => (
-                                <button
-                                    key={st}
-                                    type="button"
-                                    onClick={() => setSelectedStatus(st)}
-                                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
-                                        selectedStatus === st
-                                            ? "bg-orange-500 text-white shadow-sm"
-                                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
-                                    }`}
-                                >
-                                    {st}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Instant Search Input */}
-                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-sm sm:w-64 focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500">
-                        <Search size={14} className="text-slate-400" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search KOT#, Table#, Order#..."
-                            className="w-full bg-transparent text-xs text-slate-900 placeholder-slate-400 outline-none"
+                    {/* CHEF WORKLOAD PANEL */}
+                    <div className="px-4 pt-3 sm:px-6">
+                        <ChefWorkloadPanel
+                            chefs={workload.chefs}
+                            selectedChefId={selectedChefFilter}
+                            onSelectChef={setSelectedChefFilter}
+                            unassignedCount={unassignedItemsCount}
+                            loading={loading}
                         />
-                        {searchQuery && (
-                            <button type="button" onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600">
-                                <X size={14} />
-                            </button>
+                    </div>
+
+                    {/* Filter Bar & Controls */}
+                    <div className="border-b border-slate-200 bg-white px-4 py-2.5 sm:px-6 mt-3">
+                        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                                {/* Station Filter */}
+                                <div className="flex items-center gap-1 text-slate-500 font-semibold">
+                                    Station:
+                                </div>
+                                <select
+                                    value={selectedStationId}
+                                    onChange={(e) => setSelectedStationId(e.target.value)}
+                                    className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 outline-none"
+                                >
+                                    <option value="ALL">ALL STATIONS ({kots.length})</option>
+                                    {stations.map((st) => (
+                                        <option key={st.id} value={String(st.id)}>
+                                            {st.name}
+                                        </option>
+                                    ))}
+                                </select>
+
+                                <span className="text-slate-300">|</span>
+
+                                {/* Chef Filter Dropdown */}
+                                <div className="flex items-center gap-1 text-slate-500 font-semibold">
+                                    <UserCheck size={13} className="text-orange-500" /> Chef:
+                                </div>
+                                <select
+                                    value={selectedChefFilter}
+                                    onChange={(e) => setSelectedChefFilter(e.target.value)}
+                                    className={`rounded-lg border px-2 py-1 text-xs font-bold outline-none ${
+                                        selectedChefFilter === "UNASSIGNED"
+                                            ? "border-amber-400 bg-amber-50 text-amber-800"
+                                            : selectedChefFilter !== "ALL"
+                                            ? "border-orange-400 bg-orange-50 text-orange-800"
+                                            : "border-slate-200 bg-slate-50 text-slate-700"
+                                    }`}
+                                >
+                                    <option value="ALL">ALL CHEFS</option>
+                                    <option value="UNASSIGNED">UNASSIGNED ONLY ({unassignedItemsCount})</option>
+                                    {workload.chefs.map((c) => (
+                                        <option key={c.chefId} value={String(c.chefId)}>
+                                            {c.chefName} ({c.assigned} assigned)
+                                        </option>
+                                    ))}
+                                </select>
+
+                                <span className="text-slate-300">|</span>
+
+                                {/* Priority Filter */}
+                                <div className="flex items-center gap-1 text-slate-500 font-semibold">
+                                    <Filter size={13} /> Priority:
+                                </div>
+                                <div className="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+                                    {PRIORITIES.map((prio) => (
+                                        <button
+                                            key={prio}
+                                            type="button"
+                                            onClick={() => setSelectedPriority(prio)}
+                                            className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-all ${
+                                                selectedPriority === prio
+                                                    ? "bg-orange-500 text-white shadow-xs"
+                                                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                                            }`}
+                                        >
+                                            {prio}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <span className="text-slate-300">|</span>
+
+                                {/* Status Filter */}
+                                <div className="flex items-center gap-1 text-slate-500 font-semibold">
+                                    Status:
+                                </div>
+                                <div className="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+                                    {KOT_STATUSES.map((st) => (
+                                        <button
+                                            key={st}
+                                            type="button"
+                                            onClick={() => setSelectedStatus(st)}
+                                            className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-all ${
+                                                selectedStatus === st
+                                                    ? "bg-orange-500 text-white shadow-xs"
+                                                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                                            }`}
+                                        >
+                                            {st}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Instant Search Input */}
+                            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-xs sm:w-64 focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500">
+                                <Search size={14} className="text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Search KOT#, Table#, Chef..."
+                                    className="w-full bg-transparent text-xs text-slate-900 placeholder-slate-400 outline-none"
+                                />
+                                {searchQuery && (
+                                    <button type="button" onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600">
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Main KDS Columns View */}
+                    <main className="p-4 sm:p-6">
+                        {error && (
+                            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                                {error}
+                            </div>
                         )}
-                    </div>
-                </div>
-            </div>
 
-            {/* Main KDS Columns View */}
-            <main className="p-4 sm:p-6">
-                {error && (
-                    <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-                        {error}
-                    </div>
-                )}
-
-                {loading ? (
-                    <div className="flex items-center justify-center gap-2 py-20 text-slate-500 text-sm">
-                        <LoaderCircle size={20} className="animate-spin text-orange-500" />
-                        Loading Kitchen Display System...
-                    </div>
-                ) : filteredKots.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 bg-white py-16 text-slate-500 shadow-sm">
-                        <UtensilsCrossed size={32} className="text-slate-400" />
-                        <p className="text-sm font-semibold text-slate-700">No active kitchen tickets in this view</p>
-                        <p className="text-xs text-slate-400">Incoming tickets will split to station queues in real time.</p>
-                    </div>
-                ) : (
-                    <div className="grid gap-6 lg:grid-cols-3 items-start">
-                        {/* COLUMN 1: NEW / PENDING */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                                <div className="flex items-center gap-2">
-                                    <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                                    <h2 className="font-bold text-xs uppercase tracking-wider text-slate-800">NEW ORDERS</h2>
-                                </div>
-                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-200">
-                                    {groupedKots.NEW.length}
-                                </span>
+                        {loading ? (
+                            <div className="flex items-center justify-center gap-2 py-20 text-slate-500 text-sm">
+                                <LoaderCircle size={20} className="animate-spin text-orange-500" />
+                                Loading Kitchen Display System...
                             </div>
-
-                            <div className="space-y-3">
-                                {groupedKots.NEW.map((kot) => (
-                                    <KotCard
-                                        key={kot.id}
-                                        kot={kot}
-                                        updatingKotId={updatingKotId}
-                                        reprintingKotId={reprintingKotId}
-                                        onUpdateKotStatus={handleUpdateKotStatus}
-                                        onUpdateItemStatus={handleUpdateItemStatus}
-                                        onUpdatePriority={handleUpdatePriority}
-                                        onReprintKot={handleReprintKot}
-                                    />
-                                ))}
-                                {groupedKots.NEW.length === 0 && (
-                                    <div className="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-400 italic">
-                                        No new tickets waiting
+                        ) : filteredKots.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 bg-white py-16 text-slate-500 shadow-sm">
+                                <UtensilsCrossed size={32} className="text-slate-400" />
+                                <p className="text-sm font-semibold text-slate-700">No active kitchen tickets match this filter</p>
+                                <p className="text-xs text-slate-400">Try switching your chef filter, priority, or search parameters.</p>
+                            </div>
+                        ) : (
+                            <div className="grid gap-6 lg:grid-cols-3 items-start">
+                                {/* COLUMN 1: NEW / PENDING */}
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                                            <h2 className="font-bold text-xs uppercase tracking-wider text-slate-800">NEW ORDERS</h2>
+                                        </div>
+                                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-200">
+                                            {groupedKots.NEW.length}
+                                        </span>
                                     </div>
-                                )}
-                            </div>
-                        </div>
 
-                        {/* COLUMN 2: PREPARING */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                                <div className="flex items-center gap-2">
-                                    <Flame size={14} className="text-orange-500" />
-                                    <h2 className="font-bold text-xs uppercase tracking-wider text-slate-800">PREPARING</h2>
-                                </div>
-                                <span className="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-700 border border-orange-200">
-                                    {groupedKots.PREPARING.length}
-                                </span>
-                            </div>
-
-                            <div className="space-y-3">
-                                {groupedKots.PREPARING.map((kot) => (
-                                    <KotCard
-                                        key={kot.id}
-                                        kot={kot}
-                                        updatingKotId={updatingKotId}
-                                        reprintingKotId={reprintingKotId}
-                                        onUpdateKotStatus={handleUpdateKotStatus}
-                                        onUpdateItemStatus={handleUpdateItemStatus}
-                                        onUpdatePriority={handleUpdatePriority}
-                                        onReprintKot={handleReprintKot}
-                                    />
-                                ))}
-                                {groupedKots.PREPARING.length === 0 && (
-                                    <div className="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-400 italic">
-                                        No tickets in preparation
+                                    <div className="space-y-3">
+                                        {groupedKots.NEW.map((kot) => (
+                                            <KotCard
+                                                key={kot.id}
+                                                kot={kot}
+                                                updatingKotId={updatingKotId}
+                                                reprintingKotId={reprintingKotId}
+                                                onUpdateKotStatus={handleUpdateKotStatus}
+                                                onUpdateItemStatus={handleUpdateItemStatus}
+                                                onUpdatePriority={handleUpdatePriority}
+                                                onReprintKot={handleReprintKot}
+                                                onOpenAssignDrawer={handleOpenAssignDrawer}
+                                            />
+                                        ))}
+                                        {groupedKots.NEW.length === 0 && (
+                                            <div className="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-400 italic">
+                                                No new tickets waiting
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* COLUMN 3: READY */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle2 size={14} className="text-emerald-600" />
-                                    <h2 className="font-bold text-xs uppercase tracking-wider text-slate-800">READY FOR PASS</h2>
                                 </div>
-                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
-                                    {groupedKots.READY.length}
-                                </span>
-                            </div>
 
-                            <div className="space-y-3">
-                                {groupedKots.READY.map((kot) => (
-                                    <KotCard
-                                        key={kot.id}
-                                        kot={kot}
-                                        updatingKotId={updatingKotId}
-                                        reprintingKotId={reprintingKotId}
-                                        onUpdateKotStatus={handleUpdateKotStatus}
-                                        onUpdateItemStatus={handleUpdateItemStatus}
-                                        onUpdatePriority={handleUpdatePriority}
-                                        onReprintKot={handleReprintKot}
-                                    />
-                                ))}
-                                {groupedKots.READY.length === 0 && (
-                                    <div className="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-400 italic">
-                                        No tickets marked ready
+                                {/* COLUMN 2: PREPARING */}
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <Flame size={14} className="text-orange-500" />
+                                            <h2 className="font-bold text-xs uppercase tracking-wider text-slate-800">PREPARING</h2>
+                                        </div>
+                                        <span className="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-700 border border-orange-200">
+                                            {groupedKots.PREPARING.length}
+                                        </span>
                                     </div>
-                                )}
+
+                                    <div className="space-y-3">
+                                        {groupedKots.PREPARING.map((kot) => (
+                                            <KotCard
+                                                key={kot.id}
+                                                kot={kot}
+                                                updatingKotId={updatingKotId}
+                                                reprintingKotId={reprintingKotId}
+                                                onUpdateKotStatus={handleUpdateKotStatus}
+                                                onUpdateItemStatus={handleUpdateItemStatus}
+                                                onUpdatePriority={handleUpdatePriority}
+                                                onReprintKot={handleReprintKot}
+                                                onOpenAssignDrawer={handleOpenAssignDrawer}
+                                            />
+                                        ))}
+                                        {groupedKots.PREPARING.length === 0 && (
+                                            <div className="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-400 italic">
+                                                No tickets in preparation
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* COLUMN 3: READY */}
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <CheckCircle2 size={14} className="text-emerald-500" />
+                                            <h2 className="font-bold text-xs uppercase tracking-wider text-slate-800">READY</h2>
+                                        </div>
+                                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
+                                            {groupedKots.READY.length}
+                                        </span>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {groupedKots.READY.map((kot) => (
+                                            <KotCard
+                                                key={kot.id}
+                                                kot={kot}
+                                                updatingKotId={updatingKotId}
+                                                reprintingKotId={reprintingKotId}
+                                                onUpdateKotStatus={handleUpdateKotStatus}
+                                                onUpdateItemStatus={handleUpdateItemStatus}
+                                                onUpdatePriority={handleUpdatePriority}
+                                                onReprintKot={handleReprintKot}
+                                                onOpenAssignDrawer={handleOpenAssignDrawer}
+                                            />
+                                        ))}
+                                        {groupedKots.READY.length === 0 && (
+                                            <div className="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-400 italic">
+                                                No tickets marked ready
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                )}
-            </main>
+                        )}
+                    </main>
                 </>
             )}
+
+            {/* Kitchen Assignment Drawer */}
+            <KitchenAssignmentDrawer
+                isOpen={isDrawerOpen}
+                onClose={() => setIsDrawerOpen(false)}
+                kot={drawerKot}
+                chefs={workload.chefs}
+                onAssignItem={handleAssignItem}
+                onBulkAssign={handleBulkAssign}
+                onAssignKot={handleAssignKot}
+                onReassign={handleReassignItem}
+                isSubmitting={isSubmittingAssignment}
+            />
 
             {/* Sound Notification Modal */}
             {soundModalOpen ? (
@@ -955,7 +1237,7 @@ export default function Kitchen() {
 }
 
 /**
- * Individual KOT Card Component
+ * Individual KOT Card Component with Item-Level Chef Assignment UI
  */
 function KotCard({
     kot,
@@ -965,11 +1247,15 @@ function KotCard({
     onUpdateItemStatus,
     onUpdatePriority,
     onReprintKot,
+    onOpenAssignDrawer,
 }) {
     const sla = getSlaStatus(kot.createdAt, kot.estimatedPrepTimeMinutes);
     const orderSource = kot.order?.orderSource || "POS";
     const items = Array.isArray(kot.items) ? kot.items : [];
     const isUrgent = kot.priority === "URGENT";
+
+    const assignedCount = items.filter((it) => it.assignedChefId).length;
+    const allAssigned = items.length > 0 && assignedCount === items.length;
 
     return (
         <article
@@ -979,17 +1265,26 @@ function KotCard({
                     : "border-slate-200 bg-white hover:border-slate-300"
             }`}
         >
-            {/* Header: Ticket No, Station, Priority, Source */}
+            {/* Header: Ticket No, Station, Priority, Source & Assignment Badge */}
             <div className="border-b border-slate-100 p-3.5 pb-2.5">
                 <div className="flex items-start justify-between gap-2">
                     <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-mono text-base font-bold text-slate-900">{kot.kotNo}</span>
                             <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${sourceBadgeClass(orderSource)}`}>
                                 {orderSource}
                             </span>
                             <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${priorityBadgeClass(kot.priority)}`}>
                                 {kot.priority || "NORMAL"}
+                            </span>
+                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold border ${
+                                allAssigned
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : assignedCount > 0
+                                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                                    : "bg-slate-100 text-slate-600 border-slate-200"
+                            }`}>
+                                {assignedCount}/{items.length} Assigned
                             </span>
                         </div>
                         <p className="mt-1 text-xs text-slate-600 font-medium">
@@ -998,15 +1293,21 @@ function KotCard({
                         </p>
                     </div>
 
-                    {/* SLA Prep Timer Badge */}
-                    <div className="text-right">
+                    {/* SLA Prep Timer Badge & Assign Button */}
+                    <div className="text-right flex flex-col items-end gap-1">
                         <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${sla.badgeClass}`}>
                             <Clock3 size={11} />
                             {sla.label} ({sla.elapsed}m / {kot.estimatedPrepTimeMinutes || 15}m)
                         </span>
-                        <p className="mt-1 text-[10px] text-slate-400">
-                            {new Date(kot.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </p>
+
+                        <button
+                            type="button"
+                            onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2 py-0.5 rounded transition border border-orange-200"
+                        >
+                            <ChefHat size={12} />
+                            Assign
+                        </button>
                     </div>
                 </div>
 
@@ -1017,12 +1318,13 @@ function KotCard({
                 )}
             </div>
 
-            {/* Items Checklist - minimal horizontal rows, no heavy nested card boxes */}
+            {/* Items Checklist with Chef Assignment Chips */}
             <div className="divide-y divide-slate-100 px-3.5 py-1">
                 {items.map((it) => {
                     const isCancelled = it.status === "CANCELLED";
                     const isReady = it.status === "READY";
                     const isPrep = it.status === "PREPARING";
+                    const isAssigned = Boolean(it.assignedChefId);
 
                     return (
                         <div
@@ -1031,17 +1333,40 @@ function KotCard({
                                 isCancelled ? "opacity-50" : ""
                             }`}
                         >
-                            <div className="space-y-0.5">
-                                <div className="flex items-center gap-1.5 text-sm">
-                                    <span className="text-orange-600 font-bold">{it.qty}×</span>
+                            <div className="space-y-0.5 min-w-0">
+                                <div className="flex items-center gap-1.5 text-sm flex-wrap">
+                                    <span className="text-orange-600 font-bold">{it.qty || it.quantity || 1}×</span>
                                     <span className={`text-slate-900 font-medium ${isCancelled ? "line-through text-slate-400" : ""}`}>
-                                        {it.itemName}
+                                        {it.itemName || it.name}
                                     </span>
+
+                                    {/* Assignment Chip */}
+                                    {isAssigned ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
+                                            className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 hover:bg-orange-100 hover:text-orange-800 transition flex items-center gap-1 border border-slate-200"
+                                            title="Click to reassign"
+                                        >
+                                            <ChefHat size={10} className="text-orange-500" />
+                                            <span>{it.assignedChefName || `Chef #${it.assignedChefId}`}</span>
+                                            <span className="text-[9px] text-slate-400">({it.assignmentSource === "SELF_PICKED" ? "SELF" : "DISP"})</span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
+                                            className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition"
+                                            title="Click to assign"
+                                        >
+                                            UNASSIGNED
+                                        </button>
+                                    )}
                                 </div>
 
-                                {it.variantName && (
+                                {(it.variantName || it.variant) && (
                                     <div className="text-[11px] text-slate-500">
-                                        Variant: <span className="text-slate-700 font-medium">{it.variantName}</span>
+                                        Variant: <span className="text-slate-700 font-medium">{it.variantName || it.variant}</span>
                                     </div>
                                 )}
 

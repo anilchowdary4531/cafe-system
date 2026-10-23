@@ -19,6 +19,7 @@ export const DESIGNATION_OPTIONS = [
     "Cashier",
     "Steward",
     "Cleaner",
+    "Other / Custom",
 ];
 
 export const ACCESS_LABELS = {
@@ -50,6 +51,9 @@ export const DEFAULT_DESIGNATION_BY_ROLE = {
     WAITER: "Server",
     CHEF: "Chef",
     CASHIER: "Cashier",
+    STEWARD: "Steward",
+    CLEANER: "Cleaner",
+    SWIPER: "Swiper",
     STAFF: "Staff",
     OWNER: "Owner",
 };
@@ -75,7 +79,7 @@ export const defaultAccessByRole = (role) => {
             loyalty: false, staff: false, settings: false, notifications: true,
         };
     }
-    if (normalizedRole === "WAITER") {
+    if (normalizedRole === "WAITER" || normalizedRole === "SERVER") {
         return {
             dashboard: true, billing: true, orders: true, menu: true, inventory: false, tables: true,
             kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false,
@@ -85,10 +89,34 @@ export const defaultAccessByRole = (role) => {
     }
     if (normalizedRole === "CASHIER") {
         return {
-            dashboard: true, billing: true, orders: true, menu: false, inventory: false, tables: false,
+            dashboard: true, billing: true, orders: true, menu: false, inventory: false, tables: true,
             kitchen: false, printers: true, analytics: true, reports: true, paylater: true, shifts: true,
-            supply: false, delivery: false, delivery_partners: false, customers: true, discounts: true,
+            supply: false, delivery: false, delivery_partners: false, customers: true, discounts: false,
             loyalty: true, staff: false, settings: false, notifications: true,
+        };
+    }
+    if (normalizedRole === "STEWARD") {
+        return {
+            dashboard: true, billing: false, orders: false, menu: false, inventory: false, tables: true,
+            kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false,
+            supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false,
+            loyalty: false, staff: false, settings: false, notifications: true,
+        };
+    }
+    if (normalizedRole === "CLEANER") {
+        return {
+            dashboard: true, billing: false, orders: false, menu: false, inventory: false, tables: true,
+            kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false,
+            supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false,
+            loyalty: false, staff: false, settings: false, notifications: true,
+        };
+    }
+    if (normalizedRole === "SWIPER") {
+        return {
+            dashboard: true, billing: true, orders: false, menu: false, inventory: false, tables: true,
+            kitchen: false, printers: true, analytics: false, reports: false, paylater: false, shifts: false,
+            supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false,
+            loyalty: false, staff: false, settings: false, notifications: true,
         };
     }
     return {

@@ -120,8 +120,15 @@ import NewOrder from "./pages/admin/NewOrder.jsx";
 import PaymentSuccess from "./pages/admin/PaymentSuccess.jsx";
 import Kitchen from "./pages/Kitchen.jsx";
 import KitchenChefDetail from "./pages/KitchenChefDetail.jsx";
-import StaffProfile from "./pages/StaffProfile.jsx";
+import StaffProfile from "./pages/StaffProfile";
 import Server from "./pages/Server.jsx";
+import StewardStation from "./pages/staff/StewardStation.jsx";
+import CashierStation from "./pages/staff/CashierStation.jsx";
+import CleanerStation from "./pages/staff/CleanerStation.jsx";
+import SwiperStation from "./pages/staff/SwiperStation.jsx";
+import CustomWorkspace from "./pages/staff/CustomWorkspace.jsx";
+import StaffProfileView from "./components/StaffProfileView.jsx";
+import StaffNotificationsView from "./components/StaffNotificationsView.jsx";
 
 import PrinterSettings from "./pages/admin/PrinterSettings.jsx";
 import KotHistoryPage from "./pages/admin/KotHistoryPage.jsx";
@@ -493,6 +500,66 @@ export default function App() {
                         element={
                             <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CASHIER"]}>
                                 <Server />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* ================================= */}
+                    {/* STAFF STATIONS & WORKSPACES (Designations 4-9) */}
+                    {/* ================================= */}
+                    <Route
+                        path="/staff/steward"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "STEWARD", "STAFF"]}>
+                                <StewardStation />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/staff/cashier"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CASHIER", "STAFF"]}>
+                                <CashierStation />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/staff/cleaner"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CLEANER", "STEWARD", "STAFF"]}>
+                                <CleanerStation />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/staff/swiper"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "SWIPER", "CASHIER", "WAITER", "STAFF"]}>
+                                <SwiperStation />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/staff/workspace"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "STAFF", "STEWARD", "CLEANER", "SWIPER", "CASHIER", "WAITER", "CHEF"]}>
+                                <CustomWorkspace />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/staff/profile"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STEWARD", "CLEANER", "SWIPER", "STAFF"]}>
+                                <StaffProfileView />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/staff/notifications"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STEWARD", "CLEANER", "SWIPER", "STAFF"]}>
+                                <StaffNotificationsView />
                             </ProtectedRoute>
                         }
                     />

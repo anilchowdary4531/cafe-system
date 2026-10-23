@@ -39,10 +39,13 @@ export function normalizeCanonicalTable(raw, defaultRestaurantId = null) {
 
     const isBlocked = Boolean(raw.isBlocked);
     const isReserved = !isBlocked && !raw.isOccupied && Boolean(raw.activeReservation || raw.isReserved);
+    const cleaningStatus = raw.cleaningStatus || (raw.status === "DIRTY" ? "DIRTY" : "CLEAN");
 
     let canonicalStatus = hasStatus ? String(raw.status).toUpperCase() : undefined;
     if (isBlocked) {
         canonicalStatus = "BLOCKED";
+    } else if (cleaningStatus === "DIRTY" && !raw.isOccupied) {
+        canonicalStatus = "DIRTY";
     } else if (canonicalStatus === undefined && isExplicitlyFree) {
         canonicalStatus = isReserved ? "RESERVED" : "AVAILABLE";
     } else if (raw.isOccupied) {
@@ -83,6 +86,7 @@ export function normalizeCanonicalTable(raw, defaultRestaurantId = null) {
         tableNo,
         isBlocked,
         isReserved,
+        cleaningStatus,
         blockReason: raw.blockReason || null,
         blockedAt: raw.blockedAt || null,
         blockedByName: raw.blockedByName || null,
@@ -215,6 +219,8 @@ export function TableStateProvider({ children }) {
 
     // Track active fetch request IDs to prevent out-of-order race conditions
     const fetchSeqRef = useRef(0);
+    const tablesMapRef = useRef(tablesMap);
+    tablesMapRef.current = tablesMap;
 
     const tables = useMemo(() => {
         return Array.from(tablesMap.values()).sort((a, b) => {
@@ -291,14 +297,14 @@ export function TableStateProvider({ children }) {
         const reqTimestamp = Date.now();
 
         try {
-            if (force || tablesMap.size === 0) {
+            if (force || tablesMapRef.current.size === 0) {
                 setLoading(true);
             }
             setError(null);
 
             const res = await axios.get(`${API}/owner/${restaurantId}/tables`);
             if (seq !== fetchSeqRef.current) {
-                return tables; // Discard superseded request
+                return Array.from(tablesMapRef.current.values()); // Discard superseded request
             }
 
             const rawList = Array.isArray(res.data?.tables)
@@ -329,7 +335,7 @@ export function TableStateProvider({ children }) {
                 setLoading(false);
             }
         }
-    }, [restaurantId, reconcileIncomingTables, tables, tablesMap.size]);
+    }, [restaurantId, reconcileIncomingTables]);
 
     // Initial fetch on mount or restaurantId change
     useEffect(() => {

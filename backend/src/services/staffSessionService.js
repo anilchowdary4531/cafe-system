@@ -12,13 +12,16 @@ export const inferRoleFromDesignation = (designation) => {
 
   if (!text) return null;
 
-  if (text.includes("SERVER") || text.includes("WAITER") || text.includes("STEWARD")) {
+  if (text.includes("STEWARD")) return "STEWARD";
+  if (text.includes("CLEANER")) return "CLEANER";
+  if (text.includes("SWIPER")) return "SWIPER";
+  if (text.includes("CASHIER")) return "CASHIER";
+  if (text.includes("SERVER") || text.includes("WAITER")) {
     return "WAITER";
   }
 
   if (text.includes("CHEF")) return "CHEF";
   if (text.includes("MANAGER")) return "MANAGER";
-  if (text.includes("CASHIER")) return "CASHIER";
   if (text.includes("OWNER")) return "OWNER";
   if (text.includes("SUPER ADMIN")) return "SUPER_ADMIN";
 

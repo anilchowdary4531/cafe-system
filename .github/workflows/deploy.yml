@@ -26,8 +26,20 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             cd backend
+            if [ -f .env ]; then
+              if grep -q "^NODE_ENV=" .env; then
+                sed -i 's/^NODE_ENV=.*/NODE_ENV=production/' .env
+              else
+                echo "NODE_ENV=production" >> .env
+              fi
+            else
+              echo "NODE_ENV=production" >> .env
+            fi
+            sudo sed -i 's/NODE_ENV=development/NODE_ENV=production/g' /etc/systemd/system/tiffzy.service 2>/dev/null || true
+            sudo systemctl daemon-reload 2>/dev/null || true
             npm install
             npx prisma generate
+            npx prisma migrate deploy || true
             npx prisma db push --accept-data-loss=false || true
             sudo systemctl restart tiffzy
             sudo systemctl is-active --quiet tiffzy

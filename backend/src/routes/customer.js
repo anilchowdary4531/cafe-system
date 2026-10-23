@@ -588,14 +588,24 @@ export default async function customerRoutes(app, deps = {}) {
         });
 
         if (diningTable) {
-          const session = await getOrCreateActiveSession({
-            prisma,
-            restaurantId: restaurant.id,
-            tableId: diningTable.id,
-            guestCount: 1,
-          });
-          if (session) {
-            activeTableSessionId = session.id;
+          try {
+            const session = await getOrCreateActiveSession({
+              prisma,
+              restaurantId: restaurant.id,
+              tableId: diningTable.id,
+              guestCount: 1,
+            });
+            if (session) {
+              activeTableSessionId = session.id;
+            }
+          } catch (sessionErr) {
+            if (sessionErr?.code === "table_dirty") {
+              return reply.code(400).send({
+                message: sessionErr.message,
+                code: "table_dirty",
+              });
+            }
+            throw sessionErr;
           }
         }
       }

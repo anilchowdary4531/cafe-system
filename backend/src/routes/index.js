@@ -29,10 +29,12 @@ import deliveryRoutes from "./delivery.routes.js";
 import qrRoutes from "./qr.routes.js";
 import staffManagementRoutes from "./staffManagement.js";
 import restaurantLocationRoutes from "./restaurantLocation.routes.js";
+import staffTaskRoutes from "./staffTasks.routes.js";
 
 // Single route entrypoint to keep server.js simple.
 export default async function routes(app, deps) {
   await healthRoutes(app, deps);
+  await staffTaskRoutes(app, deps);
   await qrRoutes(app, deps);
   await restaurantLocationRoutes(app, deps);
   await supplierAuthRoutes(app, deps);

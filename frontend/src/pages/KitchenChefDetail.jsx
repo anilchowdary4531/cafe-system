@@ -1,993 +1,589 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
-    ArrowLeft,
-    Ban,
-    Bell,
-    BellOff,
-    CheckCircle2,
-    ChefHat,
-    Clock,
-    Flame,
-    History,
-    LoaderCircle,
-    MoreVertical,
-    RefreshCw,
-    Sparkles,
-    UtensilsCrossed,
-    Volume2,
-    VolumeX,
-    X,
-    User,
-    Check,
+  ArrowLeft,
+  ChefHat,
+  Clock,
+  Flame,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  UtensilsCrossed,
+  Sparkles,
+  ShieldAlert,
+  Inbox,
+  Check,
+  Play,
+  Layers,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
-import { resolveEffectiveStaffRole } from "../utils/staffRole";
-import useKitchenLiveBoardData from "../hooks/useKitchenLiveBoardData";
-import NotificationSoundPicker from "../components/NotificationSoundPicker";
-import { playNotificationSound } from "../utils/soundPlayer";
-import {
-    buildKitchenTicketRows,
-    appendKitchenAssignmentHistory,
-    createKitchenAssignmentHistoryEntry,
-    formatKitchenAge,
-    formatKitchenMoney,
-    getKitchenAssignmentHistoryStorageKey,
-    getKitchenAssignmentsStorageKey,
-    getKitchenMinutesSince,
-    isLiveKitchenStatus,
-    readKitchenAssignmentHistory,
-    readKitchenAssignments,
-    writeKitchenAssignments,
-} from "../utils/kitchenBoardStorage";
+import { api } from "../utils/apiClient";
 import { showToast } from "../utils/toast";
 
-const CHEF_PALETTES = [
-    { avatarBg: "from-amber-500 to-orange-600", avatarText: "text-white", glow: "shadow-amber-500/20", ring: "border-amber-500/30" },
-    { avatarBg: "from-orange-500 to-amber-600", avatarText: "text-white", glow: "shadow-orange-500/20", ring: "border-orange-500/30" },
-    { avatarBg: "from-yellow-500 to-amber-600", avatarText: "text-black", glow: "shadow-yellow-500/20", ring: "border-yellow-500/30" },
-    { avatarBg: "from-amber-600 to-red-600", avatarText: "text-white", glow: "shadow-red-500/20", ring: "border-red-500/30" },
-];
-
-const ACTION_BADGES = {
-    ASSIGNED: { bg: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", label: "Assigned" },
-    REASSIGNED: { bg: "bg-amber-500/10 text-amber-400 border-amber-500/20", label: "Reassigned" },
-    UNASSIGNED: { bg: "bg-zinc-800 text-zinc-400 border-zinc-700", label: "Unassigned" },
-    COMPLETED: { bg: "bg-teal-500/10 text-teal-300 border-teal-500/20", label: "Completed" },
-    DECLINED: { bg: "bg-red-500/10 text-red-500 border-red-500/20", label: "Declined" },
-};
-
-const getTimeLabel = (value) => {
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "-";
-    return d.toLocaleString([], {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-    });
-};
-
-const getRelativeLabel = (timestamp) => {
-    const age = formatKitchenAge(getKitchenMinutesSince(timestamp));
-    if (!age || age === "-") return "-";
-    return age === "just now" ? age : `${age} ago`;
-};
-
-function CompactMetricPill({ icon: Icon, label, value, colorClass = "text-amber-500" }) {
-    return (
-        <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-1.5 text-xs font-bold shadow-xs">
-            <Icon size={14} className={colorClass} />
-            <span className="theme-muted text-[11px] font-semibold">{label}:</span>
-            <span className="font-extrabold text-[var(--app-text)]">{value}</span>
-        </div>
-    );
-}
-
-function ModernTicketCard({
-    ticket,
-    chef,
-    chefLabel,
-    onAction,
-    onDecline,
-    actionLabel = "Complete",
-    actionIcon = <CheckCircle2 size={15} />,
-    isPickAction = false,
-}) {
-    const [menuOpen, setMenuOpen] = useState(false);
-    const menuRef = useRef(null);
-
-    useEffect(() => {
-        if (!menuOpen) return undefined;
-        const handleClickOutside = (e) => {
-            if (menuRef.current && !menuRef.current.contains(e.target)) {
-                setMenuOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [menuOpen]);
-
-    return (
-        <article className="group relative border-b border-[var(--app-border)]/50 py-2.5 last:border-b-0 transition-colors duration-150">
-            <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="rounded-md bg-[color-mix(in_srgb,var(--app-primary)_18%,transparent)] px-2 py-0.5 text-xs font-black text-[var(--app-primary)]">
-                            {ticket.qty}x
-                        </span>
-                        <h4 className="font-extrabold text-base text-[var(--app-text)] truncate tracking-tight group-hover:text-[var(--app-primary)] transition duration-200">
-                            {ticket.itemName}
-                        </h4>
-                        <span className="text-sm font-black theme-price tabular-nums">
-                            {formatKitchenMoney(ticket.lineTotal)}
-                        </span>
-                    </div>
-
-                    <div className="mt-1.5 flex items-center gap-2 text-xs flex-wrap">
-                        <span className="font-bold text-[11px] theme-muted">
-                            {ticket.orderRef}
-                        </span>
-                        {ticket.tableNo && (
-                            <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                                Table {ticket.tableNo}
-                            </span>
-                        )}
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-500">
-                            <Clock size={12} />
-                            {ticket.ageText}
-                        </span>
-                        <span className="text-[10px] font-extrabold uppercase tracking-widest theme-muted">
-                            • <span className="text-emerald-500 font-bold">{String(ticket.orderStatus || "").replace(/_/g, " ")}</span>
-                        </span>
-                    </div>
-                </div>
-
-                <div className="text-right shrink-0 flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => onAction?.(ticket.itemKey)}
-                        className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition flex items-center gap-1.5 shadow-sm cursor-pointer ${
-                            isPickAction
-                                ? "bg-amber-500 hover:bg-amber-400 text-black"
-                                : "bg-emerald-500 hover:bg-emerald-400 text-black"
-                        }`}
-                    >
-                        {actionIcon}
-                        {actionLabel}
-                    </button>
-
-                    {/* Three Dots Options Menu */}
-                    <div className="relative" ref={menuRef}>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setMenuOpen((prev) => !prev);
-                            }}
-                            className="p-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] theme-muted hover:text-[var(--app-text)] hover:border-[var(--app-border-strong)] transition cursor-pointer flex items-center justify-center"
-                            title="More options"
-                        >
-                            <MoreVertical size={16} />
-                        </button>
-
-                        {menuOpen && (
-                            <div className="absolute right-0 top-full mt-1.5 z-50 w-44 rounded-2xl theme-modal p-1.5 shadow-xl border border-[var(--app-border)]">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setMenuOpen(false);
-                                        onDecline?.(ticket);
-                                    }}
-                                    className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-extrabold text-red-500 hover:bg-red-500/10 transition text-left cursor-pointer"
-                                >
-                                    <Ban size={14} />
-                                    <span>Decline Item</span>
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {ticket.notes ? (
-                <div className="mt-2 rounded-xl bg-[color-mix(in_srgb,var(--app-primary)_8%,transparent)] px-3 py-1.5 text-xs italic text-[var(--app-text)] flex items-start gap-1.5 border-l-2 border-[var(--app-primary)]">
-                    <Sparkles size={14} className="text-[var(--app-primary)] shrink-0 mt-0.5" />
-                    <span>"{ticket.notes}"</span>
-                </div>
-            ) : null}
-        </article>
-    );
-}
-
-function ModernHistoryCard({ entry, chef }) {
-    const badge = ACTION_BADGES[String(entry?.action || "ASSIGNED").toUpperCase()] || ACTION_BADGES.ASSIGNED;
-
-    return (
-        <article className="border-b border-[var(--app-border)]/60 py-3 last:border-b-0 transition-colors duration-150">
-            <div className="flex items-start justify-between gap-3">
-                <div>
-                    <h5 className="font-extrabold text-sm text-[var(--app-text)] tracking-tight">
-                        {entry.itemName || "Item"}
-                    </h5>
-                    <p className="mt-0.5 text-xs theme-muted">
-                        {entry.orderRef || "Order"} {entry.orderLabel ? `• ${entry.orderLabel}` : ""} {entry.qty ? `(${entry.qty}x)` : ""}
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase border ${badge.bg}`}>
-                        {badge.label}
-                    </span>
-                    <span className="text-[11px] font-bold theme-muted">
-                        {entry.chefName || chef?.name || "Chef"}
-                    </span>
-                </div>
-            </div>
-
-            <div className="mt-2 flex items-center gap-2 text-[11px] font-semibold theme-muted">
-                <span>{getTimeLabel(entry.timestamp)}</span>
-                <span>•</span>
-                <span className="text-[var(--app-primary)]">{getRelativeLabel(entry.timestamp)}</span>
-            </div>
-
-            {entry.note ? <p className="mt-1 text-xs italic theme-muted">Note: {entry.note}</p> : null}
-        </article>
-    );
-}
-
 export default function KitchenChefDetail() {
-    const { chefId: chefIdParam } = useParams();
-    const targetChefId = String(chefIdParam || "").trim();
-    const { user } = useAuth();
-    const { socket, connected, error: socketError } = useStaffSocket();
+  const { chefId } = useParams();
+  const { user } = useAuth();
+  const { socket } = useStaffSocket();
 
-    const restaurantId = Number(
-        user?.restaurantId ||
-        user?.restaurant?.id ||
-        user?.restaurant_id ||
-        localStorage.getItem("restaurantId") ||
-        localStorage.getItem("selectedRestaurantId") ||
-        localStorage.getItem("owner_restaurant_id") ||
-        1
-    );
-    const restaurantName = String(user?.restaurant?.name || "Restaurant").trim() || "Restaurant";
-    const effectiveRole = resolveEffectiveStaffRole(user?.role, user?.designation);
+  const restaurantId = Number(
+    user?.restaurantId ||
+    user?.restaurant?.id ||
+    user?.restaurant_id ||
+    localStorage.getItem("restaurantId") ||
+    1
+  );
 
-    const [assignments, setAssignments] = useState({});
-    const [assignmentsReady, setAssignmentsReady] = useState(false);
-    const [historyEntries, setHistoryEntries] = useState([]);
-    const [historyReady, setHistoryReady] = useState(false);
-    const [historyOpen, setHistoryOpen] = useState(false);
-    const [soundModalOpen, setSoundModalOpen] = useState(false);
-    const [soundMuted, setSoundMuted] = useState(() => {
-        try {
-            return localStorage.getItem("tiffzy_kitchen_sound_muted") === "true";
-        } catch {
-            return false;
+  // Security Check: line chef can only access their own station
+  const actorRole = String(user?.role || "").toUpperCase();
+  const actorDesignation = String(user?.designation || "").toLowerCase();
+  const isPrivileged =
+    actorRole === "OWNER" ||
+    actorRole === "MANAGER" ||
+    actorRole === "SUPER_ADMIN" ||
+    actorDesignation.includes("senior chef") ||
+    actorDesignation.includes("head chef") ||
+    actorDesignation.includes("executive chef");
+
+  const isAuthorized = isPrivileged || Number(user?.id) === Number(chefId);
+
+  // State
+  const [assignedItems, setAssignedItems] = useState([]);
+  const [availableWork, setAvailableWork] = useState({ mode: "DISPATCHER", scope: "ITEMS", availableItems: [], availableKots: [] });
+  const [kitchenConfig, setKitchenConfig] = useState({ mode: "DISPATCHER", scope: "ITEMS" });
+  const [chefInfo, setChefInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [actionInProgress, setActionInProgress] = useState({});
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // Fetch Chef Info, Config, Assigned Items and Available Work
+  const loadStationData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setErrorMsg("");
+
+    try {
+      // 1. Fetch Config
+      const configRes = await api.get(`/owner/${restaurantId}/kitchen/config`);
+      const cfg = configRes.data?.ok ? configRes.data : { mode: "DISPATCHER", scope: "ITEMS" };
+      setKitchenConfig(cfg);
+
+      // 2. Fetch Assigned Items for this Chef
+      const assignedRes = await api.get(`/owner/${restaurantId}/kitchen/chef/${chefId}/assigned-items`);
+      if (assignedRes.data?.ok) {
+        setAssignedItems(assignedRes.data.items || []);
+      }
+
+      // 3. Fetch Available Work if SELF_PICK
+      if (cfg.mode === "SELF_PICK") {
+        const availRes = await api.get(`/owner/${restaurantId}/kitchen/available-work`);
+        if (availRes.data?.ok) {
+          setAvailableWork(availRes.data);
         }
-    });
+      } else {
+        setAvailableWork({ mode: "DISPATCHER", scope: cfg.scope, availableItems: [], availableKots: [] });
+      }
 
-    const toggleSoundMute = () => {
-        setSoundMuted((prev) => {
-            const next = !prev;
-            try {
-                localStorage.setItem("tiffzy_kitchen_sound_muted", String(next));
-                if (!next) {
-                    playNotificationSound();
-                }
-            } catch {
-                // ignore
-            }
-            return next;
+      // 4. Fetch Chef metadata from staff list or user
+      if (Number(user?.id) === Number(chefId)) {
+        setChefInfo({
+          id: user.id,
+          name: user.name || "Chef",
+          designation: user.designation || "Chef",
         });
+      } else {
+        try {
+          const staffRes = await api.get(`/owner/${restaurantId}/staff`);
+          const staffList = Array.isArray(staffRes.data?.staff) ? staffRes.data.staff : (Array.isArray(staffRes.data) ? staffRes.data : []);
+          const target = staffList.find((s) => Number(s.id) === Number(chefId));
+          if (target) {
+            setChefInfo(target);
+          } else {
+            setChefInfo({ id: chefId, name: `Chef #${chefId}`, designation: "Chef" });
+          }
+        } catch {
+          setChefInfo({ id: chefId, name: `Chef #${chefId}`, designation: "Chef" });
+        }
+      }
+    } catch (err) {
+      console.error("[KitchenChefDetail] Load station error:", err);
+      if (err.response?.status === 403) {
+        setErrorMsg("Access denied. You can only access your own station.");
+      } else {
+        setErrorMsg(err.response?.data?.message || err?.message || "Failed to load chef station.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [restaurantId, chefId, user]);
+
+  useEffect(() => {
+    if (isAuthorized) {
+      loadStationData();
+    }
+  }, [loadStationData, isAuthorized]);
+
+  // Socket.IO Realtime Sync
+  useEffect(() => {
+    if (!socket || !isAuthorized) return;
+
+    const handleKitchenUpdate = () => {
+      loadStationData(true);
     };
 
-    const { orders, staffUsers, ordersLoading, staffLoading, refreshing, ordersError, staffError, lastSyncAt, refreshBoard } =
-        useKitchenLiveBoardData(restaurantId, socket);
+    socket.on("kitchen:config_updated", handleKitchenUpdate);
+    socket.on("kitchen:item_assigned", handleKitchenUpdate);
+    socket.on("kitchen:item_reassigned", handleKitchenUpdate);
+    socket.on("kitchen:item_self_picked", handleKitchenUpdate);
+    socket.on("kitchen:item_status_updated", handleKitchenUpdate);
+    socket.on("kot:item_updated", handleKitchenUpdate);
+    socket.on("kot:status_updated", handleKitchenUpdate);
 
-    useEffect(() => {
-        if (!restaurantId) {
-            setAssignments({});
-            setAssignmentsReady(false);
-            setHistoryEntries([]);
-            setHistoryReady(false);
-            return undefined;
-        }
+    return () => {
+      socket.off("kitchen:config_updated", handleKitchenUpdate);
+      socket.off("kitchen:item_assigned", handleKitchenUpdate);
+      socket.off("kitchen:item_reassigned", handleKitchenUpdate);
+      socket.off("kitchen:item_self_picked", handleKitchenUpdate);
+      socket.off("kitchen:item_status_updated", handleKitchenUpdate);
+      socket.off("kot:item_updated", handleKitchenUpdate);
+      socket.off("kot:status_updated", handleKitchenUpdate);
+    };
+  }, [socket, isAuthorized, loadStationData]);
 
-        setAssignments(readKitchenAssignments(restaurantId));
-        setHistoryEntries(readKitchenAssignmentHistory(restaurantId));
-        setAssignmentsReady(true);
-        setHistoryReady(true);
+  // Lifecycle Action: START PREPARING
+  const handleStartPreparing = async (item) => {
+    setActionInProgress((prev) => ({ ...prev, [item.id]: true }));
+    try {
+      await api.put(`/owner/${restaurantId}/kitchen/items/${item.id}/status`, {
+        status: "PREPARING",
+      });
+      showToast(`Started preparing: ${item.name}`, "success");
+      await loadStationData(true);
+    } catch (err) {
+      showToast(err.response?.data?.message || "Failed to update item", "error");
+    } finally {
+      setActionInProgress((prev) => ({ ...prev, [item.id]: false }));
+    }
+  };
 
-        const onStorage = (event) => {
-            if (event.key === getKitchenAssignmentsStorageKey(restaurantId)) {
-                setAssignments(readKitchenAssignments(restaurantId));
-            }
-            if (event.key === getKitchenAssignmentHistoryStorageKey(restaurantId)) {
-                setHistoryEntries(readKitchenAssignmentHistory(restaurantId));
-            }
-        };
+  // Lifecycle Action: MARK READY
+  const handleMarkReady = async (item) => {
+    setActionInProgress((prev) => ({ ...prev, [item.id]: true }));
+    try {
+      await api.put(`/owner/${restaurantId}/kitchen/items/${item.id}/status`, {
+        status: "READY",
+      });
+      showToast(`Marked ready: ${item.name}`, "success");
+      await loadStationData(true);
+    } catch (err) {
+      showToast(err.response?.data?.message || "Failed to update item", "error");
+    } finally {
+      setActionInProgress((prev) => ({ ...prev, [item.id]: false }));
+    }
+  };
 
-        window.addEventListener("storage", onStorage);
-        return () => window.removeEventListener("storage", onStorage);
-    }, [restaurantId]);
+  // Self-Pick Action: CLAIM ITEM
+  const handleClaimItem = async (item) => {
+    setActionInProgress((prev) => ({ ...prev, [`claim_item_${item.id}`]: true }));
+    try {
+      const res = await api.post(`/owner/${restaurantId}/kitchen/items/${item.id}/self-pick`);
+      if (res.data?.ok) {
+        showToast(`Claimed: ${item.name}`, "success");
+        await loadStationData(true);
+      }
+    } catch (err) {
+      if (err.response?.status === 409) {
+        showToast("This item was just claimed by another chef.", "warning");
+      } else {
+        showToast(err.response?.data?.message || "Failed to claim item", "error");
+      }
+      await loadStationData(true);
+    } finally {
+      setActionInProgress((prev) => ({ ...prev, [`claim_item_${item.id}`]: false }));
+    }
+  };
 
-    useEffect(() => {
-        if (!assignmentsReady || !restaurantId) return;
-        writeKitchenAssignments(restaurantId, assignments);
-    }, [assignments, assignmentsReady, restaurantId]);
+  // Self-Pick Action: CLAIM KOT
+  const handleClaimKot = async (kot) => {
+    setActionInProgress((prev) => ({ ...prev, [`claim_kot_${kot.id}`]: true }));
+    try {
+      const res = await api.post(`/owner/${restaurantId}/kitchen/kots/${kot.id}/self-pick`);
+      if (res.data?.ok) {
+        showToast(`Claimed KOT #${kot.kotNumber || kot.id} (${res.data.claimedCount} items)`, "success");
+        await loadStationData(true);
+      }
+    } catch (err) {
+      if (err.response?.status === 409) {
+        showToast("All items in this KOT are already claimed.", "warning");
+      } else {
+        showToast(err.response?.data?.message || "Failed to claim KOT", "error");
+      }
+      await loadStationData(true);
+    } finally {
+      setActionInProgress((prev) => ({ ...prev, [`claim_kot_${kot.id}`]: false }));
+    }
+  };
 
-    const activeOrders = useMemo(() => {
-        const list = Array.isArray(orders) ? orders.filter((order) => isLiveKitchenStatus(order?.status)) : [];
-        return list.sort(
-            (a, b) => new Date(a?.createdAt || 0).getTime() - new Date(b?.createdAt || 0).getTime()
-        );
-    }, [orders]);
-
-    const chefs = useMemo(() => {
-        const paletteByIndex = (index) => CHEF_PALETTES[index % CHEF_PALETTES.length];
-
-        return (Array.isArray(staffUsers) ? staffUsers : [])
-            .filter((staffUser) => String(staffUser?.role || "").toUpperCase() === "CHEF" && staffUser?.isActive !== false)
-            .map((staffUser, index) => ({
-                ...staffUser,
-                id: String(staffUser?.id || ""),
-                palette: paletteByIndex(index),
-            }))
-            .sort((a, b) => {
-                const aSenior = /SENIOR/i.test(String(a?.designation || ""));
-                const bSenior = /SENIOR/i.test(String(b?.designation || ""));
-                if (aSenior !== bSenior) return aSenior ? -1 : 1;
-                return String(a?.name || "").localeCompare(String(b?.name || ""), undefined, {
-                    sensitivity: "base",
-                });
-            });
-    }, [staffUsers]);
-
-    const chefById = useMemo(() => {
-        const map = new Map();
-        chefs.forEach((chef) => {
-            map.set(String(chef.id || ""), chef);
-        });
-        return map;
-    }, [chefs]);
-
-    const currentChef = useMemo(() => {
-        if (!targetChefId) return null;
-        if (chefById.has(targetChefId)) return chefById.get(targetChefId);
-
-        const rawStaff = Array.isArray(staffUsers) ? staffUsers.find((s) => String(s.id) === targetChefId) : null;
-        if (rawStaff) {
-            return {
-                ...rawStaff,
-                id: String(rawStaff.id),
-                palette: CHEF_PALETTES[0],
-            };
-        }
-
-        return {
-            id: targetChefId,
-            name: `Chef #${targetChefId}`,
-            designation: "Chef",
-            palette: CHEF_PALETTES[0],
-        };
-    }, [chefById, staffUsers, targetChefId]);
-
-    const ticketRows = useMemo(() => buildKitchenTicketRows(activeOrders), [activeOrders]);
-
-    const assignmentsPruned = useMemo(() => {
-        const next = {};
-        ticketRows.forEach((ticket) => {
-            const chefId = String(assignments?.[ticket.itemKey] || "").trim();
-            if (chefId && (chefById.has(chefId) || chefId === targetChefId)) {
-                next[ticket.itemKey] = chefId;
-            }
-        });
-        return next;
-    }, [assignments, chefById, targetChefId, ticketRows]);
-
-    useEffect(() => {
-        if (!assignmentsReady || ordersLoading || staffLoading) return;
-        if (JSON.stringify(assignments) === JSON.stringify(assignmentsPruned)) return;
-        setAssignments(assignmentsPruned);
-    }, [assignments, assignmentsPruned, assignmentsReady, ordersLoading, staffLoading]);
-
-    const currentTickets = useMemo(() => {
-        if (!targetChefId) return [];
-        return ticketRows.filter((ticket) => String(assignmentsPruned?.[ticket.itemKey] || "").trim() === targetChefId);
-    }, [assignmentsPruned, targetChefId, ticketRows]);
-
-    const availableTickets = useMemo(() => {
-        return ticketRows.filter((ticket) => !String(assignmentsPruned?.[ticket.itemKey] || "").trim());
-    }, [assignmentsPruned, ticketRows]);
-
-    const [declineModalItem, setDeclineModalItem] = useState(null);
-    const [declineReason, setDeclineReason] = useState("");
-
-    const REASON_PRESETS = [
-        "Out of stock / Ingredients missing",
-        "Kitchen station / Equipment issue",
-        "High order queue / Over capacity",
-        "Special prep request cannot be fulfilled",
-        "Customer requested cancellation",
-    ];
-
-    const handleConfirmDecline = useCallback(() => {
-        if (!declineModalItem || !declineReason.trim()) return;
-
-        const ticket = declineModalItem;
-        const reasonText = declineReason.trim();
-
-        setAssignments((prev) => {
-            const next = { ...(prev || {}) };
-            delete next[ticket.itemKey];
-            return next;
-        });
-
-        const storedEntry = appendKitchenAssignmentHistory(
-            restaurantId,
-            createKitchenAssignmentHistoryEntry({
-                action: "DECLINED",
-                item: ticket,
-                chef: currentChef,
-                note: `Declined: ${reasonText}`,
-            })
-        );
-
-        if (storedEntry) {
-            setHistoryEntries((prev) => [...prev, storedEntry]);
-        }
-
-        showToast({
-            title: "Item Declined",
-            message: `${ticket.itemName} (${ticket.orderRef}) was declined: "${reasonText}"`,
-            variant: "error",
-            durationMs: 3000,
-        });
-
-        setDeclineModalItem(null);
-        setDeclineReason("");
-    }, [currentChef, declineModalItem, declineReason, restaurantId]);
-
-    const handleCompleteTicket = useCallback(
-        (ticketKey) => {
-            const normalizedTicketKey = String(ticketKey || "").trim();
-            if (!normalizedTicketKey || !currentChef) return;
-
-            const ticket = currentTickets.find((row) => row.itemKey === normalizedTicketKey);
-            if (!ticket) return;
-
-            const historyEntry = createKitchenAssignmentHistoryEntry({
-                action: "COMPLETED",
-                item: ticket,
-                chef: currentChef,
-                note: "Marked complete",
-            });
-
-            setAssignments((prev) => {
-                const next = { ...(prev || {}) };
-                delete next[normalizedTicketKey];
-                return next;
-            });
-
-            const storedEntry = appendKitchenAssignmentHistory(restaurantId, historyEntry);
-            if (storedEntry) {
-                setHistoryEntries((prev) => [...prev, storedEntry]);
-            }
-
-            showToast({
-                title: "Item completed",
-                message: `${ticket.itemName} from ${ticket.orderRef} was marked complete.`,
-                variant: "success",
-                durationMs: 2000,
-            });
-        },
-        [currentChef, currentTickets, restaurantId]
-    );
-
-    const handlePickTicket = useCallback(
-        (ticketKey) => {
-            const normalizedTicketKey = String(ticketKey || "").trim();
-            if (!normalizedTicketKey || !currentChef || !targetChefId) return;
-
-            const ticket = ticketRows.find((row) => row.itemKey === normalizedTicketKey);
-            if (!ticket) return;
-
-            const existingChefId = String(assignmentsPruned?.[normalizedTicketKey] || "").trim();
-            if (existingChefId && existingChefId !== targetChefId) {
-                const existingChef = chefById.get(existingChefId);
-                showToast({
-                    title: "Already taken",
-                    message: `${ticket.itemName} is already assigned to ${existingChef?.name || "another chef"}.`,
-                    variant: "error",
-                    durationMs: 2200,
-                });
-                return;
-            }
-
-            const nextAssignments = {
-                ...(assignments || {}),
-                [normalizedTicketKey]: targetChefId,
-            };
-
-            setAssignments(nextAssignments);
-
-            const storedEntry = appendKitchenAssignmentHistory(
-                restaurantId,
-                createKitchenAssignmentHistoryEntry({
-                    action: "ASSIGNED",
-                    item: ticket,
-                    chef: currentChef,
-                    note: "Picked from live orders",
-                })
-            );
-            if (storedEntry) {
-                setHistoryEntries((prev) => [...prev, storedEntry]);
-            }
-
-            showToast({
-                title: "Order picked",
-                message: `${ticket.itemName} from ${ticket.orderRef} is now yours.`,
-                variant: "success",
-                durationMs: 2000,
-            });
-        },
-        [assignments, assignmentsPruned, chefById, currentChef, restaurantId, targetChefId, ticketRows]
-    );
-
-    const relevantHistory = useMemo(() => {
-        if (!targetChefId) return [];
-        return historyEntries
-            .filter((entry) => String(entry?.chefId || "") === targetChefId || String(entry?.previousChefId || "") === targetChefId)
-            .slice()
-            .sort((left, right) => new Date(right?.timestamp || 0).getTime() - new Date(left?.timestamp || 0).getTime());
-    }, [historyEntries, targetChefId]);
-
-    const metrics = useMemo(() => {
-        const liveOrdersCount = activeOrders.length;
-        const oldestMinutes = currentTickets.reduce((max, ticket) => {
-            const minutes = getKitchenMinutesSince(ticket.createdAt);
-            if (minutes === null) return max;
-            return Math.max(max, minutes);
-        }, 0);
-        const pastEvents = relevantHistory.length;
-
-        return {
-            liveOrdersCount,
-            pastEvents,
-            oldestMinutes,
-        };
-    }, [activeOrders, currentTickets, relevantHistory]);
-
-    const pageTitle = currentChef?.name || "Chef";
-    const pageDesignation = String(currentChef?.designation || "Chef").trim() || "Chef";
-
-    useEffect(() => {
-        if (!historyOpen && !soundModalOpen && !declineModalItem) return undefined;
-
-        const onKeyDown = (event) => {
-            if (event.key === "Escape") {
-                setHistoryOpen(false);
-                setSoundModalOpen(false);
-                setDeclineModalItem(null);
-                setDeclineReason("");
-            }
-        };
-
-        const previousOverflow = typeof document !== "undefined" ? document.body.style.overflow : "";
-        if (typeof document !== "undefined") {
-            document.body.style.overflow = "hidden";
-        }
-
-        window.addEventListener("keydown", onKeyDown);
-        return () => {
-            window.removeEventListener("keydown", onKeyDown);
-            if (typeof document !== "undefined") {
-                document.body.style.overflow = previousOverflow;
-            }
-        };
-    }, [historyOpen, soundModalOpen]);
-
+  // Access Denied screen if line chef attempts to access another chef's station
+  if (!isAuthorized) {
     return (
-        <div className="min-h-screen theme-page selection:bg-amber-500 selection:text-black font-sans relative overflow-x-hidden">
-            {/* Ambient Background Gradient Glows */}
-            <div className="pointer-events-none fixed -top-40 -left-40 h-96 w-96 rounded-full bg-[var(--app-primary)]/10 blur-[120px]" />
-            <div className="pointer-events-none fixed top-1/3 -right-40 h-96 w-96 rounded-full bg-[var(--app-accent)]/10 blur-[140px]" />
-
-            {/* TOP GLASS NAVIGATION BAR */}
-            <header className="sticky top-0 z-40 theme-nav border-b border-[var(--app-border)] px-3 py-2 sm:px-4">
-                <div className="w-full flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <Link
-                            to="/kitchen"
-                            className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-2.5 py-1.5 text-xs font-bold text-[var(--app-text)] transition hover:border-[var(--app-border-strong)] flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0"
-                        >
-                            <ArrowLeft size={15} />
-                            <span>Kitchen Board</span>
-                        </Link>
-
-                        <div className="flex items-center gap-2 min-w-0">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-black font-extrabold text-sm shadow-xs">
-                                <ChefHat size={18} />
-                            </div>
-                            <div className="min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                    <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-[var(--app-text)] truncate">
-                                        {pageTitle}
-                                    </h1>
-                                    <span className="rounded-md bg-[color-mix(in_srgb,var(--app-primary)_15%,transparent)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--app-primary)] shrink-0">
-                                        {pageDesignation}
-                                    </span>
-                                </div>
-                                <p className="text-[10px] theme-muted truncate">
-                                    {restaurantName} Kitchen Station
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                        {/* Compact History Button */}
-                        <button
-                            type="button"
-                            onClick={() => setHistoryOpen(true)}
-                            className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] text-[var(--app-text)] hover:border-[var(--app-primary)] px-2.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-                        >
-                            <History size={14} className="text-[var(--app-primary)]" />
-                            <span className="hidden sm:inline">History</span>
-                            <span className="rounded-full bg-amber-500/20 text-amber-500 text-[10px] px-1.5 py-0.2 font-black">{relevantHistory.length}</span>
-                        </button>
-
-                        {/* Live Socket Status */}
-                        <div className="hidden md:flex items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-2.5 py-1.5 text-xs font-bold theme-muted">
-                            <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-                            <span className="text-[11px]">{connected ? "Live" : "Offline"}</span>
-                        </div>
-
-                        {/* Order Sound Alert Trigger */}
-                        <button
-                            type="button"
-                            onClick={() => setSoundModalOpen(true)}
-                            className="rounded-xl border border-[var(--app-border-strong)] bg-[color-mix(in_srgb,var(--app-primary)_15%,transparent)] px-2.5 py-1.5 text-xs font-bold text-[var(--app-primary)] hover:bg-[color-mix(in_srgb,var(--app-primary)_25%,transparent)] transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-                        >
-                            {soundMuted ? <BellOff size={15} className="theme-muted" /> : <Bell size={15} className="animate-pulse" />}
-                            <span className="hidden lg:inline">{soundMuted ? "Muted" : "Alerts On"}</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={refreshBoard}
-                            disabled={refreshing || ordersLoading || staffLoading}
-                            className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-1.5 text-[var(--app-text)] hover:border-[var(--app-border-strong)] transition cursor-pointer"
-                            title="Refresh Board"
-                        >
-                            <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            {/* MAIN DASHBOARD CONTENT */}
-            <main className="w-full px-2 sm:px-3 py-2 space-y-3">
-                {/* COMPACT METRIC BAR */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--app-border)]/40 pb-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <CompactMetricPill
-                            icon={Flame}
-                            label="Live Orders"
-                            value={metrics.liveOrdersCount}
-                            colorClass="text-amber-500"
-                        />
-                        <CompactMetricPill
-                            icon={CheckCircle2}
-                            label="Past Completed"
-                            value={metrics.pastEvents}
-                            colorClass="text-emerald-500"
-                        />
-                        <CompactMetricPill
-                            icon={Clock}
-                            label="Oldest Ticket Wait"
-                            value={formatKitchenAge(metrics.oldestMinutes)}
-                            colorClass="text-orange-500"
-                        />
-                    </div>
-                    <p className="text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Active Dispatch Station
-                    </p>
-                </div>
-
-                {/* BOARD COLUMNS: PASS (PICK) VS LIVE LOAD (ASSIGNED) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* LEFT COLUMN: LIVE ORDERS TO PICK FROM PASS */}
-                    <section className="space-y-2">
-                        <div className="flex items-center justify-between pb-1.5 border-b border-[var(--app-border)]/50">
-                            <div className="flex items-center gap-2">
-                                <Flame size={15} className="text-orange-500" />
-                                <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--app-text)]">Pick from Pass</h3>
-                                <span className="text-[11px] theme-muted hidden sm:inline">• Claim tickets for cooking</span>
-                            </div>
-                            <span className="rounded-full bg-[color-mix(in_srgb,var(--app-primary)_18%,transparent)] px-2 py-0.5 text-xs font-extrabold text-[var(--app-primary)]">
-                                {availableTickets.length} Open
-                            </span>
-                        </div>
-
-                        <div>
-                            {ordersLoading || staffLoading ? (
-                                <div className="flex flex-col items-center justify-center py-8 theme-muted space-y-1">
-                                    <LoaderCircle size={20} className="animate-spin text-[var(--app-primary)]" />
-                                    <p className="text-xs font-bold uppercase tracking-wider">Syncing Pass Tickets...</p>
-                                </div>
-                            ) : availableTickets.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-6 text-center p-3 space-y-1">
-                                    <UtensilsCrossed size={22} className="theme-muted opacity-40" />
-                                    <h4 className="text-xs font-bold text-[var(--app-text)]">Pass is Clear!</h4>
-                                    <p className="text-[11px] theme-muted">No unassigned tickets waiting on pass right now.</p>
-                                </div>
-                            ) : (
-                                availableTickets.map((ticket) => (
-                                    <ModernTicketCard
-                                        key={ticket.itemKey}
-                                        ticket={ticket}
-                                        chef={null}
-                                        chefLabel="Unassigned"
-                                        onAction={handlePickTicket}
-                                        onDecline={(t) => setDeclineModalItem(t)}
-                                        actionLabel="Pick Ticket"
-                                        actionIcon={<ChefHat size={14} />}
-                                        isPickAction={true}
-                                    />
-                                ))
-                            )}
-                        </div>
-                    </section>
-
-                    {/* RIGHT COLUMN: CHEF'S LIVE LOAD (ASSIGNED TO THIS CHEF) */}
-                    <section className="space-y-2">
-                        <div className="flex items-center justify-between pb-1.5 border-b border-[var(--app-border)]/50">
-                            <div className="flex items-center gap-2">
-                                <ChefHat size={15} className="text-emerald-500" />
-                                <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--app-text)]">My Live Cooking Load</h3>
-                                <span className="text-[11px] theme-muted hidden sm:inline">• Assigned to {pageTitle}</span>
-                            </div>
-                            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-extrabold text-emerald-500">
-                                {currentTickets.length} Active
-                            </span>
-                        </div>
-
-                        <div>
-                            {ordersLoading || staffLoading ? (
-                                <div className="flex flex-col items-center justify-center py-8 theme-muted space-y-1">
-                                    <LoaderCircle size={20} className="animate-spin text-emerald-500" />
-                                    <p className="text-xs font-bold uppercase tracking-wider">Syncing Live Load...</p>
-                                </div>
-                            ) : currentTickets.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-6 text-center p-3 space-y-1">
-                                    <ChefHat size={22} className="theme-muted opacity-40" />
-                                    <h4 className="text-xs font-bold text-[var(--app-text)]">No Active Load</h4>
-                                    <p className="text-[11px] theme-muted">Pick orders from left column to start cooking.</p>
-                                </div>
-                            ) : (
-                                currentTickets.map((ticket) => (
-                                    <ModernTicketCard
-                                        key={ticket.itemKey}
-                                        ticket={ticket}
-                                        chef={currentChef}
-                                        onAction={handleCompleteTicket}
-                                        onDecline={(t) => setDeclineModalItem(t)}
-                                        actionLabel="Mark Complete"
-                                        actionIcon={<CheckCircle2 size={14} />}
-                                        isPickAction={false}
-                                    />
-                                ))
-                            )}
-                        </div>
-                    </section>
-                </div>
-            </main>
-
-            {/* ACTIVITY HISTORY MODAL */}
-            {historyOpen && (
-                <div
-                    className="theme-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
-                    onClick={() => setHistoryOpen(false)}
-                >
-                    <div
-                        className="theme-modal w-full max-w-3xl rounded-3xl p-6 space-y-5 shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-center justify-between border-b border-[var(--app-border)] pb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--app-primary)_15%,transparent)] text-[var(--app-primary)] border border-[var(--app-border-strong)]">
-                                    <History size={20} />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-black text-[var(--app-text)]">Activity Trail — {pageTitle}</h3>
-                                    <p className="text-xs theme-muted">Past item assignments and completion logs</p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setHistoryOpen(false)}
-                                className="rounded-xl border border-[var(--app-border)] p-2 theme-muted hover:text-[var(--app-text)] hover:bg-[var(--app-surface-2)] transition cursor-pointer"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-1">
-                            {relevantHistory.length === 0 ? (
-                                <p className="text-center text-xs theme-muted py-10">No activity trail recorded for this chef yet.</p>
-                            ) : (
-                                relevantHistory.map((entry) => (
-                                    <ModernHistoryCard
-                                        key={entry.id || `${entry.timestamp}-${entry.itemKey}`}
-                                        entry={entry}
-                                        chef={currentChef}
-                                    />
-                                ))
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* SOUND SETTINGS MODAL */}
-            {soundModalOpen && (
-                <div
-                    className="theme-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
-                    onClick={() => setSoundModalOpen(false)}
-                >
-                    <div
-                        className="theme-modal w-full max-w-2xl rounded-3xl p-6 space-y-5 shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-center justify-between border-b border-[var(--app-border)] pb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--app-primary)_15%,transparent)] text-[var(--app-primary)] border border-[var(--app-border-strong)]">
-                                    <Bell size={20} className="animate-pulse" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-black text-[var(--app-text)]">Kitchen Order Chime & Alerts</h3>
-                                    <p className="text-xs theme-muted">Configure real-time ticket arrival audio alerts</p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setSoundModalOpen(false)}
-                                className="rounded-xl border border-[var(--app-border)] p-2 theme-muted hover:text-[var(--app-text)] hover:bg-[var(--app-surface-2)] transition cursor-pointer"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-4">
-                                <div className="flex items-center gap-3">
-                                    {soundMuted ? <VolumeX size={20} className="theme-muted" /> : <Volume2 size={20} className="text-[var(--app-primary)]" />}
-                                    <div>
-                                        <p className="text-sm font-bold text-[var(--app-text)]">{soundMuted ? "Sound Alerts Muted" : "Sound Alerts Active"}</p>
-                                        <p className="text-xs theme-muted">Plays notification sound when new orders arrive</p>
-                                    </div>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={toggleSoundMute}
-                                    className={`rounded-xl px-4 py-2 text-xs font-black transition cursor-pointer ${
-                                        soundMuted
-                                            ? "theme-button"
-                                            : "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30"
-                                    }`}
-                                >
-                                    {soundMuted ? "Unmute Sound" : "Mute Sound"}
-                                </button>
-                            </div>
-
-                            <NotificationSoundPicker />
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* DECLINE ITEM REASON MODAL */}
-            {declineModalItem && (
-                <div
-                    className="theme-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
-                    onClick={() => {
-                        setDeclineModalItem(null);
-                        setDeclineReason("");
-                    }}
-                >
-                    <div
-                        className="theme-modal w-full max-w-lg rounded-3xl p-6 space-y-5 shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-center justify-between border-b border-[var(--app-border)] pb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-500/15 text-red-500 border border-red-500/30">
-                                    <Ban size={20} />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-black text-[var(--app-text)]">Decline Item</h3>
-                                    <p className="text-xs theme-muted">Specify reason for declining {declineModalItem.itemName}</p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setDeclineModalItem(null);
-                                    setDeclineReason("");
-                                }}
-                                className="rounded-xl border border-[var(--app-border)] p-2 theme-muted hover:text-[var(--app-text)] hover:bg-[var(--app-surface-2)] transition cursor-pointer"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3.5 space-y-1">
-                                <p className="text-xs font-bold text-[var(--app-text)]">{declineModalItem.qty}x {declineModalItem.itemName}</p>
-                                <p className="text-[11px] theme-muted">{declineModalItem.orderRef} • Table {declineModalItem.tableNo || "N/A"}</p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold uppercase tracking-wider theme-muted block">Select Common Reason</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {REASON_PRESETS.map((preset) => (
-                                        <button
-                                            key={preset}
-                                            type="button"
-                                            onClick={() => setDeclineReason(preset)}
-                                            className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition cursor-pointer border ${
-                                                declineReason === preset
-                                                    ? "bg-red-500 text-white border-red-500 font-extrabold shadow-sm"
-                                                    : "bg-[var(--app-surface-2)] text-[var(--app-text)] border-[var(--app-border)] hover:border-red-500/40"
-                                            }`}
-                                        >
-                                            {preset}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold uppercase tracking-wider theme-muted block">Or Specify Reason</label>
-                                <textarea
-                                    rows={3}
-                                    value={declineReason}
-                                    onChange={(e) => setDeclineReason(e.target.value)}
-                                    placeholder="Type reason for declining this item..."
-                                    className="theme-input w-full rounded-2xl p-3 text-xs outline-none focus:ring-2 focus:ring-red-500/40"
-                                />
-                            </div>
-
-                            <div className="flex items-center justify-end gap-3 pt-2 border-t border-[var(--app-border)]">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setDeclineModalItem(null);
-                                        setDeclineReason("");
-                                    }}
-                                    className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 py-2 text-xs font-extrabold text-[var(--app-text)] hover:bg-white/5 transition cursor-pointer"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleConfirmDecline}
-                                    disabled={!declineReason.trim()}
-                                    className="rounded-xl bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white px-4 py-2 text-xs font-extrabold transition shadow-md cursor-pointer flex items-center gap-1.5"
-                                >
-                                    <Ban size={14} />
-                                    <span>Confirm Decline</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-2xl border border-red-200 dark:border-red-900/60 p-6 shadow-xl text-center">
+          <div className="w-14 h-14 bg-red-100 dark:bg-red-950/60 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert size={28} />
+          </div>
+          <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
+            Access Denied
+          </h1>
+          <p className="text-xs text-slate-600 dark:text-slate-400 mb-6">
+            You can only access your own assigned chef station.
+          </p>
+          <Link
+            to={user?.id ? `/kitchen/chef/${user.id}` : "/kitchen"}
+            className="inline-flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-xs transition"
+          >
+            Go to My Station
+          </Link>
         </div>
+      </div>
     );
+  }
+
+  // Active metrics
+  const activeItems = assignedItems.filter((it) => it.status !== "READY" && it.status !== "CANCELLED");
+  const pendingItems = assignedItems.filter((it) => it.status === "PENDING" || it.status === "ACCEPTED");
+  const prepItems = assignedItems.filter((it) => it.status === "PREPARING");
+  const readyItems = assignedItems.filter((it) => it.status === "READY");
+
+  return (
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      {/* Top Navigation Bar */}
+      <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-3">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link
+              to="/kitchen"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              title="Back to Senior Chef KDS"
+            >
+              <ArrowLeft size={16} />
+            </Link>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <ChefHat className="text-orange-500" size={18} />
+                <h1 className="text-sm sm:text-base font-extrabold tracking-tight">
+                  {chefInfo?.name || "Chef Station"}
+                </h1>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300">
+                  Station #{chefId}
+                </span>
+                {kitchenConfig.mode === "SELF_PICK" && (
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 animate-pulse">
+                    SELF-PICK ACTIVE ({kitchenConfig.scope})
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                {chefInfo?.designation || "Kitchen Line"} • Active Work: <strong>{activeItems.length} items</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => loadStationData(false)}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+            >
+              <RefreshCw size={13} className={loading ? "animate-spin text-orange-500" : ""} />
+              Refresh
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Container */}
+      <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+        {/* Metric Badges */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
+            <div className="text-[11px] text-slate-500 font-semibold mb-1">Assigned Total</div>
+            <div className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{assignedItems.length}</div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
+            <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mb-1 flex items-center gap-1">
+              <Clock size={12} />
+              Pending
+            </div>
+            <div className="text-xl font-extrabold text-amber-600 dark:text-amber-400">{pendingItems.length}</div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
+            <div className="text-[11px] text-orange-600 dark:text-orange-400 font-semibold mb-1 flex items-center gap-1">
+              <Flame size={12} />
+              Preparing
+            </div>
+            <div className="text-xl font-extrabold text-orange-600 dark:text-orange-400">{prepItems.length}</div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
+            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mb-1 flex items-center gap-1">
+              <CheckCircle2 size={12} />
+              Ready
+            </div>
+            <div className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">{readyItems.length}</div>
+          </div>
+        </div>
+
+        {/* SECTION 1: MY ASSIGNED ITEMS */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ChefHat size={16} className="text-orange-500" />
+              <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                My Assigned Items ({assignedItems.length})
+              </h2>
+            </div>
+          </div>
+
+          {assignedItems.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center text-slate-500">
+              <UtensilsCrossed size={32} className="mx-auto mb-2 text-slate-400" />
+              <div className="text-xs font-bold text-slate-700 dark:text-slate-300">No items currently assigned</div>
+              <div className="text-[11px] text-slate-400 mt-1">
+                {kitchenConfig.mode === "SELF_PICK"
+                  ? "Browse the Available Work queue below to claim items or KOTs."
+                  : "Items dispatched by the Senior Chef will automatically appear here."}
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {assignedItems.map((item) => {
+                const isBusy = Boolean(actionInProgress[item.id]);
+                const isPrep = item.status === "PREPARING";
+                const isReady = item.status === "READY";
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border p-4 bg-white dark:bg-slate-900 shadow-xs flex flex-col justify-between transition ${
+                      isReady
+                        ? "border-emerald-300 dark:border-emerald-800/60 bg-emerald-50/20 dark:bg-emerald-950/10"
+                        : isPrep
+                        ? "border-orange-300 dark:border-orange-800/60 bg-orange-50/20 dark:bg-orange-950/10"
+                        : "border-slate-200 dark:border-slate-800"
+                    }`}
+                  >
+                    <div>
+                      {/* Top Bar with KOT and SLA */}
+                      <div className="flex items-center justify-between text-xs mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <span className="text-slate-900 dark:text-slate-100">KOT #{item.kotNumber || item.kotId}</span>
+                          <span className="text-slate-400">•</span>
+                          <span className="text-slate-600 dark:text-slate-300">Table {item.tableNo || "N/A"}</span>
+                        </div>
+
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                          item.priority === "URGENT" ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" :
+                          item.priority === "HIGH" ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" :
+                          "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                        }`}>
+                          {item.priority || "NORMAL"}
+                        </span>
+                      </div>
+
+                      {/* Item Details */}
+                      <div className="mb-3">
+                        <div className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                          <span className="px-1.5 py-0.5 bg-orange-100 dark:bg-orange-950 text-orange-800 dark:text-orange-300 rounded text-xs font-black">
+                            {item.quantity}x
+                          </span>
+                          <span>{item.name}</span>
+                        </div>
+
+                        {item.variant && (
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            Variant: <strong>{item.variant}</strong>
+                          </div>
+                        )}
+
+                        {item.notes && (
+                          <div className="text-[11px] text-amber-700 dark:text-amber-400 italic bg-amber-50 dark:bg-amber-950/40 p-1.5 rounded mt-1.5">
+                            Special: {item.notes}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-2">
+                          <span>Elapsed: {item.elapsedMinutes || 0}m</span>
+                          <span>•</span>
+                          <span>Source: {item.assignmentSource || "DISPATCHED"}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                      {isReady ? (
+                        <div className="w-full py-2 bg-emerald-100/60 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5">
+                          <Check size={14} />
+                          READY FOR PICKUP
+                        </div>
+                      ) : isPrep ? (
+                        <button
+                          type="button"
+                          onClick={() => handleMarkReady(item)}
+                          disabled={isBusy}
+                          className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
+                        >
+                          <CheckCircle2 size={14} />
+                          MARK READY
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleStartPreparing(item)}
+                          disabled={isBusy}
+                          className="w-full py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
+                        >
+                          <Play size={14} />
+                          START PREPARING
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* SECTION 2: AVAILABLE WORK (SELF-PICK MODE ONLY) */}
+        {kitchenConfig.mode === "SELF_PICK" && (
+          <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-emerald-500" />
+                <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                  Available Work to Claim (Self-Pick)
+                </h2>
+              </div>
+              <span className="text-xs text-slate-500">
+                Scope: <strong>{kitchenConfig.scope}</strong>
+              </span>
+            </div>
+
+            {/* Available KOTs */}
+            {(kitchenConfig.scope === "KOTS" || kitchenConfig.scope === "BOTH") && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Layers size={14} className="text-emerald-500" />
+                  Available KOTs ({availableWork.availableKots?.length || 0})
+                </h3>
+
+                {!availableWork.availableKots?.length ? (
+                  <div className="rounded-lg border border-dashed border-slate-200 dark:border-slate-800 p-4 text-center text-xs text-slate-400">
+                    No unassigned KOTs currently available.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {availableWork.availableKots.map((k) => (
+                      <div
+                        key={k.id}
+                        className="bg-white dark:bg-slate-900 rounded-xl border border-emerald-200/80 dark:border-emerald-900/60 p-4 shadow-xs flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between text-xs mb-2">
+                            <span className="font-bold text-slate-900 dark:text-slate-100">
+                              KOT #{k.kotNumber || k.id}
+                            </span>
+                            <span className="text-slate-500">Table: {k.tableNo || "N/A"}</span>
+                          </div>
+
+                          <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1 mb-3">
+                            <div>Unassigned Items: <strong>{k.unassignedCount} of {k.totalItems}</strong></div>
+                            <div className="text-[11px] text-slate-500">Waiting: {k.elapsedMinutes || 0}m</div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleClaimKot(k)}
+                          disabled={Boolean(actionInProgress[`claim_kot_${k.id}`])}
+                          className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
+                        >
+                          <Check size={14} />
+                          CLAIM ORDER ({k.unassignedCount} items)
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Available Items */}
+            {(kitchenConfig.scope === "ITEMS" || kitchenConfig.scope === "BOTH") && (
+              <div className="space-y-2 pt-2">
+                <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <UtensilsCrossed size={14} className="text-emerald-500" />
+                  Available Individual Items ({availableWork.availableItems?.length || 0})
+                </h3>
+
+                {!availableWork.availableItems?.length ? (
+                  <div className="rounded-lg border border-dashed border-slate-200 dark:border-slate-800 p-4 text-center text-xs text-slate-400">
+                    No unassigned items currently available.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {availableWork.availableItems.map((it) => (
+                      <div
+                        key={it.id}
+                        className="bg-white dark:bg-slate-900 rounded-xl border border-emerald-200/80 dark:border-emerald-900/60 p-4 shadow-xs flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between text-xs mb-1.5">
+                            <span className="font-bold text-slate-900 dark:text-slate-100">
+                              KOT #{it.kotNumber || it.kotId}
+                            </span>
+                            <span className="text-slate-500">Table: {it.tableNo || "N/A"}</span>
+                          </div>
+
+                          <div className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1 flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded text-xs font-black">
+                              {it.quantity}x
+                            </span>
+                            <span>{it.name}</span>
+                          </div>
+
+                          {it.variant && (
+                            <div className="text-[11px] text-slate-500 mb-1">Variant: {it.variant}</div>
+                          )}
+
+                          <div className="text-[10px] text-slate-400 mb-3">
+                            Waiting: {it.elapsedMinutes || 0}m
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleClaimItem(it)}
+                          disabled={Boolean(actionInProgress[`claim_item_${it.id}`])}
+                          className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
+                        >
+                          <Check size={14} />
+                          CLAIM ITEM
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+    </div>
+  );
 }

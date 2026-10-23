@@ -285,11 +285,24 @@ export default function Login() {
         if (normalizedRole === "WAITER") {
             return "/server";
         }
+        if (normalizedRole === "STEWARD") {
+            return "/staff/steward";
+        }
         if (normalizedRole === "CASHIER") {
-            return "/owner/orders";
+            return "/staff/cashier";
+        }
+        if (normalizedRole === "CLEANER") {
+            return "/staff/cleaner";
+        }
+        if (normalizedRole === "SWIPER") {
+            return "/staff/swiper";
         }
         if (normalizedRole === "MANAGER") {
             return "/owner";
+        }
+
+        if (normalizedRole === "STAFF" || (role && String(role).toUpperCase() !== "CUSTOMER")) {
+            return "/staff/workspace";
         }
 
         return "/";

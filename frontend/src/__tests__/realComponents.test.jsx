@@ -1,7 +1,7 @@
 import React from "react";
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import App from "../App.jsx";
 import Landing from "../pages/Landing.jsx";
 import RestaurantChooser from "../pages/RestaurantChooser.jsx";
@@ -27,7 +27,31 @@ vi.mock("../utils/apiClient", async () => {
     };
 });
 
+// Mock socket.io-client to prevent live network sockets and timer loops in JSDOM
+vi.mock("socket.io-client", () => {
+    const mockSocket = {
+        id: "mock-socket-id",
+        connected: false,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        emit: vi.fn(),
+        close: vi.fn(),
+    };
+    return {
+        io: vi.fn(() => mockSocket),
+        default: vi.fn(() => mockSocket),
+    };
+});
+
 describe("Real Component Render Audit", () => {
+    beforeEach(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+        vi.clearAllMocks();
+    });
+
     it("renders Landing without crashing", () => {
         const { container } = render(
             <MemoryRouter initialEntries={["/"]}>

@@ -50,7 +50,7 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
   const tokenSessionVersion = Number(req.user?.sessionVersion || 0) || 0;
   const restaurantId = Number(req.user?.restaurantId || 0) || null;
   const branchId = Number(req.user?.branchId || 0) || null;
-  const userId = Number(req.user?.id || 0) || null;
+  const userId = Number(req.user?.id || req.user?.userId || 0) || null;
 
   if (prisma && userId) {
     const user = await prisma.user.findUnique({
@@ -58,6 +58,8 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
       select: {
         isActive: true,
         role: true,
+        designation: true,
+        name: true,
         restaurantId: true,
         branchId: true,
         sessionVersion: true,
@@ -74,9 +76,13 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
     const currentRole =
       dbRole === "SUPER_ADMIN"
         ? "SUPER_ADMIN"
-        : dbRole && dbRole !== "STAFF"
-          ? dbRole
-          : inferRoleFromDesignation(user?.designation) || role || dbRole || "STAFF";
+        : inferRoleFromDesignation(user?.designation) ||
+          inferRoleFromDesignation(dbRole) ||
+          (dbRole && dbRole !== "STAFF" ? dbRole : null) ||
+          inferRoleFromDesignation(role) ||
+          role ||
+          dbRole ||
+          "STAFF";
     const currentRestaurantId = Number(user.restaurantId || 0) || null;
     const currentBranchId = Number(user.branchId || 0) || null;
     const currentSessionVersion = Number(user.sessionVersion || 0) || 0;
@@ -120,7 +126,16 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
       }
     }
 
-    return { id: userId, userId, role: currentRole, restaurantId: currentRestaurantId, branchId: currentBranchId, mustChangePassword: Boolean(user.mustChangePassword) };
+    return {
+      id: userId,
+      userId,
+      role: currentRole,
+      designation: user.designation || null,
+      name: user.name || req.user?.name || null,
+      restaurantId: currentRestaurantId,
+      branchId: currentBranchId,
+      mustChangePassword: Boolean(user.mustChangePassword),
+    };
   }
 
   if (Boolean(req.user?.mustChangePassword) && !allowPasswordChangeOnly) {
@@ -132,7 +147,13 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
     return null;
   }
 
-  if (allowedRoles?.length && role && !allowedRoles.includes(role)) {
+  const effectiveRole =
+    inferRoleFromDesignation(req.user?.designation) ||
+    inferRoleFromDesignation(role) ||
+    role ||
+    "STAFF";
+
+  if (allowedRoles?.length && effectiveRole && !allowedRoles.includes(effectiveRole)) {
     reply.code(403).send({ message: "Insufficient role" });
     return null;
   }
@@ -145,5 +166,14 @@ export const requireStaffJwt = async (req, reply, { allowedRoles, matchRestauran
     }
   }
 
-  return { id: userId, userId, role, restaurantId, branchId, mustChangePassword: Boolean(req.user?.mustChangePassword) };
+  return {
+    id: userId,
+    userId,
+    role: effectiveRole,
+    designation: req.user?.designation || null,
+    name: req.user?.name || null,
+    restaurantId,
+    branchId,
+    mustChangePassword: Boolean(req.user?.mustChangePassword),
+  };
 };

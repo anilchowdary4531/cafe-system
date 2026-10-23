@@ -1,6 +1,8 @@
 import { testPrinterConnection } from "../services/escposService.js";
 import { dispatchKotPrint, reprintKot, updateKotStatus, updateKotItemStatus, updateKotPriority, createKotsForOrder } from "../services/kotService.js";
 import prisma from "../prisma.js";
+import { emitToKitchen } from "../realtime/socketServer.js";
+import { getKitchenWorkload } from "../services/kitchenAssignmentService.js";
 
 /**
  * Fetch KOTs for a restaurant with status, station, priority, source, table & search query filters
@@ -210,10 +212,10 @@ export const updateStatus = async (req, res) => {
 
     if (!restaurantId || !kotId) return res.status(400).send({ message: "Missing required IDs" });
 
-    const actor = req.user ? { userId: req.user.id, userName: req.user.name || req.user.email } : null;
+    const actor = req.staffActor || (req.user ? { userId: req.user.id, userName: req.user.name || req.user.email } : null);
 
     const updatedKot = await updateKotStatus({
-      prisma: req.prisma,
+      prisma: req.prisma || prisma,
       kotId,
       restaurantId,
       nextStatus: status,
@@ -221,12 +223,27 @@ export const updateStatus = async (req, res) => {
     });
     const updatedOrder = updatedKot?.order || null;
 
-    // Realtime notification & broadcast
+    // Realtime notification & broadcast (staff + io)
     const io = req.server?.io || req.app?.get?.("io");
-    if (io) {
-      io.to(`restaurant_${restaurantId}`).emit("kot:status_updated", updatedKot);
-      io.to(`restaurant:${restaurantId}`).emit("kot:status_updated", updatedKot);
-      if (updatedOrder) {
+    const staff = req.server?.staff;
+    emitToKitchen({
+      io,
+      staff,
+      restaurantId,
+      event: "kot:status_updated",
+      payload: updatedKot,
+    });
+
+    if (updatedOrder) {
+      if (staff) {
+        staff.to(`restaurant_${restaurantId}`).emit("order:updated", updatedOrder);
+        staff.to(`restaurant:${restaurantId}`).emit("order:updated", updatedOrder);
+        if (updatedOrder.tableNo) {
+          staff.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: updatedOrder.tableNo });
+          staff.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: updatedOrder.tableNo });
+        }
+      }
+      if (io) {
         io.to(`restaurant_${restaurantId}`).emit("order:updated", updatedOrder);
         io.to(`restaurant:${restaurantId}`).emit("order:updated", updatedOrder);
         if (updatedOrder.tableNo) {
@@ -235,6 +252,11 @@ export const updateStatus = async (req, res) => {
         }
       }
     }
+
+    // Refresh and emit updated workload
+    getKitchenWorkload({ prisma: req.prisma || prisma, restaurantId })
+      .then((workload) => emitToKitchen({ io, staff, restaurantId, event: "kitchen:workload_updated", payload: workload }))
+      .catch(() => {});
 
     return res.send({ ok: true, kot: updatedKot, order: updatedOrder });
   } catch (err) {
@@ -248,19 +270,32 @@ export const updateStatus = async (req, res) => {
  */
 export const updateItemStatus = async (req, res) => {
   try {
-    const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || 0);
-    const kotId = Number(req.params.kotId || 0);
+    const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || req.staffActor?.restaurantId || 0);
+    let kotId = Number(req.params.kotId || 0);
     const itemId = Number(req.params.itemId || 0);
-    const { status } = req.body;
+    const { status } = req.body || {};
 
-    if (!restaurantId || !kotId || !itemId) {
+    if (!restaurantId || !itemId) {
       return res.status(400).send({ message: "Missing required parameters" });
     }
 
-    const actor = req.user ? { userId: req.user.id, userName: req.user.name || req.user.email } : null;
+    const db = req.prisma || prisma;
+    if (!kotId) {
+      const itemRecord = await db.kitchenOrderTicketItem.findUnique({
+        where: { id: itemId },
+        select: { kotId: true },
+      });
+      kotId = Number(itemRecord?.kotId || 0);
+    }
+
+    if (!kotId) {
+      return res.status(404).send({ message: "KOT for item not found" });
+    }
+
+    const actor = req.staffActor || (req.user ? { userId: req.user.id, userName: req.user.name || req.user.email } : null);
 
     const { kot, order } = await updateKotItemStatus({
-      prisma: req.prisma || prisma,
+      prisma: db,
       kotId,
       itemId,
       restaurantId,
@@ -268,13 +303,58 @@ export const updateItemStatus = async (req, res) => {
       actor,
     });
 
+    const updatedItem = (kot?.items || []).find((it) => it.id === itemId);
+
+    // Realtime notification & broadcast (staff + io)
     const io = req.server?.io || req.app?.get?.("io");
-    if (io) {
-      io.to(`restaurant_${restaurantId}`).emit("kot:item_updated", { kotId, itemId, status, kot });
-      io.to(`restaurant:${restaurantId}`).emit("kot:item_updated", { kotId, itemId, status, kot });
-      io.to(`restaurant_${restaurantId}`).emit("kot:status_updated", kot);
-      io.to(`restaurant:${restaurantId}`).emit("kot:status_updated", kot);
-      if (order) {
+    const staff = req.server?.staff;
+
+    emitToKitchen({
+      io,
+      staff,
+      restaurantId,
+      event: "kot:item_updated",
+      payload: { kotId, itemId, status, kot, item: updatedItem },
+      targetUserIds: updatedItem?.assignedChefId ? [updatedItem.assignedChefId] : [],
+    });
+
+    emitToKitchen({
+      io,
+      staff,
+      restaurantId,
+      event: "kitchen:item_status_updated",
+      payload: { kotId, itemId, status, kot, item: updatedItem },
+      targetUserIds: updatedItem?.assignedChefId ? [updatedItem.assignedChefId] : [],
+    });
+
+    if (String(status).toUpperCase() === "READY") {
+      emitToKitchen({
+        io,
+        staff,
+        restaurantId,
+        event: "kitchen:item_ready",
+        payload: { kotId, itemId, status, kot, item: updatedItem },
+      });
+    }
+
+    emitToKitchen({
+      io,
+      staff,
+      restaurantId,
+      event: "kot:status_updated",
+      payload: kot,
+    });
+
+    if (order) {
+      if (staff) {
+        staff.to(`restaurant_${restaurantId}`).emit("order:updated", order);
+        staff.to(`restaurant:${restaurantId}`).emit("order:updated", order);
+        if (order.tableNo) {
+          staff.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
+          staff.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
+        }
+      }
+      if (io) {
         io.to(`restaurant_${restaurantId}`).emit("order:updated", order);
         io.to(`restaurant:${restaurantId}`).emit("order:updated", order);
         if (order.tableNo) {
@@ -284,7 +364,12 @@ export const updateItemStatus = async (req, res) => {
       }
     }
 
-    return res.send({ ok: true, kot, order });
+    // Refresh and emit updated workload
+    getKitchenWorkload({ prisma: db, restaurantId })
+      .then((workload) => emitToKitchen({ io, staff, restaurantId, event: "kitchen:workload_updated", payload: workload }))
+      .catch(() => {});
+
+    return res.send({ ok: true, kot, order, item: updatedItem });
   } catch (err) {
     console.error("updateItemStatus error:", err);
     return res.status(500).send({ message: err?.message || "Failed to update item status" });

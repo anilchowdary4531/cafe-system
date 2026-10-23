@@ -76,7 +76,7 @@ const STAFF_ACCESS_MODULES = [
   "settings",
   "notifications",
 ];
-const STAFF_ALLOWED_ROLES = ["OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STAFF"];
+const STAFF_ALLOWED_ROLES = ["OWNER", "MANAGER", "WAITER", "SERVER", "CHEF", "CASHIER", "STEWARD", "CLEANER", "SWIPER", "STAFF"];
 
 const defaultAccessByRole = (role) => {
   const normalizedRole = String(role || "STAFF").toUpperCase();
@@ -87,11 +87,20 @@ const defaultAccessByRole = (role) => {
   if (normalizedRole === "CHEF") return {
     dashboard: true, billing: false, orders: true, menu: false, inventory: true, tables: false, kitchen: true, printers: true, analytics: false, reports: false, paylater: false, shifts: false, supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false, loyalty: false, staff: false, settings: false, notifications: true
   };
-  if (normalizedRole === "WAITER") return {
+  if (normalizedRole === "WAITER" || normalizedRole === "SERVER") return {
     dashboard: true, billing: true, orders: true, menu: true, inventory: false, tables: true, kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false, supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false, loyalty: false, staff: false, settings: false, notifications: true
   };
   if (normalizedRole === "CASHIER") return {
-    dashboard: true, billing: true, orders: true, menu: false, inventory: false, tables: false, kitchen: false, printers: true, analytics: true, reports: true, paylater: true, shifts: true, supply: false, delivery: false, delivery_partners: false, customers: true, discounts: true, loyalty: true, staff: false, settings: false, notifications: true
+    dashboard: true, billing: true, orders: true, menu: false, inventory: false, tables: true, kitchen: false, printers: true, analytics: true, reports: true, paylater: true, shifts: true, supply: false, delivery: false, delivery_partners: false, customers: true, discounts: false, loyalty: true, staff: false, settings: false, notifications: true
+  };
+  if (normalizedRole === "STEWARD") return {
+    dashboard: true, billing: false, orders: false, menu: false, inventory: false, tables: true, kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false, supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false, loyalty: false, staff: false, settings: false, notifications: true
+  };
+  if (normalizedRole === "CLEANER") return {
+    dashboard: true, billing: false, orders: false, menu: false, inventory: false, tables: true, kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false, supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false, loyalty: false, staff: false, settings: false, notifications: true
+  };
+  if (normalizedRole === "SWIPER") return {
+    dashboard: true, billing: true, orders: false, menu: false, inventory: false, tables: true, kitchen: false, printers: true, analytics: false, reports: false, paylater: false, shifts: false, supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false, loyalty: false, staff: false, settings: false, notifications: true
   };
   return {
     dashboard: true, billing: false, orders: false, menu: false, inventory: false, tables: false, kitchen: false, printers: false, analytics: false, reports: false, paylater: false, shifts: false, supply: false, delivery: false, delivery_partners: false, customers: false, discounts: false, loyalty: false, staff: false, settings: false, notifications: true
