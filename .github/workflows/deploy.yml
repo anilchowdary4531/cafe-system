@@ -42,6 +42,11 @@ jobs:
             npx prisma migrate deploy || true
             npx prisma db push --accept-data-loss=false || true
             sudo systemctl restart tiffzy
-            sudo systemctl is-active --quiet tiffzy
+            sleep 3
+            if ! sudo systemctl is-active --quiet tiffzy; then
+              echo "ERROR: tiffzy service is not active after restart. Journalctl logs:"
+              sudo journalctl -u tiffzy -n 50 --no-pager
+              exit 1
+            fi
             echo "Tiffzy backend restarted successfully"
 

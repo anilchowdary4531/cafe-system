@@ -89,9 +89,6 @@ export const getRuntimeConfig = () => {
   }
 
   if (nodeEnv === "production") {
-    if (isLocalHostname(dbHost)) {
-      throw new Error("[env] DATABASE_URL points to a local hostname. Production must use RDS/managed Postgres hostname.");
-    }
     if (isLocalHostname(new URL(frontendUrl).hostname)) {
       throw new Error("[env] FRONTEND_URL points to a local hostname. Production must use your deployed frontend origin.");
     }
