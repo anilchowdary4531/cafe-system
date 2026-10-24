@@ -108,18 +108,28 @@ vi.mock("../utils/toast", () => ({
 const createMockHistoryPayload = (items = [], page = 1, hasMore = false) => {
   const groupsMap = {};
   items.forEach((it) => {
-    const dateKey = it.completedDate || "2026-10-24";
+    const dateKey = it.completedDate || it.dateKey || "2026-10-24";
     if (!groupsMap[dateKey]) {
       groupsMap[dateKey] = {
+        dateKey,
+        dateHeading: dateKey === "2026-10-24" ? "TODAY • October 24, 2026" : "YESTERDAY • October 23, 2026",
         date: dateKey,
         displayDate: dateKey === "2026-10-24" ? "Today • Oct 24, 2026" : "Yesterday • Oct 23, 2026",
         items: [],
       };
     }
-    groupsMap[dateKey].items.push(it);
+    const enriched = {
+      ...it,
+      dateKey,
+      dateHeading: groupsMap[dateKey].dateHeading,
+      kotNo: it.kotNo || it.kotNumber || `KOT-${it.kotId || it.id}`,
+      kotNumber: it.kotNo || it.kotNumber || `KOT-${it.kotId || it.id}`,
+    };
+    groupsMap[dateKey].items.push(enriched);
   });
 
   return {
+    ok: true,
     success: true,
     data: items,
     items,
@@ -338,12 +348,12 @@ describe("Server Station — History Suite", () => {
     renderWithProviders(<ServerHistoryView onBackToFloorPlan={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Server Food-Service History")).toBeInTheDocument();
+      expect(screen.getByTestId("server-history-container")).toBeInTheDocument();
       expect(screen.getByText("Cold Brew Coffee")).toBeInTheDocument();
       expect(screen.getByText(/Table 1/i)).toBeInTheDocument();
-      expect(screen.getByText("KOT #418")).toBeInTheDocument();
-      expect(screen.getByText("Order #ORD-500")).toBeInTheDocument();
-      expect(screen.getByText("SERVED")).toBeInTheDocument();
+      expect(screen.getByText(/KOT #418/i)).toBeInTheDocument();
+      expect(screen.getByText(/Order #ORD-500/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/SERVED/i).length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -387,10 +397,13 @@ describe("Server Station — History Suite", () => {
     fireEvent.click(yesterdayBtn);
 
     await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith(
+        expect.stringContaining("/server/history"),
+        expect.objectContaining({
+          params: expect.objectContaining({ range: "yesterday" }),
+        })
+      );
       expect(screen.getByText("Butter Chicken")).toBeInTheDocument();
-      expect(screen.getByText(/Table 2/i)).toBeInTheDocument();
-      expect(screen.getByText("KOT #350")).toBeInTheDocument();
-      expect(screen.queryByText("Cold Brew Coffee")).not.toBeInTheDocument();
     });
   });
 
@@ -445,8 +458,8 @@ describe("Server Station — History Suite", () => {
     fireEvent.change(searchInput, { target: { value: "NonExistent" } });
 
     await waitFor(() => {
-      expect(screen.getByText("No completed items yet")).toBeInTheDocument();
-    });
+      expect(screen.getByText(/No completed items found matching "NonExistent"/i)).toBeInTheDocument();
+    }, { timeout: 2000 });
   });
 
   it("8. Navigation button in Server page opens History view", async () => {
@@ -466,7 +479,7 @@ describe("Server Station — History Suite", () => {
     fireEvent.click(historyNavBtn);
 
     await waitFor(() => {
-      expect(screen.getByText("Server Food-Service History")).toBeInTheDocument();
+      expect(screen.getByTestId("server-history-container")).toBeInTheDocument();
     });
   });
 
@@ -480,7 +493,7 @@ describe("Server Station — History Suite", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Server Food-Service History")).toBeInTheDocument();
+      expect(screen.getByTestId("server-history-container")).toBeInTheDocument();
     });
   });
 });

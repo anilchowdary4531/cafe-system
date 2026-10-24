@@ -1249,8 +1249,18 @@ export const getChefHistory = async ({
   limit = 20,
 } = {}) => {
   const rid = Number(restaurantId);
-  const hasSpecificChef = chefId && String(chefId).toLowerCase() !== "all";
-  const cId = hasSpecificChef ? Number(chefId) : null;
+  let cId = null;
+  if (chefId && String(chefId).toLowerCase() !== "all") {
+    if (String(chefId).toLowerCase() === "me") {
+      cId = Number(requestingActor?.userId || requestingActor?.id || 0);
+    } else {
+      const parsed = Number(chefId);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        throw new KitchenAssignmentError("Invalid chefId provided", 400, "INVALID_CHEF_ID");
+      }
+      cId = parsed;
+    }
+  }
 
   if (!rid) {
     throw new KitchenAssignmentError("restaurantId is required", 400, "MISSING_PARAMS");
@@ -1293,13 +1303,22 @@ export const getChefHistory = async ({
       );
     }
 
-    // Verify chef belongs to this restaurant
+    // Verify chef exists and belongs to this restaurant
     const chefUser = await prisma.user.findFirst({
-      where: { id: cId, restaurantId: rid },
-      select: { id: true, name: true },
+      where: {
+        id: cId,
+        OR: [
+          { restaurantId: rid },
+          { restaurantId: null },
+        ],
+      },
+      select: { id: true, name: true, restaurantId: true },
     });
     if (!chefUser) {
       throw new KitchenAssignmentError("Chef not found in this restaurant", 404, "CHEF_NOT_FOUND");
+    }
+    if (chefUser.restaurantId && Number(chefUser.restaurantId) !== rid && actorRole !== "SUPER_ADMIN") {
+      throw new KitchenAssignmentError("Access denied. Restaurant boundary violation.", 403, "FORBIDDEN_RESTAURANT_ACCESS");
     }
   }
 
@@ -1324,8 +1343,15 @@ export const getChefHistory = async ({
     status: statusCondition,
   };
 
+  const andClauses = [];
+
   if (cId) {
-    where.assignedChefId = cId;
+    andClauses.push({
+      OR: [
+        { assignedChefId: cId },
+        { preparedByUserId: cId },
+      ],
+    });
   }
 
   // Date filtering
@@ -1406,15 +1432,21 @@ export const getChefHistory = async ({
   if (search && String(search).trim()) {
     const q = String(search).trim();
     const isNum = !Number.isNaN(Number(q));
-    where.OR = [
-      { itemName: { contains: q, mode: "insensitive" } },
-      { assignedChefName: { contains: q, mode: "insensitive" } },
-      { preparedByName: { contains: q, mode: "insensitive" } },
-      { kot: { kotNo: { contains: q, mode: "insensitive" } } },
-      { kot: { tableNo: { contains: q, mode: "insensitive" } } },
-      { kot: { order: { orderNo: { contains: q, mode: "insensitive" } } } },
-      ...(isNum ? [{ kot: { orderId: Number(q) } }] : []),
-    ];
+    andClauses.push({
+      OR: [
+        { itemName: { contains: q, mode: "insensitive" } },
+        { assignedChefName: { contains: q, mode: "insensitive" } },
+        { preparedByName: { contains: q, mode: "insensitive" } },
+        { kot: { kotNo: { contains: q, mode: "insensitive" } } },
+        { kot: { tableNo: { contains: q, mode: "insensitive" } } },
+        { kot: { order: { orderNo: { contains: q, mode: "insensitive" } } } },
+        ...(isNum ? [{ kot: { orderId: Number(q) } }, { kotId: Number(q) }, { orderItemId: Number(q) }] : []),
+      ],
+    });
+  }
+
+  if (andClauses.length > 0) {
+    where.AND = andClauses;
   }
 
   // Authoritative operational summary metrics for the filtered dataset
@@ -1563,6 +1595,7 @@ export const getChefHistory = async ({
     return {
       id: it.id,
       orderItemId: it.orderItemId,
+      kotItemId: it.id,
       menuItemId: it.menuItemId,
       orderId: it.kot?.orderId || it.kot?.order?.id,
       orderNo: it.kot?.order?.orderNo,
@@ -1585,9 +1618,12 @@ export const getChefHistory = async ({
       assignmentSource: it.assignmentSource || "DISPATCHED",
       assignedChefId: it.assignedChefId,
       assignedChefName: it.assignedChefName,
+      chefId: it.assignedChefId || it.preparedByUserId || null,
+      chefName: it.assignedChefName || it.preparedByName || null,
       assignedAt: it.assignedAt,
       startedAt: it.startedAt,
       readyAt: it.readyAt,
+      completedAt: it.readyAt,
       prepTimeMinutes,
       completedTime,
       dateKey,
@@ -1612,6 +1648,8 @@ export const getChefHistory = async ({
 
   return {
     ok: true,
+    success: true,
+    total: totalCount,
     items: formattedItems,
     groupedByDate,
     summary,
@@ -1941,6 +1979,7 @@ export const getServerHistory = async ({
     return {
       id: it.id,
       orderItemId: it.orderItemId,
+      kotItemId: it.id,
       menuItemId: it.menuItemId,
       orderId: it.kot?.orderId || it.kot?.order?.id,
       orderNo: it.kot?.order?.orderNo,

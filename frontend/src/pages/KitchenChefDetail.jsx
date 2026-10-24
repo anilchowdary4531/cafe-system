@@ -82,6 +82,7 @@ export default function KitchenChefDetail() {
   const [historyPagination, setHistoryPagination] = useState({ page: 1, limit: 20, totalCount: 0, totalPages: 1, hasMore: false });
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingMoreHistory, setLoadingMoreHistory] = useState(false);
+  const [historyError, setHistoryError] = useState("");
   const [historyDateRange, setHistoryDateRange] = useState("today");
   const [customDate, setCustomDate] = useState("");
   const [historySearch, setHistorySearch] = useState("");
@@ -155,6 +156,9 @@ export default function KitchenChefDetail() {
     } else if (pageToLoad > 1) {
       setLoadingMoreHistory(true);
     }
+    if (pageToLoad === 1) {
+      setHistoryError("");
+    }
 
     try {
       const params = {
@@ -172,18 +176,24 @@ export default function KitchenChefDetail() {
       }
 
       const res = await api.get(`/owner/${restaurantId}/kitchen/chef/${chefId}/history`, { params });
-      if (res.data?.ok) {
-        const fetchedItems = res.data.items || [];
+      if (res.data?.ok || res.data?.success) {
+        const fetchedItems = res.data.items || res.data.history || [];
         const fetchedGrouped = res.data.groupedByDate || [];
-        const pagination = res.data.pagination || { page: 1, limit: 20, totalCount: fetchedItems.length, totalPages: 1, hasMore: false };
+        const pagination = res.data.pagination || {
+          page: 1,
+          limit: 20,
+          totalCount: res.data.total ?? fetchedItems.length,
+          totalPages: 1,
+          hasMore: false,
+        };
 
         if (pageToLoad === 1) {
           setHistoryItems(fetchedItems);
           setGroupedHistory(fetchedGrouped);
         } else {
           setHistoryItems((prev) => {
-            const existingIds = new Set(prev.map((p) => p.id));
-            const newUnique = fetchedItems.filter((it) => !existingIds.has(it.id));
+            const existingIds = new Set(prev.map((p) => p.orderItemId || p.id));
+            const newUnique = fetchedItems.filter((it) => !existingIds.has(it.orderItemId || it.id));
             return [...prev, ...newUnique];
           });
 
@@ -205,7 +215,7 @@ export default function KitchenChefDetail() {
                 });
               }
               const target = groupMap.get(it.dateKey);
-              if (!target.items.some((x) => x.id === it.id)) {
+              if (!target.items.some((x) => (x.orderItemId || x.id) === (it.orderItemId || it.id))) {
                 target.items.push(it);
               }
             }
@@ -214,13 +224,20 @@ export default function KitchenChefDetail() {
         }
 
         setHistoryPagination(pagination);
+        setHistoryError("");
       }
     } catch (err) {
       console.error("[KitchenChefDetail] Load history error:", err);
-      if (err.response?.status === 403) {
+      const errStatus = err.response?.status;
+      const errMsg = err.response?.data?.message || err?.message || "Failed to load chef history";
+      if (errStatus === 403) {
         setErrorMsg("Access denied. You can only access your own history.");
+        setHistoryError("Access denied. You can only access your own history.");
       } else {
-        showToast(err.response?.data?.message || "Failed to load chef history", "error");
+        setHistoryError(errMsg);
+        if (!silent) {
+          showToast(errMsg, "error");
+        }
       }
     } finally {
       setLoadingHistory(false);
@@ -885,13 +902,13 @@ export default function KitchenChefDetail() {
                   <div className="px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-right">
                     <div className="text-[10px] font-semibold text-slate-500 uppercase">Total Completed</div>
                     <div className="text-lg font-black text-emerald-600 dark:text-emerald-400">
-                      {historyPagination.totalCount}
+                      {historyError ? "—" : historyPagination.totalCount}
                     </div>
                   </div>
                   <div className="px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-right">
                     <div className="text-[10px] font-semibold text-slate-500 uppercase">Showing</div>
                     <div className="text-lg font-black text-slate-900 dark:text-slate-100">
-                      {historyItems.length}
+                      {historyError ? 0 : historyItems.length}
                     </div>
                   </div>
                 </div>
@@ -963,7 +980,26 @@ export default function KitchenChefDetail() {
             {loadingHistory && !historyItems.length ? (
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center text-xs text-slate-500">
                 <RefreshCw size={24} className="animate-spin text-emerald-600 mx-auto mb-3" />
-                Loading completed items history...
+                Loading history...
+              </div>
+            ) : historyError && !historyItems.length ? (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-red-200 dark:border-red-900/40 p-12 text-center shadow-xs">
+                <div className="w-14 h-14 bg-red-100 dark:bg-red-950/60 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <AlertTriangle size={28} />
+                </div>
+                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 mb-1">
+                  Unable to load history.
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
+                  {historyError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => loadHistoryData(1, false)}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                >
+                  Retry
+                </button>
               </div>
             ) : groupedHistory.length === 0 ? (
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center shadow-xs">
@@ -1008,10 +1044,11 @@ export default function KitchenChefDetail() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {group.items.map((item) => (
                         <div
-                          key={`chef-history-item-${item.id}`}
+                          key={item.orderItemId ? `chef-history-orderItem-${item.orderItemId}` : `chef-history-item-${item.id}`}
                           data-testid={`history-item-${item.id}`}
                           data-kot-id={item.kotId}
                           data-order-item-id={item.orderItemId}
+                          data-kot-item-id={item.kotItemId || item.id}
                           data-menu-item-id={item.menuItemId}
                           data-order-id={item.orderId}
                           className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs flex flex-col justify-between transition hover:border-slate-300 dark:hover:border-slate-700"

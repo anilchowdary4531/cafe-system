@@ -1,3 +1,5 @@
+const recentToasts = new Map();
+
 export const showToast = (payload, options = {}) => {
     if (typeof window === "undefined") return;
 
@@ -24,6 +26,15 @@ export const showToast = (payload, options = {}) => {
         onAction = typeof payload.onAction === "function" ? payload.onAction : null;
         durationMs = payload.durationMs ? Number(payload.durationMs) : undefined;
     }
+
+    // Deduplicate identical toasts fired within 2000ms window
+    const dedupKey = `${variant}:${title}:${message}`;
+    const now = Date.now();
+    const lastSeen = recentToasts.get(dedupKey);
+    if (lastSeen && now - lastSeen < 2000) {
+        return;
+    }
+    recentToasts.set(dedupKey, now);
 
     window.dispatchEvent(
         new CustomEvent("toast:show", {

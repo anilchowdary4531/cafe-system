@@ -360,18 +360,14 @@ export default function ServerHistoryView({ onBackToFloorPlan, onBack, title }) 
           </div>
           <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">
             {activeSearch.trim()
-              ? `No completed items found matching "${activeSearch}"`
+              ? "No completed items yet"
               : dateRange === "today"
               ? "No completed items for this date."
-              : dateRange === "yesterday"
-              ? "No completed items for this date."
-              : dateRange === "custom"
-              ? "No completed items for this date."
-              : "No completed items yet."}
+              : "No completed items yet"}
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
             {activeSearch.trim()
-              ? "Try adjusting your search query or switching date filters."
+              ? `No completed items found matching "${activeSearch}". Try adjusting your search query or switching date filters.`
               : "When you mark items served/distributed from the Live Pass or table details, they will be archived here with exact timestamps."}
           </p>
         </div>
@@ -396,10 +392,11 @@ export default function ServerHistoryView({ onBackToFloorPlan, onBack, title }) 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {group.items.map((item) => (
                   <div
-                    key={`server-history-item-${item.id}`}
+                    key={item.orderItemId ? `server-history-orderItem-${item.orderItemId}` : `server-history-item-${item.id}`}
                     data-testid={`history-item-${item.id}`}
                     data-kot-id={item.kotId}
                     data-order-item-id={item.orderItemId}
+                    data-kot-item-id={item.kotItemId || item.id}
                     data-menu-item-id={item.menuItemId}
                     data-order-id={item.orderId}
                     className="bg-white dark:bg-slate-900 rounded-xl border border-[color:var(--app-border)]/40 p-4 shadow-xs flex flex-col justify-between transition hover:border-slate-300 dark:hover:border-slate-700"
@@ -409,7 +406,9 @@ export default function ServerHistoryView({ onBackToFloorPlan, onBack, title }) 
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs font-black text-slate-900 dark:text-slate-100 tracking-tight">
-                            KOT #{item.kotNo || item.kotNumber || item.kotId}
+                            {item.kotNo
+                              ? (item.kotNo.startsWith("KOT-") ? item.kotNo.replace("KOT-", "KOT #") : (item.kotNo.startsWith("KOT #") ? item.kotNo : `KOT #${item.kotNo}`))
+                              : `KOT #${item.kotNumber || item.kotId}`}
                           </span>
                           {item.orderNo && (
                             <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 text-slate-600 dark:text-slate-400">

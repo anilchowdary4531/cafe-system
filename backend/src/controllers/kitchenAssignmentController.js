@@ -16,16 +16,19 @@ import {
 } from "../services/kitchenAssignmentService.js";
 
 const handleError = (res, err) => {
+  const sendStatus = (code) => (typeof res.status === "function" ? res.status(code) : (typeof res.code === "function" ? res.code(code) : res));
   if (err instanceof KitchenAssignmentError) {
-    return res.status(err.status).send({
+    return sendStatus(err.status).send({
       ok: false,
+      success: false,
       message: err.message,
       code: err.code,
     });
   }
   console.error("[kitchenAssignmentController] Error:", err);
-  return res.status(500).send({
+  return sendStatus(500).send({
     ok: false,
+    success: false,
     message: err?.message || "Internal server error",
   });
 };

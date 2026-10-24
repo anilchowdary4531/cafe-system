@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { Truck, Search, Plus, MapPin, User, Clock, Phone, AlertCircle, RefreshCw, CheckCircle2, ShieldAlert, Loader2, Navigation } from "lucide-react";
 import { api } from "../../utils/apiClient";
 import { showToast } from "../../utils/toast";
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { MAP_CONFIG } from "../../utils/mapConfig";
 import OwnerMenuButton from "../../components/OwnerMenuButton";

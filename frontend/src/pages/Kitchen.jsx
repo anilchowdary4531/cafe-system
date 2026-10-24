@@ -1457,10 +1457,11 @@ export default function Kitchen() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                         {group.items.map((item) => (
                                             <div
-                                                key={`kitchen-history-item-${item.id}`}
+                                                key={item.orderItemId ? `kitchen-history-orderItem-${item.orderItemId}` : `kitchen-history-item-${item.id}`}
                                                 data-testid={`history-item-${item.id}`}
                                                 data-kot-id={item.kotId}
                                                 data-order-item-id={item.orderItemId}
+                                                data-kot-item-id={item.kotItemId || item.id}
                                                 data-menu-item-id={item.menuItemId}
                                                 data-order-id={item.orderId}
                                                 data-chef-id={item.assignedChefId}
