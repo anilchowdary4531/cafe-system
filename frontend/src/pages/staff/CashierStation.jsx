@@ -73,6 +73,7 @@ export const getAuthoritativeTotal = (order) => {
 export default function CashierStation() {
     const { user, token } = useAuth();
     const { socket, isConnected } = useStaffSocket();
+    const isOnline = isConnected ?? true;
     const { tables, occupiedCount, freeCount, loading: loadingTables, refreshTables } = useCanonicalTables();
 
     // Workstation view tab: "terminal" | "transactions" | "shift"
@@ -107,6 +108,7 @@ export default function CashierStation() {
     const [referenceNoInput, setReferenceNoInput] = useState("");
     const [processingPayment, setProcessingPayment] = useState(false);
     const [lastSettledOrder, setLastSettledOrder] = useState(null);
+    const paymentInFlightRef = useRef(false);
 
     // Split Billing state
     const [showSplitModal, setShowSplitModal] = useState(false);
@@ -416,6 +418,17 @@ export default function CashierStation() {
     // Payment Settlement Action
     const handleCollectPayment = async () => {
         if (!selectedOrder) return;
+        if (paymentInFlightRef.current || processingPayment) return;
+
+        if (!isOnline) {
+            showToast({
+                title: "Network Offline",
+                message: "Cannot settle payments while offline. Reconnecting to POS network...",
+                variant: "error",
+            });
+            return;
+        }
+
         if (!currentShift) {
             showToast({
                 title: "Shift Required",
@@ -426,26 +439,67 @@ export default function CashierStation() {
             return;
         }
 
+        const authTotal = getAuthoritativeTotal(selectedOrder);
+
+        if (paymentMethod === "CASH") {
+            const tendered = parseFloat(cashTendered);
+            if (Number.isNaN(tendered) || tendered < authTotal) {
+                showToast({
+                    title: "Insufficient Cash Tendered",
+                    message: `Tendered cash (₹${Number.isNaN(tendered) ? 0 : tendered}) is less than total due (₹${authTotal}). Settlement blocked.`,
+                    variant: "error",
+                });
+                return;
+            }
+        }
+
         try {
+            paymentInFlightRef.current = true;
             setProcessingPayment(true);
-            const authTotal = getAuthoritativeTotal(selectedOrder);
 
             // Settle payment with backend authoritative amount
-            const res = await axios.post(
-                `${API}/api/v1/staff/billing/settle`,
-                {
-                    orderId: selectedOrder.id,
-                    tableSessionId: selectedOrder.tableSessionId,
-                    tableNo: selectedOrder.tableNo,
-                    paymentMethod,
-                    amount: authTotal,
-                    restaurantId,
-                    shiftId: currentShift.id,
-                },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            // Try staff billing settle endpoint first, with fallback to owner table settle-bill
+            let res;
+            const targetTableNo = selectedOrder.tableNo || (selectedOrder.tableSession ? selectedOrder.tableSession.tableNo : null);
+            try {
+                res = await axios.post(
+                    `${API}/api/v1/staff/billing/settle`,
+                    {
+                        orderId: selectedOrder.id,
+                        tableSessionId: selectedOrder.tableSessionId,
+                        tableNo: selectedOrder.tableNo,
+                        paymentMethod,
+                        paymentMode: paymentMethod,
+                        amount: authTotal,
+                        restaurantId,
+                        shiftId: currentShift.id,
+                        reference: referenceNoInput.trim() || null,
+                    },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+            } catch (endpointErr) {
+                if (endpointErr.response?.status === 404 && targetTableNo) {
+                    res = await axios.post(
+                        `${API}/owner/${restaurantId}/tables/${encodeURIComponent(targetTableNo)}/settle-bill`,
+                        {
+                            tableId: selectedOrder.tableId || null,
+                            orderId: selectedOrder.id,
+                            paymentMode: paymentMethod,
+                            paymentMethod,
+                            amount: authTotal,
+                            changedByName: user?.name || "Cashier",
+                            reference: referenceNoInput.trim() || null,
+                            transactionId: referenceNoInput.trim() || null,
+                            shiftId: currentShift?.id || null,
+                        },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                } else {
+                    throw endpointErr;
+                }
+            }
 
-            if (res.data?.success || res.data?.verified) {
+            if (res.data?.success || res.data?.verified || res.data?.cleared !== undefined) {
                 const settledAmount = res.data?.authoritativeTotal || authTotal;
                 const completedOrder = {
                     ...selectedOrder,
@@ -479,6 +533,7 @@ export default function CashierStation() {
                 variant: "error",
             });
         } finally {
+            paymentInFlightRef.current = false;
             setProcessingPayment(false);
         }
     };
@@ -1052,6 +1107,7 @@ export default function CashierStation() {
                                             {/* Split Bill */}
                                             <button
                                                 type="button"
+                                                data-testid="open-split-modal-btn"
                                                 onClick={() => setShowSplitModal(true)}
                                                 className="px-2.5 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold flex items-center gap-1.5 transition border border-neutral-700 min-h-[38px]"
                                                 title="Open Split Billing Modal"
@@ -1063,6 +1119,7 @@ export default function CashierStation() {
                                             {/* Request Discount */}
                                             <button
                                                 type="button"
+                                                data-testid="request-discount-btn"
                                                 onClick={() => setShowDiscountModal(true)}
                                                 className="px-2.5 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold flex items-center gap-1.5 transition border border-neutral-700 min-h-[38px]"
                                             >
@@ -1170,6 +1227,7 @@ export default function CashierStation() {
                                                 return (
                                                     <button
                                                         key={m.id}
+                                                        data-testid={`pay-method-${m.id}`}
                                                         type="button"
                                                         onClick={() => {
                                                             if (m.id === "SPLIT") {
@@ -1293,13 +1351,23 @@ export default function CashierStation() {
                                         type="button"
                                         data-testid="settle-payment-btn"
                                         onClick={handleCollectPayment}
-                                        disabled={processingPayment || !currentShift}
-                                        className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-base transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 min-h-[52px] disabled:opacity-50"
+                                        disabled={processingPayment || !currentShift || !isOnline || (paymentMethod === "CASH" && shortDue > 0)}
+                                        className={`w-full py-4 rounded-2xl font-black text-base transition flex items-center justify-center gap-2 shadow-lg min-h-[52px] disabled:opacity-50 ${
+                                            !isOnline
+                                                ? "bg-neutral-800 text-neutral-400 cursor-not-allowed border border-neutral-700"
+                                                : paymentMethod === "CASH" && shortDue > 0
+                                                ? "bg-amber-800/80 hover:bg-amber-800 text-amber-200 cursor-not-allowed border border-amber-700/60"
+                                                : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/40"
+                                        }`}
                                     >
                                         <CheckCircle2 className="w-5 h-5" />
                                         <span>
-                                            {processingPayment
+                                            {!isOnline
+                                                ? "Offline — Settlements Paused"
+                                                : processingPayment
                                                 ? "Settling & Releasing Table..."
+                                                : paymentMethod === "CASH" && shortDue > 0
+                                                ? `Under-Tendered (Short ₹${shortDue.toFixed(2)})`
                                                 : `Confirm ₹${billTotal} Paid via ${paymentMethod}`}
                                         </span>
                                     </button>
@@ -1451,6 +1519,7 @@ export default function CashierStation() {
                                             <td className="py-2.5 px-3 text-right">
                                                 <button
                                                     type="button"
+                                                    data-testid={`reprint-tx-${tx.id}`}
                                                     onClick={() => handlePrintReceipt(tx)}
                                                     className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold text-xs inline-flex items-center gap-1 transition border border-neutral-700"
                                                 >
@@ -1494,6 +1563,7 @@ export default function CashierStation() {
                             {currentShift ? (
                                 <button
                                     type="button"
+                                    data-testid="close-shift-btn"
                                     onClick={() => setShowCloseShiftModal(true)}
                                     className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-md"
                                 >
@@ -1503,6 +1573,7 @@ export default function CashierStation() {
                             ) : (
                                 <button
                                     type="button"
+                                    data-testid="open-shift-btn"
                                     onClick={() => setShowOpenShiftModal(true)}
                                     className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-md"
                                 >
@@ -1559,6 +1630,7 @@ export default function CashierStation() {
                                     <div className="flex items-center gap-2">
                                         <button
                                             type="button"
+                                            data-testid="shift-cash-in-btn"
                                             onClick={() => {
                                                 setCashMovementType("CASH_IN");
                                                 setShowCashMovementModal(true);
@@ -1570,6 +1642,7 @@ export default function CashierStation() {
                                         </button>
                                         <button
                                             type="button"
+                                            data-testid="shift-cash-out-btn"
                                             onClick={() => {
                                                 setCashMovementType("CASH_OUT");
                                                 setShowCashMovementModal(true);
@@ -1760,7 +1833,7 @@ export default function CashierStation() {
                             Count physical currency in the cash drawer. The system compares physical cash with expected sales and float movements.
                         </p>
 
-                        <form onSubmit={handleCloseShift} className="space-y-4">
+                        <form data-testid="close-shift-form" onSubmit={handleCloseShift} className="space-y-4">
                             {/* Expected Cash Box */}
                             <div className="p-3.5 bg-neutral-950 rounded-xl border border-neutral-800 flex justify-between items-center text-xs">
                                 <div>

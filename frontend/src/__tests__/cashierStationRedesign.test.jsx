@@ -263,6 +263,10 @@ describe("CashierStation — POS Workstation Redesign", () => {
 
         fireEvent.click(screen.getByTestId("order-card-101"));
 
+        // Enter exact cash
+        const exactBtn = screen.getByText("Exact (₹840)");
+        fireEvent.click(exactBtn);
+
         const settleBtn = await screen.findByTestId("settle-payment-btn");
         fireEvent.click(settleBtn);
 
