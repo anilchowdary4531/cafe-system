@@ -41,6 +41,11 @@ import ServerProfileView from "../components/ServerProfileView";
 import ServerNotificationsView from "../components/ServerNotificationsView";
 import ChefWorkloadPanel from "../components/ChefWorkloadPanel";
 import KitchenAssignmentDrawer from "../components/KitchenAssignmentDrawer";
+import StaffWorkHistoryTabs from "../components/StaffWorkHistoryTabs";
+import ChefAssignmentActions from "../components/ChefAssignmentActions";
+import ReassignChefModal from "../components/ReassignChefModal";
+import AssignmentDetailsModal from "../components/AssignmentDetailsModal";
+import UnassignConfirmModal from "../components/UnassignConfirmModal";
 
 const KOT_STATUSES = ["ALL", "PENDING", "PREPARING", "READY", "SERVED", "CANCELLED"];
 const PRIORITIES = ["ALL", "NORMAL", "HIGH", "URGENT"];
@@ -193,6 +198,11 @@ export default function Kitchen() {
     const [drawerKot, setDrawerKot] = useState(null);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [isSubmittingAssignment, setIsSubmittingAssignment] = useState(false);
+
+    // Item-level assignment modal states
+    const [reassignModalData, setReassignModalData] = useState(null); // { item, kot }
+    const [detailsModalData, setDetailsModalData] = useState(null);   // { item, kot }
+    const [unassignModalData, setUnassignModalData] = useState(null); // { item, kot }
 
     // Filters
     const [selectedStationId, setSelectedStationId] = useState("ALL");
@@ -620,6 +630,7 @@ export default function Kitchen() {
         socket.on("kitchen:workload_updated", handleKitchenWorkloadUpdated);
         socket.on("kitchen:item_assigned", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_reassigned", handleKitchenAssignmentEvent);
+        socket.on("kitchen:item_unassigned", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_self_picked", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_status_updated", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_status_updated", onKitchenHistoryUpdated);
@@ -636,6 +647,7 @@ export default function Kitchen() {
             socket.off("kitchen:workload_updated", handleKitchenWorkloadUpdated);
             socket.off("kitchen:item_assigned", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_reassigned", handleKitchenAssignmentEvent);
+            socket.off("kitchen:item_unassigned", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_self_picked", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_status_updated", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_status_updated", onKitchenHistoryUpdated);
@@ -799,15 +811,79 @@ export default function Kitchen() {
             const res = await api.post(`/owner/${restaurantId}/kitchen/items/${itemId}/reassign`, { newChefId });
             if (res.data?.ok) {
                 showToast("Item reassigned successfully", "success");
+                // Optimistically update local kots state immediately
+                setKots((prev) =>
+                    prev.map((k) => ({
+                        ...k,
+                        items: (k.items || []).map((it) =>
+                            it.id === itemId || it.orderItemId === itemId
+                                ? {
+                                      ...it,
+                                      assignedChefId: newChefId,
+                                      assignedChefName: res.data.item?.assignedChefName || it.assignedChefName,
+                                      assignmentSource: "DISPATCHED",
+                                      assignedAt: res.data.item?.assignedAt || new Date().toISOString(),
+                                  }
+                                : it
+                        ),
+                    }))
+                );
                 await Promise.all([loadKots({ silent: true }), loadWorkload()]);
                 setIsDrawerOpen(false);
             }
         } catch (err) {
             showToast(err?.response?.data?.message || "Failed to reassign item", "error");
+            throw err;
         } finally {
             setIsSubmittingAssignment(false);
         }
     };
+
+    const handleUnassignItem = async (itemId) => {
+        setIsSubmittingAssignment(true);
+        try {
+            const res = await api.post(`/owner/${restaurantId}/kitchen/items/${itemId}/unassign`);
+            if (res.data?.ok) {
+                showToast("Chef unassigned successfully", "success");
+                // Optimistically update local kots state immediately
+                setKots((prev) =>
+                    prev.map((k) => ({
+                        ...k,
+                        items: (k.items || []).map((it) =>
+                            it.id === itemId || it.orderItemId === itemId
+                                ? {
+                                      ...it,
+                                      assignedChefId: null,
+                                      assignedChefName: null,
+                                      assignmentSource: null,
+                                      assignedAt: null,
+                                  }
+                                : it
+                        ),
+                    }))
+                );
+                await Promise.all([loadKots({ silent: true }), loadWorkload()]);
+                setIsDrawerOpen(false);
+            }
+        } catch (err) {
+            showToast(err?.response?.data?.message || "Failed to unassign item", "error");
+            throw err;
+        } finally {
+            setIsSubmittingAssignment(false);
+        }
+    };
+
+    const handleOpenReassignModal = useCallback((item, kot) => {
+        setReassignModalData({ item, kot });
+    }, []);
+
+    const handleOpenDetailsModal = useCallback((item, kot) => {
+        setDetailsModalData({ item, kot });
+    }, []);
+
+    const handleOpenUnassignModal = useCallback((item, kot) => {
+        setUnassignModalData({ item, kot });
+    }, []);
 
     // Calculate unassigned items and list for prominent queue
     const unassignedItemsList = useMemo(() => {
@@ -1144,61 +1220,36 @@ export default function Kitchen() {
 
             {/* WORKSPACE NAVIGATION TABS (COMMAND CENTER vs HISTORY) */}
             <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        data-testid="tab-command-center"
-                        onClick={() => {
-                            setViewMode("KDS");
-                            navigate("/kitchen");
-                        }}
-                        className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer ${
-                            viewMode === "KDS"
-                                ? "bg-slate-900 text-white shadow-xs"
-                                : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
-                        }`}
-                    >
-                        <Zap size={14} className={viewMode === "KDS" ? "text-orange-400" : "text-slate-500"} />
-                        <span>COMMAND CENTER</span>
-                        <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                                viewMode === "KDS"
-                                    ? "bg-orange-500 text-white"
-                                    : "bg-slate-200 text-slate-700"
-                            }`}
-                        >
-                            {kots.length}
-                        </span>
-                    </button>
-
-                    <button
-                        type="button"
-                        data-testid="tab-kitchen-history"
-                        onClick={() => {
+                <StaffWorkHistoryTabs
+                    designation="SENIOR_CHEF"
+                    activeTab={viewMode}
+                    onTabChange={(tabId) => {
+                        if (tabId === "HISTORY") {
                             setViewMode("HISTORY");
                             navigate("/kitchen/history");
-                        }}
-                        className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer ${
-                            viewMode === "HISTORY"
-                                ? "bg-slate-900 text-white shadow-xs"
-                                : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
-                        }`}
-                    >
-                        <History size={14} className={viewMode === "HISTORY" ? "text-emerald-400" : "text-slate-500"} />
-                        <span>HISTORY</span>
-                        {historySummary?.completedItems > 0 && (
-                            <span
-                                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                                    viewMode === "HISTORY"
-                                        ? "bg-emerald-600 text-white"
-                                        : "bg-slate-200 text-slate-700"
-                                }`}
-                            >
-                                {historySummary.completedItems}
-                            </span>
-                        )}
-                    </button>
-                </div>
+                        } else {
+                            setViewMode("KDS");
+                            navigate("/kitchen");
+                        }
+                    }}
+                    className="border-b-0 pb-0"
+                    tabs={[
+                        {
+                            id: "KDS",
+                            label: "COMMAND CENTER",
+                            icon: Zap,
+                            badge: kots.length,
+                            testId: "tab-command-center",
+                        },
+                        {
+                            id: "HISTORY",
+                            label: "HISTORY",
+                            icon: History,
+                            badge: historySummary?.completedItems || 0,
+                            testId: "tab-kitchen-history",
+                        },
+                    ]}
+                />
             </div>
 
             {/* Main Content Body */}
@@ -1788,50 +1839,20 @@ export default function Kitchen() {
                                     All kitchen items are currently assigned to chefs. Great job!
                                 </div>
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left text-xs">
-                                        <thead className="border-b border-slate-100 bg-slate-50/50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                            <tr>
-                                                <th className="py-2 px-3 w-8">
-                                                    <input
-                                                        type="checkbox"
-                                                        aria-label="Select all unassigned items"
-                                                        checked={
-                                                            selectedUnassignedItemIds.length > 0 &&
-                                                            selectedUnassignedItemIds.length === unassignedItemsList.length
-                                                        }
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setSelectedUnassignedItemIds(unassignedItemsList.map((it) => it.id));
-                                                            } else {
-                                                                setSelectedUnassignedItemIds([]);
-                                                            }
-                                                        }}
-                                                        className="rounded text-orange-600 focus:ring-orange-500 cursor-pointer"
-                                                    />
-                                                </th>
-                                                <th className="py-2 px-3">Ticket / Order</th>
-                                                <th className="py-2 px-3">Table</th>
-                                                <th className="py-2 px-3">Item</th>
-                                                <th className="py-2 px-3">Qty</th>
-                                                <th className="py-2 px-3">Priority</th>
-                                                <th className="py-2 px-3">Wait Time</th>
-                                                <th className="py-2 px-3">Station</th>
-                                                <th className="py-2 px-3">Status</th>
-                                                <th className="py-2 px-3 text-right">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {unassignedItemsList.map((it) => {
-                                                const isSelected = selectedUnassignedItemIds.includes(it.id);
-                                                return (
-                                                    <tr
-                                                        key={`unassigned-${it.id}`}
-                                                        className={`hover:bg-slate-50/80 transition-colors ${
-                                                            isSelected ? "bg-orange-50/40" : ""
-                                                        }`}
-                                                    >
-                                                        <td className="py-2.5 px-3">
+                                <>
+                                    {/* Mobile Cards View (< 768px) */}
+                                    <div className="md:hidden divide-y divide-slate-100 p-2 space-y-2.5">
+                                        {unassignedItemsList.map((it) => {
+                                            const isSelected = selectedUnassignedItemIds.includes(it.id);
+                                            return (
+                                                <div
+                                                    key={`unassigned-m-${it.id}`}
+                                                    className={`p-3 rounded-xl border border-slate-200/80 bg-white space-y-2 transition shadow-xs ${
+                                                        isSelected ? "bg-orange-50/50 border-orange-300 ring-1 ring-orange-300" : ""
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <label className="flex items-center gap-2 cursor-pointer">
                                                             <input
                                                                 type="checkbox"
                                                                 aria-label={`Select ${it.itemName || it.name}`}
@@ -1841,63 +1862,171 @@ export default function Kitchen() {
                                                                         isSelected ? prev.filter((id) => id !== it.id) : [...prev, it.id]
                                                                     );
                                                                 }}
-                                                                className="rounded text-orange-600 focus:ring-orange-500 cursor-pointer"
+                                                                className="rounded text-orange-600 focus:ring-orange-500 cursor-pointer h-4 w-4"
                                                             />
-                                                        </td>
-                                                        <td className="py-2.5 px-3 font-semibold text-slate-900 whitespace-nowrap">
-                                                            <span>#{it.kotNo || it.kotId}</span>
-                                                            <span className="text-[10px] text-slate-400 block font-normal">
-                                                                Order #{it.orderId}
+                                                            <span className="font-extrabold text-xs text-slate-900">
+                                                                #{it.kotNo || it.kotId}
                                                             </span>
-                                                        </td>
-                                                        <td className="py-2.5 px-3 font-bold text-slate-800 whitespace-nowrap">
+                                                            <span className="text-[10px] text-slate-400">Order #{it.orderId}</span>
+                                                        </label>
+                                                        <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-black text-xs">
                                                             Table {it.tableNo || "-"}
-                                                        </td>
-                                                        <td className="py-2.5 px-3 font-bold text-slate-900">
-                                                            {it.itemName || it.name || "Item"}
-                                                        </td>
-                                                        <td className="py-2.5 px-3 font-black text-slate-700">
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div>
+                                                            <p className="font-bold text-sm text-slate-900">{it.itemName || it.name || "Item"}</p>
+                                                            <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+                                                                <span>{it.stationName || "Kitchen"}</span>
+                                                                <span>•</span>
+                                                                <span>{formatAge(it.elapsedMinutes)} wait</span>
+                                                            </div>
+                                                        </div>
+                                                        <span className="font-black text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-800 shrink-0">
                                                             {it.quantity || it.qty || 1}x
-                                                        </td>
-                                                        <td className="py-2.5 px-3">
-                                                            <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-extrabold ${priorityBadgeClass(it.priority)}`}>
-                                                                {it.priority}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap font-medium">
-                                                            {formatAge(it.elapsedMinutes)}
-                                                        </td>
-                                                        <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
-                                                            {it.stationName || "Kitchen"}
-                                                        </td>
-                                                        <td className="py-2.5 px-3">
-                                                            <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
-                                                                {it.status}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-2.5 px-3 text-right">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    if (bulkTargetChefId) {
-                                                                        handleAssignItem(it.id, Number(bulkTargetChefId));
-                                                                    } else {
-                                                                        const targetKot = kots.find((k) => k.id === it.kotId);
-                                                                        if (targetKot) handleOpenAssignDrawer(targetKot);
-                                                                        else showToast("Select a chef or open KOT drawer", "info");
-                                                                    }
-                                                                }}
-                                                                className="inline-flex items-center gap-1 rounded bg-orange-100 hover:bg-orange-200 text-orange-800 font-bold px-2 py-0.5 text-[11px] transition"
-                                                            >
-                                                                Dispatch
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                                                        <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-extrabold ${priorityBadgeClass(it.priority)}`}>
+                                                            {it.priority}
+                                                        </span>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (bulkTargetChefId) {
+                                                                    handleAssignItem(it.id, Number(bulkTargetChefId));
+                                                                } else {
+                                                                    const targetKot = kots.find((k) => k.id === it.kotId);
+                                                                    if (targetKot) handleOpenAssignDrawer(targetKot);
+                                                                    else showToast("Select a chef or open KOT drawer", "info");
+                                                                }
+                                                            }}
+                                                            className="inline-flex items-center justify-center gap-1 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold px-3 py-2 text-xs min-h-[44px] transition shadow-xs"
+                                                        >
+                                                            <UserCheck size={14} />
+                                                            Dispatch
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Desktop & Wide Tablet Table (>= 768px) */}
+                                    <div className="hidden md:block overflow-x-auto">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="border-b border-slate-100 bg-slate-50/50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                                <tr>
+                                                    <th className="py-2 px-3 w-8">
+                                                        <input
+                                                            type="checkbox"
+                                                            aria-label="Select all unassigned items"
+                                                            checked={
+                                                                selectedUnassignedItemIds.length > 0 &&
+                                                                selectedUnassignedItemIds.length === unassignedItemsList.length
+                                                            }
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setSelectedUnassignedItemIds(unassignedItemsList.map((it) => it.id));
+                                                                } else {
+                                                                    setSelectedUnassignedItemIds([]);
+                                                                }
+                                                            }}
+                                                            className="rounded text-orange-600 focus:ring-orange-500 cursor-pointer"
+                                                        />
+                                                    </th>
+                                                    <th className="py-2 px-3">Ticket / Order</th>
+                                                    <th className="py-2 px-3">Table</th>
+                                                    <th className="py-2 px-3">Item</th>
+                                                    <th className="py-2 px-3">Qty</th>
+                                                    <th className="py-2 px-3">Priority</th>
+                                                    <th className="py-2 px-3">Wait Time</th>
+                                                    <th className="py-2 px-3">Station</th>
+                                                    <th className="py-2 px-3">Status</th>
+                                                    <th className="py-2 px-3 text-right">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {unassignedItemsList.map((it) => {
+                                                    const isSelected = selectedUnassignedItemIds.includes(it.id);
+                                                    return (
+                                                        <tr
+                                                            key={`unassigned-${it.id}`}
+                                                            className={`hover:bg-slate-50/80 transition-colors ${
+                                                                isSelected ? "bg-orange-50/40" : ""
+                                                            }`}
+                                                        >
+                                                            <td className="py-2.5 px-3">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    aria-label={`Select ${it.itemName || it.name}`}
+                                                                    checked={isSelected}
+                                                                    onChange={() => {
+                                                                        setSelectedUnassignedItemIds((prev) =>
+                                                                            isSelected ? prev.filter((id) => id !== it.id) : [...prev, it.id]
+                                                                        );
+                                                                    }}
+                                                                    className="rounded text-orange-600 focus:ring-orange-500 cursor-pointer"
+                                                                />
+                                                            </td>
+                                                            <td className="py-2.5 px-3 font-semibold text-slate-900 whitespace-nowrap">
+                                                                <span>#{it.kotNo || it.kotId}</span>
+                                                                <span className="text-[10px] text-slate-400 block font-normal">
+                                                                    Order #{it.orderId}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-2.5 px-3 font-bold text-slate-800 whitespace-nowrap">
+                                                                Table {it.tableNo || "-"}
+                                                            </td>
+                                                            <td className="py-2.5 px-3 font-bold text-slate-900">
+                                                                {it.itemName || it.name || "Item"}
+                                                            </td>
+                                                            <td className="py-2.5 px-3 font-black text-slate-700">
+                                                                {it.quantity || it.qty || 1}x
+                                                            </td>
+                                                            <td className="py-2.5 px-3">
+                                                                <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-extrabold ${priorityBadgeClass(it.priority)}`}>
+                                                                    {it.priority}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap font-medium">
+                                                                {formatAge(it.elapsedMinutes)}
+                                                            </td>
+                                                            <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
+                                                                {it.stationName || "Kitchen"}
+                                                            </td>
+                                                            <td className="py-2.5 px-3">
+                                                                <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
+                                                                    {it.status}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-2.5 px-3 text-right">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        if (bulkTargetChefId) {
+                                                                            handleAssignItem(it.id, Number(bulkTargetChefId));
+                                                                        } else {
+                                                                            const targetKot = kots.find((k) => k.id === it.kotId);
+                                                                            if (targetKot) handleOpenAssignDrawer(targetKot);
+                                                                            else showToast("Select a chef or open KOT drawer", "info");
+                                                                        }
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 rounded bg-orange-100 hover:bg-orange-200 text-orange-800 font-bold px-2 py-0.5 text-[11px] transition"
+                                                                >
+                                                                    Dispatch
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </>
                             )}
                         </div>
                     </div>
@@ -2035,7 +2164,7 @@ export default function Kitchen() {
                                 <p className="text-xs text-slate-400">Try switching your chef filter, priority, or search parameters.</p>
                             </div>
                         ) : (
-                            <div className="grid gap-6 lg:grid-cols-3 items-start">
+                            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 items-start">
                                 {/* COLUMN 1: NEW / PENDING */}
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between border-b border-slate-200 pb-2">
@@ -2060,6 +2189,9 @@ export default function Kitchen() {
                                                 onUpdatePriority={handleUpdatePriority}
                                                 onReprintKot={handleReprintKot}
                                                 onOpenAssignDrawer={handleOpenAssignDrawer}
+                                                onOpenReassignModal={handleOpenReassignModal}
+                                                onOpenDetailsModal={handleOpenDetailsModal}
+                                                onOpenUnassignModal={handleOpenUnassignModal}
                                             />
                                         ))}
                                         {groupedKots.NEW.length === 0 && (
@@ -2094,6 +2226,9 @@ export default function Kitchen() {
                                                 onUpdatePriority={handleUpdatePriority}
                                                 onReprintKot={handleReprintKot}
                                                 onOpenAssignDrawer={handleOpenAssignDrawer}
+                                                onOpenReassignModal={handleOpenReassignModal}
+                                                onOpenDetailsModal={handleOpenDetailsModal}
+                                                onOpenUnassignModal={handleOpenUnassignModal}
                                             />
                                         ))}
                                         {groupedKots.PREPARING.length === 0 && (
@@ -2128,6 +2263,9 @@ export default function Kitchen() {
                                                 onUpdatePriority={handleUpdatePriority}
                                                 onReprintKot={handleReprintKot}
                                                 onOpenAssignDrawer={handleOpenAssignDrawer}
+                                                onOpenReassignModal={handleOpenReassignModal}
+                                                onOpenDetailsModal={handleOpenDetailsModal}
+                                                onOpenUnassignModal={handleOpenUnassignModal}
                                             />
                                         ))}
                                         {groupedKots.READY.length === 0 && (
@@ -2154,6 +2292,33 @@ export default function Kitchen() {
                 onAssignKot={handleAssignKot}
                 onReassign={handleReassignItem}
                 isSubmitting={isSubmittingAssignment}
+            />
+
+            {/* Reassign Chef Modal */}
+            <ReassignChefModal
+                isOpen={Boolean(reassignModalData)}
+                onClose={() => setReassignModalData(null)}
+                item={reassignModalData?.item}
+                kot={reassignModalData?.kot}
+                chefs={workload.chefs}
+                onReassign={handleReassignItem}
+            />
+
+            {/* Assignment Details Modal */}
+            <AssignmentDetailsModal
+                isOpen={Boolean(detailsModalData)}
+                onClose={() => setDetailsModalData(null)}
+                item={detailsModalData?.item}
+                kot={detailsModalData?.kot}
+            />
+
+            {/* Unassign Confirm Modal */}
+            <UnassignConfirmModal
+                isOpen={Boolean(unassignModalData)}
+                onClose={() => setUnassignModalData(null)}
+                item={unassignModalData?.item}
+                kot={unassignModalData?.kot}
+                onConfirm={handleUnassignItem}
             />
 
             {/* Sound Notification Modal */}
@@ -2231,6 +2396,9 @@ function KotCard({
     onUpdatePriority,
     onReprintKot,
     onOpenAssignDrawer,
+    onOpenReassignModal,
+    onOpenDetailsModal,
+    onOpenUnassignModal,
 }) {
     const sla = getSlaStatus(kot.createdAt, kot.estimatedPrepTimeMinutes);
     const orderSource = kot.order?.orderSource || "POS";
@@ -2283,14 +2451,17 @@ function KotCard({
                             {sla.label} ({sla.elapsed}m / {kot.estimatedPrepTimeMinutes || 15}m)
                         </span>
 
-                        <button
-                            type="button"
-                            onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2 py-0.5 rounded transition border border-orange-200"
-                        >
-                            <ChefHat size={12} />
-                            Assign
-                        </button>
+                        {!allAssigned && (
+                            <button
+                                type="button"
+                                data-testid={`kot-header-assign-btn-${kot.id}`}
+                                onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2 py-0.5 rounded transition border border-orange-200 cursor-pointer"
+                            >
+                                <ChefHat size={12} />
+                                Assign
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -2301,13 +2472,12 @@ function KotCard({
                 )}
             </div>
 
-            {/* Items Checklist with Chef Assignment Chips */}
+            {/* Items Checklist with Item-Level Assignment Actions */}
             <div className="divide-y divide-slate-100 px-3.5 py-1">
                 {items.map((it) => {
                     const isCancelled = it.status === "CANCELLED";
                     const isReady = it.status === "READY";
                     const isPrep = it.status === "PREPARING";
-                    const isAssigned = Boolean(it.assignedChefId);
 
                     return (
                         <div
@@ -2316,35 +2486,23 @@ function KotCard({
                                 isCancelled ? "opacity-50" : ""
                             }`}
                         >
-                            <div className="space-y-0.5 min-w-0">
-                                <div className="flex items-center gap-1.5 text-sm flex-wrap">
+                            <div className="space-y-0.5 min-w-0 flex-1">
+                                <div className="flex items-center gap-2 text-sm flex-wrap">
                                     <span className="text-orange-600 font-bold">{it.qty || it.quantity || 1}×</span>
                                     <span className={`text-slate-900 font-medium ${isCancelled ? "line-through text-slate-400" : ""}`}>
                                         {it.itemName || it.name}
                                     </span>
 
-                                    {/* Assignment Chip */}
-                                    {isAssigned ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
-                                            className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 hover:bg-orange-100 hover:text-orange-800 transition flex items-center gap-1 border border-slate-200"
-                                            title="Click to reassign"
-                                        >
-                                            <ChefHat size={10} className="text-orange-500" />
-                                            <span>{it.assignedChefName || `Chef #${it.assignedChefId}`}</span>
-                                            <span className="text-[9px] text-slate-400">({it.assignmentSource === "SELF_PICKED" ? "SELF" : "DISP"})</span>
-                                        </button>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() => onOpenAssignDrawer && onOpenAssignDrawer(kot)}
-                                            className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition"
-                                            title="Click to assign"
-                                        >
-                                            UNASSIGNED
-                                        </button>
-                                    )}
+                                    {/* Authoritative Assignment Actions */}
+                                    <ChefAssignmentActions
+                                        item={it}
+                                        kot={kot}
+                                        onOpenAssignDrawer={onOpenAssignDrawer}
+                                        onOpenReassignModal={onOpenReassignModal}
+                                        onOpenDetailsModal={onOpenDetailsModal}
+                                        onOpenUnassignModal={onOpenUnassignModal}
+                                        disabled={isCancelled}
+                                    />
                                 </div>
 
                                 {(it.variantName || it.variant) && (

@@ -224,7 +224,7 @@ export default function StaffNotificationsView({
                 {/* Collapsible sound picker */}
                 {showSoundSettings && (
                     <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-xl">
-                        <NotificationSoundPicker defaultExpanded={true} />
+                        <NotificationSoundPicker defaultExpanded={false} />
                     </div>
                 )}
 

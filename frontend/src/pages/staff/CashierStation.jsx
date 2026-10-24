@@ -18,6 +18,7 @@ import {
     Layers,
     Percent,
     ArrowRight,
+    ArrowLeft,
     Users,
     X,
     Filter,
@@ -839,7 +840,7 @@ export default function CashierStation() {
                     {/* MAIN TWO-COLUMN POS WORKSPACE */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
                         {/* LEFT COLUMN: Table Strip & Active Bills Queue (5 cols on wide, 6 on regular) */}
-                        <div className="lg:col-span-5 xl:col-span-5 space-y-3">
+                        <div className={`lg:col-span-5 xl:col-span-5 space-y-3 ${selectedOrder ? "hidden lg:block" : "block"}`}>
                             {/* FLOOR / TABLE STATUS STRIP */}
                             <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 space-y-2.5">
                                 <div className="flex items-center justify-between text-xs">
@@ -1056,9 +1057,19 @@ export default function CashierStation() {
                         </div>
 
                         {/* RIGHT COLUMN: Selected Bill Workstation & Checkout Pane (7 cols on wide) */}
-                        <div className="lg:col-span-7 xl:col-span-7">
+                        <div className={`lg:col-span-7 xl:col-span-7 ${!selectedOrder ? "hidden lg:block" : "block"}`}>
                             {selectedOrder ? (
                                 <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+                                    {/* Mobile Back to Bills Queue Button */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedOrder(null)}
+                                        className="lg:hidden inline-flex items-center gap-1.5 text-xs font-bold text-orange-400 hover:text-orange-300 py-1.5 px-3 rounded-xl bg-neutral-800 border border-neutral-700 min-h-[44px] transition mb-1"
+                                    >
+                                        <ArrowLeft className="w-4 h-4" />
+                                        <span>← Back to Bills Queue</span>
+                                    </button>
+
                                     {/* BILL HEADER & FAST ACTIONS */}
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-3">
                                         <div>

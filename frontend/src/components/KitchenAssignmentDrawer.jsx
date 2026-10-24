@@ -94,7 +94,7 @@ export default function KitchenAssignmentDrawer({
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in">
-      <div className="w-full max-w-lg bg-white dark:bg-slate-900 shadow-2xl flex flex-col h-full border-l border-slate-200 dark:border-slate-800 animate-slide-left">
+      <div className="w-full max-w-full sm:max-w-lg bg-white dark:bg-slate-900 shadow-2xl flex flex-col h-full border-l border-slate-200 dark:border-slate-800 animate-slide-left">
         {/* Header */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
           <div>
@@ -283,12 +283,12 @@ export default function KitchenAssignmentDrawer({
 
         {/* Footer Actions */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex flex-col gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <button
               type="button"
               onClick={handleAssignSelected}
               disabled={isSubmitting || selectedItemIds.length === 0}
-              className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold py-2 px-3 rounded-lg shadow-sm transition flex items-center justify-center gap-1.5"
+              className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold py-2.5 px-3 rounded-lg shadow-sm transition flex items-center justify-center gap-1.5 min-h-[44px]"
             >
               <Check size={14} />
               Assign Selected ({selectedItemIds.length})
@@ -299,7 +299,7 @@ export default function KitchenAssignmentDrawer({
                 type="button"
                 onClick={handleAssignAllUnassigned}
                 disabled={isSubmitting}
-                className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold py-2 px-3 rounded-lg shadow-sm transition"
+                className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold py-2.5 px-3 rounded-lg shadow-sm transition min-h-[44px]"
               >
                 Assign All Unassigned ({unassignedItems.length})
               </button>

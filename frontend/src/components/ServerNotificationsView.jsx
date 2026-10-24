@@ -336,10 +336,10 @@ export default function ServerNotificationsView({
                 </div>
             </div>
 
-            {/* Notification Sound Picker - Toggle Panel */}
+            {/* Notification Sound Picker - Toggle Panel, customization accordion collapsed by default */}
             {showSoundSettings && (
                 <div className="animate-in fade-in duration-200">
-                    <NotificationSoundPicker defaultExpanded={true} />
+                    <NotificationSoundPicker defaultExpanded={false} />
                 </div>
             )}
 

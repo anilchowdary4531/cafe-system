@@ -283,33 +283,34 @@ export default function SplitBillingModal({
     }, [paymentMode, cashReceived, payAmount]);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-            <div className="flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0f172a] shadow-2xl text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4 backdrop-blur-md">
+            <div className="flex max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2rem)] h-[90vh] w-[calc(100vw-24px)] sm:w-full max-w-4xl flex-col overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 bg-[#0f172a] shadow-2xl text-white">
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-slate-900/60">
-                    <div className="flex items-center gap-3">
-                        <div className="rounded-2xl bg-amber-500/20 p-2.5 text-amber-400 border border-amber-500/30">
-                            <Receipt className="h-6 w-6" />
+                <div className="flex items-center justify-between border-b border-white/10 px-4 sm:px-6 py-3 sm:py-4 bg-slate-900/60">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="rounded-2xl bg-amber-500/20 p-2 sm:p-2.5 text-amber-400 border border-amber-500/30 shrink-0">
+                            <Receipt className="h-5 w-5 sm:h-6 sm:w-6" />
                         </div>
                         <div>
-                            <h3 className="text-xl font-extrabold tracking-tight">
+                            <h3 className="text-base sm:text-xl font-extrabold tracking-tight">
                                 Table {session.tableNo} — Checkout & Billing
                             </h3>
-                            <p className="text-xs text-gray-400">
+                            <p className="text-[11px] sm:text-xs text-gray-400">
                                 Grand Total: <strong className="text-emerald-400">₹{toInr(sessionTotal)}</strong> | Paid: <span className="text-sky-400">₹{toInr(totalPaidSoFar)}</span> | Balance: <strong className="text-amber-400">₹{toInr(remainingBalance)}</strong>
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="rounded-full p-2 text-gray-400 hover:bg-white/10 hover:text-white transition"
+                        className="rounded-full p-2 text-gray-400 hover:bg-white/10 hover:text-white transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        aria-label="Close billing dialog"
                     >
                         <X className="h-5 w-5" />
                     </button>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-white/10 bg-slate-950/40 px-6 pt-3 gap-2">
+                <div className="flex border-b border-white/10 bg-slate-950/40 px-3 sm:px-6 pt-3 gap-2 overflow-x-auto scrollbar-none">
                     <button
                         onClick={() => setActiveTab("PAY_FULL")}
                         className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold transition ${activeTab === "PAY_FULL" ? "border-amber-400 text-amber-400" : "border-transparent text-gray-400 hover:text-gray-200"}`}

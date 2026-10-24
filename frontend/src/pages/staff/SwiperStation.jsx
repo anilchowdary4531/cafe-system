@@ -229,7 +229,7 @@ export default function SwiperStation() {
                             <p className="text-xs text-neutral-400">No tables waiting for tableside payment.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <div className="grid grid-cols-1 min-[340px]:grid-cols-2 sm:grid-cols-4 gap-2.5">
                             {filteredOrders.map((o) => {
                                 const isSelected = selectedOrder?.id === o.id;
                                 return (
@@ -305,7 +305,7 @@ export default function SwiperStation() {
                             <label className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
                                 Payment Method Collected on Handheld
                             </label>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2.5">
                                 {[
                                     { id: "CARD", label: "EDC Card Swipe", icon: CreditCard },
                                     { id: "UPI", label: "Dynamic UPI QR", icon: QrCode },

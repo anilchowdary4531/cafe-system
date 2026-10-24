@@ -299,7 +299,7 @@ export default function StaffProfileView({
                     <p className="text-xs text-neutral-400">
                         Customize alert tones and vibration patterns for incoming tasks, orders, and table service requests.
                     </p>
-                    <NotificationSoundPicker defaultExpanded={true} />
+                    <NotificationSoundPicker defaultExpanded={false} />
                 </div>
 
                 {/* Change Password Card */}

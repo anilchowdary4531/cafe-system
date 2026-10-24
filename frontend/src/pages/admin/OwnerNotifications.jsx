@@ -130,10 +130,10 @@ export default function OwnerNotifications() {
                 </div>
             </div>
 
-            {/* Notification Sound Picker - Hidden by default, toggled via Sound Settings button */}
+            {/* Notification Sound Picker - Toggled via Sound Settings button, customization accordion collapsed by default */}
             {showSoundSettings && (
                 <div className="animate-in fade-in duration-200">
-                    <NotificationSoundPicker defaultExpanded={true} />
+                    <NotificationSoundPicker defaultExpanded={false} />
                 </div>
             )}
 

@@ -140,19 +140,31 @@ export default function NotificationSoundPicker({ className = "", defaultExpande
             }`}>
               {soundOn ? <Volume2 size={20} /> : <VolumeX size={20} />}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100">Notification Sound</h3>
-                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                  soundOn ? "bg-orange-500/15 text-orange-600 dark:text-orange-400" : "bg-slate-100 dark:bg-zinc-800 text-slate-400"
-                }`}>
-                  {soundOn ? "ON" : "OFF"}
-                </span>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setIsExpanded((prev) => !prev)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setIsExpanded((prev) => !prev);
+                  }
+                }}
+                className="cursor-pointer select-none group"
+                aria-expanded={isExpanded}
+              >
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 group-hover:text-orange-500 transition-colors">Notification Sound</h3>
+                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                    soundOn ? "bg-orange-500/15 text-orange-600 dark:text-orange-400" : "bg-slate-100 dark:bg-zinc-800 text-slate-400"
+                  }`}>
+                    {soundOn ? "ON" : "OFF"}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {soundOn ? selectedSound?.name || "Choose or upload alert sound" : "Sound alerts disabled"}
+                </p>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {soundOn ? selectedSound?.name || "Choose or upload alert sound" : "Sound alerts disabled"}
-              </p>
-            </div>
           </div>
 
           <div className="flex items-center gap-2">

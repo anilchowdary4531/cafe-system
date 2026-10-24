@@ -1625,3 +1625,47 @@ html[data-app-theme-tone="light"] .theme-adaptive .text-slate-500 {
 .theme-adaptive .border-\[\#2a3446\] {
     border-color: var(--app-border) !important;
 }
+
+/* ========================================================= */
+/* RESPONSIVE DESIGN SYSTEM & SAFE AREA INSETS */
+/* ========================================================= */
+html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+}
+
+:root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+}
+
+.safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-area-inset-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+}
+
+/* Touch target helper */
+.touch-target-min {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* Smooth momentum scrolling for mobile horizontal containers */
+.scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+.scrollbar-none::-webkit-scrollbar {
+    display: none;
+}
+

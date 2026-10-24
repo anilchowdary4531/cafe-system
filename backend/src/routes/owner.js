@@ -67,6 +67,7 @@ import {
   bulkAssignItemsController,
   assignKotController,
   reassignItemController,
+  unassignItemController,
   getChefAssignedItemsController,
   selfPickItemController,
   selfPickKotController,
@@ -4097,6 +4098,8 @@ export default async function ownerRoutes(app, deps = {}) {
   app.post("/api/owner/:restaurantId/kitchen/kots/:kotId/assign", assignKotController);
   app.post("/owner/:restaurantId/kitchen/items/:itemId/reassign", reassignItemController);
   app.post("/api/owner/:restaurantId/kitchen/items/:itemId/reassign", reassignItemController);
+  app.post("/owner/:restaurantId/kitchen/items/:itemId/unassign", unassignItemController);
+  app.post("/api/owner/:restaurantId/kitchen/items/:itemId/unassign", unassignItemController);
 
   app.post("/owner/:restaurantId/kitchen/items/:itemId/self-pick", selfPickItemController);
   app.post("/api/owner/:restaurantId/kitchen/items/:itemId/self-pick", selfPickItemController);

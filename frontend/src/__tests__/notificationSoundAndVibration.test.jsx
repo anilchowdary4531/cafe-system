@@ -209,4 +209,139 @@ describe("Notification Sound & Vibration Independence, Patterns, and Controls", 
     expect(screen.getByText("Notification Vibration")).toBeDefined();
     expect(screen.getByText("Control vibration for Tiffzy notifications")).toBeDefined();
   });
+
+  describe("Notification Sound Accordion Collapse/Expand Behaviors", () => {
+    it("1. customization section is collapsed on initial render while header remains visible", () => {
+      render(<NotificationSoundPicker />);
+
+      // Header elements are visible
+      expect(screen.getByText("Notification Sound")).toBeDefined();
+      expect(screen.getByRole("switch", { name: "Toggle notification sound" })).toBeDefined();
+      expect(screen.getByTitle("Test Sound")).toBeDefined();
+      expect(screen.getByTestId("customize-sound-control")).toBeDefined();
+
+      // Customization content is NOT rendered / hidden by default
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+      expect(screen.queryByText("Upload Custom Sound File")).toBeNull();
+      expect(screen.queryByText("Pop Premium Chime")).toBeNull();
+    });
+
+    it("2. current sound remains visible in the header when collapsed", () => {
+      render(<NotificationSoundPicker />);
+
+      const currentSoundElement = screen.getByTestId("current-notification-sound");
+      expect(currentSoundElement).toBeDefined();
+      expect(currentSoundElement.textContent).toContain("6 Tiffzy Notification Sound");
+      expect(screen.getByText(/Customize Sound Tone \(6 Tiffzy Notification Sound\)/i)).toBeDefined();
+    });
+
+    it("3. clicking the expand control reveals sound options and custom sound upload", () => {
+      render(<NotificationSoundPicker />);
+
+      // Initially collapsed
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+
+      // Click the expand control
+      const expandBtn = screen.getByTestId("customize-sound-control");
+      fireEvent.click(expandBtn);
+
+      // Now options are revealed
+      expect(screen.getByTestId("notification-sound-customization-content")).toBeDefined();
+      expect(screen.getByText("Upload Custom Sound File")).toBeDefined();
+      expect(screen.getByText("Pop Premium Chime")).toBeDefined();
+      expect(screen.getByText("Bright Bell")).toBeDefined();
+    });
+
+    it("4. clicking again collapses the sound options", () => {
+      render(<NotificationSoundPicker />);
+
+      const expandBtn = screen.getByTestId("customize-sound-control");
+
+      // Expand
+      fireEvent.click(expandBtn);
+      expect(screen.getByTestId("notification-sound-customization-content")).toBeDefined();
+
+      // Collapse
+      fireEvent.click(expandBtn);
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+      expect(screen.queryByText("Upload Custom Sound File")).toBeNull();
+      expect(screen.queryByText("Pop Premium Chime")).toBeNull();
+    });
+
+    it("clicking the header control also expands and collapses the section", () => {
+      render(<NotificationSoundPicker />);
+
+      const headerControl = screen.getByTestId("notification-sound-header-control");
+
+      // Expand via header
+      fireEvent.click(headerControl);
+      expect(screen.getByTestId("notification-sound-customization-content")).toBeDefined();
+
+      // Collapse via header
+      fireEvent.click(headerControl);
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+    });
+
+    it("5. selected sound is unchanged when toggling accordion and preserved when reopening", () => {
+      const { unmount } = render(<NotificationSoundPicker />);
+
+      const expandBtn = screen.getByTestId("customize-sound-control");
+      fireEvent.click(expandBtn);
+
+      // Select a different sound: "Bright Bell"
+      const brightBellBtn = screen.getByText("Bright Bell");
+      fireEvent.click(brightBellBtn);
+
+      // Verify header updated
+      expect(screen.getByTestId("current-notification-sound").textContent).toBe("Bright Bell");
+      expect(screen.getByText(/Customize Sound Tone \(Bright Bell\)/i)).toBeDefined();
+
+      // Collapse section
+      fireEvent.click(expandBtn);
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+
+      // Verify selected sound remains "Bright Bell" when collapsed
+      expect(screen.getByTestId("current-notification-sound").textContent).toBe("Bright Bell");
+      expect(screen.getByText(/Customize Sound Tone \(Bright Bell\)/i)).toBeDefined();
+
+      // Unmount to simulate leaving the page
+      unmount();
+
+      // Reopen page by mounting again
+      render(<NotificationSoundPicker />);
+
+      // Customization section is collapsed by default on reopen
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+
+      // Existing selected sound ("Bright Bell") is preserved on reopen
+      expect(screen.getByTestId("current-notification-sound").textContent).toBe("Bright Bell");
+      expect(screen.getByText(/Customize Sound Tone \(Bright Bell\)/i)).toBeDefined();
+    });
+
+    it("OwnerNotifications page integrates collapsed sound customization by default", () => {
+      render(
+        <BrowserRouter>
+          <OwnerNotifications />
+        </BrowserRouter>
+      );
+
+      // Header is visible
+      expect(screen.getByText("Notification Sound")).toBeDefined();
+      expect(screen.getByTestId("current-notification-sound")).toBeDefined();
+      expect(screen.getByTitle("Test Sound")).toBeDefined();
+
+      // Accordion customization details are collapsed by default on the page
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+      expect(screen.queryByText("Upload Custom Sound File")).toBeNull();
+
+      // Expand via accordion control
+      fireEvent.click(screen.getByTestId("customize-sound-control"));
+      expect(screen.getByTestId("notification-sound-customization-content")).toBeDefined();
+      expect(screen.getByText("Upload Custom Sound File")).toBeDefined();
+
+      // Collapse again
+      fireEvent.click(screen.getByTestId("customize-sound-control"));
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+    });
+  });
 });

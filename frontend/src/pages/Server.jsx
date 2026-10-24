@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
     AlertTriangle,
     Bell,
@@ -1171,27 +1171,26 @@ export default function Server() {
         <div className="min-h-screen bg-[color:var(--app-bg,#f8fafc)] text-[color:var(--app-text,#0f172a)] font-sans flex flex-col">
             {/* Top Navigation & Status Bar */}
             <header className="sticky top-0 z-30 border-b border-[color:var(--app-border)]/50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-3 sm:px-4 py-2.5 sm:py-3 shadow-xs flex flex-wrap lg:flex-nowrap items-center justify-between gap-2.5 sm:gap-3">
-                {/* Brand & Branch Info */}
+                {/* Brand & Branch Info — Owner Panel Branding */}
                 <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#d8c3a3] bg-white p-1 shadow-[0_4px_14px_rgba(104,70,37,0.12)]">
-                        <BrandLogo className="h-full w-full" title="Tiffzy logo" />
-                    </div>
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
-                            <span className="text-sm sm:text-base font-black tracking-tight text-orange-500">
-                                Tiffzy
-                            </span>
-                            <span className="text-xs font-extrabold text-[color:var(--app-muted)] hidden min-[360px]:inline">•</span>
-                            <h1 className="text-xs sm:text-base font-extrabold tracking-tight text-[color:var(--app-text)] truncate max-w-[120px] min-[400px]:max-w-[180px] sm:max-w-[240px]">{restaurantName}</h1>
-                            <span className="rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold border border-orange-500/30 whitespace-nowrap">
-                                Server Station
-                            </span>
-                        </div>
-                        <p className="text-[10px] sm:text-[11px] theme-muted flex items-center gap-1.5 flex-wrap">
-                            <span>🕒 {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                            <span className="hidden min-[360px]:inline">•</span>
-                            <span>📅 {currentTime.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-                        </p>
+                    <Link
+                        to="/server"
+                        className="flex items-center gap-2 shrink-0 group focus:outline-none"
+                        title="Tiffzy Server Station"
+                    >
+                        <BrandLogo className="theme-brand-logo h-7 w-7 sm:h-8 sm:w-8 shrink-0" title="Tiffzy logo" />
+                        <span className="theme-brand-text text-lg sm:text-xl font-bold tracking-tight group-hover:opacity-90 transition-opacity">
+                            Tiffzy
+                        </span>
+                    </Link>
+                    <div className="min-w-0 flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <span className="text-xs font-extrabold text-[color:var(--app-muted)] hidden min-[360px]:inline">•</span>
+                        <h1 className="text-xs sm:text-base font-extrabold tracking-tight text-[color:var(--app-text)] truncate max-w-[110px] min-[400px]:max-w-[160px] sm:max-w-[220px]">
+                            {restaurantName}
+                        </h1>
+                        <span className="rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold border border-orange-500/30 whitespace-nowrap">
+                            Server Station
+                        </span>
                     </div>
                 </div>
 
@@ -1350,31 +1349,44 @@ export default function Server() {
                         )}
                     </button>
 
-                    {/* Profile Button */}
-                    <button
-                        onClick={() => {
-                            if (viewMode === "PROFILE") {
-                                setViewMode("FLOOR_PLAN");
-                                navigate("/server");
-                            } else {
-                                setViewMode("PROFILE");
-                                navigate("/server/profile");
-                            }
-                        }}
-                        className={`flex items-center gap-1.5 rounded-xl border px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
-                            viewMode === "PROFILE"
-                                ? "border-orange-500 bg-orange-500 text-white"
-                                : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
-                        }`}
-                        title="My Profile"
-                    >
-                        <div className={`h-5 w-5 rounded-full flex items-center justify-center font-black text-[10px] ${
-                            viewMode === "PROFILE" ? "bg-white text-orange-600" : "bg-orange-500 text-white"
-                        }`}>
-                            {(user?.name || user?.username || "S").charAt(0).toUpperCase()}
+                    {/* Staff Profile Area with Time & Date on Top */}
+                    <div className="flex flex-col items-end justify-center shrink-0">
+                        {/* Time & Date Display (Authoritative) */}
+                        <div className="text-right leading-none pb-1 select-none flex flex-col items-end" data-testid="server-station-clock">
+                            <span className="text-[10px] sm:text-[11px] font-bold text-[color:var(--app-text,#0f172a)] tabular-nums tracking-tight">
+                                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span className="text-[9px] sm:text-[10px] font-medium text-[color:var(--app-muted,#64748b)] whitespace-nowrap mt-0.5">
+                                {currentTime.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/,/g, '')}
+                            </span>
                         </div>
-                        <span className="hidden sm:inline font-bold">{user?.name?.split(" ")[0] || "Profile"}</span>
-                    </button>
+
+                        {/* Profile Button */}
+                        <button
+                            onClick={() => {
+                                if (viewMode === "PROFILE") {
+                                    setViewMode("FLOOR_PLAN");
+                                    navigate("/server");
+                                } else {
+                                    setViewMode("PROFILE");
+                                    navigate("/server/profile");
+                                }
+                            }}
+                            className={`flex items-center gap-1.5 rounded-xl border px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                                viewMode === "PROFILE"
+                                    ? "border-orange-500 bg-orange-500 text-white"
+                                    : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
+                            }`}
+                            title="My Profile"
+                        >
+                            <div className={`h-5 w-5 rounded-full flex items-center justify-center font-black text-[10px] ${
+                                viewMode === "PROFILE" ? "bg-white text-orange-600" : "bg-orange-500 text-white"
+                            }`}>
+                                {(user?.name || user?.username || "S").charAt(0).toUpperCase()}
+                            </div>
+                            <span className="font-bold max-w-[80px] sm:max-w-none truncate">{user?.name?.split(" ")[0] || "Profile"}</span>
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -1564,7 +1576,7 @@ export default function Server() {
                             <p className="font-bold text-xs">No dining tables match selected section or search filter.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                             {filteredTables.map((table) => {
                                 const isBlocked = Boolean(table.isBlocked);
                                 const isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
