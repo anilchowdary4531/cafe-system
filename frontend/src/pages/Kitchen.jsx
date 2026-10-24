@@ -19,17 +19,19 @@ import {
     Volume2,
     VolumeX,
     X,
-    Sliders,
-    Layers,
+    Users,
     UserCheck,
-    ArrowRight,
+    CheckSquare,
+    Square,
+    Zap,
+    ShieldAlert,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import { api } from "../utils/apiClient";
 import NotificationSoundPicker from "../components/NotificationSoundPicker";
 import { playNotificationSound } from "../utils/soundPlayer";
-import { resolveEffectiveStaffRole } from "../utils/staffRole";
+import { resolveEffectiveStaffRole, isSeniorChef as isSeniorChefCheck } from "../utils/staffRole";
 import { showToast } from "../utils/toast";
 import ServerProfileView from "../components/ServerProfileView";
 import ServerNotificationsView from "../components/ServerNotificationsView";
@@ -104,8 +106,14 @@ export default function Kitchen() {
 
     const restaurantName = String(user?.restaurant?.name || "Restaurant").trim() || "Restaurant";
     const effectiveRole = resolveEffectiveStaffRole(user?.role, user?.designation);
-    const isSeniorChef = /SENIOR|HEAD|EXECUTIVE/i.test(String(user?.designation || "")) || /OWNER|MANAGER/i.test(String(user?.role || ""));
+    const isSeniorChefUser = isSeniorChefCheck(user?.role, user?.designation);
     const titleLabel = "Senior Chef Command Center";
+
+    // Role-specific navigation: Line chef must be routed to their individual Chef Station
+    if (user && effectiveRole === "CHEF" && !isSeniorChefUser) {
+        const targetId = user?.id || user?.userId;
+        return <Navigate to={targetId ? `/kitchen/chef/${targetId}` : "/"} replace />;
+    }
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -614,20 +622,73 @@ export default function Kitchen() {
         }
     };
 
-    // Calculate unassigned items count
-    const unassignedItemsCount = useMemo(() => {
-        let count = 0;
+    // Calculate unassigned items and list for prominent queue
+    const unassignedItemsList = useMemo(() => {
+        const list = [];
         (kots || []).forEach((k) => {
             if (k.status !== "CANCELLED" && k.status !== "SERVED") {
                 (k.items || []).forEach((it) => {
                     if (!it.assignedChefId && it.status !== "CANCELLED" && it.status !== "SERVED") {
-                        count += 1;
+                        const elapsedMins = k.createdAt
+                            ? Math.max(0, Math.floor((Date.now() - new Date(k.createdAt).getTime()) / 60000))
+                            : 0;
+                        list.push({
+                            ...it,
+                            orderId: k.orderId,
+                            kotId: k.id,
+                            kotNo: k.kotNo,
+                            tableNo: k.tableNo,
+                            priority: k.priority || "NORMAL",
+                            stationName: k.stationName || "Kitchen",
+                            elapsedMinutes: elapsedMins,
+                        });
                     }
                 });
             }
         });
-        return count;
+        return list;
     }, [kots]);
+
+    const unassignedItemsCount = unassignedItemsList.length;
+
+    // Total Chef Capacity and Kitchen Utilization
+    const totalCapacity = useMemo(() => {
+        return (workload.chefs || []).reduce((acc, c) => acc + (Number(c.capacity) || 10), 0) || 10;
+    }, [workload.chefs]);
+
+    const totalAssignedItems = useMemo(() => {
+        return (workload.chefs || []).reduce((acc, c) => acc + (Number(c.assigned) || 0), 0);
+    }, [workload.chefs]);
+
+    const kitchenUtilizationPercent = useMemo(() => {
+        return Math.min(100, Math.round((totalAssignedItems / Math.max(1, totalCapacity)) * 100));
+    }, [totalAssignedItems, totalCapacity]);
+
+    // Quick Bulk Assignment state & handler
+    const [selectedUnassignedItemIds, setSelectedUnassignedItemIds] = useState([]);
+    const [bulkTargetChefId, setBulkTargetChefId] = useState("");
+    const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+
+    const handleQuickBulkAssign = async () => {
+        if (!bulkTargetChefId) {
+            showToast("Please select a target chef to assign to", "warning");
+            return;
+        }
+        if (!selectedUnassignedItemIds.length) {
+            showToast("Please select at least one unassigned item", "warning");
+            return;
+        }
+        setIsBulkAssigning(true);
+        try {
+            await handleBulkAssign(selectedUnassignedItemIds, Number(bulkTargetChefId));
+            setSelectedUnassignedItemIds([]);
+            setBulkTargetChefId("");
+        } catch (err) {
+            showToast(err?.message || "Failed to bulk assign items", "error");
+        } finally {
+            setIsBulkAssigning(false);
+        }
+    };
 
     // Filter KOTs
     const filteredKots = useMemo(() => {
@@ -701,22 +762,35 @@ export default function Kitchen() {
         const readyCount = list.filter((k) => k.status === "READY").length;
         const urgentCount = list.filter((k) => k.priority === "URGENT" && k.status !== "SERVED" && k.status !== "CANCELLED").length;
 
+        let pendingItemsCount = 0;
         let overdueCount = 0;
+        let delayedItemsCount = 0;
         list.forEach((k) => {
+            if (["PENDING", "ACCEPTED", "PRINTED"].includes(k.status)) {
+                pendingItemsCount += (k.items || []).filter((it) => it.status !== "CANCELLED" && it.status !== "SERVED").length;
+            }
             if (k.status !== "SERVED" && k.status !== "CANCELLED") {
                 const sla = getSlaStatus(k.createdAt, k.estimatedPrepTimeMinutes);
-                if (sla.label === "OVERDUE") overdueCount += 1;
+                if (sla.label === "OVERDUE") {
+                    overdueCount += 1;
+                    delayedItemsCount += (k.items || []).filter((it) => it.status !== "CANCELLED" && it.status !== "SERVED").length;
+                }
             }
         });
 
+        const activeChefsCount = (workload.chefs || []).filter((c) => (c.assigned || 0) > 0 || (c.preparing || 0) > 0).length;
+
         return {
             newCount,
+            pendingItemsCount,
             prepCount,
             readyCount,
             urgentCount,
             overdueCount,
+            delayedItemsCount,
+            activeChefsCount,
         };
-    }, [kots]);
+    }, [kots, workload.chefs]);
 
     return (
         <div className="min-h-screen bg-slate-50/40 text-slate-900 font-sans">
@@ -725,17 +799,28 @@ export default function Kitchen() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <div className="flex items-center gap-2">
-                            <ChefHat className="text-orange-500" size={22} />
-                            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-                                {titleLabel} <span className="text-xs font-normal text-slate-500">(Kitchen Operations KDS)</span>
-                            </h1>
-                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
-                                {restaurantName}
-                            </span>
+                            <ChefHat className="text-orange-500 shrink-0" size={24} />
+                            <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h1 className="text-xl font-black tracking-tight text-slate-900 sm:text-2xl flex items-center gap-2">
+                                        <span>Senior Chef Command Center</span>
+                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200">
+                                            Senior Chef Dashboard
+                                        </span>
+                                    </h1>
+                                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
+                                        {restaurantName}
+                                    </span>
+                                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        LIVE OPERATIONS
+                                    </span>
+                                </div>
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                    Kitchen Operations KDS · Authoritative Chef Dispatcher · Dynamic Self-Pick · Live Workloads & SLAs
+                                </p>
+                            </div>
                         </div>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                            Authoritative Chef Dispatcher · Dynamic Self-Pick · Live Workloads & SLAs
-                        </p>
                     </div>
 
                     {/* Mode Toggle & Header Actions */}
@@ -908,6 +993,142 @@ export default function Kitchen() {
                 </div>
             ) : (
                 <>
+                    {/* TOP KPI / SUMMARY AREA */}
+                    <div className="px-4 pt-4 sm:px-6">
+                        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-8">
+                            {/* 1. New Orders / Pending Items */}
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                                <div className="flex items-center justify-between text-slate-500 mb-1">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">New Orders</span>
+                                    <Clock3 size={15} className="text-blue-500" />
+                                </div>
+                                <div className="text-xl font-black text-slate-900">{metrics.newCount}</div>
+                                <div className="text-[10px] text-slate-400 font-medium truncate">
+                                    {metrics.pendingItemsCount} pending items
+                                </div>
+                            </div>
+
+                            {/* 2. Unassigned Items */}
+                            <div className={`rounded-xl border p-3 shadow-xs transition-all ${
+                                unassignedItemsCount > 0
+                                    ? "border-amber-300 bg-amber-50/60 ring-1 ring-amber-300/50"
+                                    : "border-slate-200 bg-white"
+                            }`}>
+                                <div className="flex items-center justify-between text-slate-500 mb-1">
+                                    <span className={`text-[11px] font-bold uppercase tracking-wider ${
+                                        unassignedItemsCount > 0 ? "text-amber-800" : "text-slate-500"
+                                    }`}>
+                                        Unassigned
+                                    </span>
+                                    <UserCheck size={15} className={unassignedItemsCount > 0 ? "text-amber-600" : "text-slate-400"} />
+                                </div>
+                                <div className={`text-xl font-black ${
+                                    unassignedItemsCount > 0 ? "text-amber-900" : "text-slate-900"
+                                }`}>
+                                    {unassignedItemsCount}
+                                </div>
+                                <div className="text-[10px] text-slate-500 font-medium truncate">
+                                    {unassignedItemsCount > 0 ? "Needs Dispatch" : "All Assigned"}
+                                </div>
+                            </div>
+
+                            {/* 3. Preparing */}
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                                <div className="flex items-center justify-between text-slate-500 mb-1">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">Preparing</span>
+                                    <Flame size={15} className="text-orange-500" />
+                                </div>
+                                <div className="text-xl font-black text-slate-900">{metrics.prepCount}</div>
+                                <div className="text-[10px] text-slate-400 font-medium truncate">Active on line</div>
+                            </div>
+
+                            {/* 4. Ready */}
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                                <div className="flex items-center justify-between text-slate-500 mb-1">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">Ready</span>
+                                    <CheckCircle2 size={15} className="text-emerald-500" />
+                                </div>
+                                <div className="text-xl font-black text-slate-900">{metrics.readyCount}</div>
+                                <div className="text-[10px] text-slate-400 font-medium truncate">Awaiting pickup</div>
+                            </div>
+
+                            {/* 5. Overdue */}
+                            <div className={`rounded-xl border p-3 shadow-xs transition-all ${
+                                metrics.overdueCount > 0
+                                    ? "border-red-300 bg-red-50/70 ring-1 ring-red-300/50"
+                                    : "border-slate-200 bg-white"
+                            }`}>
+                                <div className="flex items-center justify-between text-slate-500 mb-1">
+                                    <span className={`text-[11px] font-bold uppercase tracking-wider ${
+                                        metrics.overdueCount > 0 ? "text-red-800" : "text-slate-500"
+                                    }`}>
+                                        Overdue
+                                    </span>
+                                    <AlertTriangle size={15} className={metrics.overdueCount > 0 ? "text-red-600" : "text-slate-400"} />
+                                </div>
+                                <div className={`text-xl font-black ${
+                                    metrics.overdueCount > 0 ? "text-red-900" : "text-slate-900"
+                                }`}>
+                                    {metrics.overdueCount}
+                                </div>
+                                <div className="text-[10px] text-slate-500 font-medium truncate">
+                                    {metrics.overdueCount > 0 ? "Exceeded SLA" : "Within target"}
+                                </div>
+                            </div>
+
+                            {/* 6. Active Chefs */}
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                                <div className="flex items-center justify-between text-slate-500 mb-1">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">Active Chefs</span>
+                                    <Users size={15} className="text-indigo-500" />
+                                </div>
+                                <div className="text-xl font-black text-slate-900">
+                                    {workload.chefs?.length || 0}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-medium truncate">
+                                    {metrics.activeChefsCount} cooking now
+                                </div>
+                            </div>
+
+                            {/* 7. Chef Capacity */}
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                                <div className="flex items-center justify-between text-slate-500 mb-1">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">Capacity</span>
+                                    <Zap size={15} className="text-purple-500" />
+                                </div>
+                                <div className="text-xl font-black text-slate-900">
+                                    {totalAssignedItems}/{totalCapacity}
+                                </div>
+                                <div className="mt-1 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full transition-all duration-300 ${
+                                            kitchenUtilizationPercent >= 90
+                                                ? "bg-rose-500"
+                                                : kitchenUtilizationPercent >= 70
+                                                ? "bg-amber-500"
+                                                : "bg-emerald-500"
+                                        }`}
+                                        style={{ width: `${Math.min(100, kitchenUtilizationPercent)}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* 8. SLA / Delayed Work */}
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                                <div className="flex items-center justify-between text-slate-500 mb-1">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">SLA Delays</span>
+                                    <ShieldAlert size={15} className={metrics.delayedItemsCount > 0 ? "text-amber-500" : "text-emerald-500"} />
+                                </div>
+                                <div className="text-xl font-black text-slate-900">
+                                    {metrics.delayedItemsCount}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-medium truncate">
+                                    {metrics.urgentCount} urgent tickets
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* CHEF WORKLOAD PANEL */}
                     <div className="px-4 pt-3 sm:px-6">
                         <ChefWorkloadPanel
@@ -917,6 +1138,189 @@ export default function Kitchen() {
                             unassignedCount={unassignedItemsCount}
                             loading={loading}
                         />
+                    </div>
+
+                    {/* DEDICATED UNASSIGNED WORK QUEUE */}
+                    <div className="px-4 pt-3 sm:px-6">
+                        <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+                            <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/70">
+                                <div className="flex items-center gap-2">
+                                    <span className="flex h-2.5 w-2.5 rounded-full bg-amber-500 ring-4 ring-amber-100" />
+                                    <h2 className="text-sm font-black uppercase tracking-wider text-slate-900">
+                                        Unassigned Work Queue
+                                    </h2>
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-black text-amber-800 border border-amber-200">
+                                        {unassignedItemsCount} items
+                                    </span>
+                                </div>
+
+                                {unassignedItemsCount > 0 && (
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (selectedUnassignedItemIds.length === unassignedItemsList.length) {
+                                                    setSelectedUnassignedItemIds([]);
+                                                } else {
+                                                    setSelectedUnassignedItemIds(unassignedItemsList.map((it) => it.id));
+                                                }
+                                            }}
+                                            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                                        >
+                                            {selectedUnassignedItemIds.length === unassignedItemsList.length ? (
+                                                <>
+                                                    <CheckSquare size={13} className="text-orange-600" /> Deselect All
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Square size={13} className="text-slate-400" /> Select All
+                                                </>
+                                            )}
+                                        </button>
+
+                                        <select
+                                            value={bulkTargetChefId}
+                                            onChange={(e) => setBulkTargetChefId(e.target.value)}
+                                            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 outline-none"
+                                        >
+                                            <option value="">Select Target Chef...</option>
+                                            {(workload.chefs || []).map((c) => (
+                                                <option key={c.chefId} value={String(c.chefId)}>
+                                                    {c.chefName} ({c.assigned} active)
+                                                </option>
+                                            ))}
+                                        </select>
+
+                                        <button
+                                            type="button"
+                                            disabled={!selectedUnassignedItemIds.length || !bulkTargetChefId || isBulkAssigning}
+                                            onClick={handleQuickBulkAssign}
+                                            className="inline-flex items-center gap-1 rounded-lg bg-orange-600 px-3 py-1 text-xs font-black text-white hover:bg-orange-700 disabled:opacity-40 transition shadow-xs"
+                                        >
+                                            {isBulkAssigning ? <LoaderCircle size={13} className="animate-spin" /> : <UserCheck size={13} />}
+                                            BULK DISPATCH ({selectedUnassignedItemIds.length})
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {unassignedItemsList.length === 0 ? (
+                                <div className="p-4 text-center text-xs text-slate-400 font-medium">
+                                    All kitchen items are currently assigned to chefs. Great job!
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xs">
+                                        <thead className="border-b border-slate-100 bg-slate-50/50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                            <tr>
+                                                <th className="py-2 px-3 w-8">
+                                                    <input
+                                                        type="checkbox"
+                                                        aria-label="Select all unassigned items"
+                                                        checked={
+                                                            selectedUnassignedItemIds.length > 0 &&
+                                                            selectedUnassignedItemIds.length === unassignedItemsList.length
+                                                        }
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedUnassignedItemIds(unassignedItemsList.map((it) => it.id));
+                                                            } else {
+                                                                setSelectedUnassignedItemIds([]);
+                                                            }
+                                                        }}
+                                                        className="rounded text-orange-600 focus:ring-orange-500 cursor-pointer"
+                                                    />
+                                                </th>
+                                                <th className="py-2 px-3">Ticket / Order</th>
+                                                <th className="py-2 px-3">Table</th>
+                                                <th className="py-2 px-3">Item</th>
+                                                <th className="py-2 px-3">Qty</th>
+                                                <th className="py-2 px-3">Priority</th>
+                                                <th className="py-2 px-3">Wait Time</th>
+                                                <th className="py-2 px-3">Station</th>
+                                                <th className="py-2 px-3">Status</th>
+                                                <th className="py-2 px-3 text-right">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {unassignedItemsList.map((it) => {
+                                                const isSelected = selectedUnassignedItemIds.includes(it.id);
+                                                return (
+                                                    <tr
+                                                        key={`unassigned-${it.id}`}
+                                                        className={`hover:bg-slate-50/80 transition-colors ${
+                                                            isSelected ? "bg-orange-50/40" : ""
+                                                        }`}
+                                                    >
+                                                        <td className="py-2.5 px-3">
+                                                            <input
+                                                                type="checkbox"
+                                                                aria-label={`Select ${it.itemName || it.name}`}
+                                                                checked={isSelected}
+                                                                onChange={() => {
+                                                                    setSelectedUnassignedItemIds((prev) =>
+                                                                        isSelected ? prev.filter((id) => id !== it.id) : [...prev, it.id]
+                                                                    );
+                                                                }}
+                                                                className="rounded text-orange-600 focus:ring-orange-500 cursor-pointer"
+                                                            />
+                                                        </td>
+                                                        <td className="py-2.5 px-3 font-semibold text-slate-900 whitespace-nowrap">
+                                                            <span>#{it.kotNo || it.kotId}</span>
+                                                            <span className="text-[10px] text-slate-400 block font-normal">
+                                                                Order #{it.orderId}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-2.5 px-3 font-bold text-slate-800 whitespace-nowrap">
+                                                            Table {it.tableNo || "-"}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                                                            {it.itemName || it.name || "Item"}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 font-black text-slate-700">
+                                                            {it.quantity || it.qty || 1}x
+                                                        </td>
+                                                        <td className="py-2.5 px-3">
+                                                            <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-extrabold ${priorityBadgeClass(it.priority)}`}>
+                                                                {it.priority}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap font-medium">
+                                                            {formatAge(it.elapsedMinutes)}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
+                                                            {it.stationName || "Kitchen"}
+                                                        </td>
+                                                        <td className="py-2.5 px-3">
+                                                            <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
+                                                                {it.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-right">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (bulkTargetChefId) {
+                                                                        handleAssignItem(it.id, Number(bulkTargetChefId));
+                                                                    } else {
+                                                                        const targetKot = kots.find((k) => k.id === it.kotId);
+                                                                        if (targetKot) handleOpenAssignDrawer(targetKot);
+                                                                        else showToast("Select a chef or open KOT drawer", "info");
+                                                                    }
+                                                                }}
+                                                                className="inline-flex items-center gap-1 rounded bg-orange-100 hover:bg-orange-200 text-orange-800 font-bold px-2 py-0.5 text-[11px] transition"
+                                                            >
+                                                                Dispatch
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Filter Bar & Controls */}

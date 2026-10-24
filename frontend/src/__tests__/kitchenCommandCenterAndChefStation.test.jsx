@@ -405,4 +405,73 @@ describe("Senior Chef Command Center & Individual Chef Station Suite", () => {
       expect.stringContaining("/kitchen/items/1/self-pick")
     );
   });
+
+  // 8. Designation-aware role routing
+  it("determines correct routing path based on Senior Chef vs Line Chef designation", async () => {
+    const { isSeniorChef, getChefStationPath } = await import("../utils/staffRole");
+    const { getRedirectPath } = await import("../pages/Login");
+
+    expect(isSeniorChef("CHEF", "Senior Chef")).toBe(true);
+    expect(isSeniorChef("CHEF", "Head Chef")).toBe(true);
+    expect(isSeniorChef("CHEF", "Executive Chef")).toBe(true);
+    expect(isSeniorChef("CHEF", "Line Chef")).toBe(false);
+    expect(isSeniorChef("CHEF", "Chef")).toBe(false);
+
+    expect(getChefStationPath({ id: 10, role: "CHEF", designation: "Senior Chef" })).toBe("/kitchen");
+    expect(getChefStationPath({ id: 21, role: "CHEF", designation: "Line Chef" })).toBe("/kitchen/chef/21");
+
+    expect(getRedirectPath("CHEF", "Senior Chef", 10)).toBe("/kitchen");
+    expect(getRedirectPath("CHEF", "Line Chef", 21)).toBe("/kitchen/chef/21");
+  });
+
+  // 9. Senior Chef sees Top KPI Summary Area with backend authoritative metrics
+  it("displays 8 operational KPI summary cards on Senior Chef Dashboard", async () => {
+    render(
+      <MemoryRouter initialEntries={["/kitchen"]}>
+        <Kitchen />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("New Orders")).toBeInTheDocument();
+      expect(screen.getByText("Unassigned")).toBeInTheDocument();
+      expect(screen.getByText("Preparing")).toBeInTheDocument();
+      expect(screen.getByText("Ready")).toBeInTheDocument();
+      expect(screen.getByText("Overdue")).toBeInTheDocument();
+      expect(screen.getByText("Active Chefs")).toBeInTheDocument();
+      expect(screen.getByText("Capacity")).toBeInTheDocument();
+      expect(screen.getByText("SLA Delays")).toBeInTheDocument();
+      expect(screen.getByText(/Unassigned Work Queue/i)).toBeInTheDocument();
+    });
+  });
+
+  // 10. Chef Station does NOT show global unassigned queue or other chefs' workload
+  it("isolates Chef Station to personal queue and hides other chefs' workload", async () => {
+    mockCurrentUser = {
+      id: 21,
+      name: "Chef Ravi",
+      role: "CHEF",
+      designation: "Line Chef",
+      restaurantId: 1,
+    };
+
+    render(
+      <MemoryRouter initialEntries={["/kitchen/chef/21"]}>
+        <Routes>
+          <Route path="/kitchen/chef/:chefId" element={<KitchenChefDetail />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/CHEF STATION/i)).toBeInTheDocument();
+      expect(screen.getByText(/My Preparation Queue/i)).toBeInTheDocument();
+      // Does NOT show other chef
+      expect(screen.queryByText("Chef Suresh")).not.toBeInTheDocument();
+      // Does NOT show managerial controls
+      expect(screen.queryByText(/Unassigned Work Queue/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/DISPATCHER/i)).not.toBeInTheDocument();
+    });
+  });
 });
+

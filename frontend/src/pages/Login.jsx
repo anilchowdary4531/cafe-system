@@ -8,8 +8,10 @@ import BrandLogo from "../components/BrandLogo";
 import LanguageSelector from "../components/LanguageSelector";
 import { useLanguage } from "../context/LanguageContext";
 import { ORDER_FLOW_SCOPES, setStoredOrderFlowScope, isTableOrMenuPath } from "../utils/orderFlow";
-import { resolveEffectiveStaffRole } from "../utils/staffRole";
+import { resolveEffectiveStaffRole, getStaffRedirectPath, getRedirectPath } from "../utils/staffRole";
 import { clearStaffSession } from "../utils/staffSessionStorage";
+
+export { getStaffRedirectPath, getRedirectPath };
 
 export default function Login() {
     const { login, loginSession, loginCustomer, customer } = useAuth();
@@ -182,7 +184,7 @@ export default function Login() {
         const redirectTarget =
             fromPath && fromPathname !== "/login" && !shouldIgnoreFromPath
                 ? fromPath
-                : getRedirectPath(effectiveRole, data?.user?.designation, data?.user?.id);
+                : data?.redirectPath || getRedirectPath(effectiveRole, data?.user?.designation, data?.user?.id);
         navigate(redirectTarget, { replace: true });
     };
 
@@ -266,47 +268,8 @@ export default function Login() {
         return candidate || "/";
     };
 
-    const getRedirectPath = (role, designation, userId) => {
-        const normalizedRole = resolveEffectiveStaffRole(role, designation);
-        const isSeniorChef = /SENIOR/i.test(String(designation || ""));
+    const getRedirectPath = getStaffRedirectPath;
 
-        if (normalizedRole === "SUPER_ADMIN") {
-            return "/super-admin";
-        }
-        if (normalizedRole === "ADMIN") {
-            return "/admin";
-        }
-        if (normalizedRole === "OWNER") {
-            return "/owner";
-        }
-        if (normalizedRole === "CHEF") {
-            return "/kitchen";
-        }
-        if (normalizedRole === "WAITER") {
-            return "/server";
-        }
-        if (normalizedRole === "STEWARD") {
-            return "/staff/steward";
-        }
-        if (normalizedRole === "CASHIER") {
-            return "/staff/cashier";
-        }
-        if (normalizedRole === "CLEANER") {
-            return "/staff/cleaner";
-        }
-        if (normalizedRole === "SWIPER") {
-            return "/staff/swiper";
-        }
-        if (normalizedRole === "MANAGER") {
-            return "/owner";
-        }
-
-        if (normalizedRole === "STAFF" || (role && String(role).toUpperCase() !== "CUSTOMER")) {
-            return "/staff/workspace";
-        }
-
-        return "/";
-    };
 
     useEffect(() => {
         setMode(initialMode);

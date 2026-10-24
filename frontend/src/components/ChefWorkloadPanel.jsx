@@ -119,10 +119,10 @@ export default function ChefWorkloadPanel({
                 </div>
               </div>
 
-              {/* Workload Progress Bar */}
+              {/* Workload Progress Bar & Utilization */}
               <div className="mt-1">
                 <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
-                  <span>Assigned: <strong>{chef.assigned || 0}</strong></span>
+                  <span>Assigned: <strong>{chef.assigned || 0}</strong> ({loadRatio}%)</span>
                   <span className="text-[9px]">Cap: {chef.capacity || 10}</span>
                 </div>
                 <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
@@ -133,6 +133,11 @@ export default function ChefWorkloadPanel({
                     style={{ width: `${Math.max(5, loadRatio)}%` }}
                   />
                 </div>
+                {Number(chef.overdue || 0) > 0 && (
+                  <div className="mt-1 text-[9px] font-bold text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <span>Overdue: {chef.overdue}</span>
+                  </div>
+                )}
               </div>
             </div>
           );

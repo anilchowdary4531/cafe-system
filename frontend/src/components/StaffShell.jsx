@@ -26,6 +26,7 @@ export default function StaffShell({
     tabs = [],
     unreadNotificationCount = 0,
     actions = null,
+    fullWidth = false,
 }) {
     const navigate = useNavigate();
     const location = useLocation();
@@ -85,6 +86,7 @@ export default function StaffShell({
                                     <button
                                         key={tab.id}
                                         type="button"
+                                        data-testid={`staff-tab-${tab.id}`}
                                         onClick={() => onTabChange(tab.id)}
                                         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                                             isActive
@@ -202,7 +204,7 @@ export default function StaffShell({
             )}
 
             {/* Main Workspace Body */}
-            <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 pb-20 md:pb-8">
+            <main className={`flex-1 w-full mx-auto p-3 sm:p-5 pb-20 md:pb-6 ${fullWidth ? "max-w-[1720px]" : "max-w-7xl"}`}>
                 {children}
             </main>
         </div>

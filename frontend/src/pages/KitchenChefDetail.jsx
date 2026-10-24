@@ -55,6 +55,7 @@ export default function KitchenChefDetail() {
   const [loading, setLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState({});
   const [errorMsg, setErrorMsg] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   // Fetch Chef Info, Config, Assigned Items and Available Work
   const loadStationData = useCallback(async (silent = false) => {
@@ -254,27 +255,40 @@ export default function KitchenChefDetail() {
   const prepItems = assignedItems.filter((it) => it.status === "PREPARING");
   const readyItems = assignedItems.filter((it) => it.status === "READY");
 
+  const displayedItems = useMemo(() => {
+    if (statusFilter === "ALL") return assignedItems;
+    if (statusFilter === "PENDING") {
+      return assignedItems.filter((it) => it.status === "PENDING" || it.status === "ACCEPTED");
+    }
+    return assignedItems.filter((it) => it.status === statusFilter);
+  }, [assignedItems, statusFilter]);
+
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans">
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-3">
+      <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Link
-              to="/kitchen"
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-              title="Back to Senior Chef KDS"
-            >
-              <ArrowLeft size={16} />
-            </Link>
+            {isPrivileged && (
+              <Link
+                to="/kitchen"
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                title="Back to Senior Chef Command Center"
+              >
+                <ArrowLeft size={16} />
+              </Link>
+            )}
 
             <div>
-              <div className="flex items-center gap-2">
-                <ChefHat className="text-orange-500" size={18} />
-                <h1 className="text-sm sm:text-base font-extrabold tracking-tight">
-                  {chefInfo?.name || "Chef Station"}
+              <div className="flex items-center gap-2 flex-wrap">
+                <ChefHat className="text-orange-500" size={20} />
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-orange-500 text-white shadow-xs">
+                  CHEF STATION
+                </span>
+                <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-slate-100">
+                  {chefInfo?.name || "Chef"}
                 </h1>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                   Station #{chefId}
                 </span>
                 {kitchenConfig.mode === "SELF_PICK" && (
@@ -283,8 +297,8 @@ export default function KitchenChefDetail() {
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                {chefInfo?.designation || "Kitchen Line"} • Active Work: <strong>{activeItems.length} items</strong>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                My Preparation Queue • {chefInfo?.designation || "Kitchen Line"} • Active Work: <strong>{activeItems.length} items</strong>
               </div>
             </div>
           </div>
@@ -294,7 +308,7 @@ export default function KitchenChefDetail() {
               type="button"
               onClick={() => loadStationData(false)}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-xs"
             >
               <RefreshCw size={13} className={loading ? "animate-spin text-orange-500" : ""} />
               Refresh
@@ -308,14 +322,14 @@ export default function KitchenChefDetail() {
         {/* Metric Badges */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
-            <div className="text-[11px] text-slate-500 font-semibold mb-1">Assigned Total</div>
+            <div className="text-[11px] text-slate-500 font-semibold mb-1">My Assigned Total</div>
             <div className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{assignedItems.length}</div>
           </div>
 
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
             <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mb-1 flex items-center gap-1">
               <Clock size={12} />
-              Pending
+              My Pending
             </div>
             <div className="text-xl font-extrabold text-amber-600 dark:text-amber-400">{pendingItems.length}</div>
           </div>
@@ -323,7 +337,7 @@ export default function KitchenChefDetail() {
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
             <div className="text-[11px] text-orange-600 dark:text-orange-400 font-semibold mb-1 flex items-center gap-1">
               <Flame size={12} />
-              Preparing
+              My Preparing
             </div>
             <div className="text-xl font-extrabold text-orange-600 dark:text-orange-400">{prepItems.length}</div>
           </div>
@@ -331,7 +345,7 @@ export default function KitchenChefDetail() {
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
             <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mb-1 flex items-center gap-1">
               <CheckCircle2 size={12} />
-              Ready
+              My Ready
             </div>
             <div className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">{readyItems.length}</div>
           </div>
@@ -339,19 +353,44 @@ export default function KitchenChefDetail() {
 
         {/* SECTION 1: MY ASSIGNED ITEMS */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div className="flex items-center gap-2">
               <ChefHat size={16} className="text-orange-500" />
               <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                My Assigned Items ({assignedItems.length})
+                My Assigned Items ({displayedItems.length})
               </h2>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="inline-flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold">
+              {[
+                { key: "ALL", label: `ALL (${assignedItems.length})` },
+                { key: "PENDING", label: `PENDING (${pendingItems.length})` },
+                { key: "PREPARING", label: `PREPARING (${prepItems.length})` },
+                { key: "READY", label: `READY (${readyItems.length})` },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setStatusFilter(tab.key)}
+                  className={`px-2.5 py-1 rounded-md transition text-xs font-bold ${
+                    statusFilter === tab.key
+                      ? "bg-orange-500 text-white shadow-xs"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {assignedItems.length === 0 ? (
+          {displayedItems.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center text-slate-500">
               <UtensilsCrossed size={32} className="mx-auto mb-2 text-slate-400" />
-              <div className="text-xs font-bold text-slate-700 dark:text-slate-300">No items currently assigned</div>
+              <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                {statusFilter === "ALL" ? "No items currently assigned" : `No items in ${statusFilter} state`}
+              </div>
               <div className="text-[11px] text-slate-400 mt-1">
                 {kitchenConfig.mode === "SELF_PICK"
                   ? "Browse the Available Work queue below to claim items or KOTs."
@@ -360,7 +399,7 @@ export default function KitchenChefDetail() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {assignedItems.map((item) => {
+              {displayedItems.map((item) => {
                 const isBusy = Boolean(actionInProgress[item.id]);
                 const isPrep = item.status === "PREPARING";
                 const isReady = item.status === "READY";
