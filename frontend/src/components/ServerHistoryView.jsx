@@ -242,7 +242,7 @@ export default function ServerHistoryView({ onBackToFloorPlan, onBack, title }) 
               )}
               <History className="text-orange-500" size={20} />
               <h2 className="text-lg font-black tracking-tight text-slate-900 dark:text-slate-100">
-                Server History
+                {title || "Server Food-Service History"}
               </h2>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                 Completed Food Service
