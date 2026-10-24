@@ -414,6 +414,14 @@ export default function App() {
                         }
                     />
                     <Route
+                        path="/kitchen/history"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"]}>
+                                <Kitchen />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/kitchen/profile"
                         element={
                             <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"]}>
@@ -431,6 +439,14 @@ export default function App() {
                     />
                     <Route
                         path="/kitchen/chef/:chefId"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"]}>
+                                <KitchenChefDetail />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/kitchen/chef/:chefId/history"
                         element={
                             <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"]}>
                                 <KitchenChefDetail />
@@ -497,6 +513,14 @@ export default function App() {
                     />
                     <Route
                         path="/server/notifications"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CASHIER"]}>
+                                <Server />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/server/history"
                         element={
                             <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CASHIER"]}>
                                 <Server />

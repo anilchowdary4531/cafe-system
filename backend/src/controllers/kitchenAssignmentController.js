@@ -11,6 +11,8 @@ import {
   selfPickItem,
   selfPickKot,
   getAvailableKitchenWork,
+  getChefHistory,
+  getServerHistory,
 } from "../services/kitchenAssignmentService.js";
 
 const handleError = (res, err) => {
@@ -237,3 +239,60 @@ export const getAvailableKitchenWorkController = async (req, res) => {
     return handleError(res, err);
   }
 };
+
+export const getChefHistoryController = async (req, res) => {
+  try {
+    const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || req.staffActor?.restaurantId || req.query?.restaurantId || 0);
+    const rawChefId = req.params.chefId ?? req.query?.chefId;
+    const chefId = rawChefId !== undefined && rawChefId !== null && String(rawChefId).trim() !== "" ? rawChefId : null;
+    const requestingActor = req.staffActor || req.user || null;
+    const { date, from, to, range, search, status, page, limit } = req.query || {};
+
+    const result = await getChefHistory({
+      prisma: req.prisma,
+      restaurantId,
+      chefId,
+      requestingActor,
+      date,
+      from,
+      to,
+      range,
+      search,
+      status,
+      page,
+      limit,
+    });
+    return res.send(result);
+  } catch (err) {
+    return handleError(res, err);
+  }
+};
+
+export const getServerHistoryController = async (req, res) => {
+  try {
+    const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || req.staffActor?.restaurantId || req.query?.restaurantId || 0);
+    const rawServerId = req.params.serverId ?? req.query?.serverId;
+    const serverId = rawServerId !== undefined && rawServerId !== null && String(rawServerId).trim() !== "" ? rawServerId : null;
+    const requestingActor = req.staffActor || req.user || null;
+    const { date, from, to, range, search, status, page, limit } = req.query || {};
+
+    const result = await getServerHistory({
+      prisma: req.prisma,
+      restaurantId,
+      serverId,
+      requestingActor,
+      date,
+      from,
+      to,
+      range,
+      search,
+      status,
+      page,
+      limit,
+    });
+    return res.send(result);
+  } catch (err) {
+    return handleError(res, err);
+  }
+};
+

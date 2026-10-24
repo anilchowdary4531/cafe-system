@@ -25,6 +25,10 @@ import {
     Square,
     Zap,
     ShieldAlert,
+    Calendar,
+    Clock,
+    History,
+    Inbox,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
@@ -118,10 +122,11 @@ export default function Kitchen() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Active View Mode: "KDS" | "PROFILE" | "NOTIFICATIONS"
+    // Active View Mode: "KDS" | "HISTORY" | "PROFILE" | "NOTIFICATIONS"
     const getInitialViewMode = () => {
         if (location.pathname.endsWith("/profile")) return "PROFILE";
         if (location.pathname.endsWith("/notifications")) return "NOTIFICATIONS";
+        if (location.pathname.endsWith("/history") || new URLSearchParams(location.search).get("tab") === "history") return "HISTORY";
         return "KDS";
     };
     const [viewMode, setViewMode] = useState(getInitialViewMode);
@@ -131,10 +136,12 @@ export default function Kitchen() {
             setViewMode("PROFILE");
         } else if (location.pathname.endsWith("/notifications")) {
             setViewMode("NOTIFICATIONS");
+        } else if (location.pathname.endsWith("/history") || new URLSearchParams(location.search).get("tab") === "history") {
+            setViewMode("HISTORY");
         } else {
             setViewMode("KDS");
         }
-    }, [location.pathname]);
+    }, [location.pathname, location.search]);
 
     // Unread Notifications Badge
     const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -192,6 +199,33 @@ export default function Kitchen() {
     const [selectedStatus, setSelectedStatus] = useState("ALL");
     const [selectedPriority, setSelectedPriority] = useState("ALL");
     const [searchQuery, setSearchQuery] = useState("");
+
+    // Senior Chef Whole-Kitchen History State
+    const [historyItems, setHistoryItems] = useState([]);
+    const [groupedHistory, setGroupedHistory] = useState([]);
+    const [historySummary, setHistorySummary] = useState({
+        completedItems: 0,
+        completedKots: 0,
+        activeChefs: 0,
+        avgPrepTimeMinutes: 0,
+        overdueCompletions: 0,
+    });
+    const [historyPagination, setHistoryPagination] = useState({
+        page: 1,
+        limit: 20,
+        totalCount: 0,
+        totalPages: 1,
+        hasMore: false,
+    });
+    const [loadingHistory, setLoadingHistory] = useState(false);
+    const [loadingMoreHistory, setLoadingMoreHistory] = useState(false);
+    const [historyDateRange, setHistoryDateRange] = useState("today");
+    const [historyCustomDate, setHistoryCustomDate] = useState("");
+    const [historyChefFilter, setHistoryChefFilter] = useState("ALL");
+    const [historyStatusFilter, setHistoryStatusFilter] = useState("ALL");
+    const [historySearch, setHistorySearch] = useState("");
+    const [historySearchInput, setHistorySearchInput] = useState("");
+    const historySearchTimeoutRef = useRef(null);
 
     // Audio & Action states
     const [updatingKotId, setUpdatingKotId] = useState(null);
@@ -283,6 +317,151 @@ export default function Kitchen() {
             console.error("Failed to load kitchen workload:", err);
         }
     }, [restaurantId]);
+
+    // Load Senior Chef Whole-Kitchen History
+    const loadHistoryData = useCallback(async (pageToLoad = 1, silent = false) => {
+        if (!restaurantId) return;
+        if (pageToLoad === 1 && !silent) {
+            setLoadingHistory(true);
+        } else if (pageToLoad > 1) {
+            setLoadingMoreHistory(true);
+        }
+
+        try {
+            const params = {
+                page: pageToLoad,
+                limit: 20,
+                range: historyDateRange,
+            };
+
+            if (historyDateRange === "custom" && historyCustomDate) {
+                params.date = historyCustomDate;
+            }
+
+            if (historyChefFilter && historyChefFilter !== "ALL") {
+                params.chefId = historyChefFilter;
+            }
+
+            if (historyStatusFilter && historyStatusFilter !== "ALL") {
+                params.status = historyStatusFilter;
+            }
+
+            if (historySearch.trim()) {
+                params.search = historySearch.trim();
+            }
+
+            const res = await api.get(`/owner/${restaurantId}/kitchen/history`, { params });
+            if (res.data?.ok) {
+                const fetchedItems = res.data.items || [];
+                const fetchedGrouped = res.data.groupedByDate || [];
+                const pagination = res.data.pagination || {
+                    page: 1,
+                    limit: 20,
+                    totalCount: fetchedItems.length,
+                    totalPages: 1,
+                    hasMore: false,
+                };
+                if (res.data.summary) {
+                    setHistorySummary(res.data.summary);
+                }
+
+                if (pageToLoad === 1) {
+                    setHistoryItems(fetchedItems);
+                    setGroupedHistory(fetchedGrouped);
+                } else {
+                    setHistoryItems((prev) => {
+                        const existingIds = new Set(prev.map((p) => p.id));
+                        const newUnique = fetchedItems.filter((it) => !existingIds.has(it.id));
+                        return [...prev, ...newUnique];
+                    });
+
+                    setGroupedHistory((prevGrouped) => {
+                        const groupMap = new Map();
+                        for (const g of prevGrouped) {
+                            groupMap.set(g.dateKey, {
+                                dateKey: g.dateKey,
+                                dateHeading: g.dateHeading,
+                                items: [...g.items],
+                            });
+                        }
+                        for (const it of fetchedItems) {
+                            if (!groupMap.has(it.dateKey)) {
+                                groupMap.set(it.dateKey, {
+                                    dateKey: it.dateKey,
+                                    dateHeading: it.dateHeading,
+                                    items: [],
+                                });
+                            }
+                            const target = groupMap.get(it.dateKey);
+                            if (!target.items.some((x) => x.id === it.id)) {
+                                target.items.push(it);
+                            }
+                        }
+                        return Array.from(groupMap.values());
+                    });
+                }
+
+                setHistoryPagination(pagination);
+            }
+        } catch (err) {
+            console.error("[Kitchen] Load senior chef history error:", err);
+            if (!silent) {
+                showToast(err.response?.data?.message || "Failed to load kitchen history", "error");
+            }
+        } finally {
+            setLoadingHistory(false);
+            setLoadingMoreHistory(false);
+        }
+    }, [restaurantId, historyDateRange, historyCustomDate, historyChefFilter, historyStatusFilter, historySearch]);
+
+    useEffect(() => {
+        loadHistoryData(1);
+    }, [loadHistoryData]);
+
+    const handleLoadMoreHistory = () => {
+        if (historyPagination.hasMore && !loadingMoreHistory) {
+            loadHistoryData(historyPagination.page + 1);
+        }
+    };
+
+    const handleHistorySearchChange = (val) => {
+        setHistorySearchInput(val);
+        if (historySearchTimeoutRef.current) clearTimeout(historySearchTimeoutRef.current);
+        historySearchTimeoutRef.current = setTimeout(() => {
+            setHistorySearch(val);
+        }, 350);
+    };
+
+    const handleClearHistorySearch = () => {
+        setHistorySearchInput("");
+        setHistorySearch("");
+        if (historySearchTimeoutRef.current) clearTimeout(historySearchTimeoutRef.current);
+    };
+
+    const availableChefsList = useMemo(() => {
+        const map = new Map();
+        if (Array.isArray(workload.chefs)) {
+            for (const c of workload.chefs) {
+                if (c && c.id) {
+                    map.set(Number(c.id), {
+                        id: Number(c.id),
+                        name: c.name || `Chef #${c.id}`,
+                        designation: c.designation || "Chef",
+                    });
+                }
+            }
+        }
+        for (const it of historyItems) {
+            if (it.assignedChefId && !map.has(Number(it.assignedChefId))) {
+                map.set(Number(it.assignedChefId), {
+                    id: Number(it.assignedChefId),
+                    name: it.assignedChefName || `Chef #${it.assignedChefId}`,
+                    designation: "Chef",
+                });
+            }
+        }
+        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }, [workload.chefs, historyItems]);
 
     useEffect(() => {
         if (!restaurantId) return;
@@ -427,6 +606,10 @@ export default function Kitchen() {
             }
         };
 
+        const onKitchenHistoryUpdated = () => {
+            loadHistoryData(1, true);
+        };
+
         socket.on("kot_created", onKotCreated);
         socket.on("kot:status_updated", onKotUpdated);
         socket.on("kot:item_updated", onKotItemUpdated);
@@ -439,6 +622,8 @@ export default function Kitchen() {
         socket.on("kitchen:item_reassigned", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_self_picked", handleKitchenAssignmentEvent);
         socket.on("kitchen:item_status_updated", handleKitchenAssignmentEvent);
+        socket.on("kitchen:item_status_updated", onKitchenHistoryUpdated);
+        socket.on("kitchen:item_ready", onKitchenHistoryUpdated);
 
         return () => {
             socket.off("kot_created", onKotCreated);
@@ -453,8 +638,10 @@ export default function Kitchen() {
             socket.off("kitchen:item_reassigned", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_self_picked", handleKitchenAssignmentEvent);
             socket.off("kitchen:item_status_updated", handleKitchenAssignmentEvent);
+            socket.off("kitchen:item_status_updated", onKitchenHistoryUpdated);
+            socket.off("kitchen:item_ready", onKitchenHistoryUpdated);
         };
-    }, [socket, soundMuted, loadWorkload, loadKots]);
+    }, [socket, soundMuted, loadWorkload, loadKots, loadHistoryData]);
 
     // Update KOT Status
     const handleUpdateKotStatus = async (kotId, status) => {
@@ -955,6 +1142,65 @@ export default function Kitchen() {
                 </div>
             </header>
 
+            {/* WORKSPACE NAVIGATION TABS (COMMAND CENTER vs HISTORY) */}
+            <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        data-testid="tab-command-center"
+                        onClick={() => {
+                            setViewMode("KDS");
+                            navigate("/kitchen");
+                        }}
+                        className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer ${
+                            viewMode === "KDS"
+                                ? "bg-slate-900 text-white shadow-xs"
+                                : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+                        }`}
+                    >
+                        <Zap size={14} className={viewMode === "KDS" ? "text-orange-400" : "text-slate-500"} />
+                        <span>COMMAND CENTER</span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                                viewMode === "KDS"
+                                    ? "bg-orange-500 text-white"
+                                    : "bg-slate-200 text-slate-700"
+                            }`}
+                        >
+                            {kots.length}
+                        </span>
+                    </button>
+
+                    <button
+                        type="button"
+                        data-testid="tab-kitchen-history"
+                        onClick={() => {
+                            setViewMode("HISTORY");
+                            navigate("/kitchen/history");
+                        }}
+                        className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer ${
+                            viewMode === "HISTORY"
+                                ? "bg-slate-900 text-white shadow-xs"
+                                : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+                        }`}
+                    >
+                        <History size={14} className={viewMode === "HISTORY" ? "text-emerald-400" : "text-slate-500"} />
+                        <span>HISTORY</span>
+                        {historySummary?.completedItems > 0 && (
+                            <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                                    viewMode === "HISTORY"
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-slate-200 text-slate-700"
+                                }`}
+                            >
+                                {historySummary.completedItems}
+                            </span>
+                        )}
+                    </button>
+                </div>
+            </div>
+
             {/* Main Content Body */}
             {viewMode === "PROFILE" ? (
                 <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full">
@@ -990,6 +1236,338 @@ export default function Kitchen() {
                         }}
                         backLabel="Kitchen"
                     />
+                </div>
+            ) : viewMode === "HISTORY" ? (
+                <div className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full space-y-6" data-testid="senior-chef-history-container">
+                    {/* Top Header & Operational Metrics Summary Banner */}
+                    <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                    <History className="text-emerald-600 shrink-0" size={22} />
+                                    <h2 className="text-lg font-black tracking-tight text-slate-900">
+                                        Whole-Kitchen Completed Preparation History
+                                    </h2>
+                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                        Whole Kitchen Scope
+                                    </span>
+                                </div>
+                                <p className="text-xs text-slate-500">
+                                    Authoritative kitchen preparation history across all chefs in {restaurantName}. Grouped by calendar date with completion timestamps and prep performance.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Authoritative Operational Summary Metrics */}
+                        <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3" data-testid="history-summary-cards">
+                            {/* 1. Completed Items */}
+                            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Completed Items</div>
+                                <div className="text-2xl font-black text-emerald-600 mt-1" data-testid="summary-completed-items">
+                                    {historySummary.completedItems}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-semibold mt-0.5">Authoritative order items</div>
+                            </div>
+
+                            {/* 2. Completed KOTs */}
+                            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Completed KOTs</div>
+                                <div className="text-2xl font-black text-slate-900 mt-1" data-testid="summary-completed-kots">
+                                    {historySummary.completedKots}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-semibold mt-0.5">Distinct kitchen tickets</div>
+                            </div>
+
+                            {/* 3. Active Chefs */}
+                            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Chefs</div>
+                                <div className="text-2xl font-black text-blue-600 mt-1" data-testid="summary-active-chefs">
+                                    {historySummary.activeChefs}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-semibold mt-0.5">Chefs with completions</div>
+                            </div>
+
+                            {/* 4. Avg Preparation Time */}
+                            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Avg Prep Time</div>
+                                <div className="text-2xl font-black text-purple-600 mt-1" data-testid="summary-avg-prep-time">
+                                    {historySummary.avgPrepTimeMinutes > 0 ? `${historySummary.avgPrepTimeMinutes}m` : "-"}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-semibold mt-0.5">From start to ready</div>
+                            </div>
+
+                            {/* 5. Overdue Completions */}
+                            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Overdue Completions</div>
+                                <div className="text-2xl font-black text-amber-600 mt-1" data-testid="summary-overdue-completions">
+                                    {historySummary.overdueCompletions}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-semibold mt-0.5">Exceeded target SLA</div>
+                            </div>
+                        </div>
+
+                        {/* Filters Bar: Date presets, Custom date, Chef dropdown, Status filter, Search input */}
+                        <div className="mt-5 pt-4 border-t border-slate-200 flex flex-col gap-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                {/* Date Presets */}
+                                <div className="flex flex-wrap items-center gap-1.5" data-testid="history-date-filters">
+                                    {[
+                                        { id: "today", label: "Today" },
+                                        { id: "yesterday", label: "Yesterday" },
+                                        { id: "7d", label: "Last 7 Days" },
+                                        { id: "30d", label: "Last 30 Days" },
+                                        { id: "all", label: "All Time" },
+                                        { id: "custom", label: "Custom Date" },
+                                    ].map((filter) => (
+                                        <button
+                                            key={filter.id}
+                                            type="button"
+                                            data-testid={`history-filter-${filter.id}`}
+                                            onClick={() => setHistoryDateRange(filter.id)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                                                historyDateRange === filter.id
+                                                    ? "bg-emerald-600 text-white shadow-xs"
+                                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+                                            }`}
+                                        >
+                                            {filter.label}
+                                        </button>
+                                    ))}
+
+                                    {historyDateRange === "custom" && (
+                                        <input
+                                            type="date"
+                                            data-testid="history-custom-date-input"
+                                            value={historyCustomDate}
+                                            onChange={(e) => setHistoryCustomDate(e.target.value)}
+                                            className="px-2.5 py-1 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
+                                        />
+                                    )}
+                                </div>
+
+                                {/* Status Filter */}
+                                <div className="flex items-center gap-1.5" data-testid="history-status-filters">
+                                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status:</span>
+                                    {["ALL", "READY", "SERVED"].map((st) => (
+                                        <button
+                                            key={st}
+                                            type="button"
+                                            data-testid={`history-status-${st.toLowerCase()}`}
+                                            onClick={() => setHistoryStatusFilter(st)}
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                                                historyStatusFilter === st
+                                                    ? "bg-slate-900 text-white shadow-xs"
+                                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+                                            }`}
+                                        >
+                                            {st}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+                                {/* Chef Filter Dropdown */}
+                                <div className="flex items-center gap-2">
+                                    <label htmlFor="senior-chef-history-chef-filter" className="text-xs font-bold text-slate-600 whitespace-nowrap">
+                                        Chef:
+                                    </label>
+                                    <select
+                                        id="senior-chef-history-chef-filter"
+                                        data-testid="history-chef-filter"
+                                        value={historyChefFilter}
+                                        onChange={(e) => setHistoryChefFilter(e.target.value)}
+                                        className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-emerald-500 shadow-xs"
+                                    >
+                                        <option value="ALL">ALL CHEFS ({availableChefsList.length})</option>
+                                        {availableChefsList.map((c) => (
+                                            <option key={c.id} value={c.id}>
+                                                {c.name} {c.designation ? `(${c.designation})` : ""}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Search Input */}
+                                <div className="relative w-full sm:w-72">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        data-testid="senior-chef-history-search"
+                                        placeholder="Search KOT, Order, Table, Item, Chef..."
+                                        value={historySearchInput}
+                                        onChange={(e) => handleHistorySearchChange(e.target.value)}
+                                        className="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-emerald-500 shadow-xs"
+                                    />
+                                    {historySearchInput && (
+                                        <button
+                                            type="button"
+                                            onClick={handleClearHistorySearch}
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                            title="Clear search"
+                                        >
+                                            <X size={13} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Date-wise Grouped History Display */}
+                    {loadingHistory && !historyItems.length ? (
+                        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-xs text-slate-500 shadow-xs">
+                            <RefreshCw size={24} className="animate-spin text-emerald-600 mx-auto mb-3" />
+                            Loading completed kitchen history...
+                        </div>
+                    ) : groupedHistory.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-xs">
+                            <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                                <Inbox size={28} />
+                            </div>
+                            <h3 className="text-sm font-black text-slate-900 mb-1">
+                                {historySearch.trim()
+                                    ? `No completed items found matching "${historySearch}"`
+                                    : historyChefFilter !== "ALL"
+                                    ? "No completed items found for the selected chef."
+                                    : "No completed items found for this filter criteria."}
+                            </h3>
+                            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                                When kitchen items reach READY or SERVED status, they appear here grouped chronologically by date.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {groupedHistory.map((group) => (
+                                <div key={group.dateKey} className="space-y-3" data-testid={`history-group-${group.dateKey}`}>
+                                    {/* Group Header */}
+                                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar size={15} className="text-emerald-600" />
+                                            <span className="text-xs font-black uppercase tracking-wider text-slate-800">
+                                                {group.dateHeading}
+                                            </span>
+                                        </div>
+                                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                                            {group.items.length} {group.items.length === 1 ? "item" : "items"}
+                                        </span>
+                                    </div>
+
+                                    {/* High-density Operational Cards Grid */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {group.items.map((item) => (
+                                            <div
+                                                key={`kitchen-history-item-${item.id}`}
+                                                data-testid={`history-item-${item.id}`}
+                                                data-kot-id={item.kotId}
+                                                data-order-item-id={item.orderItemId}
+                                                data-menu-item-id={item.menuItemId}
+                                                data-order-id={item.orderId}
+                                                data-chef-id={item.assignedChefId}
+                                                className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-col justify-between hover:border-slate-300 transition"
+                                            >
+                                                <div>
+                                                    {/* Card Top Row: KOT # | Order # | Table | Priority | Completed Badge */}
+                                                    <div className="flex items-center justify-between gap-2 mb-2">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span className="text-xs font-black text-slate-900 tracking-tight">
+                                                                #{item.kotNumber || item.kotId}
+                                                            </span>
+                                                            {item.orderNo && (
+                                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                                                                    {item.orderNo}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                                                {item.tableNo}
+                                                            </span>
+                                                            {item.priority === "URGENT" || item.priority === "HIGH" ? (
+                                                                <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${priorityBadgeClass(item.priority)}`}>
+                                                                    {item.priority}
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 flex items-center gap-1 border border-emerald-200">
+                                                            <CheckCircle2 size={11} />
+                                                            {item.status || "COMPLETED"}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Item Name and Quantity */}
+                                                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                                                        <div className="text-sm font-bold text-slate-900 leading-snug">
+                                                            {item.name || item.itemName}
+                                                        </div>
+                                                        <span className="text-xs font-black px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 shrink-0 border border-orange-200">
+                                                            Qty {item.quantity || item.qty}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Variant / Modifiers / Notes */}
+                                                    {item.variantName && (
+                                                        <div className="text-[11px] text-slate-500 font-medium mb-1">
+                                                            Variant: {item.variantName}
+                                                        </div>
+                                                    )}
+                                                    {item.notes && (
+                                                        <div className="text-[11px] italic text-amber-800 bg-amber-50 rounded px-2 py-1 mb-2 border border-amber-200">
+                                                            Note: {item.notes}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Chef attribution */}
+                                                    <div className="mt-2 flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-50 rounded-lg p-2 border border-slate-100">
+                                                        <ChefHat size={14} className="text-orange-500 shrink-0" />
+                                                        <span className="truncate">
+                                                            Completed by: <strong className="text-slate-900">{item.assignedChefName || "Unassigned"}</strong>
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Card Footer: Completion Time and Assignment Source */}
+                                                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 mt-2">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Clock size={12} className="text-emerald-600" />
+                                                        <span>Completed <strong>{item.completedTime}</strong></span>
+                                                        {typeof item.prepTimeMinutes === "number" && (
+                                                            <span className="text-[10px] text-slate-400">({item.prepTimeMinutes}m prep)</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                        {item.assignmentSource === "SELF_PICKED" ? "Self-Picked" : "Dispatched"}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+
+                            {/* Pagination: Load More Button */}
+                            {historyPagination.hasMore && (
+                                <div className="flex justify-center pt-4 pb-2">
+                                    <button
+                                        type="button"
+                                        data-testid="senior-chef-history-load-more"
+                                        onClick={handleLoadMoreHistory}
+                                        disabled={loadingMoreHistory}
+                                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition shadow-md disabled:opacity-50 cursor-pointer"
+                                    >
+                                        {loadingMoreHistory ? (
+                                            <>
+                                                <RefreshCw size={14} className="animate-spin" />
+                                                <span>Loading More...</span>
+                                            </>
+                                        ) : (
+                                            <span>
+                                                Load More Completed Items ({historyItems.length} of {historyPagination.totalCount})
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             ) : (
                 <>

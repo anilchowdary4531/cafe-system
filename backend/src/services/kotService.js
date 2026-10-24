@@ -330,7 +330,7 @@ export const updateKotStatus = async ({ prisma, kotId, restaurantId, nextStatus,
 export const updateKotItemStatus = async ({ prisma, kotId, itemId, restaurantId, nextStatus, actor = null } = {}) => {
     const kId = Number(kotId);
     const iId = Number(itemId);
-    const validStatuses = ["PENDING", "ACCEPTED", "PREPARING", "READY", "CANCELLED"];
+    const validStatuses = ["PENDING", "ACCEPTED", "PREPARING", "READY", "SERVED", "CANCELLED"];
     const status = String(nextStatus || "").trim().toUpperCase();
 
     if (!validStatuses.includes(status)) {

@@ -9,6 +9,7 @@ import {
     Clock,
     Filter,
     Grid,
+    History as HistoryIcon,
     LayoutGrid,
     LoaderCircle,
     Lock,
@@ -47,6 +48,7 @@ import { useCanonicalTables } from "../context/TableStateContext";
 import TablePaymentSettlementModal from "../components/TablePaymentSettlementModal";
 import ServerProfileView from "../components/ServerProfileView";
 import ServerNotificationsView from "../components/ServerNotificationsView";
+import ServerHistoryView from "../components/ServerHistoryView";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
 
@@ -250,8 +252,9 @@ export default function Server() {
         return () => clearInterval(timer);
     }, []);
 
-    // Active View Mode: "FLOOR_PLAN" | "ORDERING" | "PROFILE" | "NOTIFICATIONS"
+    // Active View Mode: "FLOOR_PLAN" | "ORDERING" | "PROFILE" | "NOTIFICATIONS" | "HISTORY"
     const getInitialViewMode = () => {
+        if (location.pathname.endsWith("/history")) return "HISTORY";
         if (location.pathname.endsWith("/profile")) return "PROFILE";
         if (location.pathname.endsWith("/notifications")) return "NOTIFICATIONS";
         return "FLOOR_PLAN";
@@ -259,7 +262,9 @@ export default function Server() {
     const [viewMode, setViewMode] = useState(getInitialViewMode);
 
     useEffect(() => {
-        if (location.pathname.endsWith("/profile")) {
+        if (location.pathname.endsWith("/history")) {
+            setViewMode("HISTORY");
+        } else if (location.pathname.endsWith("/profile")) {
             setViewMode("PROFILE");
         } else if (location.pathname.endsWith("/notifications")) {
             setViewMode("NOTIFICATIONS");
@@ -1277,6 +1282,47 @@ export default function Server() {
                         <span><span className="hidden min-[400px]:inline">New </span>Reservation</span>
                     </button>
 
+                    {/* Active Service Tab/Button */}
+                    <button
+                        data-testid="server-active-service-nav-btn"
+                        onClick={() => {
+                            setViewMode("FLOOR_PLAN");
+                            navigate("/server");
+                        }}
+                        className={`flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                            viewMode === "FLOOR_PLAN" || viewMode === "ORDERING"
+                                ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
+                                : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
+                        }`}
+                        title="Active Service Floor Plan"
+                    >
+                        <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="hidden min-[480px]:inline">Active Service</span>
+                    </button>
+
+                    {/* History Button */}
+                    <button
+                        data-testid="server-history-nav-btn"
+                        onClick={() => {
+                            if (viewMode === "HISTORY") {
+                                setViewMode("FLOOR_PLAN");
+                                navigate("/server");
+                            } else {
+                                setViewMode("HISTORY");
+                                navigate("/server/history");
+                            }
+                        }}
+                        className={`relative flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                            viewMode === "HISTORY"
+                                ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
+                                : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
+                        }`}
+                        title="Server Food-Service History"
+                    >
+                        <HistoryIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="hidden min-[480px]:inline">History</span>
+                    </button>
+
                     {/* Notifications Button */}
                     <button
                         onClick={() => {
@@ -1329,22 +1375,6 @@ export default function Server() {
                         </div>
                         <span className="hidden sm:inline font-bold">{user?.name?.split(" ")[0] || "Profile"}</span>
                     </button>
-
-                    {/* View Mode Toggle */}
-                    <div className="flex items-center bg-black/5 dark:bg-white/5 p-1 rounded-xl border border-[color:var(--app-border)]/40">
-                        <button
-                            onClick={() => {
-                                setViewMode("FLOOR_PLAN");
-                                navigate("/server");
-                            }}
-                            className={`p-1.5 rounded-lg text-xs font-bold transition ${
-                                viewMode === "FLOOR_PLAN" ? "bg-orange-500 text-white" : "theme-muted"
-                            }`}
-                            title="Floor Plan Grid View"
-                        >
-                            <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        </button>
-                    </div>
                 </div>
             </header>
 
@@ -1366,6 +1396,15 @@ export default function Server() {
                             setViewMode("FLOOR_PLAN");
                             navigate(`/server?table=${encodeURIComponent(tableNo)}`);
                         }}
+                        onBackToFloorPlan={() => {
+                            setViewMode("FLOOR_PLAN");
+                            navigate("/server");
+                        }}
+                    />
+                </div>
+            ) : viewMode === "HISTORY" ? (
+                <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full">
+                    <ServerHistoryView
                         onBackToFloorPlan={() => {
                             setViewMode("FLOOR_PLAN");
                             navigate("/server");
