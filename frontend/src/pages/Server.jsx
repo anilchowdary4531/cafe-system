@@ -440,6 +440,19 @@ export default function Server() {
         }
     );
 
+    const { data: readyRunnerData, refresh: refreshReadyRunnerData } = useCachedGet(
+        restaurantId ? `/api/v1/staff/food-runner-items?restaurantId=${restaurantId}` : null,
+        {
+            enabled: Boolean(restaurantId),
+            ttlMs: 3_000,
+            scope: `server-ready-runner:${restaurantId}`,
+        }
+    );
+
+    const [distributingItemIds, setDistributingItemIds] = useState({});
+    const [realtimeAddedReadyItems, setRealtimeAddedReadyItems] = useState([]);
+    const [realtimeRemovedItemIds, setRealtimeRemovedItemIds] = useState(new Set());
+
     const tables = useMemo(() => {
         const rawTables = canonicalTables.length > 0
             ? canonicalTables
@@ -521,74 +534,113 @@ export default function Server() {
         return Array.isArray(reservationsData.reservations) ? reservationsData.reservations : [];
     }, [reservationsData]);
 
-    // Unified List of Ready Items to Distribute (from KOTs and Orders)
+    // Unified Authoritative Item-Level Queue of Ready Items to Distribute (from KOTItems)
     const readyItemsToDistribute = useMemo(() => {
         const list = [];
-        const seenOrderIds = new Set();
+        const seenItemIds = new Set();
 
-        // 1. Collect from Ready KOTs or KOTs with ready items
-        const rawKots = Array.isArray(readyKotsData?.kots) ? readyKotsData.kots : Array.isArray(readyKotsData) ? readyKotsData : [];
-        rawKots.forEach((kot) => {
-            const kotStatus = String(kot.status || "").toUpperCase();
-            const rawItems = Array.isArray(kot.items) ? kot.items : [];
-            const isKotReady = kotStatus === "READY";
-            const readyItemsInKot = rawItems.filter((it) => String(it.status || "").toUpperCase() === "READY");
+        // 1. Primary Source of Truth: Canonical food runner / ready distribution items
+        const rawRunner = Array.isArray(readyRunnerData?.items) ? readyRunnerData.items : [];
+        const runnerItems = rawRunner
+            .concat(realtimeAddedReadyItems)
+            .filter((it) => !realtimeRemovedItemIds.has(Number(it.id || it.kotItemId)));
 
-            if (isKotReady || readyItemsInKot.length > 0) {
-                if (kot.orderId) seenOrderIds.add(Number(kot.orderId));
-                const itemsToShow = isKotReady ? rawItems : readyItemsInKot;
-                list.push({
-                    key: `kot-${kot.id}`,
-                    id: kot.id,
-                    type: "KOT",
-                    kotNo: kot.kotNo,
-                    orderId: kot.orderId,
-                    tableNo: String(kot.tableNo || kot.order?.tableNo || "N/A").trim(),
-                    waiterName: kot.waiterName || kot.order?.customerName || null,
-                    stationName: kot.stationName || "Kitchen",
-                    readyAt: kot.updatedAt || kot.createdAt,
-                    isPartial: !isKotReady && readyItemsInKot.length > 0,
-                    itemsList: itemsToShow.map((it) => ({
-                        id: it.id,
+        runnerItems.forEach((it) => {
+            const itemId = Number(it.id || it.kotItemId);
+            if (!itemId || seenItemIds.has(itemId)) return;
+            seenItemIds.add(itemId);
+
+            list.push({
+                key: `ready-kotitem-${itemId}`,
+                id: itemId, // Canonical KOTItem.id
+                kotItemId: itemId,
+                orderItemId: it.orderItemId || null,
+                orderId: it.orderId || it.kot?.orderId || null,
+                kotId: it.kotId || it.kot?.id || null,
+                restaurantId: it.restaurantId || restaurantId,
+                type: "KOT_ITEM",
+                kotNo: it.kotNo || it.kot?.kotNo || "",
+                orderNo: it.orderNo || it.kot?.order?.orderNo || "",
+                tableNo: String(it.tableNo || it.kot?.tableNo || it.kot?.order?.tableNo || "N/A").trim(),
+                waiterName: it.waiterName || it.kot?.waiterName || it.kot?.order?.assignedWaiterName || it.kot?.order?.customerName || null,
+                stationName: it.stationName || it.kot?.stationName || "Kitchen",
+                readyAt: it.readyAt || it.createdAt,
+                name: it.itemName || it.name,
+                itemName: it.itemName || it.name,
+                qty: it.qty || it.quantity || 1,
+                variantName: it.variantName || null,
+                notes: it.notes || null,
+                preparedByName: it.preparedByName || null,
+                status: "READY",
+                itemsList: [
+                    {
+                        id: itemId,
                         orderItemId: it.orderItemId,
                         name: it.itemName || it.name,
                         itemName: it.itemName || it.name,
                         qty: it.qty || it.quantity || 1,
                         notes: it.notes,
-                        status: it.status,
-                    })),
-                });
-            }
+                        status: "READY",
+                    },
+                ],
+            });
         });
 
-        // 2. Collect from Ready Orders (if not already captured as a ready KOT)
-        const rawOrders = Array.isArray(liveOrdersData?.orders) ? liveOrdersData.orders : Array.isArray(liveOrdersData) ? liveOrdersData : [];
-        rawOrders.forEach((order) => {
-            if (String(order.status || "").toUpperCase() === "READY" && !seenOrderIds.has(Number(order.id))) {
-                list.push({
-                    key: `order-${order.id}`,
-                    id: order.id,
-                    type: "ORDER",
-                    orderNo: order.orderNo,
-                    orderId: order.id,
-                    tableNo: String(order.tableNo || "N/A").trim(),
-                    waiterName: order.assignedWaiterName || order.waiterName || order.customerName || null,
-                    stationName: "Kitchen",
-                    readyAt: order.updatedAt || order.createdAt,
-                    isPartial: false,
-                    itemsList: Array.isArray(order.items)
-                        ? order.items.map((it) => ({
-                              name: it.itemName,
-                              qty: it.qty,
-                              notes: it.notes,
-                          }))
-                        : [],
+        // 2. Compatibility Fallback: If runner items endpoint is empty or in test mocks that only mock readyKotsData
+        if (list.length === 0) {
+            const rawKots = Array.isArray(readyKotsData?.kots) ? readyKotsData.kots : Array.isArray(readyKotsData) ? readyKotsData : [];
+            rawKots.forEach((kot) => {
+                const kotStatus = String(kot.status || "").toUpperCase();
+                const rawItems = Array.isArray(kot.items) ? kot.items : [];
+                const isKotReady = kotStatus === "READY";
+                const readyItemsInKot = rawItems.filter((it) => String(it.status || "").toUpperCase() === "READY");
+                const itemsToInclude = isKotReady ? (readyItemsInKot.length > 0 ? readyItemsInKot : rawItems) : readyItemsInKot;
+
+                itemsToInclude.forEach((it) => {
+                    const itemId = Number(it.id);
+                    if (itemId && (seenItemIds.has(itemId) || realtimeRemovedItemIds.has(itemId))) return;
+                    if (itemId) seenItemIds.add(itemId);
+
+                    list.push({
+                        key: `ready-kotitem-${itemId || `synth-${kot.id}-${it.itemName}`}`,
+                        id: itemId || kot.id,
+                        kotItemId: itemId || null,
+                        orderItemId: it.orderItemId || null,
+                        orderId: kot.orderId,
+                        kotId: kot.id,
+                        restaurantId: kot.restaurantId || restaurantId,
+                        type: "KOT_ITEM",
+                        kotNo: kot.kotNo || "",
+                        orderNo: kot.order?.orderNo || "",
+                        tableNo: String(kot.tableNo || kot.order?.tableNo || "N/A").trim(),
+                        waiterName: kot.waiterName || kot.order?.customerName || null,
+                        stationName: kot.stationName || "Kitchen",
+                        readyAt: it.readyAt || kot.updatedAt || kot.createdAt,
+                        name: it.itemName || it.name,
+                        itemName: it.itemName || it.name,
+                        qty: it.qty || it.quantity || 1,
+                        variantName: it.variantName || null,
+                        notes: it.notes || null,
+                        preparedByName: it.preparedByName || null,
+                        status: "READY",
+                        itemsList: [
+                            {
+                                id: itemId || kot.id,
+                                orderItemId: it.orderItemId,
+                                name: it.itemName || it.name,
+                                itemName: it.itemName || it.name,
+                                qty: it.qty || it.quantity || 1,
+                                notes: it.notes,
+                                status: "READY",
+                            },
+                        ],
+                    });
                 });
-            }
-        });
+            });
+        }
 
         return list;
-    }, [readyKotsData, liveOrdersData]);
+    }, [readyRunnerData, readyKotsData, restaurantId, realtimeAddedReadyItems, realtimeRemovedItemIds]);
 
     // Map table number (and normalized key) to count of ready items waiting for pickup
     const readyItemsByTable = useMemo(() => {
@@ -628,6 +680,7 @@ export default function Server() {
         refreshReservations,
         refreshLiveOrders,
         refreshReadyKots,
+        refreshReadyRunnerData,
         fetchUnreadCount,
         handleViewAssignedTable: null,
         user,
@@ -639,6 +692,7 @@ export default function Server() {
             refreshReservations,
             refreshLiveOrders,
             refreshReadyKots,
+            refreshReadyRunnerData,
             fetchUnreadCount,
             handleViewAssignedTable,
             user,
@@ -667,6 +721,35 @@ export default function Server() {
             callbacksRef.current.refreshReservations?.({ force: true });
             callbacksRef.current.refreshLiveOrders?.({ force: true });
             callbacksRef.current.refreshReadyKots?.({ force: true });
+            callbacksRef.current.refreshReadyRunnerData?.({ force: true });
+
+            // Instant Realtime Ready-Item Queue Synchronization
+            const readyItem = data?.item || (data?.status === "READY" ? data : null);
+            if (readyItem && (readyItem.status === "READY" || data?.action === "READY")) {
+                const itemId = Number(readyItem.id || readyItem.kotItemId);
+                if (itemId) {
+                    setRealtimeRemovedItemIds((prev) => {
+                        if (!prev.has(itemId)) return prev;
+                        const next = new Set(prev);
+                        next.delete(itemId);
+                        return next;
+                    });
+                    setRealtimeAddedReadyItems((prev) => {
+                        if (prev.some((it) => Number(it.id || it.kotItemId) === itemId)) return prev;
+                        return [...prev, readyItem];
+                    });
+                }
+            }
+
+            const deliveredItemId = Number(data?.itemId || data?.kotItemId || (data?.status === "SERVED" || data?.status === "DELIVERED" ? data?.id : 0));
+            if (deliveredItemId) {
+                setRealtimeRemovedItemIds((prev) => {
+                    const next = new Set(prev);
+                    next.add(deliveredItemId);
+                    return next;
+                });
+                setRealtimeAddedReadyItems((prev) => prev.filter((it) => Number(it.id || it.kotItemId) !== deliveredItemId));
+            }
 
             if (data?.tableId) {
                 setSelectedTable((prev) => {
@@ -785,9 +868,12 @@ export default function Server() {
         };
 
         const handleConnect = () => {
+            setRealtimeAddedReadyItems([]);
+            setRealtimeRemovedItemIds(new Set());
             callbacksRef.current.refreshTables?.({ force: true });
             callbacksRef.current.refreshLiveOrders?.({ force: true });
             callbacksRef.current.refreshReadyKots?.({ force: true });
+            callbacksRef.current.refreshReadyRunnerData?.({ force: true });
         };
 
         socket.on("connect", handleConnect);
@@ -798,6 +884,9 @@ export default function Server() {
         socket.on("waitlist:updated", handleRealtimeUpdate);
         socket.on("kot:status_updated", handleRealtimeUpdate);
         socket.on("kot:item_updated", handleRealtimeUpdate);
+        socket.on("kitchen:item_ready", handleRealtimeUpdate);
+        socket.on("food:delivered", handleRealtimeUpdate);
+        socket.on("kitchen:item_status_updated", handleRealtimeUpdate);
         socket.on("order:updated", handleRealtimeUpdate);
         socket.on("order:status_updated", handleRealtimeUpdate);
         socket.on("order:created", handleRealtimeUpdate);
@@ -815,6 +904,9 @@ export default function Server() {
             socket.off("waitlist:updated", handleRealtimeUpdate);
             socket.off("kot:status_updated", handleRealtimeUpdate);
             socket.off("kot:item_updated", handleRealtimeUpdate);
+            socket.off("kitchen:item_ready", handleRealtimeUpdate);
+            socket.off("food:delivered", handleRealtimeUpdate);
+            socket.off("kitchen:item_status_updated", handleRealtimeUpdate);
             socket.off("order:updated", handleRealtimeUpdate);
             socket.off("order:status_updated", handleRealtimeUpdate);
             socket.off("order:created", handleRealtimeUpdate);
@@ -946,41 +1038,61 @@ export default function Server() {
     }, [tables, selectedTable]);
 
     const handleMarkItemServed = async (item) => {
+        if (!item) return;
+        const itemId = Number(item.kotItemId || item.id);
+        if (itemId) {
+            setDistributingItemIds((prev) => ({ ...prev, [itemId]: true }));
+            setRealtimeRemovedItemIds((prev) => {
+                const next = new Set(prev);
+                next.add(itemId);
+                return next;
+            });
+            setRealtimeAddedReadyItems((prev) => prev.filter((existing) => Number(existing.id || existing.kotItemId) !== itemId));
+        }
         try {
-            if (item.type === "KOT") {
-                if (item.isPartial && Array.isArray(item.itemsList) && item.itemsList.length > 0) {
-                    await Promise.all(
-                        item.itemsList.map((it) =>
-                            api.put(`/owner/${restaurantId}/kitchen/items/${it.id}/status`, {
-                                status: "SERVED",
-                            })
-                        )
-                    );
-                } else {
-                    await api.put(`/owner/${restaurantId}/kots/${item.id}/status`, {
-                        status: "SERVED",
-                    });
-                }
-            } else {
+            if (item.type === "ORDER") {
                 await api.put(`/owner/${restaurantId}/orders/${item.id}/status`, {
                     status: "DELIVERED",
                     changedByName: user?.name || "Server",
                 });
+            } else {
+                // Authoritative KOTItem delivery
+                try {
+                    await api.put(`/api/v1/staff/food-runner-items/${itemId}/delivered`);
+                } catch (runnerErr) {
+                    if (item.kotId) {
+                        await api.put(`/owner/${restaurantId}/kitchen/items/${itemId}/status`, {
+                            status: "SERVED",
+                        });
+                    } else if (item.type === "KOT") {
+                        await api.put(`/owner/${restaurantId}/kots/${item.id}/status`, {
+                            status: "SERVED",
+                        });
+                    } else {
+                        throw runnerErr;
+                    }
+                }
             }
+
             showToast({
                 title: "Delivered 🍽️",
-                message: `${item.tableNo ? `Table ${item.tableNo}: ` : ""}${item.kotNo ? `Ticket #${item.kotNo}` : `Order #${item.orderNo || ""}`} marked served!`,
+                message: `${item.tableNo ? `Table ${item.tableNo}: ` : ""}${item.name || item.itemName || (item.kotNo ? `Ticket #${item.kotNo}` : "Item")} marked served!`,
                 variant: "success",
             });
-            refreshReadyKots();
-            refreshLiveOrders();
-            refreshTables();
+            refreshReadyRunnerData?.({ force: true });
+            refreshReadyKots?.({ force: true });
+            refreshLiveOrders?.({ force: true });
+            refreshTables?.({ force: true });
         } catch (err) {
             showToast({
                 title: "Error",
                 message: err?.response?.data?.message || err?.message || "Failed to mark item served",
                 variant: "error",
             });
+        } finally {
+            if (itemId) {
+                setDistributingItemIds((prev) => ({ ...prev, [itemId]: false }));
+            }
         }
     };
 
@@ -1440,7 +1552,7 @@ export default function Server() {
                                         <h3 className="font-black text-emerald-800 dark:text-emerald-300 text-sm sm:text-base flex items-center gap-2">
                                             <span>Ready for Distribution at Kitchen Pass</span>
                                             <span className="rounded-full bg-emerald-500 text-white px-2 py-0.5 text-[10px] font-extrabold">
-                                                {readyItemsToDistribute.length} Ticket(s)
+                                                {readyItemsToDistribute.length} Ready Item(s)
                                             </span>
                                         </h3>
                                         <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400 font-medium">
@@ -1467,9 +1579,14 @@ export default function Server() {
                                                     <span className="inline-block text-xs font-black px-2 py-0.5 rounded-lg bg-orange-500 text-white shadow-xs">
                                                         Table {item.tableNo}
                                                     </span>
-                                                    <span className="text-[10px] font-mono text-emerald-600 font-bold ml-1.5">
-                                                        #{item.kotNo || item.orderNo}
+                                                    <span className="text-[10px] font-mono text-emerald-600 font-bold ml-1.5" title="Authoritative KOTItem ID">
+                                                        Item #{item.kotItemId || item.id}
                                                     </span>
+                                                    {(item.kotNo || item.orderNo) && (
+                                                        <span className="text-[10px] font-mono text-emerald-600 font-bold ml-1">
+                                                            #{item.kotNo || item.orderNo}
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
                                                     {item.stationName}

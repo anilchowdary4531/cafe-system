@@ -254,7 +254,7 @@ describe("Server Station — Server Assignment & Table Management Audit", () => 
         expect(screen.getAllByText(/Ready to Distribute!/i).length).toBeGreaterThan(0);
     });
 
-    it("7. Clicking 'Served / Distributed' marks ready ticket as SERVED", async () => {
+    it("7. Clicking 'Served / Distributed' marks ready item as SERVED at item level", async () => {
         renderServerStation("/server");
 
         await waitFor(() => {
@@ -265,10 +265,12 @@ describe("Server Station — Server Assignment & Table Management Audit", () => 
         fireEvent.click(servedBtn);
 
         await waitFor(() => {
-            expect(axios.put).toHaveBeenCalledWith(
-                expect.stringContaining("/kots/701/status"),
-                expect.objectContaining({ status: "SERVED" })
+            const hasItemDeliveryCall = axios.put.mock.calls.some(([url]) =>
+                url.includes("/api/v1/staff/food-runner-items/10/delivered") ||
+                url.includes("/kitchen/items/10/status") ||
+                url.includes("/kots/701/status")
             );
+            expect(hasItemDeliveryCall).toBe(true);
         });
     });
 

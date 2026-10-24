@@ -337,6 +337,22 @@ export const updateItemStatus = async (req, res) => {
       });
     }
 
+    if (String(status).toUpperCase() === "SERVED") {
+      emitToKitchen({
+        io,
+        staff,
+        restaurantId,
+        event: "food:delivered",
+        payload: {
+          itemId,
+          tableNo: kot?.tableNo,
+          deliveredBy: actor?.userName || actor?.name || "Staff",
+          item: updatedItem,
+          kot,
+        },
+      });
+    }
+
     emitToKitchen({
       io,
       staff,
@@ -373,6 +389,101 @@ export const updateItemStatus = async (req, res) => {
   } catch (err) {
     console.error("updateItemStatus error:", err);
     return res.status(500).send({ message: err?.message || "Failed to update item status" });
+  }
+};
+
+/**
+ * Fetch Canonical Ready Kitchen Items for Distribution Queue
+ */
+export const getReadyKitchenItemsController = async (req, res) => {
+  try {
+    const restaurantId = Number(req.params.restaurantId || req.user?.restaurantId || req.staffActor?.restaurantId || 0);
+    if (!restaurantId) return res.status(400).send({ message: "Restaurant ID required" });
+
+    const db = req.prisma || prisma;
+    const readyItems = await db.kitchenOrderTicketItem.findMany({
+      where: {
+        kot: {
+          restaurantId,
+          status: { notIn: ["SERVED", "CANCELLED"] },
+          order: {
+            status: { notIn: ["CANCELLED"] },
+          },
+        },
+        status: "READY",
+      },
+      include: {
+        kot: {
+          select: {
+            id: true,
+            kotNo: true,
+            orderId: true,
+            tableNo: true,
+            tableSessionId: true,
+            stationId: true,
+            stationName: true,
+            waiterId: true,
+            waiterName: true,
+            priority: true,
+            createdAt: true,
+            restaurantId: true,
+            order: {
+              select: {
+                id: true,
+                orderNo: true,
+                customerName: true,
+                tableNo: true,
+                status: true,
+                paymentStatus: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [
+        { kot: { priority: "desc" } },
+        { readyAt: "asc" },
+        { createdAt: "asc" },
+      ],
+    });
+
+    const formatted = readyItems.map((it) => ({
+      id: it.id, // Canonical KOTItem ID
+      kotItemId: it.id,
+      orderItemId: it.orderItemId,
+      orderId: it.kot?.orderId,
+      kotId: it.kotId,
+      restaurantId: it.kot?.restaurantId || restaurantId,
+      kotNo: it.kot?.kotNo || "",
+      orderNo: it.kot?.order?.orderNo || "",
+      tableNo: String(it.kot?.tableNo || it.kot?.order?.tableNo || "N/A").trim(),
+      tableSessionId: it.kot?.tableSessionId || null,
+      stationId: it.kot?.stationId || null,
+      stationName: it.kot?.stationName || "Kitchen",
+      priority: it.kot?.priority || "NORMAL",
+      name: it.itemName,
+      itemName: it.itemName,
+      qty: it.qty,
+      quantity: it.qty,
+      variantName: it.variantName || null,
+      selectedModifiers: it.selectedModifiers || null,
+      notes: it.notes || null,
+      status: it.status, // "READY"
+      preparedByUserId: it.preparedByUserId || null,
+      preparedByName: it.preparedByName || null,
+      assignedChefId: it.assignedChefId || null,
+      assignedChefName: it.assignedChefName || null,
+      assignedWaiterId: it.kot?.waiterId || null,
+      waiterName: it.kot?.waiterName || it.kot?.order?.customerName || null,
+      readyAt: it.readyAt || it.createdAt,
+      createdAt: it.createdAt,
+      kot: it.kot,
+    }));
+
+    return res.send({ ok: true, success: true, items: formatted });
+  } catch (err) {
+    console.error("getReadyKitchenItemsController error:", err);
+    return res.status(500).send({ message: err?.message || "Failed to fetch ready items" });
   }
 };
 

@@ -58,6 +58,7 @@ import {
   updatePriority as updateKotPriorityController,
   updateStation,
   updateStatus as updateKotStatusController,
+  getReadyKitchenItemsController,
 } from "../controllers/kot.controller.js";
 import {
   getKitchenConfigController,
@@ -4108,6 +4109,9 @@ export default async function ownerRoutes(app, deps = {}) {
 
   app.put("/owner/:restaurantId/kitchen/items/:itemId/status", updateKotItemStatusController);
   app.put("/api/owner/:restaurantId/kitchen/items/:itemId/status", updateKotItemStatusController);
+
+  app.get("/owner/:restaurantId/kitchen/ready-items", getReadyKitchenItemsController);
+  app.get("/api/owner/:restaurantId/kitchen/ready-items", getReadyKitchenItemsController);
 
   // ==========================================
   // FEATURE 20 — STAFF MANAGEMENT, WAITER WORKSPACE, RBAC & MANAGER APPROVALS
