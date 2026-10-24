@@ -377,14 +377,14 @@ export default function ServerHistoryView({ onBackToFloorPlan, onBack, title }) 
         </div>
       ) : (
         <div className="space-y-6">
-          {groupedHistory.map((group) => (
-            <div key={group.dateKey} className="space-y-3" data-testid={`history-group-${group.dateKey}`}>
+          {groupedHistory.map((group, gIdx) => (
+            <div key={group.dateKey || group.date || `group-${gIdx}`} className="space-y-3" data-testid={`history-group-${group.dateKey || group.date || gIdx}`}>
               {/* Group Date Header */}
               <div className="flex items-center justify-between pb-2 border-b border-[color:var(--app-border)]/40">
                 <div className="flex items-center gap-2">
                   <Calendar size={14} className="text-orange-500" />
                   <span className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    {group.dateHeading}
+                    {group.dateHeading || group.displayDate || group.dateKey || group.date}
                   </span>
                 </div>
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 text-slate-700 dark:text-slate-300">
@@ -409,11 +409,11 @@ export default function ServerHistoryView({ onBackToFloorPlan, onBack, title }) 
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs font-black text-slate-900 dark:text-slate-100 tracking-tight">
-                            #{item.kotNumber || item.kotId}
+                            KOT #{item.kotNo || item.kotNumber || item.kotId}
                           </span>
                           {item.orderNo && (
                             <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 text-slate-600 dark:text-slate-400">
-                              {item.orderNo}
+                              Order #{item.orderNo}
                             </span>
                           )}
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 font-mono">
@@ -494,7 +494,7 @@ export default function ServerHistoryView({ onBackToFloorPlan, onBack, title }) 
             <div className="pt-2 text-center">
               <button
                 type="button"
-                data-testid="load-more-btn"
+                data-testid="history-load-more-btn"
                 disabled={loadingMore}
                 onClick={handleLoadMore}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[color:var(--app-border)]/40 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition shadow-xs disabled:opacity-50 cursor-pointer"
