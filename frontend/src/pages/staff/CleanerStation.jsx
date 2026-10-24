@@ -19,6 +19,7 @@ import { useStaffSocket } from "../../context/StaffSocketContext";
 import { API } from "../../config";
 import { showToast } from "../../utils/toast";
 import { playNotificationSound, triggerNotificationVibration } from "../../utils/soundPlayer";
+import { normalizeCanonicalTable } from "../../context/TableStateContext";
 
 export default function CleanerStation() {
     const { user, token } = useAuth();
@@ -60,7 +61,10 @@ export default function CleanerStation() {
                 headers: { Authorization: `Bearer ${token}` },
                 params: { restaurantId },
             });
-            const list = res.data?.tables || res.data || [];
+            const rawList = res.data?.tables || res.data || [];
+            const list = Array.isArray(rawList)
+                ? rawList.map((t) => normalizeCanonicalTable(t, restaurantId)).filter(Boolean)
+                : [];
             const dirty = list.filter((t) => t.cleaningStatus === "DIRTY" || t.status === "DIRTY");
             setDirtyTables(dirty);
         } catch (err) {
@@ -346,7 +350,7 @@ export default function CleanerStation() {
                                                 </span>
                                             </div>
                                             <div className="text-xs text-neutral-300 mt-2">
-                                                Section: {tbl.section || "Main Floor"} • {tbl.seats || 4} Seats
+                                                Section: {tbl.section || "Location not configured"} • {tbl.seats || 4} Seats
                                             </div>
                                             <p className="text-xs text-neutral-400 mt-1">
                                                 Dining session completed. Clean and sanitize surface before new guests arrive.

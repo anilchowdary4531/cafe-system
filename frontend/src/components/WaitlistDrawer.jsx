@@ -36,7 +36,7 @@ export default function WaitlistDrawer({
     const [customerName, setCustomerName] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
     const [guestCount, setGuestCount] = useState(2);
-    const [preferredSection, setPreferredSection] = useState("Main Floor");
+    const [preferredSection, setPreferredSection] = useState("ANY");
     const [notes, setNotes] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
@@ -260,7 +260,7 @@ export default function WaitlistDrawer({
                                         onChange={(e) => setPreferredSection(e.target.value)}
                                         className="w-full rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs"
                                     >
-                                        <option value="Main Floor">Main Floor</option>
+                                        <option value="ANY">Any Area</option>
                                         <option value="Main Hall">Main Hall</option>
                                         <option value="Patio">Patio</option>
                                         <option value="Roof Top">Roof Top</option>
@@ -331,7 +331,7 @@ export default function WaitlistDrawer({
                                             <p className="text-[11px] theme-muted flex items-center gap-2 mt-0.5">
                                                 <span>🪑 {entry.guestCount} Guests</span>
                                                 <span>•</span>
-                                                <span>📍 {entry.preferredSection || "Main Floor"}</span>
+                                                <span>📍 {entry.preferredSection && entry.preferredSection !== "ANY" && entry.preferredSection !== "Main Floor" ? entry.preferredSection : "Any Area"}</span>
                                             </p>
                                         </div>
                                         <div className="text-right">
@@ -365,7 +365,7 @@ export default function WaitlistDrawer({
                                                 <option value="">-- Choose Available Table --</option>
                                                 {availableTables.map((t) => (
                                                     <option key={t.id} value={t.id}>
-                                                        Table {t.tableNo} ({t.seats} Seats) - {t.section || "Main Area"}
+                                                        Table {t.tableNo} ({t.seats} Seats){t.section ? ` - ${t.section}` : ''}
                                                     </option>
                                                 ))}
                                             </select>

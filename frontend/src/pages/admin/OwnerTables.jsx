@@ -139,7 +139,7 @@ export default function OwnerTables() {
     const handleStartEditLayout = () => {
         const layoutMap = {};
         tables.forEach((t, index) => {
-            const defaultSection = t.section || getTableGroup(t) || "Main Floor";
+            const defaultSection = (t.section && t.section !== "Main Floor" ? t.section : null) || getTableGroup(t) || "Location not configured";
             const defaultX = t.positionX !== null && t.positionX !== undefined ? t.positionX : (index % 5) * 170 + 40;
             const defaultY = t.positionY !== null && t.positionY !== undefined ? t.positionY : Math.floor(index / 5) * 140 + 40;
 

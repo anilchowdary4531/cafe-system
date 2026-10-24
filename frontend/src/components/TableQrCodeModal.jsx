@@ -15,6 +15,7 @@ import {
 import axios from "axios";
 import { API } from "../config";
 import { showToast } from "../utils/toast";
+import { resolveCanonicalSection } from "../context/TableStateContext";
 
 export default function TableQrCodeModal({
   isOpen,
@@ -325,7 +326,7 @@ export default function TableQrCodeModal({
                           Table {tbl.tableNo}
                         </div>
                         <p className="text-[10px] text-gray-400">
-                          {tbl.section || "Main Floor"} • Seats {tbl.seats || 4}
+                          {resolveCanonicalSection(tbl)} • Seats {tbl.seats || 4}
                         </p>
                       </div>
 

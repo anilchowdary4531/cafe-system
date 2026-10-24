@@ -1684,7 +1684,7 @@ export default async function ownerRoutes(app, deps = {}) {
           restaurantId,
           tableNo,
           seats: Number(seats || 4),
-          section: section ? String(section) : "Main Floor",
+          section: section ? String(section).trim() : null,
           positionX: positionX !== undefined && positionX !== null ? Number(positionX) : null,
           positionY: positionY !== undefined && positionY !== null ? Number(positionY) : null,
           width: width ? Number(width) : 120,
@@ -1741,7 +1741,7 @@ export default async function ownerRoutes(app, deps = {}) {
         data: {
           tableNo: nextTableNo,
           seats: seats === undefined ? existing.seats : Number(seats),
-          section: section !== undefined ? String(section) : existing.section,
+          section: section !== undefined ? (section ? String(section).trim() : null) : existing.section,
           positionX: positionX !== undefined ? (positionX === null ? null : Number(positionX)) : existing.positionX,
           positionY: positionY !== undefined ? (positionY === null ? null : Number(positionY)) : existing.positionY,
           width: width !== undefined ? Number(width) : existing.width,
@@ -1987,7 +1987,7 @@ export default async function ownerRoutes(app, deps = {}) {
         }).then((rows) =>
           rows.map((t) => ({
             ...t,
-            groupName: t.section || "Main Floor",
+            groupName: t.section || null,
             isOccupied: Boolean(t.tableSessions && t.tableSessions.length > 0),
           }))
         ).catch((err) => {

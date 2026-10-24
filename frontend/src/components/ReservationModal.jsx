@@ -291,7 +291,7 @@ export default function ReservationModal({
                                     <option value="">-- Unassigned / Flexible --</option>
                                     {tables.map((t) => (
                                         <option key={t.id} value={t.id}>
-                                            Table {t.tableNo} ({t.seats} Seats) - {t.section || "Main Area"}
+                                            Table {t.tableNo} ({t.seats} Seats){t.section ? ` - ${t.section}` : ''}
                                         </option>
                                     ))}
                                 </select>

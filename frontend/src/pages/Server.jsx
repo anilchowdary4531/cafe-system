@@ -449,7 +449,7 @@ export default function Server() {
         return rawTables.map((t) => {
             const idKey = t.id ? String(t.id) : null;
             const noKey = t.tableNo ? String(t.tableNo).trim().toLowerCase() : null;
-            const override = (idKey && tableOverrides[idKey]) || (noKey && tableOverrides[noKey]) || null;
+            const override = (idKey && tableOverrides[idKey]) ? tableOverrides[idKey] : (noKey && tableOverrides[noKey] ? tableOverrides[noKey] : null);
 
             if (override) {
                 // Stale HTTP response rejection:
@@ -616,7 +616,7 @@ export default function Server() {
     const sections = useMemo(() => {
         const set = new Set(["ALL"]);
         tables.forEach((t) => {
-            const sec = String(t.section || "Main Hall").trim();
+            const sec = String(t.section || "Location not configured").trim();
             if (sec) set.add(sec);
         });
         return Array.from(set);
@@ -1010,7 +1010,7 @@ export default function Server() {
     // Filter tables based on Section, Search query, and Shift time
     const filteredTables = useMemo(() => {
         return tables.filter((t) => {
-            if (activeSectionFilter !== "ALL" && String(t.section || "Main Hall").trim() !== activeSectionFilter) {
+            if (activeSectionFilter !== "ALL" && String(t.section || "Location not configured").trim() !== activeSectionFilter) {
                 return false;
             }
             if (searchQuery) {
@@ -1607,7 +1607,7 @@ export default function Server() {
                                                 <h3 className="text-base sm:text-lg font-black tracking-tight text-[color:var(--app-text)]">
                                                     {table.tableNo}
                                                 </h3>
-                                                <p className="text-[10px] theme-muted">{table.seats} Seats • {table.section || "Main"}</p>
+                                                <p className="text-[10px] theme-muted">{table.seats} Seats • {table.section || "Location not configured"}</p>
                                             </div>
 
                                             {/* Status Badge */}
@@ -1856,7 +1856,7 @@ export default function Server() {
                                             <span>No server assigned</span>
                                         </span>
                                     )}
-                                    <span className="text-[11px] theme-muted">• Section: {selectedTable?.section || "Main"}</span>
+                                    <span className="text-[11px] theme-muted">• Section: {selectedTable?.section || "Location not configured"}</span>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
