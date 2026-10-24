@@ -1282,32 +1282,32 @@ export default function Server() {
     return (
         <div className="min-h-screen bg-[color:var(--app-bg,#f8fafc)] text-[color:var(--app-text,#0f172a)] font-sans flex flex-col">
             {/* Top Navigation & Status Bar */}
-            <header className="sticky top-0 z-30 border-b border-[color:var(--app-border)]/50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-3 sm:px-4 py-2.5 sm:py-3 shadow-xs flex flex-wrap lg:flex-nowrap items-center justify-between gap-2.5 sm:gap-3">
+            <header className="sticky top-0 z-30 border-b border-[color:var(--app-border)]/50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-2.5 sm:px-4 h-14 sm:h-[60px] max-h-[64px] shadow-xs flex items-center justify-between gap-1.5 sm:gap-2.5 overflow-x-auto lg:overflow-visible scrollbar-none">
                 {/* Brand & Branch Info — Owner Panel Branding */}
-                <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
                     <Link
                         to="/server"
-                        className="flex items-center gap-2 shrink-0 group focus:outline-none"
+                        className="flex items-center gap-1.5 shrink-0 group focus:outline-none"
                         title="Tiffzy Server Station"
                     >
-                        <BrandLogo className="theme-brand-logo h-7 w-7 sm:h-8 sm:w-8 shrink-0" title="Tiffzy logo" />
-                        <span className="theme-brand-text text-lg sm:text-xl font-bold tracking-tight group-hover:opacity-90 transition-opacity">
+                        <BrandLogo className="theme-brand-logo h-6 w-6 sm:h-7 sm:w-7 shrink-0" title="Tiffzy logo" />
+                        <span className="theme-brand-text text-base sm:text-lg font-bold tracking-tight group-hover:opacity-90 transition-opacity">
                             Tiffzy
                         </span>
                     </Link>
-                    <div className="min-w-0 flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                    <div className="min-w-0 flex items-center gap-1 sm:gap-1.5">
                         <span className="text-xs font-extrabold text-[color:var(--app-muted)] hidden min-[360px]:inline">•</span>
-                        <h1 className="text-xs sm:text-base font-extrabold tracking-tight text-[color:var(--app-text)] truncate max-w-[110px] min-[400px]:max-w-[160px] sm:max-w-[220px]">
+                        <h1 className="text-xs sm:text-sm font-extrabold tracking-tight text-[color:var(--app-text)] truncate max-w-[90px] min-[400px]:max-w-[130px] lg:max-w-[160px]">
                             {restaurantName}
                         </h1>
-                        <span className="rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold border border-orange-500/30 whitespace-nowrap">
+                        <span className="rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold border border-orange-500/30 whitespace-nowrap">
                             Server Station
                         </span>
                     </div>
                 </div>
 
                 {/* Meal Shift Selector */}
-                <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 p-1 rounded-xl border border-[color:var(--app-border)]/40 overflow-x-auto scrollbar-none max-w-full shrink-0 my-0.5 sm:my-0">
+                <div className="flex items-center gap-0.5 bg-black/5 dark:bg-white/5 p-0.5 sm:p-1 rounded-xl border border-[color:var(--app-border)]/40 shrink-0">
                     {[
                         { id: "BREAKFAST", label: "🍳 Breakfast", time: `${shiftConfig.breakfast.start}-${shiftConfig.breakfast.end}` },
                         { id: "LUNCH", label: "🍱 Lunch", time: `${shiftConfig.lunch.start}-${shiftConfig.lunch.end}` },
@@ -1316,22 +1316,24 @@ export default function Server() {
                         <button
                             key={shift.id}
                             onClick={() => setActiveShift(shift.id)}
-                            className={`flex flex-col items-center rounded-lg px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold transition whitespace-nowrap ${
+                            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] sm:text-xs font-bold transition whitespace-nowrap h-7 sm:h-8 ${
                                 activeShift === shift.id
                                     ? "bg-orange-500 text-white shadow-xs"
                                     : "theme-muted hover:text-[color:var(--app-text)]"
                             }`}
                         >
                             <span>{shift.label}</span>
-                            <span className="text-[8px] sm:text-[9px] opacity-80 font-normal">{shift.time}</span>
+                            <span className={`text-[8.5px] sm:text-[9.5px] font-normal hidden xl:inline ${activeShift === shift.id ? "text-white/85" : "opacity-70"}`}>
+                                {shift.time}
+                            </span>
                         </button>
                     ))}
                     <button
                         onClick={() => setIsShiftConfigOpen(true)}
-                        className="p-1.5 text-slate-400 hover:text-orange-500 rounded-lg transition shrink-0"
+                        className="p-1 text-slate-400 hover:text-orange-500 rounded-lg transition shrink-0"
                         title="Configure Shift Timings"
                     >
-                        <Settings2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <Settings2 className="h-3.5 w-3.5" />
                     </button>
                 </div>
 
@@ -1351,14 +1353,14 @@ export default function Server() {
                                 });
                             }
                         }}
-                        className={`relative flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-extrabold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                        className={`relative flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-extrabold transition cursor-pointer whitespace-nowrap shadow-xs ${
                             readyItemsToDistribute.length > 0
                                 ? "border-emerald-500 bg-emerald-500 text-white shadow-emerald-500/25 animate-pulse"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                         }`}
                         title="Kitchen Pass / Ready to Distribute"
                     >
-                        <Bell className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${readyItemsToDistribute.length > 0 ? "animate-bounce" : ""}`} />
+                        <Bell className={`h-3.5 w-3.5 ${readyItemsToDistribute.length > 0 ? "animate-bounce" : ""}`} />
                         <span>Ready to Distribute</span>
                         <span className={`rounded-full px-1.5 py-0.2 text-[9px] sm:text-[10px] font-black ${
                             readyItemsToDistribute.length > 0 ? "bg-white text-emerald-700" : "bg-black/10 dark:bg-white/10"
@@ -1370,9 +1372,9 @@ export default function Server() {
                     {/* Waitlist Drawer Trigger */}
                     <button
                         onClick={() => setIsWaitlistOpen(true)}
-                        className="relative flex items-center gap-1 sm:gap-1.5 rounded-xl border border-orange-500/30 bg-orange-500/10 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 transition cursor-pointer whitespace-nowrap"
+                        className="relative flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border border-orange-500/30 bg-orange-500/10 px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 transition cursor-pointer whitespace-nowrap"
                     >
-                        <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <Users className="h-3.5 w-3.5" />
                         <span className="hidden min-[450px]:inline">Waitlist</span>
                         {waitlistSummary.waitingCount > 0 && (
                             <span className="rounded-full bg-orange-500 text-white px-1.5 py-0.2 text-[9px] sm:text-[10px]">
@@ -1387,9 +1389,9 @@ export default function Server() {
                             setEditingReservation(null);
                             setIsReservationModalOpen(true);
                         }}
-                        className="flex items-center gap-1 sm:gap-1.5 rounded-xl bg-orange-500 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold text-white hover:bg-orange-600 transition shadow-xs cursor-pointer whitespace-nowrap"
+                        className="flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl bg-orange-500 px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold text-white hover:bg-orange-600 transition shadow-xs cursor-pointer whitespace-nowrap"
                     >
-                        <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <Plus className="h-3.5 w-3.5" />
                         <span><span className="hidden min-[400px]:inline">New </span>Reservation</span>
                     </button>
 
@@ -1400,14 +1402,14 @@ export default function Server() {
                             setViewMode("FLOOR_PLAN");
                             navigate("/server");
                         }}
-                        className={`flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                        className={`flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
                             viewMode === "FLOOR_PLAN" || viewMode === "ORDERING"
                                 ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                         }`}
                         title="Active Service Floor Plan"
                     >
-                        <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <LayoutGrid className="h-3.5 w-3.5" />
                         <span className="hidden min-[480px]:inline">Active Service</span>
                     </button>
 
@@ -1423,14 +1425,14 @@ export default function Server() {
                                 navigate("/server/history");
                             }
                         }}
-                        className={`relative flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                        className={`relative flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
                             viewMode === "HISTORY"
                                 ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                         }`}
                         title="Server Food-Service History"
                     >
-                        <HistoryIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <HistoryIcon className="h-3.5 w-3.5" />
                         <span className="hidden min-[480px]:inline">History</span>
                     </button>
 
@@ -1445,14 +1447,14 @@ export default function Server() {
                                 navigate("/server/notifications");
                             }
                         }}
-                        className={`relative flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                        className={`relative flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
                             viewMode === "NOTIFICATIONS"
                                 ? "border-orange-500 bg-orange-500 text-white"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                         }`}
                         title="Server Notifications"
                     >
-                        <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <Bell className="h-3.5 w-3.5" />
                         <span className="hidden min-[500px]:inline">Notifications</span>
                         {unreadNotificationCount > 0 && (
                             <span className="rounded-full bg-rose-500 text-white px-1.5 py-0.2 text-[9px] sm:text-[10px] font-black animate-pulse">
@@ -1461,14 +1463,14 @@ export default function Server() {
                         )}
                     </button>
 
-                    {/* Staff Profile Area with Time & Date on Top */}
-                    <div className="flex flex-col items-end justify-center shrink-0">
+                    {/* Staff Profile Area with Time & Date aligned horizontally on the same baseline */}
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                         {/* Time & Date Display (Authoritative) */}
-                        <div className="text-right leading-none pb-1 select-none flex flex-col items-end" data-testid="server-station-clock">
+                        <div className="text-right leading-none select-none flex flex-col items-end justify-center py-0.5" data-testid="server-station-clock">
                             <span className="text-[10px] sm:text-[11px] font-bold text-[color:var(--app-text,#0f172a)] tabular-nums tracking-tight">
                                 {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            <span className="text-[9px] sm:text-[10px] font-medium text-[color:var(--app-muted,#64748b)] whitespace-nowrap mt-0.5">
+                            <span className="text-[8.5px] sm:text-[9.5px] font-medium text-[color:var(--app-muted,#64748b)] whitespace-nowrap mt-0.5">
                                 {currentTime.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/,/g, '')}
                             </span>
                         </div>
@@ -1484,7 +1486,7 @@ export default function Server() {
                                     navigate("/server/profile");
                                 }
                             }}
-                            className={`flex items-center gap-1.5 rounded-xl border px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                            className={`flex items-center gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
                                 viewMode === "PROFILE"
                                     ? "border-orange-500 bg-orange-500 text-white"
                                     : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
