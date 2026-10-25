@@ -14,9 +14,11 @@ import {
     Upload,
     UserCircle2,
     Plus,
+    Volume2,
 } from "lucide-react";
 import { API } from "../../config";
 import ThemeSelector from "../../components/ThemeSelector";
+import NotificationSoundPicker from "../../components/NotificationSoundPicker";
 import { resolveImageUrl } from "../../utils/resolveImageUrl";
 import { uploadToS3Presigned } from "../../utils/s3Upload";
 import MapLocationPicker from "../../components/MapLocationPicker";
@@ -918,6 +920,17 @@ export default function OwnerSettings() {
                     <div className="mt-1.5 max-w-xl">
                         <p className="text-xs font-bold text-stone-700 mb-1">UI Theme</p>
                         <ThemeSelector variant="compact" />
+                    </div>
+                </article>
+
+                <article className={sectionClass}>
+                    <SectionHeader
+                        icon={Volume2}
+                        title="Sound & Vibration"
+                        subtitle="Configure sound alerts and vibration feedback for notifications."
+                    />
+                    <div className="mt-1.5">
+                        <NotificationSoundPicker defaultExpanded={false} />
                     </div>
                 </article>
 

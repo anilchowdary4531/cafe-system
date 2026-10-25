@@ -11,7 +11,6 @@ import {
     RefreshCw,
     Search,
     ShoppingBag,
-    Volume2,
     CheckCircle2,
     AlertTriangle,
     Info,
@@ -21,7 +20,6 @@ import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
 import { API } from "../config";
 import { showToast } from "../utils/toast";
-import NotificationSoundPicker from "./NotificationSoundPicker";
 import { playNotificationSound, triggerNotificationVibration } from "../utils/soundPlayer";
 
 const formatTime = (value) => {
@@ -51,7 +49,6 @@ export default function StaffNotificationsView({
     const [refreshing, setRefreshing] = useState(false);
     const [filterType, setFilterType] = useState("ALL"); // ALL | UNREAD | URGENT | TASKS
     const [searchQuery, setSearchQuery] = useState("");
-    const [showSoundSettings, setShowSoundSettings] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
 
     const handleBack = () => {
@@ -190,14 +187,6 @@ export default function StaffNotificationsView({
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
-                            onClick={() => setShowSoundSettings(!showSoundSettings)}
-                            className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-neutral-300 text-xs font-semibold flex items-center gap-1.5 transition min-h-[44px]"
-                        >
-                            <Volume2 className="w-4 h-4 text-orange-400" />
-                            <span>Sounds</span>
-                        </button>
-                        <button
-                            type="button"
                             onClick={() => {
                                 setRefreshing(true);
                                 fetchNotifications();
@@ -220,13 +209,6 @@ export default function StaffNotificationsView({
                         )}
                     </div>
                 </div>
-
-                {/* Collapsible sound picker */}
-                {showSoundSettings && (
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-xl">
-                        <NotificationSoundPicker defaultExpanded={false} />
-                    </div>
-                )}
 
                 {/* Filter and Search Bar */}
                 <div className="flex flex-col sm:flex-row gap-3">

@@ -12,6 +12,7 @@ import {
     Shield,
     Menu,
     X,
+    Settings,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
@@ -175,6 +176,18 @@ export default function StaffShell({
                                     {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
                                 </span>
                             )}
+                        </button>
+
+                        {/* Settings button */}
+                        <button
+                            type="button"
+                            data-testid="staff-settings-btn"
+                            onClick={() => navigate("/staff/settings")}
+                            className="min-w-[40px] min-h-[40px] sm:min-w-[42px] sm:min-h-[42px] rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center transition-colors border border-slate-200 dark:border-slate-700/60"
+                            title="Settings"
+                            aria-label="View staff settings"
+                        >
+                            <Settings className="w-4 h-4" />
                         </button>
 
                         {/* Profile button */}

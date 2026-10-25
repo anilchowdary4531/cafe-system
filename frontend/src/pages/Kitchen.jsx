@@ -29,6 +29,7 @@ import {
     Clock,
     History,
     Inbox,
+    Settings,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
@@ -129,7 +130,7 @@ export default function Kitchen() {
 
     // Active View Mode: "KDS" | "HISTORY" | "PROFILE" | "NOTIFICATIONS"
     const getInitialViewMode = () => {
-        if (location.pathname.endsWith("/profile")) return "PROFILE";
+        if (location.pathname.endsWith("/profile") || location.pathname.endsWith("/settings")) return "PROFILE";
         if (location.pathname.endsWith("/notifications")) return "NOTIFICATIONS";
         if (location.pathname.endsWith("/history") || new URLSearchParams(location.search).get("tab") === "history") return "HISTORY";
         return "KDS";
@@ -137,7 +138,7 @@ export default function Kitchen() {
     const [viewMode, setViewMode] = useState(getInitialViewMode);
 
     useEffect(() => {
-        if (location.pathname.endsWith("/profile")) {
+        if (location.pathname.endsWith("/profile") || location.pathname.endsWith("/settings")) {
             setViewMode("PROFILE");
         } else if (location.pathname.endsWith("/notifications")) {
             setViewMode("NOTIFICATIONS");
@@ -1188,11 +1189,35 @@ export default function Kitchen() {
                             )}
                         </button>
 
+                        {/* Settings Button */}
+                        <button
+                            type="button"
+                            data-testid="senior-chef-settings-btn"
+                            onClick={() => {
+                                if (viewMode === "PROFILE" && location.pathname.endsWith("/settings")) {
+                                    setViewMode("KDS");
+                                    navigate("/kitchen");
+                                } else {
+                                    setViewMode("PROFILE");
+                                    navigate("/kitchen/settings");
+                                }
+                            }}
+                            className={`flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                                viewMode === "PROFILE" && location.pathname.endsWith("/settings")
+                                    ? "border-orange-500 bg-orange-500 text-white"
+                                    : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                            }`}
+                            title="Kitchen Settings"
+                        >
+                            <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline font-bold">Settings</span>
+                        </button>
+
                         {/* Profile Button */}
                         <button
                             type="button"
                             onClick={() => {
-                                if (viewMode === "PROFILE") {
+                                if (viewMode === "PROFILE" && location.pathname.endsWith("/profile")) {
                                     setViewMode("KDS");
                                     navigate("/kitchen");
                                 } else {
@@ -1201,14 +1226,14 @@ export default function Kitchen() {
                                 }
                             }}
                             className={`flex items-center gap-1.5 rounded-xl border px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
-                                viewMode === "PROFILE"
+                                viewMode === "PROFILE" && location.pathname.endsWith("/profile")
                                     ? "border-orange-500 bg-orange-500 text-white"
                                     : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                             }`}
                             title="My Profile"
                         >
                             <div className={`h-5 w-5 rounded-full flex items-center justify-center font-black text-[10px] ${
-                                viewMode === "PROFILE" ? "bg-white text-orange-600" : "bg-orange-500 text-white"
+                                viewMode === "PROFILE" && location.pathname.endsWith("/profile") ? "bg-white text-orange-600" : "bg-orange-500 text-white"
                             }`}>
                                 {(user?.name || user?.username || "C").charAt(0).toUpperCase()}
                             </div>

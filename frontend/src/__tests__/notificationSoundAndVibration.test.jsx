@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import React from "react";
 import { BrowserRouter } from "react-router-dom";
 import NotificationSoundPicker from "../components/NotificationSoundPicker";
 import OwnerNotifications from "../pages/admin/OwnerNotifications";
+import OwnerSettings from "../pages/admin/OwnerSettings";
+import ServerProfileView from "../components/ServerProfileView";
+import StaffProfileView from "../components/StaffProfileView";
+import StaffShell from "../components/StaffShell";
 import {
   isSoundEnabled,
   setSoundEnabled,
@@ -17,6 +21,40 @@ import {
   isVibrationSupported,
   VIBRATION_PATTERNS,
 } from "../utils/soundPlayer";
+
+vi.mock("axios", () => {
+  const mockAxiosInstance = {
+    get: vi.fn().mockResolvedValue({ data: { settings: {}, success: true, profile: { name: "Test Staff", phone: "9876543210" } } }),
+    put: vi.fn().mockResolvedValue({ data: { success: true } }),
+    post: vi.fn().mockResolvedValue({ data: { success: true } }),
+    patch: vi.fn().mockResolvedValue({ data: { success: true } }),
+    delete: vi.fn().mockResolvedValue({ data: { success: true } }),
+    interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
+  };
+  return {
+    default: {
+      ...mockAxiosInstance,
+      create: vi.fn(() => mockAxiosInstance),
+    },
+  };
+});
+
+vi.mock("../context/AuthContext", () => ({
+  useAuth: () => ({
+    user: { id: 1, name: "Test Staff", role: "WAITER", designation: "Server", restaurantId: 1, restaurant: { id: 1, name: "Tiffzy" } },
+    token: "fake-jwt",
+    logout: vi.fn(),
+  }),
+}));
+
+vi.mock("../context/StaffSocketContext", () => ({
+  useStaffSocket: () => ({
+    socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
+    connected: true,
+    isConnected: true,
+    connectionStatus: "connected",
+  }),
+}));
 
 describe("Notification Sound & Vibration Independence, Patterns, and Controls", () => {
   beforeEach(() => {
@@ -204,7 +242,7 @@ describe("Notification Sound & Vibration Independence, Patterns, and Controls", 
     expect(getVibrationPattern()).toBe("short");
   });
 
-  it("OwnerNotifications page visibly contains Notification Sound and Notification Vibration controls", () => {
+  it("OwnerNotifications page focuses on notifications log, history, filters, and search without Sound/Vibration configuration UI", () => {
     render(
       <BrowserRouter>
         <OwnerNotifications />
@@ -212,9 +250,16 @@ describe("Notification Sound & Vibration Independence, Patterns, and Controls", 
     );
 
     expect(screen.getByText("Notifications Log")).toBeDefined();
-    expect(screen.getByText("Notification Sound")).toBeDefined();
-    expect(screen.getByText("Notification Vibration")).toBeDefined();
-    expect(screen.getByText("Control vibration for Tiffzy notifications")).toBeDefined();
+    expect(screen.getByText("Mark all as read")).toBeDefined();
+    expect(screen.getByText("ALL")).toBeDefined();
+    expect(screen.getByText("UNREAD")).toBeDefined();
+    expect(screen.getByPlaceholderText(/Search notifications/i)).toBeDefined();
+
+    // Sound & Vibration controls relocated out of Notifications page
+    expect(screen.queryByText("Notification Sound")).toBeNull();
+    expect(screen.queryByText("Notification Vibration")).toBeNull();
+    expect(screen.queryByTestId("customize-sound-control")).toBeNull();
+    expect(screen.queryByTestId("customize-vibration-control")).toBeNull();
   });
 
   describe("Notification Sound Accordion Collapse/Expand Behaviors", () => {
@@ -325,14 +370,14 @@ describe("Notification Sound & Vibration Independence, Patterns, and Controls", 
       expect(screen.getByText(/Customize Sound Tone \(Bright Bell\)/i)).toBeDefined();
     });
 
-    it("OwnerNotifications page integrates collapsed sound customization by default", () => {
+    it("OwnerSettings page integrates collapsed sound customization by default", () => {
       render(
         <BrowserRouter>
-          <OwnerNotifications />
+          <OwnerSettings />
         </BrowserRouter>
       );
 
-      // Header is visible
+      // Header is visible in Settings
       expect(screen.getByText("Notification Sound")).toBeDefined();
       expect(screen.getByTestId("current-notification-sound")).toBeDefined();
       expect(screen.getByTitle("Test Sound")).toBeDefined();
@@ -440,14 +485,14 @@ describe("Notification Sound & Vibration Independence, Patterns, and Controls", 
       expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
     });
 
-    it("6. OwnerNotifications page integrates both collapsed Sound and Vibration sections by default", () => {
+    it("6. OwnerSettings page integrates both collapsed Sound and Vibration sections by default", () => {
       render(
         <BrowserRouter>
-          <OwnerNotifications />
+          <OwnerSettings />
         </BrowserRouter>
       );
 
-      // Both headers exist
+      // Both headers exist under Settings
       expect(screen.getByText("Notification Sound")).toBeDefined();
       expect(screen.getByText("Notification Vibration")).toBeDefined();
 
@@ -463,6 +508,83 @@ describe("Notification Sound & Vibration Independence, Patterns, and Controls", 
       // Collapsing Vibration
       fireEvent.click(screen.getByTestId("customize-vibration-control"));
       expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
+    });
+  });
+
+  describe("All Designation Workspaces Settings and Sound & Vibration Relocation Verification", () => {
+    it("renders Sound & Vibration collapsed by default in ServerProfileView", () => {
+      render(
+        <BrowserRouter>
+          <ServerProfileView onBackToFloorPlan={vi.fn()} />
+        </BrowserRouter>
+      );
+
+      expect(screen.getByText("Notification Sound")).toBeDefined();
+      expect(screen.getByText("Notification Vibration")).toBeDefined();
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+      expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
+
+      // Expanding Sound expands Sound
+      fireEvent.click(screen.getByTestId("customize-sound-control"));
+      expect(screen.getByTestId("notification-sound-customization-content")).toBeDefined();
+      expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
+    });
+
+    it("renders Sound & Vibration collapsed by default in StaffProfileView", () => {
+      render(
+        <BrowserRouter>
+          <StaffProfileView onBack={vi.fn()} />
+        </BrowserRouter>
+      );
+
+      expect(screen.getByText("Notification Sound")).toBeDefined();
+      expect(screen.getByText("Notification Vibration")).toBeDefined();
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+      expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
+
+      // Expanding Vibration expands Vibration independently
+      fireEvent.click(screen.getByTestId("customize-vibration-control"));
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+      expect(screen.getByTestId("notification-vibration-customization-content")).toBeDefined();
+    });
+
+    it("StaffShell renders accessible Settings button for staff designations (Steward, Cashier, Cleaner, Swiper, etc.)", () => {
+      render(
+        <BrowserRouter>
+          <StaffShell designation="STEWARD">
+            <div>Steward Station Content</div>
+          </StaffShell>
+        </BrowserRouter>
+      );
+
+      const settingsBtn = screen.getByTestId("staff-settings-btn");
+      expect(settingsBtn).toBeDefined();
+      expect(settingsBtn.getAttribute("title")).toBe("Settings");
+      expect(settingsBtn.getAttribute("aria-label")).toBe("View staff settings");
+    });
+
+    it("verifies accessibility contracts (aria-expanded, aria-controls, matching ids)", () => {
+      render(<NotificationSoundPicker />);
+
+      const soundToggleBtn = screen.getByTestId("customize-sound-control");
+      const vibrationToggleBtn = screen.getByTestId("customize-vibration-control");
+
+      expect(soundToggleBtn.getAttribute("aria-expanded")).toBe("false");
+      expect(soundToggleBtn.getAttribute("aria-controls")).toBe("notification-sound-customization-content");
+      expect(vibrationToggleBtn.getAttribute("aria-expanded")).toBe("false");
+      expect(vibrationToggleBtn.getAttribute("aria-controls")).toBe("notification-vibration-customization-content");
+
+      // Expand Sound
+      fireEvent.click(soundToggleBtn);
+      expect(soundToggleBtn.getAttribute("aria-expanded")).toBe("true");
+      const soundContent = screen.getByTestId("notification-sound-customization-content");
+      expect(soundContent.id).toBe("notification-sound-customization-content");
+
+      // Expand Vibration
+      fireEvent.click(vibrationToggleBtn);
+      expect(vibrationToggleBtn.getAttribute("aria-expanded")).toBe("true");
+      const vibrationContent = screen.getByTestId("notification-vibration-customization-content");
+      expect(vibrationContent.id).toBe("notification-vibration-customization-content");
     });
   });
 });

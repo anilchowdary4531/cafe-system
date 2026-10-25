@@ -438,6 +438,14 @@ export default function App() {
                         }
                     />
                     <Route
+                        path="/kitchen/settings"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"]}>
+                                <Kitchen />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/kitchen/chef/:chefId"
                         element={
                             <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"]}>
@@ -450,6 +458,14 @@ export default function App() {
                         element={
                             <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"]}>
                                 <KitchenChefDetail />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/kitchen/chef/:chefId/settings"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "CHEF"]}>
+                                <StaffProfileView title="Chef Settings" backLabel="Back to Chef Station" />
                             </ProtectedRoute>
                         }
                     />
@@ -527,6 +543,14 @@ export default function App() {
                             </ProtectedRoute>
                         }
                     />
+                    <Route
+                        path="/server/settings"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CASHIER"]}>
+                                <Server />
+                            </ProtectedRoute>
+                        }
+                    />
 
                     {/* ================================= */}
                     {/* STAFF STATIONS & WORKSPACES (Designations 4-9) */}
@@ -576,6 +600,14 @@ export default function App() {
                         element={
                             <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STEWARD", "CLEANER", "SWIPER", "STAFF"]}>
                                 <StaffProfileView />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/staff/settings"
+                        element={
+                            <ProtectedRoute roles={["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CHEF", "CASHIER", "STEWARD", "CLEANER", "SWIPER", "STAFF"]}>
+                                <StaffProfileView title="Staff Settings" backLabel="Back to Workspace" />
                             </ProtectedRoute>
                         }
                     />

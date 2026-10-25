@@ -19,6 +19,7 @@ import {
   Calendar,
   Search,
   X,
+  Settings,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useStaffSocket } from "../context/StaffSocketContext";
@@ -485,6 +486,16 @@ export default function KitchenChefDetail() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <Link
+              to={`/kitchen/chef/${chefId}/settings`}
+              data-testid="chef-settings-btn"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-xs cursor-pointer"
+              title="Chef Settings"
+            >
+              <Settings size={13} className="text-slate-600 dark:text-slate-400" />
+              <span className="hidden min-[420px]:inline">Settings</span>
+            </Link>
+
             <button
               type="button"
               onClick={() => {

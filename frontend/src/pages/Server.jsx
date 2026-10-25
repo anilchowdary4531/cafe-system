@@ -255,7 +255,7 @@ export default function Server() {
     // Active View Mode: "FLOOR_PLAN" | "ORDERING" | "PROFILE" | "NOTIFICATIONS" | "HISTORY"
     const getInitialViewMode = () => {
         if (location.pathname.endsWith("/history")) return "HISTORY";
-        if (location.pathname.endsWith("/profile")) return "PROFILE";
+        if (location.pathname.endsWith("/profile") || location.pathname.endsWith("/settings")) return "PROFILE";
         if (location.pathname.endsWith("/notifications")) return "NOTIFICATIONS";
         return "FLOOR_PLAN";
     };
@@ -264,7 +264,7 @@ export default function Server() {
     useEffect(() => {
         if (location.pathname.endsWith("/history")) {
             setViewMode("HISTORY");
-        } else if (location.pathname.endsWith("/profile")) {
+        } else if (location.pathname.endsWith("/profile") || location.pathname.endsWith("/settings")) {
             setViewMode("PROFILE");
         } else if (location.pathname.endsWith("/notifications")) {
             setViewMode("NOTIFICATIONS");
@@ -1489,11 +1489,36 @@ export default function Server() {
                             </span>
                         </div>
 
+                        {/* Settings Button */}
+                        <button
+                            type="button"
+                            data-testid="server-settings-btn"
+                            onClick={() => {
+                                if (viewMode === "PROFILE" && location.pathname.endsWith("/settings")) {
+                                    setViewMode("FLOOR_PLAN");
+                                    navigate("/server");
+                                } else {
+                                    setViewMode("PROFILE");
+                                    navigate("/server/settings");
+                                }
+                            }}
+                            className={`flex items-center gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                                viewMode === "PROFILE" && location.pathname.endsWith("/settings")
+                                    ? "border-orange-500 bg-orange-500 text-white"
+                                    : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
+                            }`}
+                            title="Server Settings"
+                            aria-label="Server Settings"
+                        >
+                            <Settings2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline font-bold">Settings</span>
+                        </button>
+
                         {/* Profile Button */}
                         <button
                             type="button"
                             onClick={() => {
-                                if (viewMode === "PROFILE") {
+                                if (viewMode === "PROFILE" && location.pathname.endsWith("/profile")) {
                                     setViewMode("FLOOR_PLAN");
                                     navigate("/server");
                                 } else {
@@ -1502,7 +1527,7 @@ export default function Server() {
                                 }
                             }}
                             className={`flex items-center gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
-                                viewMode === "PROFILE"
+                                viewMode === "PROFILE" && location.pathname.endsWith("/profile")
                                     ? "border-orange-500 bg-orange-500 text-white"
                                     : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                             }`}
