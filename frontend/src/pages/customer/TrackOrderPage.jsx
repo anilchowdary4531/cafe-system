@@ -2,9 +2,11 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { Truck, MapPin, Phone, Clock, ArrowLeft, Navigation, ShieldCheck, AlertCircle, RefreshCw, CheckCircle2, Loader2 } from "lucide-react";
 import { api } from "../../utils/apiClient";
-import * as maplibregl from "maplibre-gl";
+import * as maplibreglRaw from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { MAP_CONFIG } from "../../utils/mapConfig";
+
+const maplibregl = maplibreglRaw.Map ? maplibreglRaw : (maplibreglRaw.default || maplibreglRaw);
 import io from "socket.io-client";
 import { API_BASE_URL } from "../../config";
 import BrandLogo from "../../components/BrandLogo";
@@ -123,6 +125,7 @@ export default function TrackOrderPage() {
         center: [restLng, restLat],
         zoom: 13,
         attributionControl: true,
+        transformRequest: MAP_CONFIG.transformRequest,
       });
 
       mapRef.current = map;

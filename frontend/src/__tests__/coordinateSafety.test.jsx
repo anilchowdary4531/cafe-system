@@ -45,6 +45,18 @@ describe("Coordinate Safety & Historical Swapped Values Audit", () => {
         expect(parseAndValidateCoords(12.9716, null)).toBeNull();
     });
 
+    it("rejects empty strings, whitespace, and booleans so Null Island (0,0) is never accidentally chosen", () => {
+        expect(parseAndValidateCoords("", "")).toBeNull();
+        expect(parseAndValidateCoords("   ", "   ")).toBeNull();
+        expect(parseAndValidateCoords(true, false)).toBeNull();
+        expect(parseAndValidateCoords("abc", "def")).toBeNull();
+    });
+
+    it("safely handles valid string coordinates", () => {
+        const result = parseAndValidateCoords("12.9716", "77.5946");
+        expect(result).toEqual({ lat: 12.9716, lng: 77.5946 });
+    });
+
     it("correctly validates normal valid coordinates (e.g. Bengaluru 12.9716, 77.5946)", () => {
         const result = parseAndValidateCoords(12.9716, 77.5946);
         expect(result).toEqual({ lat: 12.9716, lng: 77.5946 });

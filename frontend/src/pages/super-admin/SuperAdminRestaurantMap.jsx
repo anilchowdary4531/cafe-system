@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import * as maplibregl from "maplibre-gl";
+import * as maplibreglRaw from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+
+const maplibregl = maplibreglRaw.Map ? maplibreglRaw : (maplibreglRaw.default || maplibreglRaw);
 import {
     Menu,
     Search,
@@ -365,6 +367,7 @@ export default function SuperAdminRestaurantMap() {
                 center: initialCenter,
                 zoom: initialZoom,
                 attributionControl: true,
+                transformRequest: MAP_CONFIG.transformRequest,
             });
 
             map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
