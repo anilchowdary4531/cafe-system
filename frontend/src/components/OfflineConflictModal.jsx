@@ -43,7 +43,7 @@ export default function OfflineConflictModal() {
                         <AlertTriangle className="h-6 w-6" />
                         <h3 className="text-lg font-bold">Offline Sync Conflict</h3>
                     </div>
-                    <button onClick={handleDismiss} className="text-gray-400 hover:text-white">
+                    <button type="button" onClick={handleDismiss} className="text-gray-400 hover:text-white" title="Close" aria-label="Close offline conflict modal">
                         <X className="h-5 w-5" />
                     </button>
                 </div>

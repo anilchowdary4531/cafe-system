@@ -321,6 +321,7 @@ export default function ServerNotificationsView({
                         disabled={refreshing}
                         className="rounded-lg bg-black/5 dark:bg-white/5 p-1.5 text-xs font-bold theme-muted hover:text-[color:var(--app-text)] transition cursor-pointer"
                         title="Refresh Notifications"
+                        aria-label="Refresh Notifications"
                     >
                         <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
                     </button>
@@ -349,6 +350,7 @@ export default function ServerNotificationsView({
                 <div className="flex items-center gap-1 overflow-x-auto py-0.5 text-[11px] scrollbar-none">
                     {["ALL", "UNREAD", "ORDERS", "KITCHEN", "SUCCESS", "INFO"].map((tab) => (
                         <button
+                            type="button"
                             key={tab}
                             onClick={() => setFilterType(tab)}
                             className={`rounded-lg px-3 py-1 font-bold transition whitespace-nowrap cursor-pointer ${
@@ -366,6 +368,9 @@ export default function ServerNotificationsView({
                 <div className="relative w-full md:w-56">
                     <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 theme-muted" />
                     <input
+                        id="server-notifications-search"
+                        name="serverNotificationsSearch"
+                        aria-label="Search notifications"
                         type="text"
                         placeholder="Search notifications..."
                         value={searchQuery}

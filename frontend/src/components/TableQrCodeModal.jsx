@@ -133,6 +133,7 @@ export default function TableQrCodeModal({
           <div className="flex items-center space-x-3">
             <div className="flex bg-gray-800/80 p-1 rounded-xl border border-gray-700/50">
               <button
+                type="button"
                 onClick={() => setActiveTab("SINGLE")}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
                   activeTab === "SINGLE"
@@ -143,6 +144,7 @@ export default function TableQrCodeModal({
                 Table {currentTable?.tableNo || "Card"}
               </button>
               <button
+                type="button"
                 onClick={() => setActiveTab("BATCH")}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
                   activeTab === "BATCH"
@@ -155,6 +157,7 @@ export default function TableQrCodeModal({
             </div>
 
             <button
+              type="button"
               onClick={handlePrint}
               className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-xl transition shadow-lg shadow-emerald-900/30"
             >
@@ -163,7 +166,10 @@ export default function TableQrCodeModal({
             </button>
 
             <button
+              type="button"
               onClick={onClose}
+              title="Close"
+              aria-label="Close QR code modal"
               className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-xl transition"
             >
               <X className="w-5 h-5" />
@@ -238,14 +244,19 @@ export default function TableQrCodeModal({
                   <div className="flex items-center space-x-2 bg-gray-950 p-2.5 rounded-xl border border-gray-800">
                     <input
                       type="text"
+                      id="table-qr-target-url"
+                      name="tableQrTargetUrl"
+                      aria-label="QR Target URL"
                       readOnly
                       value={currentQrTargetUrl}
                       className="bg-transparent text-xs text-indigo-300 w-full outline-none font-mono truncate"
                     />
                     <button
+                      type="button"
                       onClick={handleCopyUrl}
                       className="p-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg transition"
                       title="Copy URL"
+                      aria-label="Copy URL"
                     >
                       {copied ? (
                         <Check className="w-4 h-4 text-emerald-400" />
@@ -272,6 +283,7 @@ export default function TableQrCodeModal({
 
                   {!showConfirmRegen ? (
                     <button
+                      type="button"
                       onClick={() => setShowConfirmRegen(true)}
                       className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition"
                     >
@@ -285,6 +297,7 @@ export default function TableQrCodeModal({
                       </p>
                       <div className="flex space-x-2">
                         <button
+                          type="button"
                           onClick={handleRegenerateToken}
                           disabled={regenerating}
                           className="flex-1 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-semibold transition"
@@ -292,6 +305,7 @@ export default function TableQrCodeModal({
                           {regenerating ? "Regenerating..." : "Yes, Regenerate"}
                         </button>
                         <button
+                          type="button"
                           onClick={() => setShowConfirmRegen(false)}
                           className="px-3 py-1.5 bg-gray-800 text-gray-300 hover:text-white rounded-lg text-xs transition"
                         >

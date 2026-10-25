@@ -1085,8 +1085,11 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                                             </button>
                                                         </div>
                                                     )}
-                                                    <label className="theme-muted block text-xs font-medium">Delivery Address *</label>
+                                                    <label htmlFor="checkout-manual-address" className="theme-muted block text-xs font-medium">Delivery Address *</label>
                                                     <textarea
+                                                        id="checkout-manual-address"
+                                                        name="manualAddress"
+                                                        aria-label="Delivery Address"
                                                         value={manualAddress}
                                                         onChange={(e) => setManualAddress(e.target.value)}
                                                         placeholder="House/flat number, building, street, area, landmark, pincode"
@@ -1112,8 +1115,12 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                     Customer Contact *
                                 </h4>
                                 <div>
-                                    <label className="theme-muted mb-1 block text-xs">Mobile Phone or WhatsApp *</label>
+                                    <label htmlFor="checkout-customer-contact" className="theme-muted mb-1 block text-xs">Mobile Phone or WhatsApp *</label>
                                     <input
+                                        id="checkout-customer-contact"
+                                        name="customerContact"
+                                        autoComplete="tel"
+                                        aria-label="Mobile Phone or WhatsApp"
                                         value={phone || email}
                                         onChange={(e) => {
                                             const val = e.target.value;
@@ -1141,8 +1148,11 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                             </div>
                                         )}
                                         <div>
-                                            <label className="theme-muted mb-1 block text-xs">Enter 6-Digit OTP</label>
+                                            <label htmlFor="checkout-otp-input" className="theme-muted mb-1 block text-xs">Enter 6-Digit OTP</label>
                                             <input
+                                                id="checkout-otp-input"
+                                                name="otp"
+                                                aria-label="Enter 6-Digit OTP"
                                                 value={otp}
                                                 onChange={(e) => setOtp(e.target.value)}
                                                 inputMode="numeric"
@@ -1233,10 +1243,13 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
 
                         {/* 3. Special Cooking Instructions */}
                         <div className="space-y-2 pb-5 border-b border-[var(--app-border)]">
-                            <label className="theme-muted mb-1 block text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                            <label htmlFor="checkout-special-instructions" className="theme-muted mb-1 block text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                                 Special Cooking Instructions (optional)
                             </label>
                             <textarea
+                                id="checkout-special-instructions"
+                                name="notes"
+                                aria-label="Special Cooking Instructions (optional)"
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
                                 placeholder="e.g. Less spicy, extra sauce, allergy notes"
@@ -1267,6 +1280,9 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                             ) : (
                                 <div className="mt-2 flex gap-2">
                                     <input
+                                        id="checkout-coupon-code"
+                                        name="couponCode"
+                                        aria-label="Enter coupon code"
                                         type="text"
                                         value={couponInput}
                                         onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
@@ -1322,6 +1338,9 @@ export default function CheckoutPrompt({ open, onClose, cart, clearCart }) {
                                     ) : (
                                         <div className="mt-2 flex gap-2">
                                             <input
+                                                id="checkout-loyalty-points"
+                                                name="loyaltyPoints"
+                                                aria-label="Loyalty points to redeem"
                                                 type="number"
                                                 value={pointsToRedeemInput}
                                                 onChange={(e) => setPointsToRedeemInput(e.target.value)}

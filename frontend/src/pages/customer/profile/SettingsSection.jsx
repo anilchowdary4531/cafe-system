@@ -335,13 +335,14 @@ export default function SettingsSection({ profile, customerToken, loading, savin
                                     </div>
                                     <div className="flex items-center gap-2 rounded-2xl border border-black/5 bg-black/5 px-4 py-3 text-xs font-medium dark:border-white/5 dark:bg-white/5">
                                         <input
-                                            id="defaultAddr"
+                                            id="settings-default-addr"
+                                            name="isDefault"
                                             type="checkbox"
                                             checked={Boolean(addressDraft.isDefault)}
                                             onChange={(e) => setAddressDraft((d) => ({ ...d, isDefault: e.target.checked }))}
                                             className="h-4 w-4 rounded border-gray-300 accent-amber-500"
                                         />
-                                        <label htmlFor="defaultAddr" className="cursor-pointer font-semibold">
+                                        <label htmlFor="settings-default-addr" className="cursor-pointer font-semibold">
                                             Set as default address
                                         </label>
                                     </div>

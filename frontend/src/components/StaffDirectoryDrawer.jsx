@@ -284,6 +284,8 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                         <button
                             type="button"
                             onClick={onClose}
+                            title="Close"
+                            aria-label="Close staff directory drawer"
                             className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 rounded-xl transition-colors"
                         >
                             <X className="w-5 h-5" />
@@ -300,10 +302,13 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                                 <span className="text-[10px] text-neutral-500 font-normal">Staff Member</span>
                             </div>
                             <div>
-                                <label className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Full Name *</label>
+                                <label htmlFor="staff-drawer-name" className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Full Name *</label>
                                 <input
+                                    id="staff-drawer-name"
+                                    name="staffDrawerName"
                                     type="text"
                                     required
+                                    autoComplete="name"
                                     value={addForm.name}
                                     onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
                                     placeholder="e.g. Ramesh Kumar"
@@ -312,10 +317,13 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Phone *</label>
+                                    <label htmlFor="staff-drawer-phone" className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Phone *</label>
                                     <input
+                                        id="staff-drawer-phone"
+                                        name="staffDrawerPhone"
                                         type="tel"
                                         required
+                                        autoComplete="tel"
                                         value={addForm.phone}
                                         onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
                                         placeholder="9876543210"
@@ -323,10 +331,13 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Email *</label>
+                                    <label htmlFor="staff-drawer-email" className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Email *</label>
                                     <input
+                                        id="staff-drawer-email"
+                                        name="staffDrawerEmail"
                                         type="email"
                                         required
+                                        autoComplete="email"
                                         value={addForm.email}
                                         onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
                                         placeholder="ramesh@gmail.com"
@@ -336,8 +347,10 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Role *</label>
+                                    <label htmlFor="staff-drawer-role" className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Role *</label>
                                     <select
+                                        id="staff-drawer-role"
+                                        name="staffDrawerRole"
                                         value={addForm.role}
                                         onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
                                         className="w-full p-2 bg-white rounded-lg border border-neutral-300 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
@@ -350,8 +363,10 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Designation</label>
+                                    <label htmlFor="staff-drawer-designation" className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Designation</label>
                                     <input
+                                        id="staff-drawer-designation"
+                                        name="staffDrawerDesignation"
                                         type="text"
                                         value={addForm.designation}
                                         onChange={(e) => setAddForm({ ...addForm, designation: e.target.value })}
@@ -361,9 +376,12 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Password (Optional)</label>
+                                <label htmlFor="staff-drawer-password" className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Password (Optional)</label>
                                 <input
+                                    id="staff-drawer-password"
+                                    name="staffDrawerPassword"
                                     type="text"
+                                    autoComplete="new-password"
                                     value={addForm.password}
                                     onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
                                     placeholder="Leave blank for auto-generated temporary password"
@@ -395,6 +413,9 @@ export default function StaffDirectoryDrawer({ isOpen, onClose, restaurantId, on
                     <div className="flex items-center gap-2 bg-neutral-100 px-3 py-2 rounded-xl border border-neutral-200">
                         <Search className="w-4 h-4 text-neutral-400" />
                         <input
+                            id="staff-directory-search"
+                            name="staffDirectorySearch"
+                            aria-label="Search staff name, role, phone"
                             type="text"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}

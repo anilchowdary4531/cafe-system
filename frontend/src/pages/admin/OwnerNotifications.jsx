@@ -143,6 +143,7 @@ export default function OwnerNotifications() {
                 <div className="flex items-center gap-1 overflow-x-auto py-0.5 text-[11px]">
                     {["ALL", "UNREAD", "ORDERS", "SUCCESS", "INFO"].map((tab) => (
                         <button
+                            type="button"
                             key={tab}
                             onClick={() => setFilterType(tab)}
                             className={`rounded-lg px-3 py-1 font-bold transition ${
@@ -160,6 +161,9 @@ export default function OwnerNotifications() {
                 <div className="relative w-full md:w-56">
                     <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 theme-muted" />
                     <input
+                        id="owner-notifications-search"
+                        name="ownerNotificationsSearch"
+                        aria-label="Search notifications"
                         type="text"
                         placeholder="Search notifications..."
                         value={searchQuery}

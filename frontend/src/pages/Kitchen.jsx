@@ -1387,6 +1387,9 @@ export default function Kitchen() {
 
                                     {historyDateRange === "custom" && (
                                         <input
+                                            id="kitchen-history-custom-date"
+                                            name="kitchenHistoryCustomDate"
+                                            aria-label="Select custom history date"
                                             type="date"
                                             data-testid="history-custom-date-input"
                                             value={historyCustomDate}
@@ -1425,6 +1428,8 @@ export default function Kitchen() {
                                     </label>
                                     <select
                                         id="senior-chef-history-chef-filter"
+                                        name="seniorChefHistoryChefFilter"
+                                        aria-label="Filter history by chef"
                                         data-testid="history-chef-filter"
                                         value={historyChefFilter}
                                         onChange={(e) => setHistoryChefFilter(e.target.value)}
@@ -1443,6 +1448,9 @@ export default function Kitchen() {
                                 <div className="relative w-full sm:w-72">
                                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                     <input
+                                        id="senior-chef-history-search"
+                                        name="seniorChefHistorySearch"
+                                        aria-label="Search KOT, Order, Table, Item, Chef"
                                         type="text"
                                         data-testid="senior-chef-history-search"
                                         placeholder="Search KOT, Order, Table, Item, Chef..."
@@ -1454,8 +1462,9 @@ export default function Kitchen() {
                                         <button
                                             type="button"
                                             onClick={handleClearHistorySearch}
-                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                                             title="Clear search"
+                                            aria-label="Clear search"
                                         >
                                             <X size={13} />
                                         </button>
@@ -1809,6 +1818,9 @@ export default function Kitchen() {
                                         </button>
 
                                         <select
+                                            id="kitchen-bulk-target-chef"
+                                            name="bulkTargetChefId"
+                                            aria-label="Select Target Chef for Bulk Dispatch"
                                             value={bulkTargetChefId}
                                             onChange={(e) => setBulkTargetChefId(e.target.value)}
                                             className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 outline-none"
@@ -1854,6 +1866,8 @@ export default function Kitchen() {
                                                     <div className="flex items-center justify-between gap-2">
                                                         <label className="flex items-center gap-2 cursor-pointer">
                                                             <input
+                                                                id={`bulk-unassigned-m-${it.id}`}
+                                                                name={`bulk_unassigned_${it.id}`}
                                                                 type="checkbox"
                                                                 aria-label={`Select ${it.itemName || it.name}`}
                                                                 checked={isSelected}
@@ -1922,6 +1936,8 @@ export default function Kitchen() {
                                                 <tr>
                                                     <th className="py-2 px-3 w-8">
                                                         <input
+                                                            id="kitchen-select-all-unassigned"
+                                                            name="selectAllUnassigned"
                                                             type="checkbox"
                                                             aria-label="Select all unassigned items"
                                                             checked={
@@ -1961,6 +1977,8 @@ export default function Kitchen() {
                                                         >
                                                             <td className="py-2.5 px-3">
                                                                 <input
+                                                                    id={`bulk-unassigned-t-${it.id}`}
+                                                                    name={`bulk_unassigned_t_${it.id}`}
                                                                     type="checkbox"
                                                                     aria-label={`Select ${it.itemName || it.name}`}
                                                                     checked={isSelected}
@@ -2040,6 +2058,9 @@ export default function Kitchen() {
                                     Station:
                                 </div>
                                 <select
+                                    id="kitchen-station-filter"
+                                    name="selectedStationId"
+                                    aria-label="Filter by kitchen station"
                                     value={selectedStationId}
                                     onChange={(e) => setSelectedStationId(e.target.value)}
                                     className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 outline-none"
@@ -2059,6 +2080,9 @@ export default function Kitchen() {
                                     <UserCheck size={13} className="text-orange-500" /> Chef:
                                 </div>
                                 <select
+                                    id="kitchen-chef-filter"
+                                    name="selectedChefFilter"
+                                    aria-label="Filter by assigned chef"
                                     value={selectedChefFilter}
                                     onChange={(e) => setSelectedChefFilter(e.target.value)}
                                     className={`rounded-lg border px-2 py-1 text-xs font-bold outline-none ${
@@ -2129,6 +2153,9 @@ export default function Kitchen() {
                             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-xs sm:w-64 focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500">
                                 <Search size={14} className="text-slate-400" />
                                 <input
+                                    id="kitchen-instant-search"
+                                    name="kitchenSearchQuery"
+                                    aria-label="Search KOT, Table, Chef"
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -2136,7 +2163,13 @@ export default function Kitchen() {
                                     className="w-full bg-transparent text-xs text-slate-900 placeholder-slate-400 outline-none"
                                 />
                                 {searchQuery && (
-                                    <button type="button" onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchQuery("")}
+                                        className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                                        title="Clear search"
+                                        aria-label="Clear search"
+                                    >
                                         <X size={14} />
                                     </button>
                                 )}

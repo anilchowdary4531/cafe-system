@@ -932,6 +932,9 @@ export default function CashierStation() {
                                     <div className="relative w-full">
                                         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                                         <input
+                                            id="cashier-unpaid-bills-search"
+                                            name="cashierBillsSearch"
+                                            aria-label="Search table, bill #, phone, customer"
                                             type="text"
                                             placeholder="Search table, bill #, phone, customer..."
                                             value={searchQuery}
@@ -942,7 +945,9 @@ export default function CashierStation() {
                                             <button
                                                 type="button"
                                                 onClick={() => setSearchQuery("")}
-                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white cursor-pointer"
+                                                title="Clear search"
+                                                aria-label="Clear search"
                                             >
                                                 <X className="w-3.5 h-3.5" />
                                             </button>
@@ -1312,8 +1317,10 @@ export default function CashierStation() {
                                             {/* Cash Tendered Input & Change Output */}
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                                                 <div>
-                                                    <label className="text-xs text-neutral-400 block mb-1 font-semibold">Cash Tendered (₹)</label>
+                                                    <label htmlFor="cashier-cash-tendered" className="text-xs text-neutral-400 block mb-1 font-semibold">Cash Tendered (₹)</label>
                                                     <input
+                                                        id="cashier-cash-tendered"
+                                                        name="cashTendered"
                                                         type="number"
                                                         value={cashTendered}
                                                         onChange={(e) => setCashTendered(e.target.value)}
@@ -1343,10 +1350,12 @@ export default function CashierStation() {
                                     {(paymentMethod === "UPI" || paymentMethod === "CARD") && (
                                         <div className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 flex items-center gap-3">
                                             <div className="flex-1">
-                                                <label className="text-[11px] text-neutral-400 block mb-1 font-semibold">
+                                                <label htmlFor="cashier-payment-reference" className="text-[11px] text-neutral-400 block mb-1 font-semibold">
                                                     {paymentMethod === "UPI" ? "UPI UTR / Reference No. (Optional)" : "Card Approval / Transaction Slip No."}
                                                 </label>
                                                 <input
+                                                    id="cashier-payment-reference"
+                                                    name="referenceNo"
                                                     type="text"
                                                     value={referenceNoInput}
                                                     onChange={(e) => setReferenceNoInput(e.target.value)}
@@ -1440,6 +1449,9 @@ export default function CashierStation() {
                             <div className="relative w-full sm:w-64">
                                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                                 <input
+                                    id="cashier-transactions-search"
+                                    name="txSearchQuery"
+                                    aria-label="Search bill #, customer, phone"
                                     type="text"
                                     placeholder="Search bill #, customer, phone..."
                                     value={txSearchQuery}
@@ -1453,6 +1465,7 @@ export default function CashierStation() {
                                 onClick={fetchTransactions}
                                 className="p-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition border border-neutral-700"
                                 title="Refresh transactions"
+                                aria-label="Refresh transactions"
                             >
                                 <RefreshCw className="w-4 h-4" />
                             </button>
@@ -1736,10 +1749,12 @@ export default function CashierStation() {
                         </p>
                         <form onSubmit={handleOpenShift} className="space-y-4">
                             <div>
-                                <label className="text-xs font-bold text-neutral-300 block mb-1">
+                                <label htmlFor="cashier-opening-cash" className="text-xs font-bold text-neutral-300 block mb-1">
                                     Opening Cash Amount (₹)
                                 </label>
                                 <input
+                                    id="cashier-opening-cash"
+                                    name="openingCash"
                                     type="number"
                                     value={openingCashInput}
                                     onChange={(e) => setOpeningCashInput(e.target.value)}
@@ -1750,10 +1765,12 @@ export default function CashierStation() {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-neutral-300 block mb-1">
+                                <label htmlFor="cashier-shift-notes" className="text-xs font-bold text-neutral-300 block mb-1">
                                     Shift Notes / Station
                                 </label>
                                 <input
+                                    id="cashier-shift-notes"
+                                    name="shiftNotes"
                                     type="text"
                                     value={shiftNotesInput}
                                     onChange={(e) => setShiftNotesInput(e.target.value)}
@@ -1790,8 +1807,10 @@ export default function CashierStation() {
                         </h3>
                         <form onSubmit={handleCashMovement} className="space-y-4">
                             <div>
-                                <label className="text-xs font-bold text-neutral-300 block mb-1">Amount (₹)</label>
+                                <label htmlFor="cashier-movement-amount" className="text-xs font-bold text-neutral-300 block mb-1">Amount (₹)</label>
                                 <input
+                                    id="cashier-movement-amount"
+                                    name="movementAmount"
                                     type="number"
                                     value={movementAmountInput}
                                     onChange={(e) => setMovementAmountInput(e.target.value)}
@@ -1802,8 +1821,10 @@ export default function CashierStation() {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-neutral-300 block mb-1">Reason / Notes</label>
+                                <label htmlFor="cashier-movement-reason" className="text-xs font-bold text-neutral-300 block mb-1">Reason / Notes</label>
                                 <input
+                                    id="cashier-movement-reason"
+                                    name="movementReason"
                                     type="text"
                                     value={movementReasonInput}
                                     onChange={(e) => setMovementReasonInput(e.target.value)}
@@ -1856,10 +1877,12 @@ export default function CashierStation() {
 
                             {/* Actual Counted Input */}
                             <div>
-                                <label className="text-xs font-bold text-neutral-300 block mb-1">
+                                <label htmlFor="cashier-actual-cash" className="text-xs font-bold text-neutral-300 block mb-1">
                                     Actual Physical Cash Counted (₹)
                                 </label>
                                 <input
+                                    id="cashier-actual-cash"
+                                    name="actualCash"
                                     type="number"
                                     value={actualCashInput}
                                     onChange={(e) => setActualCashInput(e.target.value)}
@@ -1895,10 +1918,12 @@ export default function CashierStation() {
                             {/* Variance Explanation Note (Mandatory if variance != 0) */}
                             {Math.abs(closeShiftVariance) > 0.01 && actualCashInput !== "" && (
                                 <div>
-                                    <label className="text-xs font-bold text-amber-300 block mb-1">
+                                    <label htmlFor="cashier-variance-reason" className="text-xs font-bold text-amber-300 block mb-1">
                                         Discrepancy Explanation (Required)
                                     </label>
                                     <input
+                                        id="cashier-variance-reason"
+                                        name="varianceReason"
                                         type="text"
                                         value={varianceReasonInput}
                                         onChange={(e) => setVarianceReasonInput(e.target.value)}
@@ -1942,10 +1967,12 @@ export default function CashierStation() {
                         </p>
                         <form onSubmit={handleRequestDiscount} className="space-y-4">
                             <div>
-                                <label className="text-xs font-bold text-neutral-300 block mb-1">
+                                <label htmlFor="cashier-discount-amount" className="text-xs font-bold text-neutral-300 block mb-1">
                                     Discount Amount (₹)
                                 </label>
                                 <input
+                                    id="cashier-discount-amount"
+                                    name="discountAmount"
                                     type="number"
                                     value={discountAmountInput}
                                     onChange={(e) => setDiscountAmountInput(e.target.value)}
@@ -1957,8 +1984,10 @@ export default function CashierStation() {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-neutral-300 block mb-1">Reason</label>
+                                <label htmlFor="cashier-discount-reason" className="text-xs font-bold text-neutral-300 block mb-1">Reason</label>
                                 <input
+                                    id="cashier-discount-reason"
+                                    name="discountReason"
                                     type="text"
                                     value={discountReasonInput}
                                     onChange={(e) => setDiscountReasonInput(e.target.value)}

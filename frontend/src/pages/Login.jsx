@@ -868,8 +868,11 @@ export default function Login() {
 
                             <div className="space-y-5">
                                 <div>
-                                    <label className="theme-muted mb-2 block text-sm">Email Address</label>
+                                    <label htmlFor="login-email" className="theme-muted mb-2 block text-sm">Email Address</label>
                                     <input
+                                        id="login-email"
+                                        name="email"
+                                        autoComplete="email"
                                         type="email"
                                         placeholder="admin@cafe.com"
                                         value={email}
@@ -890,7 +893,7 @@ export default function Login() {
 
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
-                                        <label className="theme-muted text-sm">Password</label>
+                                        <label htmlFor="login-password" className="theme-muted text-sm">Password</label>
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -910,6 +913,9 @@ export default function Login() {
                                     </div>
                                     <div className="relative">
                                         <input
+                                            id="login-password"
+                                            name="password"
+                                            autoComplete="current-password"
                                             type={showPassword ? "text" : "password"}
                                             placeholder="Enter password"
                                             value={password}
@@ -919,6 +925,8 @@ export default function Login() {
 
                                         <button
                                             type="button"
+                                            aria-label={showPassword ? "Hide password" : "Show password"}
+                                            title={showPassword ? "Hide password" : "Show password"}
                                             onClick={() => setShowPassword(!showPassword)}
                                             className="theme-muted absolute right-4 top-3.5 hover:opacity-80"
                                         >
@@ -960,8 +968,10 @@ export default function Login() {
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="theme-muted mb-1 block text-sm">Restaurant Name *</label>
+                                    <label htmlFor="register-restaurant-name" className="theme-muted mb-1 block text-sm">Restaurant Name *</label>
                                     <input
+                                        id="register-restaurant-name"
+                                        name="restaurantName"
                                         type="text"
                                         placeholder="e.g. Bean House"
                                         value={registerRestaurantName}
@@ -971,8 +981,11 @@ export default function Login() {
                                 </div>
 
                                 <div>
-                                    <label className="theme-muted mb-1 block text-sm">Owner Name *</label>
+                                    <label htmlFor="register-owner-name" className="theme-muted mb-1 block text-sm">Owner Name *</label>
                                     <input
+                                        id="register-owner-name"
+                                        name="name"
+                                        autoComplete="name"
                                         type="text"
                                         placeholder="Your full name"
                                         value={registerOwnerName}
@@ -982,8 +995,11 @@ export default function Login() {
                                 </div>
 
                                 <div>
-                                    <label className="theme-muted mb-1 block text-sm">Owner Email *</label>
+                                    <label htmlFor="register-owner-email" className="theme-muted mb-1 block text-sm">Owner Email *</label>
                                     <input
+                                        id="register-owner-email"
+                                        name="email"
+                                        autoComplete="email"
                                         type="email"
                                         placeholder="you@example.com"
                                         value={registerOwnerEmail}
@@ -993,8 +1009,11 @@ export default function Login() {
                                 </div>
 
                                 <div>
-                                    <label className="theme-muted mb-1 block text-sm">Owner Phone</label>
+                                    <label htmlFor="register-owner-phone" className="theme-muted mb-1 block text-sm">Owner Phone</label>
                                     <input
+                                        id="register-owner-phone"
+                                        name="phone"
+                                        autoComplete="tel"
                                         type="tel"
                                         placeholder="Enter phone number"
                                         value={registerOwnerPhone}
@@ -1004,9 +1023,12 @@ export default function Login() {
                                 </div>
 
                                 <div>
-                                    <label className="theme-muted mb-1 block text-sm">Password *</label>
+                                    <label htmlFor="register-owner-password" className="theme-muted mb-1 block text-sm">Password *</label>
                                     <div className="relative">
                                         <input
+                                            id="register-owner-password"
+                                            name="password"
+                                            autoComplete="new-password"
                                             type={showPassword ? "text" : "password"}
                                             placeholder="Min 6 characters"
                                             value={registerOwnerPassword}
@@ -1015,6 +1037,8 @@ export default function Login() {
                                         />
                                         <button
                                             type="button"
+                                            aria-label={showPassword ? "Hide password" : "Show password"}
+                                            title={showPassword ? "Hide password" : "Show password"}
                                             onClick={() => setShowPassword(!showPassword)}
                                             className="theme-muted absolute right-4 top-3 hover:opacity-80"
                                         >
@@ -1070,10 +1094,13 @@ export default function Login() {
                                 {customerStep === "phone" ? (
                                     <>
                                         <div>
-                                            <label className="theme-muted mb-2 block text-sm font-medium">Phone Number or Email Address *</label>
+                                            <label htmlFor="customer-login-identifier" className="theme-muted mb-2 block text-sm font-medium">Phone Number or Email Address *</label>
                                             <div className="relative">
                                                 <User size={18} className="theme-muted absolute left-4 top-3.5" />
                                                 <input
+                                                    id="customer-login-identifier"
+                                                    name="username"
+                                                    autoComplete="username"
                                                     type="text"
                                                     placeholder="Enter phone number or email address"
                                                     value={customerInput !== "" ? customerInput : (customerEmail || customerPhone)}
@@ -1100,6 +1127,7 @@ export default function Login() {
                                         </div>
 
                                         <button
+                                            type="button"
                                             onClick={handleCustomerRequestOtp}
                                             disabled={customerLoading}
                                             className="theme-button w-full rounded-xl py-3 font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70 mt-2"
@@ -1128,8 +1156,11 @@ export default function Login() {
                                         </div>
 
                                         <div>
-                                            <label className="theme-muted mb-2 block text-sm font-medium">Enter 6-Digit OTP *</label>
+                                            <label htmlFor="customer-login-otp" className="theme-muted mb-2 block text-sm font-medium">Enter 6-Digit OTP *</label>
                                             <input
+                                                id="customer-login-otp"
+                                                name="oneTimePassword"
+                                                autoComplete="one-time-code"
                                                 type="text"
                                                 inputMode="numeric"
                                                 maxLength={6}
@@ -1142,10 +1173,13 @@ export default function Login() {
 
                                         {!hasExistingName && (
                                             <div>
-                                                <label className="theme-muted mb-2 block text-sm font-medium">Full Name (Optional)</label>
+                                                <label htmlFor="customer-login-name" className="theme-muted mb-2 block text-sm font-medium">Full Name (Optional)</label>
                                                 <div className="relative">
                                                     <User size={18} className="theme-muted absolute left-4 top-3.5" />
                                                     <input
+                                                        id="customer-login-name"
+                                                        name="name"
+                                                        autoComplete="name"
                                                         type="text"
                                                         placeholder="Enter your full name"
                                                         value={customerName}
@@ -1223,8 +1257,11 @@ export default function Login() {
 
                                 <form onSubmit={handleForcedPasswordSubmit} className="space-y-4">
                                     <div>
-                                        <label className="theme-muted mb-1 block text-sm">Current (Temporary) Password</label>
+                                        <label htmlFor="forced-current-password" className="theme-muted mb-1 block text-sm">Current (Temporary) Password</label>
                                         <input
+                                            id="forced-current-password"
+                                            name="currentPassword"
+                                            autoComplete="current-password"
                                             type="password"
                                             value={forcedCurrentPassword}
                                             onChange={(e) => setForcedCurrentPassword(e.target.value)}
@@ -1235,8 +1272,11 @@ export default function Login() {
                                     </div>
 
                                     <div>
-                                        <label className="theme-muted mb-1 block text-sm">New Password (min 6 characters)</label>
+                                        <label htmlFor="forced-new-password" className="theme-muted mb-1 block text-sm">New Password (min 6 characters)</label>
                                         <input
+                                            id="forced-new-password"
+                                            name="newPassword"
+                                            autoComplete="new-password"
                                             type="password"
                                             value={forcedNewPassword}
                                             onChange={(e) => setForcedNewPassword(e.target.value)}
@@ -1248,8 +1288,11 @@ export default function Login() {
                                     </div>
 
                                     <div>
-                                        <label className="theme-muted mb-1 block text-sm">Confirm New Password</label>
+                                        <label htmlFor="forced-confirm-password" className="theme-muted mb-1 block text-sm">Confirm New Password</label>
                                         <input
+                                            id="forced-confirm-password"
+                                            name="confirmPassword"
+                                            autoComplete="new-password"
                                             type="password"
                                             value={forcedConfirmPassword}
                                             onChange={(e) => setForcedConfirmPassword(e.target.value)}
@@ -1313,8 +1356,11 @@ export default function Login() {
                                         </p>
 
                                         <div>
-                                            <label className="theme-muted mb-1 block text-sm">Email Address</label>
+                                            <label htmlFor="forgot-email" className="theme-muted mb-1 block text-sm">Email Address</label>
                                             <input
+                                                id="forgot-email"
+                                                name="email"
+                                                autoComplete="email"
                                                 type="email"
                                                 value={forgotEmail}
                                                 onChange={(e) => setForgotEmail(e.target.value)}
@@ -1350,8 +1396,11 @@ export default function Login() {
                                         </p>
 
                                         <div>
-                                            <label className="theme-muted mb-1 block text-sm">6-Digit Verification Code</label>
+                                            <label htmlFor="forgot-otp" className="theme-muted mb-1 block text-sm">6-Digit Verification Code</label>
                                             <input
+                                                id="forgot-otp"
+                                                name="oneTimePassword"
+                                                autoComplete="one-time-code"
                                                 type="text"
                                                 inputMode="numeric"
                                                 pattern="[0-9]*"
@@ -1412,9 +1461,12 @@ export default function Login() {
                                         </p>
 
                                         <div>
-                                            <label className="theme-muted mb-1 block text-sm">New Password (min 6 characters)</label>
+                                            <label htmlFor="forgot-new-password" className="theme-muted mb-1 block text-sm">New Password (min 6 characters)</label>
                                             <div className="relative">
                                                 <input
+                                                    id="forgot-new-password"
+                                                    name="newPassword"
+                                                    autoComplete="new-password"
                                                     type={showForgotNewPassword ? "text" : "password"}
                                                     value={forgotNewPassword}
                                                     onChange={(e) => setForgotNewPassword(e.target.value)}
@@ -1425,6 +1477,8 @@ export default function Login() {
                                                 />
                                                 <button
                                                     type="button"
+                                                    aria-label={showForgotNewPassword ? "Hide password" : "Show password"}
+                                                    title={showForgotNewPassword ? "Hide password" : "Show password"}
                                                     onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
                                                     className="theme-muted absolute right-3 top-2.5 hover:opacity-80"
                                                 >
@@ -1434,8 +1488,11 @@ export default function Login() {
                                         </div>
 
                                         <div>
-                                            <label className="theme-muted mb-1 block text-sm">Confirm New Password</label>
+                                            <label htmlFor="forgot-confirm-password" className="theme-muted mb-1 block text-sm">Confirm New Password</label>
                                             <input
+                                                id="forgot-confirm-password"
+                                                name="confirmPassword"
+                                                autoComplete="new-password"
                                                 type={showForgotNewPassword ? "text" : "password"}
                                                 value={forgotConfirmPassword}
                                                 onChange={(e) => setForgotConfirmPassword(e.target.value)}

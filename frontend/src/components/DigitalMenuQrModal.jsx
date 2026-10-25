@@ -174,6 +174,7 @@ export default function DigitalMenuQrModal({
 
           <div className="flex items-center space-x-3">
             <button
+              type="button"
               onClick={handlePreview}
               className="flex items-center space-x-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-semibold rounded-xl transition"
             >
@@ -182,6 +183,7 @@ export default function DigitalMenuQrModal({
             </button>
 
             <button
+              type="button"
               onClick={handlePrint}
               className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-gray-950 text-xs font-bold rounded-xl transition shadow-lg shadow-amber-500/20"
             >
@@ -190,7 +192,10 @@ export default function DigitalMenuQrModal({
             </button>
 
             <button
+              type="button"
               onClick={onClose}
+              title="Close"
+              aria-label="Close digital menu QR modal"
               className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-xl transition"
             >
               <X className="w-5 h-5" />
@@ -260,15 +265,20 @@ export default function DigitalMenuQrModal({
                   </h4>
                   <div className="flex items-center space-x-2 bg-gray-950 p-2.5 rounded-xl border border-gray-800">
                     <input
+                      id="digital-menu-url"
+                      name="digitalMenuUrl"
+                      aria-label="Public Menu URL"
                       type="text"
                       readOnly
                       value={menuTargetUrl}
                       className="bg-transparent text-xs text-amber-300 w-full outline-none font-mono truncate"
                     />
                     <button
+                      type="button"
                       onClick={handleCopyUrl}
                       className="p-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg transition"
                       title="Copy URL"
+                      aria-label="Copy URL"
                     >
                       {copied ? (
                         <Check className="w-4 h-4 text-emerald-400" />
@@ -296,6 +306,8 @@ export default function DigitalMenuQrModal({
                         <span className="text-[10px] text-gray-400">Allow customers to scan & view menu</span>
                       </div>
                       <button
+                        type="button"
+                        aria-label="Toggle public menu setting"
                         onClick={() => handleToggleSetting("menu", !isPublicMenuEnabled)}
                         className="p-1 text-amber-400 hover:scale-105 transition"
                       >
@@ -314,6 +326,8 @@ export default function DigitalMenuQrModal({
                         <span className="text-[10px] text-gray-400">Allow takeaway/delivery checkout from menu</span>
                       </div>
                       <button
+                        type="button"
+                        aria-label="Toggle online ordering setting"
                         onClick={() => handleToggleSetting("ordering", !isPublicOrderingEnabled)}
                         className="p-1 text-amber-400 hover:scale-105 transition"
                       >
@@ -332,6 +346,8 @@ export default function DigitalMenuQrModal({
                         <span className="text-[10px] text-gray-400">Display item prices on public menu</span>
                       </div>
                       <button
+                        type="button"
+                        aria-label="Toggle dish prices setting"
                         onClick={() => handleToggleSetting("prices", !showPricesOnPublicMenu)}
                         className="p-1 text-amber-400 hover:scale-105 transition"
                       >
@@ -361,6 +377,7 @@ export default function DigitalMenuQrModal({
 
                   {!showConfirmRegen ? (
                     <button
+                      type="button"
                       onClick={() => setShowConfirmRegen(true)}
                       className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition"
                     >
@@ -374,6 +391,7 @@ export default function DigitalMenuQrModal({
                       </p>
                       <div className="flex space-x-2">
                         <button
+                          type="button"
                           onClick={handleRegenerateToken}
                           disabled={regenerating}
                           className="flex-1 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-semibold transition"
@@ -381,6 +399,7 @@ export default function DigitalMenuQrModal({
                           {regenerating ? "Regenerating..." : "Yes, Regenerate"}
                         </button>
                         <button
+                          type="button"
                           onClick={() => setShowConfirmRegen(false)}
                           className="px-3 py-1.5 bg-gray-800 text-gray-300 hover:text-white rounded-lg text-xs transition"
                         >
@@ -399,6 +418,7 @@ export default function DigitalMenuQrModal({
         <div className="px-6 py-3 border-t border-gray-800 bg-gray-950 flex items-center justify-between text-xs text-gray-400 no-print">
           <span>{restaurantName} • Digital Menu Studio</span>
           <button
+            type="button"
             onClick={onClose}
             className="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-xl transition"
           >

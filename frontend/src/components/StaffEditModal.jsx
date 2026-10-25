@@ -293,12 +293,15 @@ export default function StaffEditModal({
                         )}
 
                         <div>
-                            <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                            <label htmlFor="staff-edit-name" className="block text-[11px] font-semibold text-neutral-700 mb-1">
                                 Full Name *
                             </label>
                             <input
+                                id="staff-edit-name"
+                                name="name"
                                 type="text"
                                 required
+                                autoComplete="name"
                                 aria-label="Full Name"
                                 value={draft.name}
                                 onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
@@ -309,12 +312,15 @@ export default function StaffEditModal({
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                                <label htmlFor="staff-edit-email" className="block text-[11px] font-semibold text-neutral-700 mb-1">
                                     Email Address *
                                 </label>
                                 <input
+                                    id="staff-edit-email"
+                                    name="email"
                                     type="email"
                                     required
+                                    autoComplete="email"
                                     aria-label="Email Address"
                                     value={draft.email}
                                     onChange={(e) => setDraft((prev) => ({ ...prev, email: e.target.value }))}
@@ -323,11 +329,14 @@ export default function StaffEditModal({
                                 />
                             </div>
                             <div>
-                                <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                                <label htmlFor="staff-edit-phone" className="block text-[11px] font-semibold text-neutral-700 mb-1">
                                     Phone Number
                                 </label>
                                 <input
+                                    id="staff-edit-phone"
+                                    name="phone"
                                     type="tel"
+                                    autoComplete="tel"
                                     aria-label="Phone Number"
                                     value={draft.phone}
                                     onChange={(e) => setDraft((prev) => ({ ...prev, phone: e.target.value }))}
@@ -339,10 +348,12 @@ export default function StaffEditModal({
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                                <label htmlFor="staff-edit-role" className="block text-[11px] font-semibold text-neutral-700 mb-1">
                                     Role *
                                 </label>
                                 <select
+                                    id="staff-edit-role"
+                                    name="role"
                                     aria-label="Role"
                                     value={draft.role}
                                     disabled={staffUser?.role === "OWNER"}
@@ -365,10 +376,12 @@ export default function StaffEditModal({
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                                <label htmlFor="staff-edit-designation" className="block text-[11px] font-semibold text-neutral-700 mb-1">
                                     Designation
                                 </label>
                                 <select
+                                    id="staff-edit-designation"
+                                    name="designationOption"
                                     aria-label="Designation"
                                     value={draft.designationOption}
                                     onChange={(e) =>
@@ -388,10 +401,12 @@ export default function StaffEditModal({
 
                         {draft.designationOption === "OTHER" && (
                             <div>
-                                <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                                <label htmlFor="staff-edit-custom-designation" className="block text-[11px] font-semibold text-neutral-700 mb-1">
                                     Custom Designation
                                 </label>
                                 <input
+                                    id="staff-edit-custom-designation"
+                                    name="customDesignation"
                                     type="text"
                                     aria-label="Custom Designation"
                                     value={draft.customDesignation}
@@ -406,11 +421,14 @@ export default function StaffEditModal({
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                             <div>
-                                <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                                <label htmlFor="staff-edit-password" className="block text-[11px] font-semibold text-neutral-700 mb-1">
                                     New Password (Optional)
                                 </label>
                                 <div className="relative flex items-center">
                                     <input
+                                        id="staff-edit-password"
+                                        name="password"
+                                        autoComplete="new-password"
                                         type={showPassword ? "text" : "password"}
                                         value={draft.password}
                                         onChange={(e) =>
@@ -430,8 +448,10 @@ export default function StaffEditModal({
                                 </div>
                             </div>
                             <div>
-                                <label className="flex items-center gap-2 p-2.5 bg-neutral-50 rounded-xl border border-neutral-300 text-xs text-neutral-700 cursor-pointer">
+                                <label htmlFor="staff-edit-active" className="flex items-center gap-2 p-2.5 bg-neutral-50 rounded-xl border border-neutral-300 text-xs text-neutral-700 cursor-pointer">
                                     <input
+                                        id="staff-edit-active"
+                                        name="isActive"
                                         type="checkbox"
                                         checked={Boolean(draft.isActive)}
                                         disabled={staffUser?.role === "OWNER"}
@@ -454,9 +474,12 @@ export default function StaffEditModal({
                                     {Object.keys(ACCESS_LABELS).map((key) => (
                                         <label
                                             key={key}
+                                            htmlFor={`staff-perm-${key}`}
                                             className="flex items-center gap-2 text-xs text-neutral-700 cursor-pointer"
                                         >
                                             <input
+                                                id={`staff-perm-${key}`}
+                                                name={`perm-${key}`}
                                                 type="checkbox"
                                                 checked={Boolean(draft.access?.[key])}
                                                 onChange={(e) =>

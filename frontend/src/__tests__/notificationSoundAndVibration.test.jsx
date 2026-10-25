@@ -190,6 +190,13 @@ describe("Notification Sound & Vibration Independence, Patterns, and Controls", 
   it("allows selecting vibration pattern via UI buttons", () => {
     render(<NotificationSoundPicker />);
 
+    // Customization content is collapsed by default on initial render
+    expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
+    expect(screen.queryByText("Vibration Pattern")).toBeNull();
+
+    // Expand vibration section
+    fireEvent.click(screen.getByTestId("customize-vibration-control"));
+
     expect(screen.getByText("Vibration Pattern")).toBeDefined();
     const shortBtn = screen.getByText("Short");
     fireEvent.click(shortBtn);
@@ -342,6 +349,120 @@ describe("Notification Sound & Vibration Independence, Patterns, and Controls", 
       // Collapse again
       fireEvent.click(screen.getByTestId("customize-sound-control"));
       expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+    });
+  });
+
+  describe("Notification Vibration Accordion Collapse/Expand & Independence Behaviors", () => {
+    it("1. vibration customization section is collapsed on initial render while header remains visible", () => {
+      render(<NotificationSoundPicker />);
+
+      // Header elements are visible
+      expect(screen.getByText("Notification Vibration")).toBeDefined();
+      expect(screen.getByRole("switch", { name: "Toggle notification vibration" })).toBeDefined();
+      expect(screen.getByTitle("Test Vibration")).toBeDefined();
+      expect(screen.getByTestId("customize-vibration-control")).toBeDefined();
+
+      // Vibration customization content is NOT rendered / hidden by default
+      expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
+      expect(screen.queryByText("Vibration Pattern")).toBeNull();
+      expect(screen.queryByText("Choose haptic feel")).toBeNull();
+    });
+
+    it("2. clicking the vibration expand control reveals pattern options", () => {
+      render(<NotificationSoundPicker />);
+
+      expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
+
+      fireEvent.click(screen.getByTestId("customize-vibration-control"));
+
+      expect(screen.getByTestId("notification-vibration-customization-content")).toBeDefined();
+      expect(screen.getByText("Vibration Pattern")).toBeDefined();
+      expect(screen.getByText("Default")).toBeDefined();
+      expect(screen.getByText("Short")).toBeDefined();
+      expect(screen.getByText("Double")).toBeDefined();
+      expect(screen.getByText("Strong")).toBeDefined();
+    });
+
+    it("3. clicking again collapses the vibration options", () => {
+      render(<NotificationSoundPicker />);
+
+      const expandBtn = screen.getByTestId("customize-vibration-control");
+
+      // Expand
+      fireEvent.click(expandBtn);
+      expect(screen.getByTestId("notification-vibration-customization-content")).toBeDefined();
+
+      // Collapse
+      fireEvent.click(expandBtn);
+      expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
+      expect(screen.queryByText("Vibration Pattern")).toBeNull();
+    });
+
+    it("4. clicking the vibration header control also expands and collapses the section", () => {
+      render(<NotificationSoundPicker />);
+
+      const headerControl = screen.getByTestId("notification-vibration-header-control");
+
+      // Expand via header
+      fireEvent.click(headerControl);
+      expect(screen.getByTestId("notification-vibration-customization-content")).toBeDefined();
+
+      // Collapse via header
+      fireEvent.click(headerControl);
+      expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
+    });
+
+    it("5. Sound and Vibration sections are strictly INDEPENDENT in expanded state", () => {
+      render(<NotificationSoundPicker />);
+
+      // Both initially collapsed
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+      expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
+
+      // Expanding Sound does NOT expand Vibration
+      fireEvent.click(screen.getByTestId("customize-sound-control"));
+      expect(screen.getByTestId("notification-sound-customization-content")).toBeDefined();
+      expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
+
+      // Expanding Vibration now keeps Sound expanded and expands Vibration
+      fireEvent.click(screen.getByTestId("customize-vibration-control"));
+      expect(screen.getByTestId("notification-sound-customization-content")).toBeDefined();
+      expect(screen.getByTestId("notification-vibration-customization-content")).toBeDefined();
+
+      // Collapsing Sound does NOT collapse Vibration
+      fireEvent.click(screen.getByTestId("customize-sound-control"));
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+      expect(screen.getByTestId("notification-vibration-customization-content")).toBeDefined();
+
+      // Collapsing Vibration returns to both collapsed
+      fireEvent.click(screen.getByTestId("customize-vibration-control"));
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+      expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
+    });
+
+    it("6. OwnerNotifications page integrates both collapsed Sound and Vibration sections by default", () => {
+      render(
+        <BrowserRouter>
+          <OwnerNotifications />
+        </BrowserRouter>
+      );
+
+      // Both headers exist
+      expect(screen.getByText("Notification Sound")).toBeDefined();
+      expect(screen.getByText("Notification Vibration")).toBeDefined();
+
+      // Both customization bodies are collapsed by default on initial page load
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+      expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
+
+      // Expanding Vibration only expands Vibration on the page
+      fireEvent.click(screen.getByTestId("customize-vibration-control"));
+      expect(screen.queryByTestId("notification-sound-customization-content")).toBeNull();
+      expect(screen.getByTestId("notification-vibration-customization-content")).toBeDefined();
+
+      // Collapsing Vibration
+      fireEvent.click(screen.getByTestId("customize-vibration-control"));
+      expect(screen.queryByTestId("notification-vibration-customization-content")).toBeNull();
     });
   });
 });

@@ -257,8 +257,11 @@ export default function StaffProfileView({
                                 </div>
                             )}
                             <div className="space-y-1">
-                                <label className="text-xs font-semibold text-neutral-300">Full Name</label>
+                                <label htmlFor="staff-profile-name" className="text-xs font-semibold text-neutral-300">Full Name</label>
                                 <input
+                                    id="staff-profile-name"
+                                    name="name"
+                                    autoComplete="name"
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
@@ -267,8 +270,11 @@ export default function StaffProfileView({
                                 />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-semibold text-neutral-300">Phone Number</label>
+                                <label htmlFor="staff-profile-phone" className="text-xs font-semibold text-neutral-300">Phone Number</label>
                                 <input
+                                    id="staff-profile-phone"
+                                    name="phone"
+                                    autoComplete="tel"
                                     type="tel"
                                     value={phone}
                                     onChange={(e) => setPhone(e.target.value)}
@@ -320,9 +326,12 @@ export default function StaffProfileView({
                             </div>
                         )}
                         <div className="space-y-1">
-                            <label className="text-xs font-semibold text-neutral-300">Current Password</label>
+                            <label htmlFor="staff-profile-current-password" className="text-xs font-semibold text-neutral-300">Current Password</label>
                             <div className="relative">
                                 <input
+                                    id="staff-profile-current-password"
+                                    name="currentPassword"
+                                    autoComplete="current-password"
                                     type={showCurrentPassword ? "text" : "password"}
                                     value={currentPassword}
                                     onChange={(e) => setCurrentPassword(e.target.value)}
@@ -331,6 +340,8 @@ export default function StaffProfileView({
                                 />
                                 <button
                                     type="button"
+                                    aria-label={showCurrentPassword ? "Hide password" : "Show password"}
+                                    title={showCurrentPassword ? "Hide password" : "Show password"}
                                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-200"
                                 >
@@ -340,9 +351,12 @@ export default function StaffProfileView({
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <label className="text-xs font-semibold text-neutral-300">New Password</label>
+                                <label htmlFor="staff-profile-new-password" className="text-xs font-semibold text-neutral-300">New Password</label>
                                 <div className="relative">
                                     <input
+                                        id="staff-profile-new-password"
+                                        name="newPassword"
+                                        autoComplete="new-password"
                                         type={showNewPassword ? "text" : "password"}
                                         value={newPassword}
                                         onChange={(e) => setNewPassword(e.target.value)}
@@ -352,6 +366,8 @@ export default function StaffProfileView({
                                     />
                                     <button
                                         type="button"
+                                        aria-label={showNewPassword ? "Hide password" : "Show password"}
+                                        title={showNewPassword ? "Hide password" : "Show password"}
                                         onClick={() => setShowNewPassword(!showNewPassword)}
                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-200"
                                     >
@@ -360,8 +376,11 @@ export default function StaffProfileView({
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-semibold text-neutral-300">Confirm New Password</label>
+                                <label htmlFor="staff-profile-confirm-password" className="text-xs font-semibold text-neutral-300">Confirm New Password</label>
                                 <input
+                                    id="staff-profile-confirm-password"
+                                    name="confirmPassword"
+                                    autoComplete="new-password"
                                     type="password"
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}

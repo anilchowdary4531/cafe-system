@@ -211,6 +211,9 @@ export default function SwiperStation() {
                         <div className="relative w-full sm:w-64">
                             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                             <input
+                                id="swiper-tables-search"
+                                name="swiperTablesSearch"
+                                aria-label="Search table # or bill"
                                 type="text"
                                 placeholder="Search table # or bill..."
                                 value={searchQuery}

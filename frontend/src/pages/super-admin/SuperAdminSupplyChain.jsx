@@ -313,12 +313,12 @@ export default function SuperAdminSupplyChain() {
     ].filter((d) => d.value > 0);
 
     return (
-        <div className="theme-page min-h-screen" id="super-admin-top">
+        <div className="theme-page min-h-screen" id="super-admin-supply-top">
             <SuperAdminSidebar open={sidebarOpen} setOpen={setSidebarOpen} currentKey="supply" />
 
             <header className="theme-nav border-b px-2 py-2 md:px-3">
                 <div className="w-full flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center gap-3" id="profile-section">
+                    <div className="flex items-center gap-3" id="supply-profile-section">
                         <button
                             type="button"
                             onClick={() => setSidebarOpen(true)}

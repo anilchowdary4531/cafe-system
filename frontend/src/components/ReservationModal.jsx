@@ -185,7 +185,7 @@ export default function ReservationModal({
                             <p className="text-[11px] theme-muted">Book table slots with real-time conflict check</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-white transition">
+                    <button type="button" onClick={onClose} title="Close" aria-label="Close reservation modal" className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-white transition">
                         <X className="h-4 w-4" />
                     </button>
                 </div>
@@ -199,8 +199,11 @@ export default function ReservationModal({
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Customer Name (Optional)</label>
+                                <label htmlFor="res-customer-name" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Customer Name (Optional)</label>
                                 <input
+                                    id="res-customer-name"
+                                    name="customerName"
+                                    autoComplete="name"
                                     type="text"
                                     placeholder="e.g. Rahul Kumar or Guest"
                                     value={customerName}
@@ -209,8 +212,11 @@ export default function ReservationModal({
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Phone Number (Optional)</label>
+                                <label htmlFor="res-customer-phone" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Phone Number (Optional)</label>
                                 <input
+                                    id="res-customer-phone"
+                                    name="customerPhone"
+                                    autoComplete="tel"
                                     type="tel"
                                     placeholder="e.g. 9876543210"
                                     value={customerPhone}
@@ -228,8 +234,10 @@ export default function ReservationModal({
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Date *</label>
+                                <label htmlFor="res-date" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Date *</label>
                                 <input
+                                    id="res-date"
+                                    name="reservationDate"
                                     type="date"
                                     value={reservationDate}
                                     onChange={(e) => setReservationDate(e.target.value)}
@@ -238,8 +246,10 @@ export default function ReservationModal({
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Start Time *</label>
+                                <label htmlFor="res-start-time" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Start Time *</label>
                                 <input
+                                    id="res-start-time"
+                                    name="startTime"
                                     type="time"
                                     value={startTime}
                                     onChange={(e) => setStartTime(e.target.value)}
@@ -248,8 +258,10 @@ export default function ReservationModal({
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">End Time *</label>
+                                <label htmlFor="res-end-time" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">End Time *</label>
                                 <input
+                                    id="res-end-time"
+                                    name="endTime"
                                     type="time"
                                     value={endTime}
                                     onChange={(e) => setEndTime(e.target.value)}
@@ -267,8 +279,10 @@ export default function ReservationModal({
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Guest Count</label>
+                                <label htmlFor="res-guest-count" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Guest Count</label>
                                 <input
+                                    id="res-guest-count"
+                                    name="guestCount"
                                     type="number"
                                     min="1"
                                     max="50"
@@ -278,8 +292,11 @@ export default function ReservationModal({
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Assign Table (Select for Dashboard grid reservation)</label>
+                                <label htmlFor="res-table-select" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Assign Table (Select for Dashboard grid reservation)</label>
                                 <select
+                                    id="res-table-select"
+                                    name="selectedTableId"
+                                    aria-label="Assign Table"
                                     value={selectedTableId}
                                     onChange={(e) => setSelectedTableId(e.target.value)}
                                     className={`w-full rounded-xl border px-3 py-1.5 text-xs outline-none transition ${
@@ -335,8 +352,10 @@ export default function ReservationModal({
 
                     {/* Section 4: Special Notes */}
                     <div className="pt-1">
-                        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Special Notes / Requests</label>
+                        <label htmlFor="res-special-notes" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Special Notes / Requests</label>
                         <input
+                            id="res-special-notes"
+                            name="specialNotes"
                             type="text"
                             placeholder="e.g. High chair needed, Birthday celebration"
                             value={notes}

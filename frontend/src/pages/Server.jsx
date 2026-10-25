@@ -1315,6 +1315,7 @@ export default function Server() {
                     ].map((shift) => (
                         <button
                             key={shift.id}
+                            type="button"
                             onClick={() => setActiveShift(shift.id)}
                             className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] sm:text-xs font-bold transition whitespace-nowrap h-7 sm:h-8 ${
                                 activeShift === shift.id
@@ -1329,9 +1330,11 @@ export default function Server() {
                         </button>
                     ))}
                     <button
+                        type="button"
                         onClick={() => setIsShiftConfigOpen(true)}
                         className="p-1 text-slate-400 hover:text-orange-500 rounded-lg transition shrink-0"
                         title="Configure Shift Timings"
+                        aria-label="Configure Shift Timings"
                     >
                         <Settings2 className="h-3.5 w-3.5" />
                     </button>
@@ -1341,6 +1344,7 @@ export default function Server() {
                 <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     {/* Ready to Distribute Trigger Button */}
                     <button
+                        type="button"
                         onClick={() => {
                             const el = document.getElementById("ready-distribution-section");
                             if (el) {
@@ -1359,6 +1363,7 @@ export default function Server() {
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                         }`}
                         title="Kitchen Pass / Ready to Distribute"
+                        aria-label="Kitchen Pass / Ready to Distribute"
                     >
                         <Bell className={`h-3.5 w-3.5 ${readyItemsToDistribute.length > 0 ? "animate-bounce" : ""}`} />
                         <span>Ready to Distribute</span>
@@ -1371,8 +1376,10 @@ export default function Server() {
 
                     {/* Waitlist Drawer Trigger */}
                     <button
+                        type="button"
                         onClick={() => setIsWaitlistOpen(true)}
                         className="relative flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border border-orange-500/30 bg-orange-500/10 px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 transition cursor-pointer whitespace-nowrap"
+                        aria-label="Waitlist"
                     >
                         <Users className="h-3.5 w-3.5" />
                         <span className="hidden min-[450px]:inline">Waitlist</span>
@@ -1385,11 +1392,13 @@ export default function Server() {
 
                     {/* New Reservation Trigger */}
                     <button
+                        type="button"
                         onClick={() => {
                             setEditingReservation(null);
                             setIsReservationModalOpen(true);
                         }}
                         className="flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl bg-orange-500 px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold text-white hover:bg-orange-600 transition shadow-xs cursor-pointer whitespace-nowrap"
+                        aria-label="New Reservation"
                     >
                         <Plus className="h-3.5 w-3.5" />
                         <span><span className="hidden min-[400px]:inline">New </span>Reservation</span>
@@ -1397,6 +1406,7 @@ export default function Server() {
 
                     {/* Active Service Tab/Button */}
                     <button
+                        type="button"
                         data-testid="server-active-service-nav-btn"
                         onClick={() => {
                             setViewMode("FLOOR_PLAN");
@@ -1408,6 +1418,7 @@ export default function Server() {
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                         }`}
                         title="Active Service Floor Plan"
+                        aria-label="Active Service Floor Plan"
                     >
                         <LayoutGrid className="h-3.5 w-3.5" />
                         <span className="hidden min-[480px]:inline">Active Service</span>
@@ -1415,6 +1426,7 @@ export default function Server() {
 
                     {/* History Button */}
                     <button
+                        type="button"
                         data-testid="server-history-nav-btn"
                         onClick={() => {
                             if (viewMode === "HISTORY") {
@@ -1425,19 +1437,21 @@ export default function Server() {
                                 navigate("/server/history");
                             }
                         }}
-                        className={`relative flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                        className={`relative flex items-center justify-center rounded-lg sm:rounded-xl border w-10 h-10 transition cursor-pointer shrink-0 shadow-xs ${
                             viewMode === "HISTORY"
                                 ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                         }`}
-                        title="Server Food-Service History"
+                        title="History"
+                        aria-label="History"
                     >
-                        <HistoryIcon className="h-3.5 w-3.5" />
-                        <span className="hidden min-[480px]:inline">History</span>
+                        <HistoryIcon className="h-5 w-5" />
                     </button>
 
                     {/* Notifications Button */}
                     <button
+                        type="button"
+                        data-testid="server-notifications-nav-btn"
                         onClick={() => {
                             if (viewMode === "NOTIFICATIONS") {
                                 setViewMode("FLOOR_PLAN");
@@ -1447,18 +1461,18 @@ export default function Server() {
                                 navigate("/server/notifications");
                             }
                         }}
-                        className={`relative flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                        className={`relative flex items-center justify-center rounded-lg sm:rounded-xl border w-10 h-10 transition cursor-pointer shrink-0 shadow-xs ${
                             viewMode === "NOTIFICATIONS"
-                                ? "border-orange-500 bg-orange-500 text-white"
+                                ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                         }`}
-                        title="Server Notifications"
+                        title="Notifications"
+                        aria-label="Notifications"
                     >
-                        <Bell className="h-3.5 w-3.5" />
-                        <span className="hidden min-[500px]:inline">Notifications</span>
+                        <Bell className="h-5 w-5" />
                         {unreadNotificationCount > 0 && (
-                            <span className="rounded-full bg-rose-500 text-white px-1.5 py-0.2 text-[9px] sm:text-[10px] font-black animate-pulse">
-                                {unreadNotificationCount}
+                            <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-rose-500 text-[9px] sm:text-[10px] font-black text-white shadow-xs animate-pulse">
+                                {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
                             </span>
                         )}
                     </button>
@@ -1477,6 +1491,7 @@ export default function Server() {
 
                         {/* Profile Button */}
                         <button
+                            type="button"
                             onClick={() => {
                                 if (viewMode === "PROFILE") {
                                     setViewMode("FLOOR_PLAN");
@@ -1492,6 +1507,7 @@ export default function Server() {
                                     : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                             }`}
                             title="My Profile"
+                            aria-label="My Profile"
                         >
                             <div className={`h-5 w-5 rounded-full flex items-center justify-center font-black text-[10px] ${
                                 viewMode === "PROFILE" ? "bg-white text-orange-600" : "bg-orange-500 text-white"
@@ -1638,6 +1654,7 @@ export default function Server() {
                             {sections.map((sec) => (
                                 <button
                                     key={sec}
+                                    type="button"
                                     onClick={() => setActiveSectionFilter(sec)}
                                     className={`rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
                                         activeSectionFilter === sec
@@ -1654,6 +1671,9 @@ export default function Server() {
                         <div className="relative w-full md:w-60 lg:w-72">
                             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 theme-muted" />
                             <input
+                                id="server-table-search"
+                                name="serverTableSearch"
+                                aria-label="Search tables, waiters, guests"
                                 type="text"
                                 placeholder="Search table #, waiter, guest..."
                                 value={searchQuery}
@@ -2001,6 +2021,7 @@ export default function Server() {
                                     <Trash2 className="h-3 w-3" /> Free Table
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={() => {
                                         setSelectedTable(null);
                                         setViewMode("FLOOR_PLAN");
@@ -2062,6 +2083,7 @@ export default function Server() {
                             {["ALL", "Coffee", "Breakfast", "Burgers", "Pizza", "Salads", "Desserts"].map((cat) => (
                                 <button
                                     key={cat}
+                                    type="button"
                                     onClick={() => setActiveCategory(cat)}
                                     className={`rounded-xl px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
                                         activeCategory === cat ? "bg-orange-500 text-white" : "theme-muted bg-black/5 dark:bg-white/5"
@@ -2079,6 +2101,7 @@ export default function Server() {
                                 .map((item) => (
                                     <button
                                         key={item.id}
+                                        type="button"
                                         onClick={() => handleAddToCart(item)}
                                         className="flex flex-col justify-between rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 text-left hover:border-orange-500 transition shadow-xs cursor-pointer active:scale-98"
                                     >
@@ -2158,7 +2181,13 @@ export default function Server() {
                                             <div className="flex items-center gap-2 shrink-0">
                                                 <span className="font-mono font-bold">x{item.qty}</span>
                                                 <span className="font-bold text-orange-500">{formatMoney(item.price * item.qty)}</span>
-                                                <button onClick={() => handleRemoveFromCart(item.id)} className="text-red-400 hover:text-red-500 p-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveFromCart(item.id)}
+                                                    className="text-red-400 hover:text-red-500 p-1"
+                                                    title={`Remove ${item.name}`}
+                                                    aria-label={`Remove ${item.name} from cart`}
+                                                >
                                                     <Trash2 className="h-3.5 w-3.5" />
                                                 </button>
                                             </div>
@@ -2176,6 +2205,7 @@ export default function Server() {
                             </div>
 
                             <button
+                                type="button"
                                 onClick={handleSendKOT}
                                 disabled={placingOrder || Object.keys(cart).length === 0}
                                 className="w-full rounded-xl bg-orange-500 py-3 text-xs font-bold text-white hover:bg-orange-600 disabled:opacity-50 transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
@@ -2207,6 +2237,7 @@ export default function Server() {
                                     View Cart
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={handleSendKOT}
                                     disabled={placingOrder}
                                     className="px-4 py-2 rounded-xl bg-orange-500 text-white text-xs font-bold hover:bg-orange-600 shadow-md flex items-center gap-1.5 disabled:opacity-50"
