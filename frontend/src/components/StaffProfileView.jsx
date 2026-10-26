@@ -31,23 +31,33 @@ export default function StaffProfileView({
     const navigate = useNavigate();
     const { user, logout, token } = useAuth();
 
+    const [profileData, setProfileData] = useState(null);
+    const [loadingProfile, setLoadingProfile] = useState(false);
+
+    const currentUser = profileData || user;
+    const effectiveRole = resolveEffectiveStaffRole(currentUser?.role, currentUser?.designation);
+    const restaurantId = Number(
+        currentUser?.restaurantId ||
+        currentUser?.restaurant?.id ||
+        currentUser?.restaurant_id ||
+        localStorage.getItem("restaurantId") ||
+        1
+    );
+    const restaurantName = String(currentUser?.restaurant?.name || user?.restaurant?.name || "Tiffzy Restaurant").trim();
+
     const handleBack = () => {
         if (typeof onBack === "function") {
             onBack();
+        } else if (effectiveRole === "SWIPER") {
+            navigate("/staff/swiper");
         } else {
             navigate(-1);
         }
     };
 
-    const effectiveRole = resolveEffectiveStaffRole(user?.role, user?.designation);
-    const restaurantId = Number(
-        user?.restaurantId ||
-        user?.restaurant?.id ||
-        user?.restaurant_id ||
-        localStorage.getItem("restaurantId") ||
-        1
-    );
-    const restaurantName = String(user?.restaurant?.name || "Tiffzy Restaurant").trim();
+    const resolvedBackLabel = backLabel !== "Back to Workspace"
+        ? backLabel
+        : (effectiveRole === "SWIPER" ? "Back to Swiper Station" : "Back to Workspace");
 
     // Editable profile state
     const [isEditing, setIsEditing] = useState(false);
@@ -66,10 +76,47 @@ export default function StaffProfileView({
     const [passwordError, setPasswordError] = useState("");
     const [passwordSuccess, setPasswordSuccess] = useState("");
 
+    // Fetch live authenticated staff profile on mount
     useEffect(() => {
-        if (user?.name) setName(user.name);
-        if (user?.phone) setPhone(user.phone);
-    }, [user]);
+        let isMounted = true;
+        const fetchStaffProfile = async () => {
+            if (!token) return;
+            try {
+                setLoadingProfile(true);
+                const res = await axios.get(`${API}/api/staff/profile/me`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (res.data?.success && res.data?.user && isMounted) {
+                    setProfileData(res.data.user);
+                    if (res.data.user.name) setName(res.data.user.name);
+                    if (res.data.user.phone) setPhone(res.data.user.phone);
+                }
+            } catch (err) {
+                try {
+                    const fallbackRes = await axios.get(`${API}/staff/profile/me`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                    if (fallbackRes.data?.success && fallbackRes.data?.user && isMounted) {
+                        setProfileData(fallbackRes.data.user);
+                        if (fallbackRes.data.user.name) setName(fallbackRes.data.user.name);
+                        if (fallbackRes.data.user.phone) setPhone(fallbackRes.data.user.phone);
+                    }
+                } catch (fallbackErr) {
+                    // Retain AuthContext fallback if offline or test environment
+                }
+            } finally {
+                if (isMounted) setLoadingProfile(false);
+            }
+        };
+
+        fetchStaffProfile();
+        return () => { isMounted = false; };
+    }, [token]);
+
+    useEffect(() => {
+        if (currentUser?.name && !isEditing) setName(currentUser.name);
+        if (currentUser?.phone && !isEditing) setPhone(currentUser.phone);
+    }, [currentUser, isEditing]);
 
     const handleSaveProfile = async (e) => {
         e.preventDefault();
@@ -172,7 +219,7 @@ export default function StaffProfileView({
                             className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800/80 text-neutral-300 hover:text-white hover:bg-neutral-800 transition min-h-[40px]"
                         >
                             <ArrowLeft className="w-4 h-4" />
-                            <span className="text-xs sm:text-sm font-semibold">{backLabel}</span>
+                            <span className="text-xs sm:text-sm font-semibold">{resolvedBackLabel}</span>
                         </button>
                         <h1 className="text-base sm:text-xl font-bold tracking-tight text-white">{title}</h1>
                     </div>
@@ -184,19 +231,19 @@ export default function StaffProfileView({
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-neutral-800/60 pb-4">
                         <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
                             <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-orange-500/15 border border-orange-500/30 text-orange-400 flex items-center justify-center font-bold text-lg sm:text-xl shrink-0">
-                                {user?.name ? user.name.slice(0, 2).toUpperCase() : "ST"}
+                                {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "ST"}
                             </div>
                             <div className="min-w-0 space-y-0.5">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <h2 className="text-base sm:text-lg font-bold text-white truncate">
-                                        {user?.name || "Staff Member"}
+                                        {currentUser?.name || "Staff Member"}
                                     </h2>
                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
                                         Active
                                     </span>
                                 </div>
                                 <p className="text-xs text-neutral-400 flex items-center gap-1.5 truncate">
-                                    <span className="text-orange-400 font-semibold">{user?.designation || effectiveRole}</span>
+                                    <span className="text-orange-400 font-semibold">{currentUser?.designation || effectiveRole}</span>
                                     <span>•</span>
                                     <span>{restaurantName}</span>
                                 </p>
@@ -217,8 +264,8 @@ export default function StaffProfileView({
                                     type="button"
                                     onClick={() => {
                                         setIsEditing(false);
-                                        setName(user?.name || "");
-                                        setPhone(user?.phone || "");
+                                        setName(currentUser?.name || "");
+                                        setPhone(currentUser?.phone || "");
                                     }}
                                     className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 text-xs sm:text-sm font-medium transition min-h-[38px]"
                                 >
@@ -235,25 +282,25 @@ export default function StaffProfileView({
                                 <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mb-1 font-medium">
                                     <Mail className="w-3.5 h-3.5 text-neutral-500" /> Email
                                 </div>
-                                <div className="font-semibold text-white text-xs sm:text-sm truncate">{user?.email || "Not specified"}</div>
+                                <div className="font-semibold text-white text-xs sm:text-sm truncate">{currentUser?.email || "Not specified"}</div>
                             </div>
                             <div className="bg-neutral-950/40 p-3 sm:p-3.5 rounded-xl border border-neutral-800/40">
                                 <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mb-1 font-medium">
                                     <Phone className="w-3.5 h-3.5 text-neutral-500" /> Phone
                                 </div>
-                                <div className="font-semibold text-white text-xs sm:text-sm truncate">{user?.phone || "Not specified"}</div>
+                                <div className="font-semibold text-white text-xs sm:text-sm truncate">{currentUser?.phone || "Not specified"}</div>
                             </div>
                             <div className="bg-neutral-950/40 p-3 sm:p-3.5 rounded-xl border border-neutral-800/40">
                                 <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mb-1 font-medium">
                                     <Shield className="w-3.5 h-3.5 text-neutral-500" /> Designation
                                 </div>
-                                <div className="font-semibold text-white text-xs sm:text-sm truncate">{user?.designation || effectiveRole}</div>
+                                <div className="font-semibold text-white text-xs sm:text-sm truncate">{currentUser?.designation || effectiveRole}</div>
                             </div>
                             <div className="bg-neutral-950/40 p-3 sm:p-3.5 rounded-xl border border-neutral-800/40">
                                 <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mb-1 font-medium">
                                     <Sparkles className="w-3.5 h-3.5 text-neutral-500" /> Staff ID
                                 </div>
-                                <div className="font-semibold text-white text-xs sm:text-sm">#{user?.id || "N/A"}</div>
+                                <div className="font-semibold text-white text-xs sm:text-sm">#{currentUser?.id || "N/A"}</div>
                             </div>
                         </div>
                     ) : (

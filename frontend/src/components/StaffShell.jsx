@@ -55,7 +55,7 @@ export default function StaffShell({
         <div className="min-h-screen bg-slate-50/60 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans">
             {/* Top Navigation Header */}
             <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 px-3 py-2 sm:px-6 sm:py-2.5">
-                <div className="w-full max-w-[1720px] mx-auto flex items-center justify-between gap-1.5 sm:gap-3">
+                <div className={`w-full flex items-center justify-between gap-1.5 sm:gap-3 ${fullWidth ? "max-w-none px-1" : "max-w-[1720px] mx-auto"}`}>
                     {/* Left: Brand + Restaurant + Title */}
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                         <Link
@@ -193,6 +193,7 @@ export default function StaffShell({
                         {/* Profile button */}
                         <button
                             type="button"
+                            data-testid="staff-profile-btn"
                             onClick={() => navigate("/staff/profile")}
                             className="min-w-[40px] min-h-[40px] sm:min-w-[42px] sm:min-h-[42px] rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center transition-colors border border-slate-200 dark:border-slate-700/60"
                             title="My Profile"
@@ -250,7 +251,7 @@ export default function StaffShell({
             )}
 
             {/* Main Workspace Body */}
-            <main className={`flex-1 w-full mx-auto p-3 sm:p-5 pb-16 md:pb-6 ${fullWidth ? "max-w-[1720px]" : "max-w-[1600px]"}`}>
+            <main className={`flex-1 w-full pb-16 md:pb-6 flex flex-col ${fullWidth ? "max-w-none px-3 sm:px-6 py-3 sm:py-4" : "max-w-[1600px] mx-auto p-3 sm:p-5"}`}>
                 {children}
             </main>
         </div>

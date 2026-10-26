@@ -135,7 +135,7 @@ describe("Tiffzy Canonical Ready-to-Distribute Sync — Cross-Page & Realtime Ve
     mockReadyItems = [];
     renderServer();
 
-    const headerBtn = screen.getByTitle("Kitchen Pass / Ready to Distribute");
+    const headerBtn = screen.getByTitle("Ready to Distribute");
     expect(headerBtn).toHaveTextContent("Ready to Distribute");
     expect(headerBtn).toHaveTextContent("0");
   });
@@ -175,7 +175,7 @@ describe("Tiffzy Canonical Ready-to-Distribute Sync — Cross-Page & Realtime Ve
     renderServer();
 
     // Header must show 2
-    const headerBtn = screen.getByTitle("Kitchen Pass / Ready to Distribute");
+    const headerBtn = screen.getByTitle("Ready to Distribute");
     expect(headerBtn).toHaveTextContent("Ready to Distribute");
     expect(headerBtn).toHaveTextContent("2");
 
@@ -208,7 +208,7 @@ describe("Tiffzy Canonical Ready-to-Distribute Sync — Cross-Page & Realtime Ve
 
     renderServer();
 
-    const headerBtn = screen.getByTitle("Kitchen Pass / Ready to Distribute");
+    const headerBtn = screen.getByTitle("Ready to Distribute");
     expect(headerBtn).toHaveTextContent("Ready to Distribute");
     expect(headerBtn).toHaveTextContent("1");
 
@@ -274,7 +274,7 @@ describe("Tiffzy Canonical Ready-to-Distribute Sync — Cross-Page & Realtime Ve
 
     renderServer();
 
-    const headerBtn = screen.getByTitle("Kitchen Pass / Ready to Distribute");
+    const headerBtn = screen.getByTitle("Ready to Distribute");
     expect(headerBtn).toHaveTextContent("Ready to Distribute");
     expect(headerBtn).toHaveTextContent("2");
 
@@ -287,7 +287,7 @@ describe("Tiffzy Canonical Ready-to-Distribute Sync — Cross-Page & Realtime Ve
     mockReadyItems = [];
     renderServer();
 
-    const headerBtn = screen.getByTitle("Kitchen Pass / Ready to Distribute");
+    const headerBtn = screen.getByTitle("Ready to Distribute");
     expect(headerBtn).toHaveTextContent("0");
 
     // Chef marks item 555 ready, triggering socket event
@@ -333,7 +333,7 @@ describe("Tiffzy Canonical Ready-to-Distribute Sync — Cross-Page & Realtime Ve
     ];
 
     renderServer();
-    const headerBtn = screen.getByTitle("Kitchen Pass / Ready to Distribute");
+    const headerBtn = screen.getByTitle("Ready to Distribute");
     expect(headerBtn).toHaveTextContent("1");
 
     // Waiter distributes item 555, triggering food:delivered

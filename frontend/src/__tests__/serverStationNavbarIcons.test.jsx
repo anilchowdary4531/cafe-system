@@ -204,4 +204,65 @@ describe("Server Station Navbar — History & Notifications Icon-Only Buttons", 
     expect(settingsBtn.className).toContain("h-8");
     expect(settingsBtn.querySelector("svg")).not.toBeNull();
   });
+
+  it("7. Ready to Distribute button is compact icon button with badge count and tooltip", async () => {
+    renderServer();
+
+    const readyBtn = screen.getByTestId("server-ready-distribute-nav-btn");
+    expect(readyBtn).toBeInTheDocument();
+    expect(readyBtn).toHaveAttribute("title", "Ready to Distribute");
+    expect(readyBtn).toHaveAttribute("aria-label", "Ready to Distribute");
+    expect(readyBtn.querySelector("svg")).not.toBeNull();
+    // Badge shows count 0
+    expect(readyBtn).toHaveTextContent("0");
+  });
+
+  it("8. Waitlist button is compact icon button with tooltip and opens waitlist on click", async () => {
+    renderServer();
+
+    const waitlistBtn = screen.getByTestId("server-waitlist-nav-btn");
+    expect(waitlistBtn).toBeInTheDocument();
+    expect(waitlistBtn).toHaveAttribute("title", "Waitlist");
+    expect(waitlistBtn).toHaveAttribute("aria-label", "Waitlist");
+    expect(waitlistBtn.className).toContain("w-8");
+    expect(waitlistBtn.className).toContain("h-8");
+    expect(waitlistBtn.querySelector("svg")).not.toBeNull();
+
+    fireEvent.click(waitlistBtn);
+    await waitFor(() => {
+      expect(screen.getByText(/Host Waitlist Queue/i)).toBeInTheDocument();
+    });
+  });
+
+  it("9. New Reservation button is compact icon button with tooltip and opens modal on click", async () => {
+    renderServer();
+
+    const resBtn = screen.getByTestId("server-new-reservation-nav-btn");
+    expect(resBtn).toBeInTheDocument();
+    expect(resBtn).toHaveAttribute("title", "New Reservation");
+    expect(resBtn).toHaveAttribute("aria-label", "New Reservation");
+    expect(resBtn.className).toContain("w-8");
+    expect(resBtn.className).toContain("h-8");
+    expect(resBtn.querySelector("svg")).not.toBeNull();
+
+    fireEvent.click(resBtn);
+    await waitFor(() => {
+      expect(screen.getByText(/New Table Reservation/i)).toBeInTheDocument();
+    });
+  });
+
+  it("10. Active Service button is compact icon button with tooltip and activates floor plan", async () => {
+    renderServer();
+
+    const activeServiceBtn = screen.getByTestId("server-active-service-nav-btn");
+    expect(activeServiceBtn).toBeInTheDocument();
+    expect(activeServiceBtn).toHaveAttribute("title", "Active Service");
+    expect(activeServiceBtn).toHaveAttribute("aria-label", "Active Service");
+    expect(activeServiceBtn.className).toContain("w-8");
+    expect(activeServiceBtn.className).toContain("h-8");
+    expect(activeServiceBtn.querySelector("svg")).not.toBeNull();
+
+    fireEvent.click(activeServiceBtn);
+    expect(activeServiceBtn).toBeInTheDocument();
+  });
 });
