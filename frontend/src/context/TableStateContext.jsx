@@ -59,21 +59,24 @@ export function normalizeCanonicalTable(raw, defaultRestaurantId = null, tableGr
     const hasStatus = raw.status !== undefined && raw.status !== null;
     const hasOccupancy = raw.isOccupied !== undefined && raw.isOccupied !== null;
 
+    const isDirty = raw.cleaningStatus === "DIRTY" || raw.status === "DIRTY";
+    const cleaningStatus = isDirty ? "DIRTY" : (raw.cleaningStatus || "CLEAN");
+
     const isExplicitlyFree =
+        !isDirty && (
         raw.status === "AVAILABLE" ||
         raw.isOccupied === false ||
         raw.session?.status === "CLOSED" ||
         raw.activeSession?.status === "CLOSED" ||
-        raw.sessionStatus === "CLOSED";
+        raw.sessionStatus === "CLOSED");
 
     const isBlocked = Boolean(raw.isBlocked);
     const isReserved = !isBlocked && !raw.isOccupied && Boolean(raw.activeReservation || raw.isReserved);
-    const cleaningStatus = raw.cleaningStatus || (raw.status === "DIRTY" ? "DIRTY" : "CLEAN");
 
     let canonicalStatus = hasStatus ? String(raw.status).toUpperCase() : undefined;
     if (isBlocked) {
         canonicalStatus = "BLOCKED";
-    } else if (cleaningStatus === "DIRTY" && !raw.isOccupied) {
+    } else if (isDirty && !raw.isOccupied) {
         canonicalStatus = "DIRTY";
     } else if (canonicalStatus === undefined && isExplicitlyFree) {
         canonicalStatus = isReserved ? "RESERVED" : "AVAILABLE";

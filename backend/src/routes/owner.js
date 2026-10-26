@@ -1069,6 +1069,8 @@ export default async function ownerRoutes(app, deps = {}) {
 
           const activeOrderStatus = resolveCanonicalActiveOrderStatus(tableActiveOrders, activeSession ? latestOrder : null);
 
+          const isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
+
           let canonicalStatus = "AVAILABLE";
           if (isBlocked) {
             canonicalStatus = "BLOCKED";
@@ -1078,6 +1080,8 @@ export default async function ownerRoutes(app, deps = {}) {
               : activeSession?.status === "BILLING"
               ? "BILLING"
               : "OCCUPIED";
+          } else if (isDirty) {
+            canonicalStatus = "DIRTY";
           } else if (isReserved) {
             canonicalStatus = "RESERVED";
           }
@@ -1087,6 +1091,7 @@ export default async function ownerRoutes(app, deps = {}) {
               id: table.id,
               tableNo: table.tableNo,
               status: canonicalStatus,
+              cleaningStatus: isDirty ? "DIRTY" : (table.cleaningStatus || "CLEAN"),
               isOccupied: false,
               isReserved,
               isBlocked,
@@ -1141,6 +1146,7 @@ export default async function ownerRoutes(app, deps = {}) {
             id: table.id,
             tableNo: table.tableNo,
             status: canonicalStatus,
+            cleaningStatus: table.cleaningStatus || "CLEAN",
             isOccupied: true,
             isReserved: false,
             isBlocked: false,

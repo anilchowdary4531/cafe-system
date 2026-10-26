@@ -693,7 +693,9 @@ export default function OwnerTables() {
             const targetId = payload.tableId || payload.id;
             const targetNo = payload.tableNo;
 
-            if (payload.status === "AVAILABLE" || payload.isOccupied === false) {
+            const isDirty = payload.cleaningStatus === "DIRTY" || payload.status === "DIRTY";
+
+            if (isDirty) {
                 if (targetId) {
                     setActiveSessions((prev) => {
                         const next = { ...prev };
@@ -705,12 +707,45 @@ export default function OwnerTables() {
                     prev.map((t) => {
                         const match =
                             (targetId && String(t.id) === String(targetId)) ||
-                            (targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+                            (!targetId && targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+                        if (match) {
+                            return {
+                                ...t,
+                                isOccupied: false,
+                                status: "DIRTY",
+                                cleaningStatus: "DIRTY",
+                                activeOrderCount: 0,
+                                activeItemCount: 0,
+                                activeOrders: [],
+                                activeOrderStatus: null,
+                                paymentStatus: null,
+                                session: { status: "CLOSED" },
+                                activeSession: null,
+                                occupiedSince: null,
+                            };
+                        }
+                        return t;
+                    })
+                );
+            } else if (payload.status === "AVAILABLE" || payload.isOccupied === false) {
+                if (targetId) {
+                    setActiveSessions((prev) => {
+                        const next = { ...prev };
+                        delete next[String(targetId)];
+                        return next;
+                    });
+                }
+                setTables((prev) =>
+                    prev.map((t) => {
+                        const match =
+                            (targetId && String(t.id) === String(targetId)) ||
+                            (!targetId && targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
                         if (match) {
                             return {
                                 ...t,
                                 isOccupied: false,
                                 status: "AVAILABLE",
+                                cleaningStatus: "CLEAN",
                                 activeOrderCount: 0,
                                 activeItemCount: 0,
                                 activeOrders: [],
@@ -734,7 +769,7 @@ export default function OwnerTables() {
                     prev.map((t) => {
                         const match =
                             (targetId && String(t.id) === String(targetId)) ||
-                            (targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
+                            (!targetId && targetNo && String(t.tableNo).trim().toLowerCase() === String(targetNo).trim().toLowerCase());
                         if (match) {
                             return {
                                 ...t,
@@ -757,6 +792,10 @@ export default function OwnerTables() {
         socket.on("order:created", loadActiveSessions);
         socket.on("order:updated", loadActiveSessions);
         socket.on("reservation:updated", handleReservationChange);
+        socket.on("cleaner:table_dirty", loadTables);
+        socket.on("cleaner:table_cleaned", loadTables);
+        socket.on("cleaner:task_completed", loadTables);
+        socket.on("cleaner:task_created", loadTables);
 
         return () => {
             if (typeof socket.off === "function") {
@@ -767,6 +806,10 @@ export default function OwnerTables() {
                 socket.off("order:created", loadActiveSessions);
                 socket.off("order:updated", loadActiveSessions);
                 socket.off("reservation:updated", handleReservationChange);
+                socket.off("cleaner:table_dirty", loadTables);
+                socket.off("cleaner:table_cleaned", loadTables);
+                socket.off("cleaner:task_completed", loadTables);
+                socket.off("cleaner:task_created", loadTables);
             }
         };
     }, [socket]);
@@ -1481,6 +1524,9 @@ export default function OwnerTables() {
                         <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" /> Occupied
                     </span>
                     <span className="flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Cleaning
+                    </span>
+                    <span className="flex items-center gap-1.5">
                         <span className="h-2.5 w-2.5 rounded-full bg-purple-500" /> Billing
                     </span>
                     <span className="flex items-center gap-1.5">
@@ -1708,10 +1754,11 @@ export default function OwnerTables() {
                             {filteredTables.map((table, index) => {
                                 const session = activeSessions[String(table.id)];
                                 const sessionStatus = session ? session.status : "AVAILABLE";
-                                const isOccupied = sessionStatus === "OPEN";
-                                const isBilling = sessionStatus === "BILLING";
-                                const isPaid = sessionStatus === "PAID";
-                                const isAvailable = !session;
+                                const isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
+                                const isOccupied = !isDirty && sessionStatus === "OPEN";
+                                const isBilling = !isDirty && sessionStatus === "BILLING";
+                                const isPaid = !isDirty && sessionStatus === "PAID";
+                                const isAvailable = !session && !isDirty;
 
                                 const layoutData = isEditingLayout && editedLayoutTables[table.id]
                                     ? editedLayoutTables[table.id]
@@ -1769,6 +1816,8 @@ export default function OwnerTables() {
                                                 ? "border-amber-500/80 bg-gradient-to-br from-amber-950/80 via-[#0f172a] to-amber-900/40 text-amber-200 shadow-amber-500/20 shadow-lg"
                                                 : isPaid
                                                 ? "border-cyan-500/80 bg-gradient-to-br from-cyan-950/80 via-[#0f172a] to-cyan-900/40 text-cyan-200"
+                                                : isDirty
+                                                ? "border-amber-500/80 bg-gradient-to-br from-amber-950/80 via-[#0f172a] to-amber-900/40 text-amber-200 shadow-amber-500/20 shadow-lg"
                                                 : resForTable || table.isReserved
                                                 ? "border-purple-500/80 bg-gradient-to-br from-purple-950/80 via-[#0f172a] to-purple-900/40 text-purple-200 shadow-purple-500/20 shadow-lg"
                                                 : "border-emerald-500/40 bg-gradient-to-br from-[#0f172a] to-emerald-950/20 text-gray-200 hover:border-emerald-400"
@@ -1792,6 +1841,10 @@ export default function OwnerTables() {
                                             <div className="text-center my-0.5">
                                                 <p className="text-sm font-black text-emerald-400 tabular-nums">{formatMoney(session.total)}</p>
                                                 <p className="text-[10px] text-amber-300">{formatAge(session.openedAt)}</p>
+                                            </div>
+                                        ) : isDirty ? (
+                                            <div className="text-center my-0.5">
+                                                <p className="text-[10px] text-center text-amber-400 font-bold animate-pulse">Cleaning Needed</p>
                                             </div>
                                         ) : resForTable ? (
                                             <div className="text-center my-0.5">
@@ -1885,10 +1938,11 @@ export default function OwnerTables() {
                                         const tableGroup = getTableGroup(table);
                                         const session = activeSessions[String(table.id)];
                                         const sessionStatus = session ? session.status : "AVAILABLE";
-                                        const isOccupied = sessionStatus === "OPEN";
-                                        const isBilling = sessionStatus === "BILLING";
-                                        const isPaid = sessionStatus === "PAID";
-                                        const isAvailable = !session;
+                                        const isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
+                                        const isOccupied = !isDirty && sessionStatus === "OPEN";
+                                        const isBilling = !isDirty && sessionStatus === "BILLING";
+                                        const isPaid = !isDirty && sessionStatus === "PAID";
+                                        const isAvailable = !session && !isDirty;
                                         const resForTable = reservations.find((r) =>
                                             Number(r.tableId) === Number(table.id) ||
                                             (r.tableNo && String(r.tableNo).trim().toLowerCase() === String(table.tableNo).trim().toLowerCase()) ||
@@ -1905,6 +1959,8 @@ export default function OwnerTables() {
                                                         ? "border-amber-500/50 bg-amber-500/5"
                                                         : isPaid
                                                         ? "border-cyan-500/50 bg-cyan-500/5"
+                                                        : isDirty
+                                                        ? "border-amber-500/50 bg-amber-500/5"
                                                         : resForTable || table.isReserved
                                                         ? "border-purple-500/50 bg-purple-500/5"
                                                         : "border-[color:var(--app-border)]/40 hover:border-orange-500/50"
@@ -1977,12 +2033,14 @@ export default function OwnerTables() {
                                                                     ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
                                                                     : isPaid
                                                                     ? "bg-cyan-400/20 text-cyan-300 border border-cyan-400/30"
+                                                                    : isDirty
+                                                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
                                                                     : resForTable || table.isReserved
                                                                     ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
                                                                     : "bg-emerald-400/20 text-emerald-300 border border-emerald-400/30"
                                                             }`}
                                                         >
-                                                            {isOccupied ? "Running" : isBilling ? "Billing" : isPaid ? "Paid" : resForTable || table.isReserved ? "Reserved" : "Available"}
+                                                            {isOccupied ? "Running" : isBilling ? "Billing" : isPaid ? "Paid" : isDirty ? "Cleaning" : resForTable || table.isReserved ? "Reserved" : "Available"}
                                                         </span>
 
                                                         <div className="relative" data-table-actions-menu>
