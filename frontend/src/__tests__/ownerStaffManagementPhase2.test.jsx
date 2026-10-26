@@ -253,4 +253,65 @@ describe("Phase 2 — OwnerStaff Management Component", () => {
         expect(loginCodes[0].textContent).not.toContain("jwt=");
         expect(loginCodes[0].textContent).not.toContain("password");
     });
+
+    it("10. Add New Staff Member form has NO Initial Module Access Template, retains all core fields, and creates staff", async () => {
+        axios.post.mockResolvedValueOnce({
+            data: {
+                user: { id: 104, name: "David Server", email: "david@restaurant.com", role: "WAITER" },
+                temporaryPassword: "Staff#test123",
+            },
+        });
+
+        render(
+            <MemoryRouter initialEntries={["/owner/staff"]}>
+                <OwnerStaff />
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("Alice Waiter")).toBeInTheDocument();
+        });
+
+        // 1 & 2: Open Add Staff Form
+        fireEvent.click(screen.getByRole("button", { name: /add staff/i }));
+        expect(screen.getByText("Add New Staff Member")).toBeInTheDocument();
+
+        // 3: Verify Initial Module Access Template is completely removed
+        expect(screen.queryByText(/Initial Module Access Template/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Tables & QR/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Billing Desk/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Kitchen Operations/i)).not.toBeInTheDocument();
+
+        // 4, 5, 6, 7, 8: Verify all required fields remain intact
+        expect(screen.getByPlaceholderText(/e\.g\. John Doe/i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/e\.g\. john@restaurant\.com/i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/e\.g\. 9876543210/i)).toBeInTheDocument();
+        expect(screen.getByText("Staff Role *")).toBeInTheDocument();
+        expect(screen.getByText("Designation")).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/auto-generated if left blank/i)).toBeInTheDocument();
+        expect(screen.getByText("Active Account")).toBeInTheDocument();
+
+        // Fill form and create
+        fireEvent.change(screen.getByPlaceholderText(/e\.g\. John Doe/i), { target: { value: "David Server" } });
+        fireEvent.change(screen.getByPlaceholderText(/e\.g\. john@restaurant\.com/i), { target: { value: "david@restaurant.com" } });
+        fireEvent.change(screen.getByPlaceholderText(/e\.g\. 9876543210/i), { target: { value: "9876543211" } });
+
+        // 9: Create Staff Member works and submits default access payload
+        fireEvent.click(screen.getByRole("button", { name: /create staff member/i }));
+
+        await waitFor(() => {
+            expect(axios.post).toHaveBeenCalledWith(
+                expect.stringContaining("/owner/1/staff"),
+                expect.objectContaining({
+                    name: "David Server",
+                    email: "david@restaurant.com",
+                    phone: "9876543211",
+                    role: expect.any(String),
+                    access: expect.any(Object),
+                    isActive: true,
+                })
+            );
+        });
+    });
 });
+

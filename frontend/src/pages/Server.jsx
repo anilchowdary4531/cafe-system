@@ -21,6 +21,7 @@ import {
     Search,
     Settings2,
     ShoppingBag,
+    Sparkles,
     Trash2,
     Unlock,
     User,

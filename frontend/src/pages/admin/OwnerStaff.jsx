@@ -1009,31 +1009,6 @@ export default function OwnerStaff() {
                             </div>
                         </div>
 
-                        {/* Initial Access Matrix */}
-                        <div className="rounded-xl border border-[color:var(--app-border)]/40 bg-[#0a1020] p-3.5">
-                            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-400">
-                                Initial Module Access Template ({form.role})
-                            </p>
-                            <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                                {Object.keys(form.access).map((key) => (
-                                    <label key={key} className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={Boolean(form.access[key])}
-                                            onChange={(e) =>
-                                                setForm((prev) => ({
-                                                    ...prev,
-                                                    access: { ...prev.access, [key]: e.target.checked },
-                                                }))
-                                            }
-                                            className="rounded accent-orange-500"
-                                        />
-                                        <span>{ACCESS_LABELS[key] || key}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
                         <div className="flex items-center justify-end gap-3 pt-2">
                             <button
                                 type="button"
