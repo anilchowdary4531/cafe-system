@@ -161,36 +161,41 @@ export default function StaffProfileView({
     };
 
     return (
-        <div className="min-h-screen bg-neutral-950 text-neutral-100 p-4 sm:p-6 md:p-8 font-sans">
-            <div className="max-w-3xl mx-auto space-y-6">
+        <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans w-full">
+            <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-4 sm:py-6 space-y-5">
                 {/* Header with back button */}
-                <div className="flex items-center justify-between gap-4 border-b border-neutral-800 pb-4">
-                    <button
-                        type="button"
-                        onClick={handleBack}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800 transition min-h-[44px]"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        <span className="text-sm font-semibold">{backLabel}</span>
-                    </button>
-                    <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white">{title}</h1>
+                <div className="flex items-center justify-between gap-3 border-b border-neutral-800/80 pb-3.5">
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={handleBack}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800/80 text-neutral-300 hover:text-white hover:bg-neutral-800 transition min-h-[40px]"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                            <span className="text-xs sm:text-sm font-semibold">{backLabel}</span>
+                        </button>
+                        <h1 className="text-base sm:text-xl font-bold tracking-tight text-white">{title}</h1>
+                    </div>
                 </div>
 
-                {/* Profile Card */}
-                <div className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-6 shadow-xl space-y-6">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-neutral-800/80 pb-6">
-                        <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-2xl bg-orange-600/20 border border-orange-500/40 text-orange-400 flex items-center justify-center font-bold text-2xl shadow-inner">
+                {/* Profile Overview Section */}
+                <div className="rounded-2xl border border-neutral-800/70 bg-neutral-900/40 p-4 sm:p-5 md:p-6 space-y-4">
+                    {/* Profile Header Row */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-neutral-800/60 pb-4">
+                        <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
+                            <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-orange-500/15 border border-orange-500/30 text-orange-400 flex items-center justify-center font-bold text-lg sm:text-xl shrink-0">
                                 {user?.name ? user.name.slice(0, 2).toUpperCase() : "ST"}
                             </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                    {user?.name || "Staff Member"}
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <div className="min-w-0 space-y-0.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h2 className="text-base sm:text-lg font-bold text-white truncate">
+                                        {user?.name || "Staff Member"}
+                                    </h2>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
                                         Active
                                     </span>
-                                </h2>
-                                <p className="text-sm text-neutral-400 flex items-center gap-2 mt-0.5">
+                                </div>
+                                <p className="text-xs text-neutral-400 flex items-center gap-1.5 truncate">
                                     <span className="text-orange-400 font-semibold">{user?.designation || effectiveRole}</span>
                                     <span>•</span>
                                     <span>{restaurantName}</span>
@@ -198,95 +203,99 @@ export default function StaffProfileView({
                             </div>
                         </div>
 
-                        {!isEditing ? (
-                            <button
-                                type="button"
-                                onClick={() => setIsEditing(true)}
-                                className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-sm font-medium border border-neutral-700 transition min-h-[44px]"
-                            >
-                                Edit Profile
-                            </button>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsEditing(false);
-                                    setName(user?.name || "");
-                                    setPhone(user?.phone || "");
-                                }}
-                                className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm font-medium transition min-h-[44px]"
-                            >
-                                Cancel
-                            </button>
-                        )}
+                        <div className="shrink-0 self-end sm:self-auto">
+                            {!isEditing ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditing(true)}
+                                    className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-neutral-800/90 hover:bg-neutral-700 text-neutral-200 hover:text-white text-xs sm:text-sm font-semibold border border-neutral-700/60 transition min-h-[38px]"
+                                >
+                                    Edit Profile
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsEditing(false);
+                                        setName(user?.name || "");
+                                        setPhone(user?.phone || "");
+                                    }}
+                                    className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 text-xs sm:text-sm font-medium transition min-h-[38px]"
+                                >
+                                    Cancel
+                                </button>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Details or Edit Form */}
+                    {/* Profile Information List / Edit Form */}
                     {!isEditing ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                            <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800/60">
-                                <div className="text-xs text-neutral-400 flex items-center gap-1.5 mb-1">
-                                    <Mail className="w-3.5 h-3.5" /> Email
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 pt-1">
+                            <div className="bg-neutral-950/40 p-3 sm:p-3.5 rounded-xl border border-neutral-800/40">
+                                <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mb-1 font-medium">
+                                    <Mail className="w-3.5 h-3.5 text-neutral-500" /> Email
                                 </div>
-                                <div className="font-semibold text-white">{user?.email || "Not specified"}</div>
+                                <div className="font-semibold text-white text-xs sm:text-sm truncate">{user?.email || "Not specified"}</div>
                             </div>
-                            <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800/60">
-                                <div className="text-xs text-neutral-400 flex items-center gap-1.5 mb-1">
-                                    <Phone className="w-3.5 h-3.5" /> Phone
+                            <div className="bg-neutral-950/40 p-3 sm:p-3.5 rounded-xl border border-neutral-800/40">
+                                <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mb-1 font-medium">
+                                    <Phone className="w-3.5 h-3.5 text-neutral-500" /> Phone
                                 </div>
-                                <div className="font-semibold text-white">{user?.phone || "Not specified"}</div>
+                                <div className="font-semibold text-white text-xs sm:text-sm truncate">{user?.phone || "Not specified"}</div>
                             </div>
-                            <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800/60">
-                                <div className="text-xs text-neutral-400 flex items-center gap-1.5 mb-1">
-                                    <Shield className="w-3.5 h-3.5" /> Designation
+                            <div className="bg-neutral-950/40 p-3 sm:p-3.5 rounded-xl border border-neutral-800/40">
+                                <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mb-1 font-medium">
+                                    <Shield className="w-3.5 h-3.5 text-neutral-500" /> Designation
                                 </div>
-                                <div className="font-semibold text-white">{user?.designation || effectiveRole}</div>
+                                <div className="font-semibold text-white text-xs sm:text-sm truncate">{user?.designation || effectiveRole}</div>
                             </div>
-                            <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800/60">
-                                <div className="text-xs text-neutral-400 flex items-center gap-1.5 mb-1">
-                                    <Sparkles className="w-3.5 h-3.5" /> Staff ID
+                            <div className="bg-neutral-950/40 p-3 sm:p-3.5 rounded-xl border border-neutral-800/40">
+                                <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mb-1 font-medium">
+                                    <Sparkles className="w-3.5 h-3.5 text-neutral-500" /> Staff ID
                                 </div>
-                                <div className="font-semibold text-white">#{user?.id || "N/A"}</div>
+                                <div className="font-semibold text-white text-xs sm:text-sm">#{user?.id || "N/A"}</div>
                             </div>
                         </div>
                     ) : (
-                        <form onSubmit={handleSaveProfile} className="space-y-4">
+                        <form onSubmit={handleSaveProfile} className="space-y-3.5 pt-1">
                             {profileError && (
                                 <div className="p-3 bg-red-950/60 border border-red-800/60 text-red-200 text-xs rounded-xl">
                                     {profileError}
                                 </div>
                             )}
-                            <div className="space-y-1">
-                                <label htmlFor="staff-profile-name" className="text-xs font-semibold text-neutral-300">Full Name</label>
-                                <input
-                                    id="staff-profile-name"
-                                    name="name"
-                                    autoComplete="name"
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-orange-500"
-                                    required
-                                />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                <div className="space-y-1">
+                                    <label htmlFor="staff-profile-name" className="text-xs font-semibold text-neutral-300">Full Name</label>
+                                    <input
+                                        id="staff-profile-name"
+                                        name="name"
+                                        autoComplete="name"
+                                        type="text"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        className="w-full bg-neutral-950/70 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500 transition min-h-[40px]"
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label htmlFor="staff-profile-phone" className="text-xs font-semibold text-neutral-300">Phone Number</label>
+                                    <input
+                                        id="staff-profile-phone"
+                                        name="phone"
+                                        autoComplete="tel"
+                                        type="tel"
+                                        value={phone}
+                                        onChange={(e) => setPhone(e.target.value)}
+                                        className="w-full bg-neutral-950/70 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500 transition min-h-[40px]"
+                                        placeholder="+91..."
+                                    />
+                                </div>
                             </div>
-                            <div className="space-y-1">
-                                <label htmlFor="staff-profile-phone" className="text-xs font-semibold text-neutral-300">Phone Number</label>
-                                <input
-                                    id="staff-profile-phone"
-                                    name="phone"
-                                    autoComplete="tel"
-                                    type="tel"
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-orange-500"
-                                    placeholder="+91..."
-                                />
-                            </div>
-                            <div className="flex justify-end pt-2">
+                            <div className="flex justify-end pt-1">
                                 <button
                                     type="submit"
                                     disabled={savingProfile}
-                                    className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-sm transition min-h-[44px] flex items-center gap-2 disabled:opacity-50"
+                                    className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs sm:text-sm transition min-h-[40px] flex items-center gap-2 disabled:opacity-50 shadow-sm"
                                 >
                                     {savingProfile ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                                     Save Details
@@ -297,24 +306,32 @@ export default function StaffProfileView({
                 </div>
 
                 {/* Notification Sound & Vibration Settings */}
-                <div className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-6 shadow-xl space-y-4">
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-orange-400" />
-                        Sound & Vibration Preferences
-                    </h3>
-                    <p className="text-xs text-neutral-400">
-                        Customize alert tones and vibration patterns for incoming tasks, orders, and table service requests.
-                    </p>
+                <div className="space-y-2.5">
+                    <div className="px-1">
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-orange-400" />
+                            Sound & Vibration Preferences
+                        </h3>
+                        <p className="text-xs text-neutral-400 mt-0.5">
+                            Customize alert tones and vibration patterns for incoming tasks, orders, and table service requests.
+                        </p>
+                    </div>
                     <NotificationSoundPicker defaultExpanded={false} />
                 </div>
 
-                {/* Change Password Card */}
-                <div className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-6 shadow-xl space-y-4">
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                        <KeyRound className="w-4 h-4 text-orange-400" />
-                        Security & Password Change
-                    </h3>
-                    <form onSubmit={handleChangePassword} className="space-y-4">
+                {/* Change Password Section */}
+                <div className="rounded-2xl border border-neutral-800/70 bg-neutral-900/40 p-4 sm:p-5 md:p-6 space-y-3.5">
+                    <div>
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                            <KeyRound className="w-4 h-4 text-orange-400" />
+                            Security & Password Change
+                        </h3>
+                        <p className="text-xs text-neutral-400 mt-0.5">
+                            Update your login password to keep your staff account secure.
+                        </p>
+                    </div>
+
+                    <form onSubmit={handleChangePassword} className="space-y-3.5 pt-1">
                         {passwordError && (
                             <div className="p-3 bg-red-950/60 border border-red-800/60 text-red-200 text-xs rounded-xl">
                                 {passwordError}
@@ -325,31 +342,33 @@ export default function StaffProfileView({
                                 {passwordSuccess}
                             </div>
                         )}
-                        <div className="space-y-1">
-                            <label htmlFor="staff-profile-current-password" className="text-xs font-semibold text-neutral-300">Current Password</label>
-                            <div className="relative">
-                                <input
-                                    id="staff-profile-current-password"
-                                    name="currentPassword"
-                                    autoComplete="current-password"
-                                    type={showCurrentPassword ? "text" : "password"}
-                                    value={currentPassword}
-                                    onChange={(e) => setCurrentPassword(e.target.value)}
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-orange-500 pr-10"
-                                    required
-                                />
-                                <button
-                                    type="button"
-                                    aria-label={showCurrentPassword ? "Hide password" : "Show password"}
-                                    title={showCurrentPassword ? "Hide password" : "Show password"}
-                                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-200"
-                                >
-                                    {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                </button>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                            <div className="space-y-1">
+                                <label htmlFor="staff-profile-current-password" className="text-xs font-semibold text-neutral-300">Current Password</label>
+                                <div className="relative">
+                                    <input
+                                        id="staff-profile-current-password"
+                                        name="currentPassword"
+                                        autoComplete="current-password"
+                                        type={showCurrentPassword ? "text" : "password"}
+                                        value={currentPassword}
+                                        onChange={(e) => setCurrentPassword(e.target.value)}
+                                        className="w-full bg-neutral-950/70 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500 pr-9 min-h-[40px] transition"
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        aria-label={showCurrentPassword ? "Hide password" : "Show password"}
+                                        title={showCurrentPassword ? "Hide password" : "Show password"}
+                                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-200"
+                                    >
+                                        {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
                             <div className="space-y-1">
                                 <label htmlFor="staff-profile-new-password" className="text-xs font-semibold text-neutral-300">New Password</label>
                                 <div className="relative">
@@ -360,7 +379,7 @@ export default function StaffProfileView({
                                         type={showNewPassword ? "text" : "password"}
                                         value={newPassword}
                                         onChange={(e) => setNewPassword(e.target.value)}
-                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-orange-500 pr-10"
+                                        className="w-full bg-neutral-950/70 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500 pr-9 min-h-[40px] transition"
                                         required
                                         minLength={6}
                                     />
@@ -375,6 +394,7 @@ export default function StaffProfileView({
                                     </button>
                                 </div>
                             </div>
+
                             <div className="space-y-1">
                                 <label htmlFor="staff-profile-confirm-password" className="text-xs font-semibold text-neutral-300">Confirm New Password</label>
                                 <input
@@ -384,17 +404,18 @@ export default function StaffProfileView({
                                     type="password"
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-orange-500"
+                                    className="w-full bg-neutral-950/70 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500 min-h-[40px] transition"
                                     required
                                     minLength={6}
                                 />
                             </div>
                         </div>
-                        <div className="flex justify-end pt-2">
+
+                        <div className="flex justify-end pt-1">
                             <button
                                 type="submit"
                                 disabled={changingPassword}
-                                className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-sm transition min-h-[44px] flex items-center gap-2 disabled:opacity-50"
+                                className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs sm:text-sm transition min-h-[40px] flex items-center gap-2 disabled:opacity-50 shadow-sm"
                             >
                                 {changingPassword ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
                                 Update Password
@@ -403,11 +424,11 @@ export default function StaffProfileView({
                     </form>
                 </div>
 
-                {/* Logout Card */}
-                <div className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-6 shadow-xl flex items-center justify-between gap-4">
+                {/* Logout Footer Section */}
+                <div className="rounded-xl border border-neutral-800/60 bg-neutral-900/30 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                        <h4 className="text-sm font-bold text-white">Log Out of Station</h4>
-                        <p className="text-xs text-neutral-400">End your current shift and log out on this device.</p>
+                        <h4 className="text-xs sm:text-sm font-bold text-white">Log Out of Station</h4>
+                        <p className="text-xs text-neutral-400 mt-0.5">End your current shift and log out on this device.</p>
                     </div>
                     <button
                         type="button"
@@ -417,7 +438,7 @@ export default function StaffProfileView({
                                 navigate("/login?mode=staff");
                             }
                         }}
-                        className="px-4 py-2 rounded-xl bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-800/60 text-sm font-semibold transition min-h-[44px] flex items-center gap-2"
+                        className="px-4 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-rose-300 hover:text-white border border-rose-800/50 text-xs sm:text-sm font-semibold transition min-h-[38px] flex items-center justify-center gap-2 shrink-0"
                     >
                         <LogOut className="w-4 h-4" />
                         Log Out

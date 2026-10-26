@@ -170,7 +170,7 @@ export default function ServerProfileView({
     const designationLabel = user?.designation || (roleBadge === "WAITER" ? "Server" : roleBadge);
 
     return (
-        <div className="flex-1 p-3 sm:p-4 max-w-4xl mx-auto w-full space-y-4 animate-in fade-in duration-200">
+        <div className="flex-1 w-full max-w-full space-y-4 animate-in fade-in duration-200">
             {/* Top Navigation Bar */}
             <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)]/40 pb-3">
                 <div className="flex items-center gap-3">

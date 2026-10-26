@@ -412,4 +412,124 @@ describe("SuperAdminRestaurantMap Component Integration QA", () => {
         expect(screen.getByText("Cafe Fido")).toBeInTheDocument();
         expect(screen.getByText("Invalid Coord Cafe")).toBeInTheDocument();
     });
+
+    it("12. Custom Tiffzy animated markers render with pulse ripple, pin silhouette, white restaurant icon, and accessibility attributes", async () => {
+        render(
+            <MemoryRouter>
+                <SuperAdminRestaurantMap />
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("Cafe King")).toBeInTheDocument();
+        });
+
+        // 2 markers created
+        expect(createdMarkers.length).toBe(2);
+
+        const markerEl = createdMarkers[0].element;
+
+        // Verify Tiffzy classes
+        expect(markerEl.classList.contains("tiffzy-restaurant-marker")).toBe(true);
+        expect(markerEl.classList.contains("tiffzy-admin-marker")).toBe(true);
+
+        // Accessibility attributes
+        expect(markerEl.getAttribute("role")).toBe("button");
+        expect(markerEl.getAttribute("tabindex")).toBe("0");
+        expect(markerEl.getAttribute("aria-label")).toBe("Restaurant: Cafe King");
+
+        // Pulse ripple element
+        const pulse = markerEl.querySelector(".tiffzy-marker-pulse");
+        expect(pulse).toBeTruthy();
+
+        // Pin container and SVG
+        const pin = markerEl.querySelector(".tiffzy-marker-pin");
+        expect(pin).toBeTruthy();
+
+        const pinSvg = markerEl.querySelector(".tiffzy-pin-svg");
+        expect(pinSvg).toBeTruthy();
+
+        // Restaurant icon
+        const icon = markerEl.querySelector("[data-testid='restaurant-icon']");
+        expect(icon).toBeTruthy();
+    });
+
+    it("13. Handles active and inactive restaurant marker visual distinctions correctly", async () => {
+        // Provide sample with one active and one inactive located restaurant
+        api.get.mockResolvedValueOnce({
+            data: {
+                success: true,
+                data: {
+                    totalRestaurants: 2,
+                    locatedRestaurants: 2,
+                    missingLocationRestaurants: 0,
+                    activeRestaurants: 1,
+                    inactiveRestaurants: 1,
+                    restaurants: [
+                        {
+                            id: 10,
+                            name: "Active Cafe",
+                            latitude: 12.97,
+                            longitude: 77.59,
+                            isActive: true,
+                            isOpen: true,
+                        },
+                        {
+                            id: 20,
+                            name: "Inactive Cafe",
+                            latitude: 13.01,
+                            longitude: 77.62,
+                            isActive: false,
+                            isOpen: false,
+                        },
+                    ],
+                },
+            },
+        });
+
+        render(
+            <MemoryRouter>
+                <SuperAdminRestaurantMap />
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("Active Cafe")).toBeInTheDocument();
+            expect(screen.getByText("Inactive Cafe")).toBeInTheDocument();
+        });
+
+        expect(createdMarkers.length).toBe(2);
+
+        const activeMarkerEl = createdMarkers[0].element;
+        const inactiveMarkerEl = createdMarkers[1].element;
+
+        expect(activeMarkerEl.classList.contains("tiffzy-marker-active")).toBe(true);
+        expect(inactiveMarkerEl.classList.contains("tiffzy-marker-inactive")).toBe(true);
+    });
+
+    it("14. Keyboard navigation (Enter / Space) triggers restaurant focus and updates selected marker state", async () => {
+        render(
+            <MemoryRouter>
+                <SuperAdminRestaurantMap />
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("Cafe King")).toBeInTheDocument();
+        });
+
+        expect(createdMarkers.length).toBe(2);
+
+        // Press Enter on Cafe King marker
+        fireEvent.keyDown(createdMarkers[0].element, { key: "Enter", code: "Enter" });
+
+        // Map centers on Cafe King
+        expect(mockFlyTo).toHaveBeenCalledWith(
+            expect.objectContaining({
+                center: [77.59, 12.975],
+                zoom: 14,
+            })
+        );
+    });
 });
+

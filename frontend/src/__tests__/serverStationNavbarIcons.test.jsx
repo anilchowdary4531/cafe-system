@@ -72,6 +72,18 @@ vi.mock("../hooks/useCachedGet", () => ({
 
 vi.mock("../utils/soundPlayer", () => ({
   playNotificationSound: vi.fn(),
+  getActiveSoundConfig: vi.fn(() => ({ id: "sound1", name: "Chime" })),
+  saveSoundConfig: vi.fn(),
+  isSoundEnabled: vi.fn(() => true),
+  setSoundEnabled: vi.fn(),
+  isVibrationEnabled: vi.fn(() => false),
+  setVibrationEnabled: vi.fn(),
+  triggerNotificationVibration: vi.fn(),
+  VIBRATION_PATTERNS: [],
+  getVibrationPattern: vi.fn(() => "default"),
+  setVibrationPattern: vi.fn(),
+  isVibrationSupported: vi.fn(() => false),
+  BUILTIN_SOUNDS: [],
 }));
 
 vi.mock("../utils/toast", () => ({
@@ -90,6 +102,7 @@ describe("Server Station Navbar — History & Notifications Icon-Only Buttons", 
                   <Route path="/server" element={<Server />} />
                   <Route path="/server/history" element={<Server />} />
                   <Route path="/server/notifications" element={<Server />} />
+                  <Route path="/server/profile" element={<Server />} />
                 </Routes>
               </CartProvider>
             </RestaurantContextProvider>
@@ -108,9 +121,9 @@ describe("Server Station Navbar — History & Notifications Icon-Only Buttons", 
     expect(historyBtn).toHaveAttribute("title", "History");
     expect(historyBtn).toHaveAttribute("aria-label", "History");
 
-    // Icon button has compact 40x40 styling
-    expect(historyBtn.className).toContain("w-10");
-    expect(historyBtn.className).toContain("h-10");
+    // Icon button has compact styling
+    expect(historyBtn.className).toContain("w-8");
+    expect(historyBtn.className).toContain("h-8");
     expect(historyBtn.className).toContain("justify-center");
 
     // Contains svg icon and no text node with "History"
@@ -128,9 +141,9 @@ describe("Server Station Navbar — History & Notifications Icon-Only Buttons", 
     expect(notifBtn).toHaveAttribute("title", "Notifications");
     expect(notifBtn).toHaveAttribute("aria-label", "Notifications");
 
-    // Icon button has compact 40x40 styling
-    expect(notifBtn.className).toContain("w-10");
-    expect(notifBtn.className).toContain("h-10");
+    // Icon button has compact styling
+    expect(notifBtn.className).toContain("w-8");
+    expect(notifBtn.className).toContain("h-8");
     expect(notifBtn.className).toContain("justify-center");
 
     // Contains svg bell icon
@@ -159,5 +172,36 @@ describe("Server Station Navbar — History & Notifications Icon-Only Buttons", 
     await waitFor(() => {
       expect(screen.getByText(/Real-time alerts for orders/i)).toBeInTheDocument();
     });
+  });
+
+  it("5. Profile button is icon-only, accessible, and opens Profile view on click", async () => {
+    renderServer();
+
+    const profileBtn = screen.getByTestId("server-profile-btn");
+    expect(profileBtn).toBeInTheDocument();
+    expect(profileBtn).toHaveAttribute("title", "Profile");
+    expect(profileBtn).toHaveAttribute("aria-label", "Server Profile");
+    expect(profileBtn.className).toContain("w-8");
+    expect(profileBtn.className).toContain("h-8");
+    expect(profileBtn.querySelector("svg")).not.toBeNull();
+    expect(profileBtn.textContent.trim()).toBe("");
+
+    fireEvent.click(profileBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Server Profile/i)).toBeInTheDocument();
+    });
+  });
+
+  it("6. Settings button is icon-only, accessible with title and aria-label", async () => {
+    renderServer();
+
+    const settingsBtn = screen.getByTestId("server-settings-btn");
+    expect(settingsBtn).toBeInTheDocument();
+    expect(settingsBtn).toHaveAttribute("title", "Settings");
+    expect(settingsBtn).toHaveAttribute("aria-label", "Settings");
+    expect(settingsBtn.className).toContain("w-8");
+    expect(settingsBtn.className).toContain("h-8");
+    expect(settingsBtn.querySelector("svg")).not.toBeNull();
   });
 });

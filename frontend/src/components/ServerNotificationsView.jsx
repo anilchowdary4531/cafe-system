@@ -43,7 +43,7 @@ export default function ServerNotificationsView({
 }) {
     const handleBack = onBack || onBackToFloorPlan;
     const effectiveBackLabel = backLabel || "Floor Plan";
-    const { user, token } = useAuth();
+    const { token } = useAuth();
     const { socket } = useStaffSocket();
 
     const [notifications, setNotifications] = useState([]);
@@ -243,7 +243,7 @@ export default function ServerNotificationsView({
             if (filterType === "UNREAD" && !isUnread) return false;
 
             if (filterType === "ORDERS") {
-                if (!typeUpper.includes("ORDER")) return false;
+                if (!typeUpper.includes("ORDER") && !typeUpper.includes("KOT")) return false;
             } else if (filterType === "KITCHEN") {
                 if (!typeUpper.includes("KOT") && !typeUpper.includes("KITCHEN") && !typeUpper.includes("FOOD") && !typeUpper.includes("PASS") && !typeUpper.includes("READY")) return false;
             } else if (filterType === "SUCCESS") {
@@ -424,7 +424,14 @@ export default function ServerNotificationsView({
                                     {tableNo && handleSelectTable && (
                                         <button
                                             type="button"
-                                            onClick={() => handleSelectTable(tableNo)}
+                                            onClick={() => {
+                                                const tid = item.tableId || item.data?.tableId;
+                                                if (tid !== undefined && tid !== null) {
+                                                    handleSelectTable(tableNo, tid);
+                                                } else {
+                                                    handleSelectTable(tableNo);
+                                                }
+                                            }}
                                             className="rounded-lg bg-orange-500/10 hover:bg-orange-500 text-orange-600 dark:text-orange-400 hover:text-white px-2 py-0.5 font-bold transition flex items-center gap-0.5 cursor-pointer"
                                             title={`View Table ${tableNo}`}
                                         >

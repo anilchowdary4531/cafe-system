@@ -153,15 +153,23 @@ export default async function notificationRoutes(app, deps) {
     const actor = await resolveActor(req);
     if (!actor) return reply.code(401).send({ message: "Authentication required" });
 
-    let count;
-    if (actor.recipientType === RECIPIENT_TYPES.USER && actor.restaurantId) {
+    if (actor.recipientType === RECIPIENT_TYPES.USER) {
+      const userConditions = [
+        {
+          recipientType: RECIPIENT_TYPES.USER,
+          recipientId: Number(actor.recipientId),
+          ...(actor.restaurantId ? { restaurantId: Number(actor.restaurantId) } : {}),
+        },
+      ];
+      if (actor.restaurantId) {
+        userConditions.push({
+          recipientType: RECIPIENT_TYPES.RESTAURANT,
+          recipientId: Number(actor.restaurantId),
+        });
+      }
       count = await prisma.notification.count({
         where: {
-          OR: [
-            { recipientType: RECIPIENT_TYPES.USER, recipientId: actor.recipientId },
-            { recipientType: RECIPIENT_TYPES.RESTAURANT, recipientId: actor.restaurantId },
-            { restaurantId: actor.restaurantId },
-          ],
+          OR: userConditions,
           isRead: false,
         },
       });

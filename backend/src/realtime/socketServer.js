@@ -303,11 +303,39 @@ export const initRealtime = ({ app, prisma, allowedOrigins = [], isOriginAllowed
     let chain = staff.to(restaurantRoom(rid));
     if (bid) chain = chain.to(branchRoom(rid, bid));
     chain.emit("order:created", order);
+    chain.emit("order_created", { order, source: order?.orderSource || "POS" });
+    chain.emit("new_order", order);
+    if (order?.tableNo) {
+      const tablePayload = {
+        restaurantId: rid,
+        tableNo: order.tableNo,
+        tableId: order.tableSession?.tableId || null,
+        tableSessionId: order.tableSessionId || null,
+      };
+      chain.emit("table:updated", tablePayload);
+      chain.emit("table:session_updated", tablePayload);
+    }
 
     // Also broadcast to root Socket.IO rooms for restaurant subscribers
     if (io) {
       io.to(`restaurant_${rid}`).emit("new_order", order);
       io.to(`restaurant:${rid}`).emit("new_order", order);
+      io.to(`restaurant_${rid}`).emit("order:created", order);
+      io.to(`restaurant:${rid}`).emit("order:created", order);
+      io.to(`restaurant_${rid}`).emit("order_created", { order, source: order?.orderSource || "POS" });
+      io.to(`restaurant:${rid}`).emit("order_created", { order, source: order?.orderSource || "POS" });
+      if (order?.tableNo) {
+        const tablePayload = {
+          restaurantId: rid,
+          tableNo: order.tableNo,
+          tableId: order.tableSession?.tableId || null,
+          tableSessionId: order.tableSessionId || null,
+        };
+        io.to(`restaurant_${rid}`).emit("table:updated", tablePayload);
+        io.to(`restaurant:${rid}`).emit("table:updated", tablePayload);
+        io.to(`restaurant_${rid}`).emit("table:session_updated", tablePayload);
+        io.to(`restaurant:${rid}`).emit("table:session_updated", tablePayload);
+      }
     }
 
     // Broadcast station KOTs to kitchen & trigger thermal print dispatch

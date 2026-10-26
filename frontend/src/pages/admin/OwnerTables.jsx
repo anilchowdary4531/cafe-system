@@ -10,6 +10,7 @@ import TableQrCodeModal from "../../components/TableQrCodeModal";
 import OfflineStatusBar from "../../components/OfflineStatusBar";
 import OfflineConflictModal from "../../components/OfflineConflictModal";
 import { cacheTablesOffline, getOfflineTables } from "../../utils/offline/offlineDb";
+import { isServerStaff } from "../../utils/staffRole";
 
 const emptyForm = {
     tableNo: "",
@@ -114,6 +115,9 @@ export default function OwnerTables() {
 
     // Server Assignment State
     const [staffList, setStaffList] = useState([]);
+    const eligibleServers = useMemo(() => {
+        return (staffList || []).filter((s) => isServerStaff(s));
+    }, [staffList]);
     const [assignServerModalTable, setAssignServerModalTable] = useState(null);
     const [selectedWaiterIdToAssign, setSelectedWaiterIdToAssign] = useState("");
     const [submittingAssignServer, setSubmittingAssignServer] = useState(false);
@@ -429,7 +433,15 @@ export default function OwnerTables() {
         if (e && e.preventDefault) e.preventDefault();
         if (!restaurantId || !assignServerModalTable || !selectedWaiterIdToAssign) return;
 
-        const waiterUser = staffList.find((s) => String(s.id) === String(selectedWaiterIdToAssign));
+        const waiterUser = eligibleServers.find((s) => String(s.id) === String(selectedWaiterIdToAssign));
+        if (!waiterUser) {
+            showToast({
+                title: "Invalid Server",
+                message: "Please select an active staff member with Server designation",
+                variant: "error",
+            });
+            return;
+        }
         const waiterName = waiterUser ? (waiterUser.name || waiterUser.userName || "Server") : "Server";
         const prevTables = [...tables];
 
@@ -2491,19 +2503,23 @@ export default function OwnerTables() {
                         </p>
 
                         <div>
-                            <label className="block text-xs font-semibold theme-muted mb-1">Select Server / Waiter</label>
+                            <label htmlFor="assign-server-select" className="block text-xs font-semibold theme-muted mb-1">Select Server / Waiter</label>
                             <select
+                                id="assign-server-select"
                                 value={selectedWaiterIdToAssign}
                                 onChange={(e) => setSelectedWaiterIdToAssign(e.target.value)}
                                 className="w-full rounded-xl border border-[color:var(--app-border)]/40 bg-[color:var(--app-bg)] px-4 py-2.5 text-sm text-[color:var(--app-text)] outline-none focus:border-orange-500"
                             >
-                                <option value="">-- Choose a Server --</option>
-                                {staffList.map((staff) => (
+                                <option value="">{eligibleServers.length === 0 ? "-- No servers available --" : "-- Choose a Server --"}</option>
+                                {eligibleServers.map((staff) => (
                                     <option key={staff.id} value={staff.id}>
                                         {staff.name || staff.userName || `Staff #${staff.id}`} ({staff.role || "Staff"}{staff.designation ? ` - ${staff.designation}` : ""})
                                     </option>
                                 ))}
                             </select>
+                            {eligibleServers.length === 0 && (
+                                <p className="text-xs text-amber-500/90 mt-1.5 font-medium">No servers available</p>
+                            )}
                         </div>
 
                         {(assignServerModalTable.assignedWaiterId || assignServerModalTable.assignedWaiterName) && (

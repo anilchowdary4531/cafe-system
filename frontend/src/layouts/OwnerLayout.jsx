@@ -56,7 +56,7 @@ import { resolveRestaurantName, resolveAuthoritativeRestaurantId } from "../util
 import BrandLogo from "../components/BrandLogo";
 import Footer from "../components/Footer";
 import { useAuth } from "../context/AuthContext";
-import { resolveEffectiveStaffRole } from "../utils/staffRole";
+import { resolveEffectiveStaffRole, isServerStaff } from "../utils/staffRole";
 import { showToast } from "../utils/toast";
 import tiffzyLogo from "../assets/tiffzy-logo.png";
 import NewOrderPopup from "../components/NewOrderPopup";
@@ -1411,6 +1411,10 @@ export default function OwnerLayout() {
         return map;
     }, [staffOverview.users]);
 
+    const eligibleServers = useMemo(() => {
+        return (staffOverview.users || []).filter((staffUser) => isServerStaff(staffUser));
+    }, [staffOverview.users]);
+
     const tableOccupiedByKey = useMemo(() => {
         const map = new Map();
         tableOverview.tables.forEach((table) => {
@@ -1585,6 +1589,14 @@ export default function OwnerLayout() {
         if (!normalizedStaffId) return;
 
         const staffMember = staffById.get(normalizedStaffId);
+        if (staffMember && !isServerStaff(staffMember)) {
+            showToast({
+                title: "Invalid Server",
+                message: "Only staff with Server designation can be assigned to a table",
+                variant: "error",
+            });
+            return;
+        }
         const staffName = staffMember ? (staffMember.name || staffMember.userName || "Server") : "Server";
 
         const prevAssignments = { ...(tableAssignments || {}) };
@@ -3114,13 +3126,13 @@ export default function OwnerLayout() {
                                                                     <p className="theme-muted mt-1">
                                                                         Loading staff...
                                                                     </p>
-                                                                ) : staffOverview.users.length === 0 ? (
+                                                                ) : eligibleServers.length === 0 ? (
                                                                     <p className="theme-muted mt-1">
-                                                                        No active staff found.
+                                                                        No servers available
                                                                     </p>
                                                                 ) : (
                                                                     <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                                                        {staffOverview.users.map(
+                                                                        {eligibleServers.map(
                                                                             (staffUser) => {
                                                                                 const staffId = String(
                                                                                     staffUser.id || ""

@@ -54,8 +54,8 @@ export default function StaffShell({
     return (
         <div className="min-h-screen bg-slate-50/60 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans">
             {/* Top Navigation Header */}
-            <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 px-2.5 py-2 sm:px-6 sm:py-2.5">
-                <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-3">
+            <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 px-3 py-2 sm:px-6 sm:py-2.5">
+                <div className="w-full max-w-[1720px] mx-auto flex items-center justify-between gap-1.5 sm:gap-3">
                     {/* Left: Brand + Restaurant + Title */}
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                         <Link
@@ -250,7 +250,7 @@ export default function StaffShell({
             )}
 
             {/* Main Workspace Body */}
-            <main className={`flex-1 w-full mx-auto p-3 sm:p-5 pb-16 md:pb-6 ${fullWidth ? "max-w-[1720px]" : "max-w-7xl"}`}>
+            <main className={`flex-1 w-full mx-auto p-3 sm:p-5 pb-16 md:pb-6 ${fullWidth ? "max-w-[1720px]" : "max-w-[1600px]"}`}>
                 {children}
             </main>
         </div>

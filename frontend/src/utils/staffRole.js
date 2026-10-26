@@ -55,6 +55,30 @@ export const resolveEffectiveStaffRole = (role, designation) => {
     return inferRoleFromDesignation(designation) || normalizedRole || "STAFF";
 };
 
+export const isServerDesignation = (designation, role) => {
+    const rawDesignation = String(designation || "").trim();
+    if (rawDesignation) {
+        const inferred = inferRoleFromDesignation(rawDesignation);
+        if (inferred) {
+            return inferred === "WAITER";
+        }
+        const upper = rawDesignation.toUpperCase();
+        return upper === "SERVER" || upper === "WAITER";
+    }
+
+    const rawRole = String(role || "").trim().toUpperCase();
+    return rawRole === "WAITER" || rawRole === "SERVER";
+};
+
+export const isServerStaff = (staffUser) => {
+    if (!staffUser) return false;
+    if (staffUser.isActive === false) return false;
+    return isServerDesignation(
+        staffUser.designation || staffUser.staffDesignation || staffUser.jobTitle,
+        staffUser.role
+    );
+};
+
 export const isSeniorChef = (role, designation) => {
     const r = String(role || "").trim().toUpperCase();
     if (r === "OWNER" || r === "MANAGER" || r === "SUPER_ADMIN") return true;

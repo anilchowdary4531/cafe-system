@@ -634,49 +634,52 @@ export default function SuperAdminRestaurantMap() {
 
         locatedRestaurants.forEach((r) => {
             const el = document.createElement("div");
-            el.className = `tiffzy-admin-marker cursor-pointer transition-transform duration-200 hover:scale-125`;
-            el.style.zIndex = "10";
+            const isSelected = selectedRestaurant?.id === r.id;
+            const statusDotColor = r.isActive ? (r.isOpen ? "#059669" : "#D97706") : "#795548";
+            const pinBgColor = r.isActive ? "#FE5102" : "#78716C";
+            const pinStrokeColor = isSelected ? "#FFFFFF" : "#FFFFFF";
+            const pinStrokeWidth = isSelected ? "2.5" : "1.5";
+
+            el.className = `tiffzy-restaurant-marker tiffzy-admin-marker cursor-pointer ${
+                isSelected ? "tiffzy-marker-selected" : ""
+            } ${r.isActive ? "tiffzy-marker-active" : "tiffzy-marker-inactive"}`;
+            el.style.zIndex = isSelected ? "30" : "10";
+            el.setAttribute("role", "button");
+            el.setAttribute("tabindex", "0");
+            el.setAttribute("aria-label", `Restaurant: ${r.name}`);
             el.setAttribute("title", `${r.name} (${r.city || "No City"}${r.state ? `, ${r.state}` : ""})`);
             el.setAttribute("data-testid", `map-marker-${r.id}`);
             el.id = `map-marker-${r.id}`;
 
-            const isSelected = selectedRestaurant?.id === r.id;
-            const statusDotColor = r.isActive ? (r.isOpen ? "#059669" : "#D97706") : "#795548";
-
             el.innerHTML = `
-                <div style="position: relative; display: flex; align-items: center; justify-content: center;">
-                    <div style="
-                        background: ${isSelected ? "#FE5102" : "#FE5102"}; 
-                        color: #ffffff; 
-                        width: ${isSelected ? "38px" : "32px"}; 
-                        height: ${isSelected ? "38px" : "32px"}; 
-                        border-radius: 50%; 
-                        display: flex; 
-                        align-items: center; 
-                        justify-content: center; 
-                        box-shadow: ${isSelected ? "0 4px 16px rgba(254,81,2,0.5)" : "0 3px 10px rgba(43,23,16,0.25)"}; 
-                        border: ${isSelected ? "3px solid #FFFBF7" : "2.5px solid #ffffff"};
-                        transition: all 0.2s ease;
-                    ">
-                        <svg width="${isSelected ? "20" : "16"}" height="${isSelected ? "20" : "16"}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
-                            <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
-                            <line x1="6" y1="1" x2="6" y2="4"></line>
-                            <line x1="10" y1="1" x2="10" y2="4"></line>
-                            <line x1="14" y1="1" x2="14" y2="4"></line>
-                        </svg>
-                    </div>
-                    <div style="
-                        position: absolute; 
-                        top: -2px; 
-                        right: -2px; 
-                        width: 10px; 
-                        height: 10px; 
-                        border-radius: 50%; 
-                        background: ${statusDotColor}; 
-                        border: 2px solid #ffffff;
-                        box-shadow: 0 0 4px ${statusDotColor};
-                    "></div>
+                <div class="tiffzy-marker-pulse-wrapper">
+                    <div class="tiffzy-marker-pulse"></div>
+                </div>
+                <div class="tiffzy-marker-pin">
+                    <svg class="tiffzy-pin-svg" viewBox="0 0 38 48" width="38" height="48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Tiffzy Pin Silhouette -->
+                        <path
+                            d="M 19 46 C 16 39 4 25 4 16 A 15 15 0 1 1 34 16 C 34 25 22 39 19 46 Z"
+                            fill="${pinBgColor}"
+                            stroke="${pinStrokeColor}"
+                            stroke-width="${pinStrokeWidth}"
+                            stroke-linejoin="round"
+                        />
+                        <!-- White Restaurant Utensils / Store Icon -->
+                        <g transform="translate(11, 8)" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none" class="tiffzy-restaurant-icon" data-testid="restaurant-icon">
+                            <!-- Fork -->
+                            <path d="M12 1v4a2 2 0 0 1-2 2 2 2 0 0 1-2-2V1" />
+                            <path d="M10 1v7" />
+                            <path d="M10 8v7" />
+                            <!-- Knife -->
+                            <path d="M4 1v14" />
+                            <path d="M4 1a3.5 3.5 0 0 1 3.5 3.5v3.5a1.5 1.5 0 0 1-1.5 1.5H4" />
+                        </g>
+                    </svg>
+                    <!-- Status dot: Active Open (green) / Active Closed (amber) / Inactive (slate) -->
+                    <div class="tiffzy-marker-status-dot" style="background: ${statusDotColor};" title="${
+                        r.isActive ? (r.isOpen ? "Active & Open" : "Active & Closed") : "Inactive"
+                    }"></div>
                 </div>
             `;
 
@@ -685,7 +688,15 @@ export default function SuperAdminRestaurantMap() {
                 focusRestaurant(r);
             });
 
-            const marker = new maplibregl.Marker({ element: el })
+            el.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    focusRestaurant(r);
+                }
+            });
+
+            const marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
                 .setLngLat([r.longitude, r.latitude])
                 .addTo(map);
 
@@ -1012,8 +1023,14 @@ export default function SuperAdminRestaurantMap() {
                         <p className="text-[10px] uppercase tracking-wider font-extrabold text-[#795548] mb-1.5">MAP LEGEND</p>
                         <div className="flex flex-col gap-1.5">
                             <div className="flex items-center gap-2">
-                                <div className="w-3.5 h-3.5 rounded-full bg-[#FE5102] border-2 border-white flex items-center justify-center text-[8px] text-white">☕</div>
-                                <span className="text-[11px] font-semibold text-[#2B1710]">Restaurant Outlet</span>
+                                <div className="relative w-4 h-5 flex items-center justify-center shrink-0">
+                                    <span className="w-3.5 h-3.5 rounded-full bg-[#FE5102]/25 animate-ping absolute inset-0 m-auto pointer-events-none"></span>
+                                    <svg viewBox="0 0 38 48" className="w-3.5 h-4.5 drop-shadow-xs relative z-1" fill="none">
+                                        <path d="M 19 46 C 16 39 4 25 4 16 A 15 15 0 1 1 34 16 C 34 25 22 39 19 46 Z" fill="#FE5102" stroke="#FFF" strokeWidth="2" />
+                                        <circle cx="19" cy="16" r="4.5" fill="#FFF" />
+                                    </svg>
+                                </div>
+                                <span className="text-[11px] font-semibold text-[#2B1710]">Tiffzy Restaurant Pin</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <div className="w-2.5 h-2.5 rounded-full bg-[#059669] shadow-[0_0_4px_#059669]"></div>

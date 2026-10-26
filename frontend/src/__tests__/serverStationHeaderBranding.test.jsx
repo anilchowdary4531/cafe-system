@@ -127,9 +127,10 @@ describe("Server Station Header — Owner Panel Branding & Time/Date Layout", ()
         const clockContainer = screen.getByTestId("server-station-clock");
         expect(clockContainer).toBeInTheDocument();
 
-        const profileBtn = screen.getByTitle("My Profile");
+        const profileBtn = screen.getByTestId("server-profile-btn");
         expect(profileBtn).toBeInTheDocument();
-        expect(profileBtn).toHaveTextContent("Kamalesh");
+        expect(profileBtn).toHaveAttribute("title", "Profile");
+        expect(profileBtn).toHaveAttribute("aria-label", "Server Profile");
 
         // Verify clockContainer appears before profileBtn in the DOM hierarchy
         const parent = clockContainer.parentElement;

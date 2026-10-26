@@ -23,6 +23,7 @@ import {
     ShoppingBag,
     Trash2,
     Unlock,
+    User,
     UserCheck,
     UserPlus,
     Users,
@@ -232,7 +233,7 @@ export default function Server() {
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
-    const { user, logout } = useAuth();
+    const { user, token, logout } = useAuth();
     const { socket } = useStaffSocket();
 
     const restaurantId = Number(
@@ -366,7 +367,7 @@ export default function Server() {
         setTableOverrides((prev) => {
             const next = { ...prev };
             if (idKey) next[idKey] = releasePatch;
-            if (noKey) next[noKey] = releasePatch;
+            else if (noKey) next[noKey] = releasePatch;
             return next;
         });
 
@@ -459,10 +460,22 @@ export default function Server() {
             : (!tablesData ? [] : Array.isArray(tablesData.tables) ? tablesData.tables : Array.isArray(tablesData) ? tablesData : []);
         if (!rawTables.length) return [];
 
-        return rawTables.map((t) => {
+        // Canonical Table Deduplication: Ensure each database table ID appears exactly once
+        const seenIds = new Set();
+        const uniqueRawTables = [];
+        for (const t of rawTables) {
+            const tid = t?.id ? Number(t.id) : null;
+            if (tid) {
+                if (seenIds.has(tid)) continue;
+                seenIds.add(tid);
+            }
+            uniqueRawTables.push(t);
+        }
+
+        return uniqueRawTables.map((t) => {
             const idKey = t.id ? String(t.id) : null;
             const noKey = t.tableNo ? String(t.tableNo).trim().toLowerCase() : null;
-            const override = (idKey && tableOverrides[idKey]) ? tableOverrides[idKey] : (noKey && tableOverrides[noKey] ? tableOverrides[noKey] : null);
+            const override = (idKey && tableOverrides[idKey]) ? tableOverrides[idKey] : (!idKey && noKey && tableOverrides[noKey] ? tableOverrides[noKey] : null);
 
             if (override) {
                 // Stale HTTP response rejection:
@@ -649,11 +662,11 @@ export default function Server() {
             const raw = String(item.tableNo || "").trim();
             if (!raw || raw === "N/A") return;
             const norm = normalizeTableKey(raw);
-            map.set(raw, (map.get(raw) || 0) + 1);
-            map.set(raw.toLowerCase(), (map.get(raw.toLowerCase()) || 0) + 1);
-            if (norm) {
-                map.set(norm, (map.get(norm) || 0) + 1);
-            }
+            const keysToIncrement = new Set([raw]);
+            if (norm) keysToIncrement.add(norm);
+            keysToIncrement.forEach((k) => {
+                map.set(k, (map.get(k) || 0) + 1);
+            });
         });
         return map;
     }, [readyItemsToDistribute]);
@@ -845,21 +858,24 @@ export default function Server() {
             const typeUpper = String(notif?.notificationType || notif?.type || "").toUpperCase();
             const isAssigned = typeUpper === "TABLE_ASSIGNMENT" || notif?.data?.action === "ASSIGNED" || notif?.data?.action === "REASSIGNED";
             const isUnassigned = typeUpper === "TABLE_UNASSIGNED" || notif?.data?.action === "UNASSIGNED";
+            const isKotSent = typeUpper === "KOT_SENT" || notif?.data?.action === "KOT_SENT";
 
-            if (isAssigned || isUnassigned) {
+            if (isAssigned || isUnassigned || isKotSent) {
                 playNotificationSound();
                 const targetTableNo = notif.tableNo || notif.data?.tableNo || "";
                 const targetTableId = notif.tableId || notif.data?.tableId || null;
 
                 showToast({
-                    title: notif.title || (isAssigned ? (targetTableNo ? `📋 Table Assigned — Table ${targetTableNo}` : "📋 Table Assigned") : "Table Unassigned"),
+                    title: notif.title || (isAssigned ? (targetTableNo ? `📋 Table Assigned — Table ${targetTableNo}` : "📋 Table Assigned") : isKotSent ? (targetTableNo ? `🍳 Order Sent to Kitchen — Table ${targetTableNo}` : "🍳 Order Sent to Kitchen") : "Table Unassigned"),
                     message: notif.message || (isAssigned
                         ? (targetTableNo ? `Table ${targetTableNo} has been assigned to you. Please check/attend Table ${targetTableNo}.` : "A table has been assigned to you.")
-                        : (targetTableNo ? `Table ${targetTableNo} assignment updated.` : "Table assignment updated.")),
-                    variant: isAssigned ? "success" : "info",
-                    actionLabel: isAssigned && (targetTableNo || targetTableId) ? "View Table" : undefined,
-                    durationMs: isAssigned ? 8000 : 4000,
-                    onAction: isAssigned && (targetTableNo || targetTableId) ? () => {
+                        : isKotSent
+                            ? (targetTableNo ? `Order sent to kitchen for Table ${targetTableNo}` : "Order sent to kitchen")
+                            : (targetTableNo ? `Table ${targetTableNo} assignment updated.` : "Table assignment updated.")),
+                    variant: isAssigned || isKotSent ? "success" : "info",
+                    actionLabel: (isAssigned || isKotSent) && (targetTableNo || targetTableId) ? "View Table" : undefined,
+                    durationMs: (isAssigned || isKotSent) ? 8000 : 4000,
+                    onAction: (isAssigned || isKotSent) && (targetTableNo || targetTableId) ? () => {
                         callbacksRef.current.handleViewAssignedTable?.(targetTableNo, targetTableId);
                     } : undefined,
                 });
@@ -1203,9 +1219,11 @@ export default function Server() {
             const assignedId = selectedTable.assignedWaiterId || selectedTable.activeSession?.waiterId || (user?.role === "WAITER" || user?.role === "SERVER" ? user?.id : null);
             const assignedName = selectedTable.assignedWaiterName || selectedTable.activeSession?.waiterName || (user?.role === "WAITER" || user?.role === "SERVER" ? user?.name : null);
 
+            const canonicalTableSessionId = selectedTable.tableSessionId || selectedTable.sessionId || selectedTable.activeSession?.id || null;
             const payload = {
                 tableNo: selectedTable.tableNo,
                 tableId: selectedTable.id,
+                tableSessionId: canonicalTableSessionId,
                 waiterId: assignedId || null,
                 waiterName: assignedName || null,
                 items: itemsList.map((i) => ({
@@ -1217,7 +1235,12 @@ export default function Server() {
                 fulfillment: "DINEIN",
             };
 
-            const res = await axios.post(`${API}/owner/${restaurantId}/orders`, payload);
+            const res = token
+                ? await axios.post(`${API}/owner/${restaurantId}/orders`, payload, {
+                      headers: { Authorization: `Bearer ${token}` },
+                      withCredentials: true,
+                  })
+                : await axios.post(`${API}/owner/${restaurantId}/orders`, payload);
             if (res.data?.success) {
                 showToast({
                     title: "KOT Sent to Kitchen! 🍳",
@@ -1421,7 +1444,7 @@ export default function Server() {
                         aria-label="Active Service Floor Plan"
                     >
                         <LayoutGrid className="h-3.5 w-3.5" />
-                        <span className="hidden min-[480px]:inline">Active Service</span>
+                        <span className="hidden xl:inline">Active Service</span>
                     </button>
 
                     {/* History Button */}
@@ -1437,7 +1460,7 @@ export default function Server() {
                                 navigate("/server/history");
                             }
                         }}
-                        className={`relative flex items-center justify-center rounded-lg sm:rounded-xl border w-10 h-10 transition cursor-pointer shrink-0 shadow-xs ${
+                        className={`relative flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 sm:w-9 sm:h-9 transition cursor-pointer shrink-0 shadow-xs ${
                             viewMode === "HISTORY"
                                 ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
@@ -1445,7 +1468,7 @@ export default function Server() {
                         title="History"
                         aria-label="History"
                     >
-                        <HistoryIcon className="h-5 w-5" />
+                        <HistoryIcon className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                     </button>
 
                     {/* Notifications Button */}
@@ -1461,7 +1484,7 @@ export default function Server() {
                                 navigate("/server/notifications");
                             }
                         }}
-                        className={`relative flex items-center justify-center rounded-lg sm:rounded-xl border w-10 h-10 transition cursor-pointer shrink-0 shadow-xs ${
+                        className={`relative flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 sm:w-9 sm:h-9 transition cursor-pointer shrink-0 shadow-xs ${
                             viewMode === "NOTIFICATIONS"
                                 ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
@@ -1469,7 +1492,7 @@ export default function Server() {
                         title="Notifications"
                         aria-label="Notifications"
                     >
-                        <Bell className="h-5 w-5" />
+                        <Bell className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                         {unreadNotificationCount > 0 && (
                             <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-rose-500 text-[9px] sm:text-[10px] font-black text-white shadow-xs animate-pulse">
                                 {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
@@ -1502,23 +1525,23 @@ export default function Server() {
                                     navigate("/server/settings");
                                 }
                             }}
-                            className={`flex items-center gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                            className={`flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 sm:w-9 sm:h-9 transition cursor-pointer shrink-0 shadow-xs ${
                                 viewMode === "PROFILE" && location.pathname.endsWith("/settings")
-                                    ? "border-orange-500 bg-orange-500 text-white"
+                                    ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                     : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                             }`}
-                            title="Server Settings"
-                            aria-label="Server Settings"
+                            title="Settings"
+                            aria-label="Settings"
                         >
-                            <Settings2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                            <span className="hidden sm:inline font-bold">Settings</span>
+                            <Settings2 className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                         </button>
 
                         {/* Profile Button */}
                         <button
                             type="button"
+                            data-testid="server-profile-btn"
                             onClick={() => {
-                                if (viewMode === "PROFILE" && location.pathname.endsWith("/profile")) {
+                                if (viewMode === "PROFILE" && !location.pathname.endsWith("/settings")) {
                                     setViewMode("FLOOR_PLAN");
                                     navigate("/server");
                                 } else {
@@ -1526,20 +1549,15 @@ export default function Server() {
                                     navigate("/server/profile");
                                 }
                             }}
-                            className={`flex items-center gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
-                                viewMode === "PROFILE" && location.pathname.endsWith("/profile")
-                                    ? "border-orange-500 bg-orange-500 text-white"
+                            className={`flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 sm:w-9 sm:h-9 transition cursor-pointer shrink-0 shadow-xs ${
+                                viewMode === "PROFILE" && !location.pathname.endsWith("/settings")
+                                    ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                     : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                             }`}
-                            title="My Profile"
-                            aria-label="My Profile"
+                            title="Profile"
+                            aria-label="Server Profile"
                         >
-                            <div className={`h-5 w-5 rounded-full flex items-center justify-center font-black text-[10px] ${
-                                viewMode === "PROFILE" ? "bg-white text-orange-600" : "bg-orange-500 text-white"
-                            }`}>
-                                {(user?.name || user?.username || "S").charAt(0).toUpperCase()}
-                            </div>
-                            <span className="font-bold max-w-[80px] sm:max-w-none truncate">{user?.name?.split(" ")[0] || "Profile"}</span>
+                            <User className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                         </button>
                     </div>
                 </div>
@@ -1559,9 +1577,13 @@ export default function Server() {
                 <div className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full">
                     <ServerNotificationsView
                         onUnreadCountChange={setUnreadNotificationCount}
-                        onNavigateToTable={(tableNo) => {
-                            setViewMode("FLOOR_PLAN");
-                            navigate(`/server?table=${encodeURIComponent(tableNo)}`);
+                        onNavigateToTable={(tableNo, tableId) => {
+                            if (tableId) {
+                                handleViewAssignedTable(tableNo, tableId);
+                            } else {
+                                setViewMode("FLOOR_PLAN");
+                                navigate(`/server?table=${encodeURIComponent(tableNo)}`);
+                            }
                         }}
                         onBackToFloorPlan={() => {
                             setViewMode("FLOOR_PLAN");
@@ -1752,6 +1774,7 @@ export default function Server() {
                                 return (
                                     <div
                                         key={table.id}
+                                        data-testid={`table-card-${table.id}`}
                                         onClick={() => handleSelectTableForOrder(table)}
                                         className={`group relative flex flex-col justify-between rounded-2xl border p-3 cursor-pointer transition-all duration-200 shadow-xs hover:-translate-y-0.5 min-h-[155px] sm:min-h-[165px] h-full text-xs bg-white dark:bg-slate-900 ${
                                             isBlocked
