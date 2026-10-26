@@ -243,7 +243,7 @@ export default async function staffRoutes(app, deps = {}) {
       });
 
       const { userPayload, effectiveRole } = buildStaffLoginPayload({ user: updatedUser, normalizeDbPermissions });
-      const { token, sessionVersion } = await issueStaffSession({ prisma, app, user: updatedUser, effectiveRole });
+      const { token, refreshToken, sessionVersion } = await issueStaffSession({ prisma, app, user: updatedUser, effectiveRole });
       userPayload.sessionVersion = sessionVersion;
 
       if (hadMustChange) {
@@ -293,6 +293,7 @@ export default async function staffRoutes(app, deps = {}) {
         message: "Password updated successfully",
         mustChangePassword: false,
         token,
+        refreshToken,
         sessionVersion,
         user: userPayload,
       };

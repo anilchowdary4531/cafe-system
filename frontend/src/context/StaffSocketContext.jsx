@@ -78,6 +78,10 @@ export function StaffSocketProvider({ children }) {
         };
 
         const onReconnectAttempt = () => {
+            const latestToken = String(staffToken || getActiveStaffToken() || "").trim();
+            if (latestToken && socket.auth) {
+                socket.auth.token = latestToken;
+            }
             setConnected(false);
             setConnectionStatus("reconnecting");
         };

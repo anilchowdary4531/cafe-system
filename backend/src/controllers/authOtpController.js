@@ -208,7 +208,7 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions, on
       if (!user) return reply.code(401).send({ message: "Account not found or inactive" });
 
       const { userPayload, effectiveRole } = buildStaffLoginPayload({ user, normalizeDbPermissions });
-      const { token, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
+      const { token, refreshToken, sessionVersion } = await issueStaffSession({ prisma, app, user, effectiveRole });
       userPayload.sessionVersion = sessionVersion;
 
       await logAuditEvent({
@@ -224,7 +224,7 @@ export const buildAuthOtpController = ({ prisma, app, normalizeDbPermissions, on
         req,
       });
 
-      return { message: "Login success", actorType, token, user: userPayload, offlineMode: false };
+      return { message: "Login success", actorType, token, refreshToken, user: userPayload, offlineMode: false };
     } catch (err) {
       // eslint-disable-next-line no-console
       console.log(err);
