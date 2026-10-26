@@ -508,28 +508,22 @@ export const consumeStaffLoginToken = async ({
     }
   }
 
-  if (!tokenRecord) {
-    const err = new Error("Invalid staff login link");
-    err.statusCode = 401;
-    throw err;
-  }
-
-  if (tokenRecord.purpose !== STAFF_LOGIN_PURPOSE) {
-    const err = new Error("Invalid staff login link purpose");
+  if (!tokenRecord || tokenRecord.purpose !== STAFF_LOGIN_PURPOSE) {
+    const err = new Error("Invalid staff login link.");
     err.statusCode = 401;
     throw err;
   }
 
   // Check if token has already been used
   if (tokenRecord.usedAt !== null) {
-    const err = new Error("This staff login link has already been used");
+    const err = new Error("This staff login link has already been used. Generate a new link.");
     err.statusCode = 401;
     throw err;
   }
 
   // Check if token has expired
   if (new Date() > new Date(tokenRecord.expiresAt)) {
-    const err = new Error("This staff login link has expired");
+    const err = new Error("This staff login link has expired. Generate a new link.");
     err.statusCode = 401;
     throw err;
   }
@@ -550,7 +544,7 @@ export const consumeStaffLoginToken = async ({
 
   // Disabled staff rejection: a disabled staff account must never authenticate
   if (user.isActive === false) {
-    const err = new Error("Account is disabled. Contact owner/admin.");
+    const err = new Error("This staff account is inactive.");
     err.statusCode = 403;
     throw err;
   }
@@ -568,7 +562,16 @@ export const consumeStaffLoginToken = async ({
   });
 
   if (updateResult.count === 0) {
-    const err = new Error("This staff login link has already been used or expired");
+    const rechecked = await prisma.staffLoginToken.findUnique({
+      where: { id: tokenRecord.id },
+      select: { usedAt: true, expiresAt: true },
+    });
+    if (rechecked && new Date() > new Date(rechecked.expiresAt)) {
+      const err = new Error("This staff login link has expired. Generate a new link.");
+      err.statusCode = 401;
+      throw err;
+    }
+    const err = new Error("This staff login link has already been used. Generate a new link.");
     err.statusCode = 401;
     throw err;
   }

@@ -705,13 +705,13 @@ export default function Server() {
     });
     useEffect(() => {
         callbacksRef.current = {
+            ...callbacksRef.current,
             refreshTables: combinedRefreshTables,
             refreshReservations,
             refreshLiveOrders,
             refreshReadyKots,
             refreshReadyRunnerData,
             fetchUnreadCount,
-            handleViewAssignedTable,
             user,
             applyTableRelease,
         };
@@ -1016,6 +1016,9 @@ export default function Server() {
             navigate(`/server?table=${encodeURIComponent(tableNo)}`);
         }
     }, [tables, handleSelectTableForOrder, navigate]);
+    useEffect(() => {
+        callbacksRef.current.handleViewAssignedTable = handleViewAssignedTable;
+    }, [handleViewAssignedTable]);
     useEffect(() => {
         if (!urlTableParam) {
             autoSelectedRef.current = null;

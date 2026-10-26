@@ -67,6 +67,39 @@ const DEFAULT_DESIGNATION_BY_ROLE = {
     OWNER: "Owner",
 };
 
+function getDesignationBadgeClass(designation) {
+    const d = String(designation || "").trim().toLowerCase();
+    if (d.includes("server") || d.includes("waiter")) {
+        return "bg-orange-50 text-orange-800 border-orange-200";
+    }
+    if (d.includes("clean") || d.includes("housekeeping")) {
+        return "bg-stone-100 text-stone-700 border-stone-300";
+    }
+    if (d.includes("steward")) {
+        return "bg-sky-50 text-sky-800 border-sky-200";
+    }
+    if (d.includes("chef") || d.includes("cook")) {
+        return "bg-amber-50 text-amber-800 border-amber-200";
+    }
+    if (d.includes("manager")) {
+        return "bg-indigo-50 text-indigo-800 border-indigo-200";
+    }
+    if (d.includes("cashier")) {
+        return "bg-emerald-50 text-emerald-800 border-emerald-200";
+    }
+    if (d.includes("swiper")) {
+        return "bg-purple-50 text-purple-800 border-purple-200";
+    }
+    return "bg-orange-50 text-orange-800 border-orange-200";
+}
+
+function getStatusBadgeClass(isActive) {
+    if (isActive) {
+        return "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]";
+    }
+    return "bg-[#FEF2F2] text-[#B91C1C] border-[#FECACA]";
+}
+
 const ACCESS_LABELS = {
     dashboard: "Dashboard",
     billing: "Billing Desk",
@@ -409,6 +442,19 @@ export default function OwnerStaff() {
             await axios.patch(`${API}/owner/${restaurantId}/staff/${staffUser.id}/status`, {
                 isActive: nextStatus,
             });
+
+            // Clear login links on status change
+            setLoginLinks((prev) => {
+                const next = { ...prev };
+                delete next[staffUser.id];
+                return next;
+            });
+            setTemporaryPasswords((prev) => {
+                const next = { ...prev };
+                delete next[staffUser.id];
+                return next;
+            });
+
             showToast({
                 title: nextStatus ? "Staff Activated" : "Staff Deactivated",
                 message: `${staffUser.name} is now ${nextStatus ? "active" : "disabled"}. Active sessions have been revoked.`,
@@ -435,6 +481,18 @@ export default function OwnerStaff() {
         try {
             setDeletingFor(staffUser.id);
             await axios.delete(`${API}/owner/${restaurantId}/staff/${staffUser.id}`);
+
+            setLoginLinks((prev) => {
+                const next = { ...prev };
+                delete next[staffUser.id];
+                return next;
+            });
+            setTemporaryPasswords((prev) => {
+                const next = { ...prev };
+                delete next[staffUser.id];
+                return next;
+            });
+
             if (selectedAccessUserId === staffUser.id) {
                 setSelectedAccessUserId(null);
                 setAccessDraft({});
@@ -474,6 +532,18 @@ export default function OwnerStaff() {
         setShowEditPassword(false);
         const currentDesig = resolveDesignation(staffUser);
         const isStandard = DESIGNATION_OPTIONS.includes(currentDesig);
+
+        // Clear any stale login link or temporary password for this staff user
+        setLoginLinks((prev) => {
+            const next = { ...prev };
+            delete next[staffUser.id];
+            return next;
+        });
+        setTemporaryPasswords((prev) => {
+            const next = { ...prev };
+            delete next[staffUser.id];
+            return next;
+        });
 
         setEditDraft({
             name: String(staffUser?.name || ""),
@@ -542,6 +612,18 @@ export default function OwnerStaff() {
                 });
             }
 
+            // Invalidate/clear stale login link and temporary password for this staff member after update
+            setLoginLinks((prev) => {
+                const next = { ...prev };
+                delete next[staffUser.id];
+                return next;
+            });
+            setTemporaryPasswords((prev) => {
+                const next = { ...prev };
+                delete next[staffUser.id];
+                return next;
+            });
+
             showToast({
                 title: "Staff user updated",
                 message: `Successfully saved updates for ${name}.`,
@@ -564,6 +646,13 @@ export default function OwnerStaff() {
             await axios.put(`${API}/owner/${restaurantId}/staff/${staffUserId}/access`, {
                 access: accessDraft,
             });
+
+            setLoginLinks((prev) => {
+                const next = { ...prev };
+                delete next[staffUserId];
+                return next;
+            });
+
             showToast({
                 title: "Permissions Saved",
                 message: "Updated module access permissions successfully.",
@@ -836,16 +925,16 @@ export default function OwnerStaff() {
 
             {/* Add Staff Drawer / Form */}
             {showAddStaffForm && (
-                <article className="rounded-2xl border border-[color:var(--app-border)]/60 bg-[var(--app-card)] p-5 shadow-lg">
-                    <div className="mb-4 flex items-center justify-between border-b border-[color:var(--app-border)]/40 pb-3">
-                        <h4 className="flex items-center gap-2 text-base font-bold text-[color:var(--app-text)]">
-                            <UserPlus size={18} className="text-[var(--app-primary)]" />
+                <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between border-b border-stone-100 pb-3">
+                        <h4 className="flex items-center gap-2 text-base font-bold text-[#1C1917]">
+                            <UserPlus size={18} className="text-[#F97316]" />
                             Add New Staff Member
                         </h4>
                         <button
                             type="button"
                             onClick={() => setShowAddStaffForm(false)}
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition cursor-pointer"
+                            className="rounded-lg p-1.5 text-[#57534E] hover:bg-stone-100 hover:text-[#1C1917] transition cursor-pointer"
                         >
                             <X size={16} />
                         </button>
@@ -854,20 +943,20 @@ export default function OwnerStaff() {
                     <form onSubmit={handleCreate} className="space-y-4">
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             <div>
-                                <label className="mb-1 block text-xs font-semibold text-gray-400">
+                                <label className="mb-1 block text-xs font-bold text-[#57534E]">
                                     Full Name *
                                 </label>
                                 <input
                                     placeholder="e.g. John Doe"
                                     value={form.name}
                                     onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                                    className="w-full rounded-xl border border-[color:var(--app-border)]/80 bg-[#0f172a] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[var(--app-primary)]"
+                                    className="w-full rounded-xl border border-[#D6D3D1] bg-white px-3.5 py-2.5 text-xs text-[#292524] placeholder-[#78716C] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="mb-1 block text-xs font-semibold text-gray-400">
+                                <label className="mb-1 block text-xs font-bold text-[#57534E]">
                                     Email Address *
                                 </label>
                                 <input
@@ -875,26 +964,26 @@ export default function OwnerStaff() {
                                     placeholder="e.g. john@restaurant.com"
                                     value={form.email}
                                     onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-                                    className="w-full rounded-xl border border-[color:var(--app-border)]/80 bg-[#0f172a] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[var(--app-primary)]"
+                                    className="w-full rounded-xl border border-[#D6D3D1] bg-white px-3.5 py-2.5 text-xs text-[#292524] placeholder-[#78716C] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="mb-1 block text-xs font-semibold text-gray-400">
+                                <label className="mb-1 block text-xs font-bold text-[#57534E]">
                                     Phone Number *
                                 </label>
                                 <input
                                     placeholder="e.g. 9876543210"
                                     value={form.phone}
                                     onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
-                                    className="w-full rounded-xl border border-[color:var(--app-border)]/80 bg-[#0f172a] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[var(--app-primary)]"
+                                    className="w-full rounded-xl border border-[#D6D3D1] bg-white px-3.5 py-2.5 text-xs text-[#292524] placeholder-[#78716C] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="mb-1 block text-xs font-semibold text-gray-400">
+                                <label className="mb-1 block text-xs font-bold text-[#57534E]">
                                     Staff Role *
                                 </label>
                                 <select
@@ -908,7 +997,7 @@ export default function OwnerStaff() {
                                             access: defaultAccessByRole(r),
                                         }));
                                     }}
-                                    className="w-full rounded-xl border border-[color:var(--app-border)]/80 bg-[#0f172a] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[var(--app-primary)]"
+                                    className="w-full rounded-xl border border-[#D6D3D1] bg-white px-3.5 py-2.5 text-xs text-[#292524] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                 >
                                     <option value="MANAGER">Manager</option>
                                     <option value="WAITER">Server / Waiter</option>
@@ -919,7 +1008,7 @@ export default function OwnerStaff() {
                             </div>
 
                             <div>
-                                <label className="mb-1 block text-xs font-semibold text-gray-400">
+                                <label className="mb-1 block text-xs font-bold text-[#57534E]">
                                     Designation
                                 </label>
                                 <select
@@ -930,7 +1019,7 @@ export default function OwnerStaff() {
                                             designationOption: e.target.value,
                                         }))
                                     }
-                                    className="w-full rounded-xl border border-[color:var(--app-border)]/80 bg-[#0f172a] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[var(--app-primary)]"
+                                    className="w-full rounded-xl border border-[#D6D3D1] bg-white px-3.5 py-2.5 text-xs text-[#292524] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                 >
                                     {DESIGNATION_OPTIONS.map((designation) => (
                                         <option key={designation} value={designation}>
@@ -943,7 +1032,7 @@ export default function OwnerStaff() {
 
                             {form.designationOption === "OTHER" && (
                                 <div>
-                                    <label className="mb-1 block text-xs font-semibold text-gray-400">
+                                    <label className="mb-1 block text-xs font-bold text-[#57534E]">
                                         Custom Designation
                                     </label>
                                     <input
@@ -955,14 +1044,14 @@ export default function OwnerStaff() {
                                                 customDesignation: e.target.value,
                                             }))
                                         }
-                                        className="w-full rounded-xl border border-[color:var(--app-border)]/80 bg-[#0f172a] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[var(--app-primary)]"
+                                        className="w-full rounded-xl border border-[#D6D3D1] bg-white px-3.5 py-2.5 text-xs text-[#292524] placeholder-[#78716C] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                     />
                                 </div>
                             )}
 
                             <div>
                                 <div className="mb-1 flex items-center justify-between">
-                                    <label className="text-xs font-semibold text-gray-400">
+                                    <label className="text-xs font-bold text-[#57534E]">
                                         Temporary Password
                                     </label>
                                     <button
@@ -972,7 +1061,7 @@ export default function OwnerStaff() {
                                             setForm((prev) => ({ ...prev, password: generated }));
                                             setShowAddPassword(true);
                                         }}
-                                        className="text-[11px] font-semibold text-[var(--app-primary)] hover:underline cursor-pointer"
+                                        className="text-[11px] font-bold text-[#F97316] hover:text-[#EA580C] hover:underline cursor-pointer"
                                     >
                                         Auto-Generate
                                     </button>
@@ -983,12 +1072,12 @@ export default function OwnerStaff() {
                                         placeholder="Auto-generated if left blank"
                                         value={form.password}
                                         onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-                                        className="w-full rounded-xl border border-[color:var(--app-border)]/80 bg-[#0f172a] pl-3.5 pr-10 py-2.5 text-xs text-white outline-none focus:border-[var(--app-primary)]"
+                                        className="w-full rounded-xl border border-[#D6D3D1] bg-white pl-3.5 pr-10 py-2.5 text-xs text-[#292524] placeholder-[#78716C] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                     />
                                     <button
                                         type="button"
                                         onClick={() => setShowAddPassword((prev) => !prev)}
-                                        className="absolute right-3 text-gray-400 hover:text-white cursor-pointer"
+                                        className="absolute right-3 text-[#78716C] hover:text-[#1C1917] cursor-pointer"
                                         aria-label={showAddPassword ? "Hide password" : "Show password"}
                                     >
                                         {showAddPassword ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -997,14 +1086,14 @@ export default function OwnerStaff() {
                             </div>
 
                             <div className="flex items-end">
-                                <label className="flex items-center gap-2.5 rounded-xl border border-[color:var(--app-border)]/80 bg-[#0f172a] px-3.5 py-2.5 text-xs text-gray-300 w-full cursor-pointer">
+                                <label className="flex items-center gap-2.5 rounded-xl border border-[#D6D3D1] bg-white px-3.5 py-2.5 text-xs text-[#292524] w-full cursor-pointer hover:bg-stone-50">
                                     <input
                                         type="checkbox"
                                         checked={form.isActive}
                                         onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))}
-                                        className="rounded accent-orange-500"
+                                        className="rounded accent-[#F97316]"
                                     />
-                                    <span className="font-semibold">Active Account</span>
+                                    <span className="font-semibold text-[#1C1917]">Active Account</span>
                                 </label>
                             </div>
                         </div>
@@ -1013,14 +1102,14 @@ export default function OwnerStaff() {
                             <button
                                 type="button"
                                 onClick={() => setShowAddStaffForm(false)}
-                                className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-white/5 transition cursor-pointer"
+                                className="rounded-xl border border-[#D6D3D1] bg-white px-4 py-2 text-xs font-semibold text-[#57534E] hover:bg-stone-50 hover:text-[#1C1917] transition cursor-pointer"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={creating}
-                                className="inline-flex items-center gap-2 rounded-xl bg-[var(--app-primary)] px-5 py-2 text-xs font-bold text-black shadow-md hover:opacity-90 disabled:opacity-60 transition cursor-pointer"
+                                className="inline-flex items-center gap-2 rounded-xl bg-[#F97316] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-[#EA580C] disabled:opacity-60 transition cursor-pointer"
                             >
                                 {creating ? (
                                     <>
@@ -1045,11 +1134,11 @@ export default function OwnerStaff() {
                     <div className="flex items-center gap-3">
                         <OwnerMenuButton />
                         <div>
-                            <h4 className="text-xl font-bold flex items-center gap-2 text-[color:var(--app-text)]">
-                                <Users size={22} className="text-[var(--app-primary)]" />
+                            <h4 className="text-xl font-bold flex items-center gap-2 text-[#1C1917] tracking-tight">
+                                <Users size={22} className="text-[#F97316]" />
                                 Staff Directory & Access
                             </h4>
-                            <p className="text-xs theme-muted">
+                            <p className="text-xs font-medium text-[#57534E]">
                                 {restaurantName} &bull; {users.length} total staff &bull; {activeCount} active
                             </p>
                         </div>
@@ -1057,19 +1146,19 @@ export default function OwnerStaff() {
 
                     <div className="flex flex-wrap items-center gap-2">
                         {/* Search Input */}
-                        <div className="flex min-w-[200px] flex-1 sm:w-64 items-center gap-2 rounded-xl border border-[color:var(--app-border)]/70 bg-[#0f172a] px-3.5 py-2 text-xs">
-                            <Search size={14} className="text-gray-400 shrink-0" />
+                        <div className="flex min-w-[200px] flex-1 sm:w-64 items-center gap-2 rounded-xl border border-[#D6D3D1] bg-white px-3.5 py-2 text-xs transition-colors focus-within:border-[#F97316] focus-within:ring-1 focus-within:ring-[#F97316] shadow-xs">
+                            <Search size={14} className="text-[#78716C] shrink-0" />
                             <input
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 placeholder="Search by name, email, role..."
-                                className="w-full bg-transparent outline-none text-white placeholder-gray-400"
+                                className="w-full bg-transparent outline-none text-[#292524] placeholder-[#78716C] font-medium"
                             />
                             {query && (
                                 <button
                                     type="button"
                                     onClick={() => setQuery("")}
-                                    className="text-gray-400 hover:text-white"
+                                    className="text-stone-400 hover:text-[#1C1917] cursor-pointer"
                                 >
                                     <X size={12} />
                                 </button>
@@ -1080,7 +1169,7 @@ export default function OwnerStaff() {
                         <select
                             value={roleFilter}
                             onChange={(e) => setRoleFilter(e.target.value)}
-                            className="rounded-xl border border-[color:var(--app-border)]/70 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-gray-200 outline-none"
+                            className="rounded-xl border border-[#D6D3D1] bg-white px-3 py-2 text-xs font-semibold text-[#292524] outline-none transition-colors focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316] shadow-xs cursor-pointer"
                             aria-label="Filter staff by role"
                         >
                             {ROLE_OPTIONS.map((opt) => (
@@ -1094,7 +1183,7 @@ export default function OwnerStaff() {
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="rounded-xl border border-[color:var(--app-border)]/70 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-gray-200 outline-none"
+                            className="rounded-xl border border-[#D6D3D1] bg-white px-3 py-2 text-xs font-semibold text-[#292524] outline-none transition-colors focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316] shadow-xs cursor-pointer"
                             aria-label="Filter staff by active status"
                         >
                             {STATUS_OPTIONS.map((opt) => (
@@ -1108,7 +1197,7 @@ export default function OwnerStaff() {
                         <button
                             type="button"
                             onClick={() => setShowAddStaffForm((prev) => !prev)}
-                            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[var(--app-primary)] px-4 py-2 text-xs font-bold text-black shadow-md transition hover:opacity-90 cursor-pointer"
+                            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] active:bg-[#C2410C] px-4 py-2 text-xs font-bold text-white shadow-md transition cursor-pointer"
                         >
                             <UserPlus size={15} />
                             <span>{showAddStaffForm ? "Hide Form" : "Add Staff"}</span>
@@ -1118,17 +1207,17 @@ export default function OwnerStaff() {
 
                 {/* Directory Content List */}
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center rounded-2xl border border-[color:var(--app-border)]/40 bg-[var(--app-card)] p-12 text-center">
-                        <LoaderCircle size={28} className="animate-spin text-[var(--app-primary)] mb-3" />
-                        <p className="text-sm font-semibold theme-muted">Loading staff directory...</p>
+                    <div className="flex flex-col items-center justify-center rounded-2xl border border-stone-200 bg-white p-12 text-center shadow-xs">
+                        <LoaderCircle size={28} className="animate-spin text-[#F97316] mb-3" />
+                        <p className="text-sm font-semibold text-[#57534E]">Loading staff directory...</p>
                     </div>
                 ) : filteredUsers.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[color:var(--app-border)]/60 bg-[var(--app-card)]/40 p-12 text-center">
-                        <Users size={32} className="text-gray-500 mb-3" />
-                        <h5 className="text-sm font-bold text-[color:var(--app-text)]">
+                    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50/60 p-12 text-center">
+                        <Users size={32} className="text-stone-400 mb-3" />
+                        <h5 className="text-sm font-bold text-[#1C1917]">
                             {users.length === 0 ? "No Staff Members Added Yet" : "No Staff Matching Filters"}
                         </h5>
-                        <p className="mt-1 text-xs theme-muted max-w-sm">
+                        <p className="mt-1 text-xs text-[#57534E] max-w-sm">
                             {users.length === 0
                                 ? "Add your restaurant managers, servers, chefs, and cashiers to manage operations and permissions."
                                 : "Try clearing your search query or reset the role and status filters."}
@@ -1157,20 +1246,20 @@ export default function OwnerStaff() {
                             return (
                                 <div
                                     key={staffUser.id}
-                                    className="relative rounded-2xl border border-[color:var(--app-border)]/50 bg-[var(--app-card)] p-4 shadow-sm hover:border-[color:var(--app-border)] transition"
+                                    className="relative rounded-2xl border border-[#E7E5E4] bg-white p-4 shadow-xs hover:border-[#FDBA74] hover:bg-[#FFF7ED]/30 transition"
                                 >
                                     {isEditing ? (
                                         /* In-Place Edit Form */
-                                        <div className="space-y-4 rounded-xl border border-amber-500/30 bg-[#0b1329] p-4 shadow-xl">
-                                            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                                                <h5 className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wide text-amber-400">
+                                        <div className="space-y-4 rounded-xl border border-[#FDBA74] bg-[#FFF7ED]/40 p-4 shadow-xs">
+                                            <div className="flex items-center justify-between border-b border-[#FDBA74]/50 pb-2">
+                                                <h5 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#C2410C]">
                                                     <Pencil size={14} />
                                                     Editing Staff Profile: {staffUser.name} (ID: #{staffUser.id})
                                                 </h5>
                                                 <button
                                                     type="button"
                                                     onClick={cancelEditRow}
-                                                    className="text-xs text-gray-400 hover:text-white"
+                                                    className="text-xs font-semibold text-[#57534E] hover:text-[#1C1917] cursor-pointer"
                                                 >
                                                     Cancel
                                                 </button>
@@ -1178,7 +1267,7 @@ export default function OwnerStaff() {
 
                                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                                 <div>
-                                                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#57534E]">
                                                         Full Name *
                                                     </label>
                                                     <input
@@ -1187,13 +1276,13 @@ export default function OwnerStaff() {
                                                             setEditDraft((prev) => ({ ...prev, name: e.target.value }))
                                                         }
                                                         placeholder="Full name"
-                                                        className="w-full rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs text-white outline-none focus:border-amber-500"
+                                                        className="w-full rounded-lg border border-[#D6D3D1] bg-white px-3 py-2 text-xs text-[#292524] placeholder-[#78716C] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                                         required
                                                     />
                                                 </div>
 
                                                 <div>
-                                                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#57534E]">
                                                         Email Address *
                                                     </label>
                                                     <input
@@ -1203,13 +1292,13 @@ export default function OwnerStaff() {
                                                             setEditDraft((prev) => ({ ...prev, email: e.target.value }))
                                                         }
                                                         placeholder="Email address"
-                                                        className="w-full rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs text-white outline-none focus:border-amber-500"
+                                                        className="w-full rounded-lg border border-[#D6D3D1] bg-white px-3 py-2 text-xs text-[#292524] placeholder-[#78716C] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                                         required
                                                     />
                                                 </div>
 
                                                 <div>
-                                                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#57534E]">
                                                         Phone Number
                                                     </label>
                                                     <input
@@ -1218,12 +1307,12 @@ export default function OwnerStaff() {
                                                             setEditDraft((prev) => ({ ...prev, phone: e.target.value }))
                                                         }
                                                         placeholder="Phone number"
-                                                        className="w-full rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs text-white outline-none focus:border-amber-500"
+                                                        className="w-full rounded-lg border border-[#D6D3D1] bg-white px-3 py-2 text-xs text-[#292524] placeholder-[#78716C] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                                     />
                                                 </div>
 
                                                 <div>
-                                                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#57534E]">
                                                         Role
                                                     </label>
                                                     <select
@@ -1237,7 +1326,7 @@ export default function OwnerStaff() {
                                                                 designationOption: getRoleDesignationFallback(r),
                                                             }));
                                                         }}
-                                                        className="w-full rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs text-white outline-none focus:border-amber-500 disabled:opacity-60"
+                                                        className="w-full rounded-lg border border-[#D6D3D1] bg-white px-3 py-2 text-xs text-[#292524] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316] disabled:bg-stone-100 disabled:text-stone-400"
                                                     >
                                                         {staffUser.role === "OWNER" && <option value="OWNER">Owner</option>}
                                                         <option value="MANAGER">Manager</option>
@@ -1249,7 +1338,7 @@ export default function OwnerStaff() {
                                                 </div>
 
                                                 <div>
-                                                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#57534E]">
                                                         Designation
                                                     </label>
                                                     <select
@@ -1260,7 +1349,7 @@ export default function OwnerStaff() {
                                                                 designationOption: e.target.value,
                                                             }))
                                                         }
-                                                        className="w-full rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs text-white outline-none focus:border-amber-500"
+                                                        className="w-full rounded-lg border border-[#D6D3D1] bg-white px-3 py-2 text-xs text-[#292524] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                                     >
                                                         {DESIGNATION_OPTIONS.map((designation) => (
                                                             <option key={designation} value={designation}>
@@ -1273,7 +1362,7 @@ export default function OwnerStaff() {
 
                                                 {editDraft.designationOption === "OTHER" && (
                                                     <div>
-                                                        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                        <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#57534E]">
                                                             Custom Designation
                                                         </label>
                                                         <input
@@ -1285,13 +1374,13 @@ export default function OwnerStaff() {
                                                                 }))
                                                             }
                                                             placeholder="Custom designation"
-                                                            className="w-full rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs text-white outline-none focus:border-amber-500"
+                                                            className="w-full rounded-lg border border-[#D6D3D1] bg-white px-3 py-2 text-xs text-[#292524] placeholder-[#78716C] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                                         />
                                                     </div>
                                                 )}
 
                                                 <div>
-                                                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#57534E]">
                                                         New Password (Optional)
                                                     </label>
                                                     <div className="relative flex items-center">
@@ -1305,12 +1394,12 @@ export default function OwnerStaff() {
                                                                 }))
                                                             }
                                                             placeholder="Leave blank to keep current"
-                                                            className="w-full rounded-lg border border-white/10 bg-[#0f172a] pl-3 pr-9 py-2 text-xs text-white outline-none focus:border-amber-500"
+                                                            className="w-full rounded-lg border border-[#D6D3D1] bg-white pl-3 pr-9 py-2 text-xs text-[#292524] placeholder-[#78716C] outline-none focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316]"
                                                         />
                                                         <button
                                                             type="button"
                                                             onClick={() => setShowEditPassword((prev) => !prev)}
-                                                            className="absolute right-2.5 text-gray-400 hover:text-white cursor-pointer"
+                                                            className="absolute right-2.5 text-[#78716C] hover:text-[#1C1917] cursor-pointer"
                                                             aria-label={showEditPassword ? "Hide password" : "Show password"}
                                                         >
                                                             {showEditPassword ? <EyeOff size={13} /> : <Eye size={13} />}
@@ -1319,7 +1408,7 @@ export default function OwnerStaff() {
                                                 </div>
 
                                                 <div className="flex items-end">
-                                                    <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs text-gray-300 w-full cursor-pointer">
+                                                    <label className="flex items-center gap-2 rounded-lg border border-[#D6D3D1] bg-white px-3 py-2 text-xs text-[#292524] w-full cursor-pointer hover:bg-stone-50">
                                                         <input
                                                             type="checkbox"
                                                             checked={Boolean(editDraft.isActive)}
@@ -1330,22 +1419,22 @@ export default function OwnerStaff() {
                                                                     isActive: e.target.checked,
                                                                 }))
                                                             }
-                                                            className="accent-amber-500"
+                                                            className="accent-[#F97316]"
                                                         />
-                                                        <span className="font-semibold">Active Account</span>
+                                                        <span className="font-semibold text-[#1C1917]">Active Account</span>
                                                     </label>
                                                 </div>
                                             </div>
 
                                             {/* Edit Permissions Matrix if not Owner */}
                                             {staffUser.role !== "OWNER" && (
-                                                <div className="pt-3 border-t border-white/10">
-                                                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                                                <div className="pt-3 border-t border-[#FDBA74]/50">
+                                                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[#57534E]">
                                                         Module Access Permissions
                                                     </p>
                                                     <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                                                         {modules.map((key) => (
-                                                            <label key={key} className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                                                            <label key={key} className="flex items-center gap-2 text-xs font-medium text-[#292524] cursor-pointer">
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={Boolean(editDraft.access?.[key])}
@@ -1358,7 +1447,7 @@ export default function OwnerStaff() {
                                                                             },
                                                                         }))
                                                                     }
-                                                                    className="accent-amber-500"
+                                                                    className="accent-[#F97316]"
                                                                 />
                                                                 <span>{ACCESS_LABELS[key] || key}</span>
                                                             </label>
@@ -1367,11 +1456,11 @@ export default function OwnerStaff() {
                                                 </div>
                                             )}
 
-                                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#FDBA74]/50">
                                                 <button
                                                     type="button"
                                                     onClick={cancelEditRow}
-                                                    className="rounded-lg border border-white/20 px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:bg-white/5 transition cursor-pointer"
+                                                    className="rounded-lg border border-[#D6D3D1] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#57534E] hover:bg-stone-50 hover:text-[#1C1917] transition cursor-pointer"
                                                 >
                                                     Cancel
                                                 </button>
@@ -1379,7 +1468,7 @@ export default function OwnerStaff() {
                                                     type="button"
                                                     onClick={() => saveEditedRow(staffUser)}
                                                     disabled={savingEditFor === staffUser.id}
-                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-1.5 text-xs font-bold text-black shadow-md hover:bg-orange-400 disabled:opacity-60 transition cursor-pointer"
+                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#F97316] px-4 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#EA580C] disabled:opacity-60 transition cursor-pointer"
                                                 >
                                                     {savingEditFor === staffUser.id ? (
                                                         <>
@@ -1400,48 +1489,46 @@ export default function OwnerStaff() {
                                         <div className="flex flex-col gap-3 pr-24">
                                             {/* Identity Row */}
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className="text-xs font-mono font-bold text-gray-400 bg-white/5 px-2 py-0.5 rounded-md border border-white/10">
+                                                <span className="text-xs font-mono font-bold text-[#57534E] bg-stone-100 px-2 py-0.5 rounded-md border border-stone-200">
                                                     #{staffUser.id}
                                                 </span>
-                                                <p className="text-base font-bold text-[color:var(--app-text)]">
+                                                <p className="text-base font-bold text-[#1C1917]">
                                                     {staffUser.name}
                                                 </p>
-                                                <span className="theme-staff-role-pill rounded-full px-2.5 py-0.5 text-[11px] font-bold">
+                                                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${getDesignationBadgeClass(resolveDesignation(staffUser))}`}>
                                                     {resolveDesignation(staffUser)}
                                                 </span>
-                                                <span className="rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                                                <span className="rounded-full bg-stone-100 text-[#57534E] border border-stone-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
                                                     {staffUser.role}
                                                 </span>
                                                 <span
-                                                    className={`theme-staff-status-pill rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                                                        staffUser.isActive ? "is-active" : "is-disabled"
-                                                    }`}
+                                                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${getStatusBadgeClass(staffUser.isActive)}`}
                                                 >
                                                     {staffUser.isActive ? "ACTIVE" : "DISABLED"}
                                                 </span>
-                                                <span className="flex items-center gap-1 text-[11px] text-gray-400 bg-white/5 px-2 py-0.5 rounded-md">
-                                                    <Building2 size={12} className="text-gray-400" />
+                                                <span className="flex items-center gap-1 text-[11px] font-medium text-[#57534E] bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-md">
+                                                    <Building2 size={12} className="text-[#78716C]" />
                                                     {restaurantName}
                                                 </span>
                                             </div>
 
                                             {/* Contact Details */}
-                                            <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs theme-muted">
-                                                <span>Email: <strong className="text-[color:var(--app-text)] font-medium">{staffUser.email}</strong></span>
-                                                <span>Phone: <strong className="text-[color:var(--app-text)] font-medium">{staffUser.phone || "None"}</strong></span>
-                                                <span>Joined: {new Date(staffUser.createdAt).toLocaleDateString()}</span>
+                                            <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs">
+                                                <span className="text-[#57534E]">Email: <strong className="text-[#1C1917] font-semibold">{staffUser.email}</strong></span>
+                                                <span className="text-[#57534E]">Phone: <strong className="text-[#1C1917] font-semibold">{staffUser.phone || "None"}</strong></span>
+                                                <span className="text-[#57534E]">Joined: <strong className="text-[#1C1917] font-semibold">{new Date(staffUser.createdAt).toLocaleDateString()}</strong></span>
                                             </div>
 
                                             {/* Safe Pre-fill Login URL (No tokens) */}
                                             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                                                <span className="text-gray-400 font-medium">Login URL:</span>
-                                                <code className="rounded bg-black/30 border border-white/10 px-2 py-1 text-[11px] text-[var(--app-primary)] select-all break-all">
+                                                <span className="text-[#57534E] font-semibold">Login URL:</span>
+                                                <code className="rounded bg-[#F5F5F4] border border-[#D6D3D1] px-2.5 py-1 text-[11px] font-mono text-[#44403C] select-all break-all">
                                                     {staffLoginLink}
                                                 </code>
                                                 <button
                                                     type="button"
                                                     onClick={() => copyStaffLoginLink(staffUser)}
-                                                    className="inline-flex items-center gap-1 rounded-md bg-white/5 border border-white/10 px-2.5 py-1 text-[11px] font-semibold text-gray-200 hover:bg-white/10 transition cursor-pointer"
+                                                    className="inline-flex items-center gap-1 rounded-md bg-white border border-[#D6D3D1] px-2.5 py-1 text-[11px] font-semibold text-[#44403C] hover:bg-stone-50 hover:text-[#1C1917] transition cursor-pointer"
                                                 >
                                                     <Copy size={12} />
                                                     <span>Copy Link</span>
@@ -1449,7 +1536,7 @@ export default function OwnerStaff() {
                                                 <button
                                                     type="button"
                                                     onClick={() => shareStaffLoginOnWhatsApp(staffUser)}
-                                                    className="inline-flex items-center gap-1 rounded-md bg-emerald-600/20 border border-emerald-500/30 px-2.5 py-1 text-[11px] font-semibold text-emerald-400 hover:bg-emerald-600/30 transition cursor-pointer"
+                                                    className="inline-flex items-center gap-1 rounded-md bg-[#ECFDF5] border border-[#A7F3D0] px-2.5 py-1 text-[11px] font-semibold text-[#047857] hover:bg-emerald-100 transition cursor-pointer"
                                                 >
                                                     <span>WhatsApp</span>
                                                 </button>
@@ -1457,23 +1544,23 @@ export default function OwnerStaff() {
 
                                             {/* Temporary Password Row */}
                                             <div className="flex flex-wrap items-center gap-2 text-xs">
-                                                <span className="text-gray-400 font-medium">Password:</span>
+                                                <span className="text-[#57534E] font-semibold">Password:</span>
                                                 {temporaryPasswords[staffUser.id] ? (
                                                     <>
-                                                        <code className="rounded bg-orange-500/10 border border-orange-500/30 px-2.5 py-1 font-mono text-[11px] font-bold text-orange-400 select-all">
+                                                        <code className="rounded bg-amber-50 border border-amber-300 px-2.5 py-1 font-mono text-[11px] font-bold text-amber-900 select-all">
                                                             {temporaryPasswords[staffUser.id]}
                                                         </code>
                                                         <button
                                                             type="button"
                                                             onClick={() => copyTemporaryPassword(staffUser.id, temporaryPasswords[staffUser.id])}
-                                                            className="inline-flex items-center gap-1 rounded-md bg-orange-500/20 border border-orange-500/30 px-2.5 py-1 text-[11px] font-semibold text-orange-300 hover:bg-orange-500/30 transition cursor-pointer"
+                                                            className="inline-flex items-center gap-1 rounded-md bg-white border border-stone-300 px-2.5 py-1 text-[11px] font-semibold text-[#44403C] hover:bg-stone-50 transition cursor-pointer"
                                                             title="Copy Temporary Password"
                                                             aria-label={`Copy temporary password for ${staffUser.name}`}
                                                         >
                                                             {copiedPasswordId === staffUser.id ? (
                                                                 <>
-                                                                    <Check size={12} className="text-emerald-400" />
-                                                                    <span className="text-emerald-400 font-bold">Copied</span>
+                                                                    <Check size={12} className="text-[#047857]" />
+                                                                    <span className="text-[#047857] font-bold">Copied</span>
                                                                 </>
                                                             ) : (
                                                                 <>
@@ -1482,13 +1569,13 @@ export default function OwnerStaff() {
                                                                 </>
                                                             )}
                                                         </button>
-                                                        <span className="text-[11px] text-gray-400 italic">
+                                                        <span className="text-[11px] text-[#78716C] italic">
                                                             Temporary password — shown only after reset.
                                                         </span>
                                                     </>
                                                 ) : (
                                                     <div className="flex items-center gap-2.5">
-                                                        <span className="font-mono tracking-widest text-gray-400 select-none text-xs">
+                                                        <span className="font-mono tracking-widest text-[#57534E] select-none text-xs font-bold">
                                                             ••••••••••
                                                         </span>
                                                         {staffUser.role !== "OWNER" && (
@@ -1496,7 +1583,7 @@ export default function OwnerStaff() {
                                                                 type="button"
                                                                 onClick={() => handleGenerateStaffLoginLink(staffUser)}
                                                                 disabled={generatingLoginLinkFor === staffUser.id || !staffUser.isActive}
-                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-orange-500/40 bg-orange-500/15 px-2.5 py-1 text-[11px] font-bold text-orange-400 transition hover:bg-orange-500 hover:text-black cursor-pointer shadow-xs disabled:opacity-50"
+                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-[#FDBA74] bg-[#FFF7ED] px-2.5 py-1 text-[11px] font-bold text-[#C2410C] transition hover:bg-[#F97316] hover:text-white cursor-pointer shadow-xs disabled:opacity-50"
                                                                 title="Generate a secure 10-minute, single-use passwordless login link"
                                                                 data-testid={`generate-login-link-${staffUser.id}`}
                                                             >
@@ -1510,25 +1597,25 @@ export default function OwnerStaff() {
 
                                             {/* Generated One-Time Login Link Card */}
                                             {loginLinks[staffUser.id] && (
-                                                <div className="mt-2.5 rounded-xl border border-orange-500/30 bg-orange-500/10 p-3 text-xs space-y-2" data-testid={`login-link-container-${staffUser.id}`}>
+                                                <div className="mt-2.5 rounded-xl border border-[#FDBA74] bg-[#FFF7ED] p-3 text-xs space-y-2" data-testid={`login-link-container-${staffUser.id}`}>
                                                     <div className="flex flex-wrap items-center justify-between gap-2">
-                                                        <span className="font-bold text-orange-400 flex items-center gap-1.5">
-                                                            <ShieldCheck size={14} className="text-emerald-400" />
+                                                        <span className="font-bold text-[#C2410C] flex items-center gap-1.5">
+                                                            <ShieldCheck size={14} className="text-[#047857]" />
                                                             Staff Login Link
                                                         </span>
-                                                        <span className="text-[11px] text-amber-300 font-medium">
+                                                        <span className="text-[11px] text-[#7C2D12] font-semibold">
                                                             Expires in 10 minutes • Single use
                                                         </span>
                                                     </div>
                                                     <div className="flex flex-wrap items-center gap-2">
-                                                        <span className="text-gray-400 font-medium">Login Link:</span>
-                                                        <code className="rounded bg-black/40 border border-white/10 px-2 py-1 text-[11px] text-orange-300 select-all font-mono break-all flex-1 min-w-[200px]">
+                                                        <span className="text-[#57534E] font-semibold">Login Link:</span>
+                                                        <code className="rounded bg-white border border-[#D6D3D1] px-2.5 py-1 text-[11px] text-[#292524] select-all font-mono break-all flex-1 min-w-[200px]">
                                                             {loginLinks[staffUser.id].loginUrl}
                                                         </code>
                                                         <button
                                                             type="button"
                                                             onClick={() => copyGeneratedLoginLink(staffUser.id, loginLinks[staffUser.id].loginUrl)}
-                                                            className="inline-flex items-center gap-1 rounded-md bg-orange-500 px-3 py-1 text-[11px] font-bold text-black hover:bg-orange-400 transition cursor-pointer"
+                                                            className="inline-flex items-center gap-1 rounded-md bg-[#F97316] px-3 py-1 text-[11px] font-bold text-white hover:bg-[#EA580C] transition cursor-pointer shadow-xs"
                                                             data-testid={`copy-login-link-${staffUser.id}`}
                                                         >
                                                             {copiedLoginLinkId === staffUser.id ? (
@@ -1546,23 +1633,23 @@ export default function OwnerStaff() {
                                                         <button
                                                             type="button"
                                                             onClick={() => shareStaffLoginOnWhatsApp(staffUser)}
-                                                            className="inline-flex items-center gap-1 rounded-md bg-emerald-600/30 border border-emerald-500/40 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-600/40 transition cursor-pointer"
+                                                            className="inline-flex items-center gap-1 rounded-md bg-[#ECFDF5] border border-[#A7F3D0] px-2.5 py-1 text-[11px] font-semibold text-[#047857] hover:bg-emerald-100 transition cursor-pointer"
                                                         >
                                                             <span>WhatsApp</span>
                                                         </button>
                                                     </div>
-                                                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-400">
-                                                        <span>Status: <strong className="text-emerald-400 font-semibold">Single-use login link</strong></span>
+                                                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-[#57534E]">
+                                                        <span>Status: <strong className="text-[#047857] font-semibold">Single-use login link</strong></span>
                                                         <span>•</span>
-                                                        <span>Expires: <strong className="text-amber-400 font-semibold">10 minutes</strong></span>
+                                                        <span>Expires: <strong className="text-[#C2410C] font-semibold">10 minutes</strong></span>
                                                         <span>•</span>
-                                                        <span className="text-gray-500">No password in link</span>
+                                                        <span className="text-[#78716C]">No password in link</span>
                                                     </div>
                                                 </div>
                                             )}
 
-                                            <div className="flex items-center gap-1.5 text-[11px] text-gray-400 font-medium">
-                                                <KeyRound size={12} className="text-amber-400 shrink-0" />
+                                            <div className="flex items-center gap-1.5 text-[11px] text-[#57534E] font-medium">
+                                                <KeyRound size={12} className="text-[#EA580C] shrink-0" />
                                                 <span>Password must be entered separately at login (never shared in link for security).</span>
                                             </div>
                                         </div>
@@ -1574,7 +1661,7 @@ export default function OwnerStaff() {
                                             <button
                                                 type="button"
                                                 onClick={() => startEditRow(staffUser)}
-                                                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-bold text-amber-400 transition hover:bg-amber-500 hover:text-black cursor-pointer shadow-xs"
+                                                className="inline-flex items-center gap-1.5 rounded-xl border border-[#FDBA74] bg-[#FFF7ED] px-3 py-1.5 text-xs font-bold text-[#C2410C] transition hover:bg-[#F97316] hover:text-white cursor-pointer shadow-xs"
                                                 title="Edit staff member profile and permissions"
                                             >
                                                 <Pencil size={13} />
@@ -1586,10 +1673,10 @@ export default function OwnerStaff() {
                                                     type="button"
                                                     onClick={() => handleGenerateTempPassword(staffUser)}
                                                     disabled={generatingTempPasswordFor === staffUser.id}
-                                                    className="inline-flex items-center gap-1.5 rounded-xl border border-orange-500/40 bg-orange-500/15 px-3 py-1.5 text-xs font-bold text-orange-400 transition hover:bg-orange-500 hover:text-black cursor-pointer shadow-xs disabled:opacity-50"
+                                                    className="inline-flex items-center gap-1.5 rounded-xl border border-stone-300 bg-stone-100 px-3 py-1.5 text-xs font-bold text-[#1C1917] transition hover:bg-stone-200 cursor-pointer shadow-xs disabled:opacity-50"
                                                     title="Issue / Reset Temporary Password"
                                                 >
-                                                    <KeyRound size={13} />
+                                                    <KeyRound size={13} className="text-[#57534E]" />
                                                     <span>{generatingTempPasswordFor === staffUser.id ? "Issuing..." : "Reset Password"}</span>
                                                 </button>
                                             )}
@@ -1601,20 +1688,20 @@ export default function OwnerStaff() {
                                                         prev === staffUser.id ? null : staffUser.id
                                                     )
                                                 }
-                                                className="inline-flex items-center justify-center rounded-xl bg-[#111827] border border-white/10 p-2 text-gray-200 hover:bg-[#1b2438] cursor-pointer"
+                                                className="inline-flex items-center justify-center rounded-xl bg-white border border-[#D6D3D1] p-2 text-[#57534E] hover:bg-stone-100 hover:text-[#1C1917] transition cursor-pointer shadow-xs"
                                                 aria-label="Open staff actions"
                                             >
                                                 <MoreVertical size={16} />
                                             </button>
 
                                             {openActionMenuFor === staffUser.id && (
-                                                <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-xl border border-white/10 bg-[#111827] p-1.5 shadow-2xl">
+                                                <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-xl border border-stone-200 bg-white p-1.5 shadow-xl">
                                                     <button
                                                         type="button"
                                                         onClick={() => startEditRow(staffUser)}
-                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-amber-200 hover:bg-amber-500/10 cursor-pointer"
+                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#292524] hover:bg-[#FFF7ED] hover:text-[#C2410C] transition cursor-pointer"
                                                     >
-                                                        <Pencil size={14} />
+                                                        <Pencil size={14} className="text-[#F97316]" />
                                                         Edit Profile
                                                     </button>
 
@@ -1622,9 +1709,9 @@ export default function OwnerStaff() {
                                                         <button
                                                             type="button"
                                                             onClick={() => handleGenerateTempPassword(staffUser)}
-                                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-orange-300 hover:bg-orange-500/10 cursor-pointer"
+                                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#292524] hover:bg-[#FFF7ED] hover:text-[#C2410C] transition cursor-pointer"
                                                         >
-                                                            <KeyRound size={14} />
+                                                            <KeyRound size={14} className="text-[#F97316]" />
                                                             Reset Password
                                                         </button>
                                                     )}
@@ -1636,12 +1723,12 @@ export default function OwnerStaff() {
                                                             updatingStatusFor === staffUser.id ||
                                                             staffUser.role === "OWNER"
                                                         }
-                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-cyan-200 hover:bg-cyan-500/10 disabled:opacity-50 cursor-pointer"
+                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#292524] hover:bg-stone-100 transition disabled:opacity-50 cursor-pointer"
                                                     >
                                                         {staffUser.isActive ? (
-                                                            <UserRoundX size={14} />
+                                                            <UserRoundX size={14} className="text-[#B91C1C]" />
                                                         ) : (
-                                                            <UserRoundCheck size={14} />
+                                                            <UserRoundCheck size={14} className="text-[#047857]" />
                                                         )}
                                                         {staffUser.isActive ? "Deactivate / Disable" : "Activate Staff"}
                                                     </button>
@@ -1649,9 +1736,9 @@ export default function OwnerStaff() {
                                                     <button
                                                         type="button"
                                                         onClick={() => openAccessPanel(staffUser)}
-                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-indigo-200 hover:bg-indigo-500/10 cursor-pointer"
+                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#292524] hover:bg-stone-100 transition cursor-pointer"
                                                     >
-                                                        <ShieldCheck size={14} />
+                                                        <ShieldCheck size={14} className="text-indigo-600" />
                                                         Permissions Matrix
                                                     </button>
 
@@ -1659,7 +1746,7 @@ export default function OwnerStaff() {
                                                         type="button"
                                                         onClick={() => confirmDeleteStaff(staffUser)}
                                                         disabled={deletingFor === staffUser.id || staffUser.role === "OWNER"}
-                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-red-300 hover:bg-red-500/10 disabled:opacity-50 cursor-pointer"
+                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#B91C1C] hover:bg-red-50 hover:text-red-700 transition disabled:opacity-50 cursor-pointer"
                                                     >
                                                         <Trash2 size={14} />
                                                         Delete Staff
@@ -1671,14 +1758,14 @@ export default function OwnerStaff() {
 
                                     {/* Standalone Delegate Access Drawer/Panel */}
                                     {isAccessOpen && !isEditing && (
-                                        <div className="mt-4 rounded-xl border border-indigo-500/30 bg-[#0d142c] p-4 shadow-inner">
-                                            <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
+                                        <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 shadow-xs">
+                                            <div className="mb-3 flex items-center justify-between border-b border-indigo-100 pb-2">
                                                 <div>
-                                                    <h5 className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wide text-indigo-400">
-                                                        <ShieldCheck size={15} />
+                                                    <h5 className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wide text-indigo-950">
+                                                        <ShieldCheck size={15} className="text-indigo-600" />
                                                         Module Access Permissions for {staffUser.name} ({staffUser.role})
                                                     </h5>
-                                                    <p className="text-[11px] theme-muted">
+                                                    <p className="text-[11px] text-[#57534E]">
                                                         Checked modules are available when {staffUser.name} logs in.
                                                     </p>
                                                 </div>
@@ -1687,7 +1774,7 @@ export default function OwnerStaff() {
                                                     onClick={() =>
                                                         setAccessDraft(defaultAccessByRole(staffUser.role))
                                                     }
-                                                    className="text-[11px] font-semibold text-indigo-300 hover:underline cursor-pointer"
+                                                    className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 hover:underline cursor-pointer"
                                                 >
                                                     Reset to Role Defaults
                                                 </button>
@@ -1695,7 +1782,7 @@ export default function OwnerStaff() {
 
                                             <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                                                 {modules.map((moduleKey) => (
-                                                    <label key={moduleKey} className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                                                    <label key={moduleKey} className="flex items-center gap-2 text-xs font-medium text-[#292524] cursor-pointer">
                                                         <input
                                                             type="checkbox"
                                                             checked={Boolean(accessDraft[moduleKey])}
@@ -1706,18 +1793,18 @@ export default function OwnerStaff() {
                                                                     [moduleKey]: e.target.checked,
                                                                 }))
                                                             }
-                                                            className="accent-indigo-500 rounded"
+                                                            className="accent-[#F97316] rounded"
                                                         />
                                                         <span>{ACCESS_LABELS[moduleKey] || moduleKey}</span>
                                                     </label>
                                                 ))}
                                             </div>
 
-                                            <div className="mt-4 flex items-center justify-end gap-2 border-t border-white/10 pt-3">
+                                            <div className="mt-4 flex items-center justify-end gap-2 border-t border-indigo-100 pt-3">
                                                 <button
                                                     type="button"
                                                     onClick={() => setSelectedAccessUserId(null)}
-                                                    className="rounded-lg border border-white/20 px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:bg-white/5 cursor-pointer"
+                                                    className="rounded-lg border border-stone-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-[#57534E] hover:bg-stone-50 hover:text-[#1C1917] cursor-pointer"
                                                 >
                                                     Close
                                                 </button>
@@ -1725,7 +1812,7 @@ export default function OwnerStaff() {
                                                     type="button"
                                                     onClick={() => saveAccess(staffUser.id)}
                                                     disabled={savingAccessFor === staffUser.id || staffUser.role === "OWNER"}
-                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--app-primary)] px-4 py-1.5 text-xs font-bold text-black disabled:opacity-60 cursor-pointer"
+                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#F97316] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#EA580C] shadow-xs disabled:opacity-60 cursor-pointer"
                                                 >
                                                     {savingAccessFor === staffUser.id ? (
                                                         <LoaderCircle size={13} className="animate-spin" />
@@ -1747,33 +1834,33 @@ export default function OwnerStaff() {
             {/* One-Time Temporary Password Modal */}
             {temporaryPasswordModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4">
-                    <div className="w-full max-w-md rounded-2xl border border-[var(--app-primary)]/40 bg-[#0f172a] p-6 shadow-2xl">
-                        <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
-                            <h4 className="flex items-center gap-2 text-base font-bold text-white">
-                                <KeyRound size={18} className="text-[var(--app-primary)]" />
+                    <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl">
+                        <div className="mb-4 flex items-center justify-between border-b border-stone-200 pb-3">
+                            <h4 className="flex items-center gap-2 text-base font-bold text-[#1C1917]">
+                                <KeyRound size={18} className="text-[#F97316]" />
                                 Temporary Password Created
                             </h4>
                             <button
                                 type="button"
                                 onClick={() => setTemporaryPasswordModal(null)}
-                                className="text-gray-400 hover:text-white"
+                                className="text-[#78716C] hover:text-[#1C1917] cursor-pointer"
                             >
                                 <X size={16} />
                             </button>
                         </div>
 
-                        <p className="text-xs text-gray-300 leading-relaxed mb-4">
+                        <p className="text-xs text-[#57534E] leading-relaxed mb-4">
                             A secure temporary password was created for{" "}
-                            <strong className="text-white">{temporaryPasswordModal.name}</strong> (
+                            <strong className="text-[#1C1917]">{temporaryPasswordModal.name}</strong> (
                             {temporaryPasswordModal.email}).
                         </p>
 
-                        <div className="rounded-xl border border-white/15 bg-black/40 p-3.5 mb-4 space-y-2">
-                            <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 block">
+                        <div className="rounded-xl border border-[#D6D3D1] bg-[#F5F5F4] p-3.5 mb-4 space-y-2">
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-[#57534E] block">
                                 Temporary Password
                             </label>
                             <div className="flex items-center justify-between gap-2">
-                                <code className="font-mono text-sm font-bold text-[var(--app-primary)] tracking-wide">
+                                <code className="font-mono text-base font-bold text-[#C2410C] tracking-wide">
                                     {temporaryPasswordModal.temporaryPassword}
                                 </code>
                                 <button
@@ -1792,16 +1879,16 @@ export default function OwnerStaff() {
                                             showToast({ title: "Copy Failed", message: "Clipboard access denied.", variant: "error" });
                                         }
                                     }}
-                                    className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/15 px-3 py-1.5 text-xs font-semibold text-white transition cursor-pointer"
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-stone-300 hover:bg-stone-50 px-3 py-1.5 text-xs font-bold text-[#1C1917] shadow-xs transition cursor-pointer"
                                 >
-                                    {copiedPassword ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                                    {copiedPassword ? <Check size={14} className="text-[#047857]" /> : <Copy size={14} />}
                                     <span>{copiedPassword ? "Copied" : "Copy"}</span>
                                 </button>
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300 flex items-start gap-2 mb-5">
-                            <AlertTriangle size={15} className="shrink-0 text-amber-400 mt-0.5" />
+                        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-2 mb-5">
+                            <AlertTriangle size={15} className="shrink-0 text-amber-600 mt-0.5" />
                             <span>
                                 <strong>Important Security Notice:</strong> This password is only shown once and cannot be retrieved later. Share it securely with the staff member.
                             </span>
@@ -1811,7 +1898,7 @@ export default function OwnerStaff() {
                             <button
                                 type="button"
                                 onClick={() => setTemporaryPasswordModal(null)}
-                                className="rounded-xl bg-[var(--app-primary)] px-5 py-2 text-xs font-bold text-black shadow-md hover:opacity-90 transition cursor-pointer"
+                                className="rounded-xl bg-[#F97316] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-[#EA580C] transition cursor-pointer"
                             >
                                 I Have Shared / Saved This Password
                             </button>
@@ -1823,19 +1910,19 @@ export default function OwnerStaff() {
             {/* Confirm Deactivation Modal */}
             {confirmDeactivateUser && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4">
-                    <div className="w-full max-w-md rounded-2xl border border-red-500/40 bg-[#0f172a] p-6 shadow-2xl">
-                        <div className="mb-4 flex items-center gap-2 border-b border-white/10 pb-3">
-                            <UserRoundX size={20} className="text-red-400" />
-                            <h4 className="text-base font-bold text-white">
+                    <div className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-6 shadow-2xl">
+                        <div className="mb-4 flex items-center gap-2 border-b border-stone-200 pb-3">
+                            <UserRoundX size={20} className="text-red-600" />
+                            <h4 className="text-base font-bold text-[#1C1917]">
                                 Deactivate Staff Member?
                             </h4>
                         </div>
 
-                        <p className="text-xs text-gray-300 leading-relaxed mb-4">
-                            Are you sure you want to deactivate <strong className="text-white">{confirmDeactivateUser.name}</strong>?
+                        <p className="text-xs text-[#57534E] leading-relaxed mb-4">
+                            Are you sure you want to deactivate <strong className="text-[#1C1917]">{confirmDeactivateUser.name}</strong>?
                         </p>
 
-                        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 mb-5">
+                        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800 mb-5">
                             Deactivating this account will immediately revoke all active login sessions and block access to staff portals until re-enabled.
                         </div>
 
@@ -1843,7 +1930,7 @@ export default function OwnerStaff() {
                             <button
                                 type="button"
                                 onClick={() => setConfirmDeactivateUser(null)}
-                                className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-white/5 cursor-pointer"
+                                className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-[#57534E] hover:bg-stone-50 hover:text-[#1C1917] cursor-pointer"
                             >
                                 Cancel
                             </button>
@@ -1851,7 +1938,7 @@ export default function OwnerStaff() {
                                 type="button"
                                 onClick={() => executeToggleStatus(confirmDeactivateUser, false)}
                                 disabled={updatingStatusFor === confirmDeactivateUser.id}
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-red-500 transition cursor-pointer disabled:opacity-60"
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-red-700 transition cursor-pointer disabled:opacity-60"
                             >
                                 {updatingStatusFor === confirmDeactivateUser.id ? (
                                     <LoaderCircle size={14} className="animate-spin" />
@@ -1868,21 +1955,21 @@ export default function OwnerStaff() {
             {/* Confirm Delete Modal */}
             {confirmDeleteUser && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4">
-                    <div className="w-full max-w-md rounded-2xl border border-red-500/40 bg-[#0f172a] p-6 shadow-2xl">
-                        <div className="mb-4 flex items-center gap-2 border-b border-white/10 pb-3">
-                            <Trash2 size={20} className="text-red-400" />
-                            <h4 className="text-base font-bold text-white">
+                    <div className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-6 shadow-2xl">
+                        <div className="mb-4 flex items-center gap-2 border-b border-stone-200 pb-3">
+                            <Trash2 size={20} className="text-red-600" />
+                            <h4 className="text-base font-bold text-[#1C1917]">
                                 Delete Staff Member Permanently?
                             </h4>
                         </div>
 
-                        <p className="text-xs text-gray-300 leading-relaxed mb-3">
+                        <p className="text-xs text-[#57534E] leading-relaxed mb-3">
                             Are you sure you want to permanently delete{" "}
-                            <strong className="text-white">{confirmDeleteUser.name}</strong> (
+                            <strong className="text-[#1C1917]">{confirmDeleteUser.name}</strong> (
                             {confirmDeleteUser.email})?
                         </p>
 
-                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-300 mb-5">
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 mb-5">
                             <strong>Note:</strong> If this staff member has historical records (such as completed shifts, closed cash floats, or past orders), deletion will be rejected to protect business audit trails. Please <strong>deactivate</strong> the account instead if they have historical activity.
                         </div>
 
@@ -1890,7 +1977,7 @@ export default function OwnerStaff() {
                             <button
                                 type="button"
                                 onClick={() => setConfirmDeleteUser(null)}
-                                className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-white/5 cursor-pointer"
+                                className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-[#57534E] hover:bg-stone-50 hover:text-[#1C1917] cursor-pointer"
                             >
                                 Cancel
                             </button>
@@ -1898,7 +1985,7 @@ export default function OwnerStaff() {
                                 type="button"
                                 onClick={executeDeleteStaff}
                                 disabled={deletingFor === confirmDeleteUser.id}
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-red-500 transition cursor-pointer disabled:opacity-60"
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-red-700 transition cursor-pointer disabled:opacity-60"
                             >
                                 {deletingFor === confirmDeleteUser.id ? (
                                     <LoaderCircle size={14} className="animate-spin" />

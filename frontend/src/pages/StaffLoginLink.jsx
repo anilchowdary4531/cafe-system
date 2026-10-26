@@ -62,11 +62,14 @@ export default function StaffLoginLink() {
                 }
             } catch (err) {
                 setStatus("error");
+                const status = err?.response?.status;
                 const serverMsg = err?.response?.data?.message;
                 if (serverMsg) {
                     setErrorMessage(serverMsg);
+                } else if (status === 403) {
+                    setErrorMessage("This staff account is inactive.");
                 } else {
-                    setErrorMessage("This staff login link is invalid, expired, or has already been used. Please ask your restaurant owner for a new link.");
+                    setErrorMessage("Invalid staff login link.");
                 }
             }
         };

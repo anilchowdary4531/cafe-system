@@ -49,6 +49,7 @@ import {
   deletePrinter,
   getKots,
   getPrinters,
+  getReadyItemsController,
   getStations,
   getWorkloadMetrics,
   testPrinter,
@@ -58,7 +59,6 @@ import {
   updatePriority as updateKotPriorityController,
   updateStation,
   updateStatus as updateKotStatusController,
-  getReadyKitchenItemsController,
 } from "../controllers/kot.controller.js";
 import {
   getKitchenConfigController,
@@ -68,7 +68,6 @@ import {
   bulkAssignItemsController,
   assignKotController,
   reassignItemController,
-  unassignItemController,
   getChefAssignedItemsController,
   selfPickItemController,
   selfPickKotController,
@@ -85,8 +84,6 @@ import { assignWaiterToTable, unassignWaiterFromTable, getWaiterAssignmentHistor
 import { getAuditLogs, logAuditEvent } from "../services/auditLogService.js";
 import { approveCancellation, approveDiscount, approveReprint } from "../controllers/managerApprovalController.js";
 import { completeSessionAndReleaseTable } from "../services/tableSessionService.js";
-import { createAndDispatchNotification } from "../services/notificationService.js";
-import { NOTIFICATION_TYPES, RECIPIENT_TYPES } from "../constants/notificationTypes.js";
 
 export default async function ownerRoutes(app, deps = {}) {
   const prisma = deps?.prisma || defaultPrisma;
@@ -404,7 +401,7 @@ export default async function ownerRoutes(app, deps = {}) {
     }
   });
 
-  const handleCreateOwnerOrder = async (req, reply) => {
+  app.post("/owner/:restaurantId/orders", async (req, reply) => {
     try {
       const restaurantId = Number(req.params.restaurantId);
       if (!restaurantId) return reply.code(400).send({ message: "Invalid restaurant id" });
@@ -422,88 +419,22 @@ export default async function ownerRoutes(app, deps = {}) {
         input: req.body,
       });
 
-      // Broadcast Socket.IO events for real-time updates across screens (/staff and root namespaces)
+      // Broadcast Socket.IO events for real-time updates across screens
       try {
         const io = req.server?.io || realtime?.io;
-        const staff = req.server?.staff || realtime?.staff || (typeof io?.of === "function" ? io.of("/staff") : null);
-        const canonicalTableId = order.tableSession?.tableId || (req.body?.tableId ? Number(req.body.tableId) : null);
-        const canonicalSessionId = order.tableSessionId || order.tableSession?.id || null;
-        const tablePayload = {
-          restaurantId,
-          tableNo: order.tableNo,
-          tableId: canonicalTableId,
-          tableSessionId: canonicalSessionId,
-        };
-
         if (io) {
           io.to(`restaurant_${restaurantId}`).emit("new_order", order);
           io.to(`restaurant:${restaurantId}`).emit("new_order", order);
           io.to(`restaurant_${restaurantId}`).emit("order_created", { order, source: order.orderSource || "POS" });
           io.to(`restaurant:${restaurantId}`).emit("order_created", { order, source: order.orderSource || "POS" });
-          io.to(`restaurant_${restaurantId}`).emit("order:created", order);
-          io.to(`restaurant:${restaurantId}`).emit("order:created", order);
           if (order.tableNo) {
-            io.to(`restaurant_${restaurantId}`).emit("table:updated", tablePayload);
-            io.to(`restaurant:${restaurantId}`).emit("table:updated", tablePayload);
-            io.to(`restaurant_${restaurantId}`).emit("table:session_updated", tablePayload);
-            io.to(`restaurant:${restaurantId}`).emit("table:session_updated", tablePayload);
+            io.to(`restaurant_${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
+            io.to(`restaurant:${restaurantId}`).emit("table:updated", { restaurantId, tableNo: order.tableNo });
+            io.to(`restaurant_${restaurantId}`).emit("table:session_updated", { restaurantId, tableNo: order.tableNo });
           }
-        }
-
-        if (staff) {
-          staff.to(`restaurant_${restaurantId}`).emit("new_order", order);
-          staff.to(`restaurant:${restaurantId}`).emit("new_order", order);
-          staff.to(`restaurant_${restaurantId}`).emit("order_created", { order, source: order.orderSource || "POS" });
-          staff.to(`restaurant:${restaurantId}`).emit("order_created", { order, source: order.orderSource || "POS" });
-          staff.to(`restaurant_${restaurantId}`).emit("order:created", order);
-          staff.to(`restaurant:${restaurantId}`).emit("order:created", order);
-          if (order.tableNo) {
-            staff.to(`restaurant_${restaurantId}`).emit("table:updated", tablePayload);
-            staff.to(`restaurant:${restaurantId}`).emit("table:updated", tablePayload);
-            staff.to(`restaurant_${restaurantId}`).emit("table:session_updated", tablePayload);
-            staff.to(`restaurant:${restaurantId}`).emit("table:session_updated", tablePayload);
-          }
-        }
-
-        if (typeof realtime?.emitOrderCreated === "function") {
-          realtime.emitOrderCreated(order).catch(() => {});
         }
       } catch (e) {
         console.warn("Socket broadcast error on order creation:", e?.message);
-      }
-
-      // Dispatch in-app notification to the assigned server / waiter
-      const waiterId = order.tableSession?.waiterId || actor?.userId || (req.body?.waiterId ? Number(req.body.waiterId) : null);
-      if (waiterId) {
-        try {
-          const tableDisplay = order.tableNo ? `Table ${order.tableNo}` : "Table";
-          const resolvedTableId = order.tableSession?.tableId || (req.body?.tableId ? Number(req.body.tableId) : null);
-          const resolvedSessionId = order.tableSessionId || order.tableSession?.id || null;
-          await createAndDispatchNotification({
-            prisma,
-            realtime: req.server?.realtime || realtime || { io: req.server?.io, staff: req.server?.staff || realtime?.staff },
-            recipientType: RECIPIENT_TYPES.USER,
-            recipientId: Number(waiterId),
-            restaurantId,
-            orderId: order.id,
-            notificationType: NOTIFICATION_TYPES.KOT_SENT || "KOT_SENT",
-            title: `🍳 Order Sent to Kitchen — ${tableDisplay}`,
-            message: `Order #${order.orderNo || order.id} sent to kitchen for ${tableDisplay}`,
-            data: {
-              orderId: order.id,
-              orderNo: order.orderNo,
-              tableId: resolvedTableId,
-              tableSessionId: resolvedSessionId,
-              tableNo: order.tableNo,
-              action: "KOT_SENT",
-              restaurantId,
-              status: order.status || "PLACED",
-            },
-            idempotencyKey: `kot_sent_${order.id}_${Number(waiterId)}`,
-          }).catch((e) => console.warn("[OrderRoute] Server KOT notification warning:", e?.message));
-        } catch (notifErr) {
-          console.warn("[OrderRoute] Failed to dispatch server KOT notification:", notifErr?.message);
-        }
       }
 
       return reply.code(201).send({
@@ -518,10 +449,7 @@ export default async function ownerRoutes(app, deps = {}) {
         message: err.message || "Failed to create order",
       });
     }
-  };
-
-  app.post("/owner/:restaurantId/orders", handleCreateOwnerOrder);
-  app.post("/api/owner/:restaurantId/orders", handleCreateOwnerOrder);
+  });
 
   app.get("/owner/:restaurantId/menu", async (req, reply) => {
     try {
@@ -827,11 +755,6 @@ export default async function ownerRoutes(app, deps = {}) {
           },
           select: {
             tableNo: true,
-            tableSession: {
-              select: {
-                tableId: true,
-              },
-            },
             status: true,
             paymentStatus: true,
             orderNo: true,
@@ -870,9 +793,15 @@ export default async function ownerRoutes(app, deps = {}) {
       };
 
       const activeSessionsByTableId = new Map();
+      const activeSessionsByTable = {};
       for (const session of activeSessions) {
         if (session.tableId) {
           activeSessionsByTableId.set(Number(session.tableId), session);
+        }
+        for (const k of getTableKeys(session.tableNo)) {
+          if (!activeSessionsByTable[k]) {
+            activeSessionsByTable[k] = session;
+          }
         }
       }
 
@@ -894,6 +823,7 @@ export default async function ownerRoutes(app, deps = {}) {
       }
 
       const activeOrdersByTableId = new Map();
+      const activeOrdersByTable = {};
 
       for (const order of activeOrders) {
         const formattedOrder = {
@@ -923,13 +853,21 @@ export default async function ownerRoutes(app, deps = {}) {
           }
           activeOrdersByTableId.get(targetTableId).push(formattedOrder);
         }
+
+        for (const k of getTableKeys(order.tableNo)) {
+          if (!activeOrdersByTable[k]) activeOrdersByTable[k] = [];
+          if (!activeOrdersByTable[k].some((o) => o.id === formattedOrder.id)) {
+            activeOrdersByTable[k].push(formattedOrder);
+          }
+        }
       }
 
-      const latestOrderByTableId = new Map();
+      const latestOrderByTable = {};
       for (const order of latestTableOrders) {
-        const ordTableId = order.tableSession?.tableId ? Number(order.tableSession.tableId) : null;
-        if (ordTableId && !latestOrderByTableId.has(ordTableId)) {
-          latestOrderByTableId.set(ordTableId, order);
+        for (const k of getTableKeys(order.tableNo)) {
+          if (!latestOrderByTable[k]) {
+            latestOrderByTable[k] = order;
+          }
         }
       }
 
@@ -960,9 +898,35 @@ export default async function ownerRoutes(app, deps = {}) {
           qrTargetUrl: `/order/table/${token}`,
           ...(function buildTableState() {
           const tid = Number(table.id);
-          const tableActiveOrders = activeOrdersByTableId.get(tid) || [];
-          const latestOrder = latestOrderByTableId.get(tid) || null;
-          const activeSession = activeSessionsByTableId.get(tid) || null;
+          let tableActiveOrders = activeOrdersByTableId.has(tid)
+            ? activeOrdersByTableId.get(tid)
+            : [];
+          if (!tableActiveOrders.length) {
+            for (const k of getTableKeys(table.tableNo)) {
+              if (activeOrdersByTable[k]?.length) {
+                tableActiveOrders = activeOrdersByTable[k];
+                break;
+              }
+            }
+          }
+
+          let latestOrder = null;
+          for (const k of getTableKeys(table.tableNo)) {
+            if (latestOrderByTable[k]) {
+              latestOrder = latestOrderByTable[k];
+              break;
+            }
+          }
+
+          let activeSession = activeSessionsByTableId.get(tid) || null;
+          if (!activeSession) {
+            for (const k of getTableKeys(table.tableNo)) {
+              if (activeSessionsByTable[k]) {
+                activeSession = activeSessionsByTable[k];
+                break;
+              }
+            }
+          }
           
           const resById = reservationsByTableId.get(Number(table.id)) || [];
           const resByNo = reservationsByTableNo.get(String(table.tableNo || "").trim().toLowerCase()) || [];
@@ -1069,8 +1033,6 @@ export default async function ownerRoutes(app, deps = {}) {
 
           const activeOrderStatus = resolveCanonicalActiveOrderStatus(tableActiveOrders, activeSession ? latestOrder : null);
 
-          const isDirty = table.cleaningStatus === "DIRTY" || table.status === "DIRTY";
-
           let canonicalStatus = "AVAILABLE";
           if (isBlocked) {
             canonicalStatus = "BLOCKED";
@@ -1080,8 +1042,6 @@ export default async function ownerRoutes(app, deps = {}) {
               : activeSession?.status === "BILLING"
               ? "BILLING"
               : "OCCUPIED";
-          } else if (isDirty) {
-            canonicalStatus = "DIRTY";
           } else if (isReserved) {
             canonicalStatus = "RESERVED";
           }
@@ -1091,7 +1051,6 @@ export default async function ownerRoutes(app, deps = {}) {
               id: table.id,
               tableNo: table.tableNo,
               status: canonicalStatus,
-              cleaningStatus: isDirty ? "DIRTY" : (table.cleaningStatus || "CLEAN"),
               isOccupied: false,
               isReserved,
               isBlocked,
@@ -1146,7 +1105,6 @@ export default async function ownerRoutes(app, deps = {}) {
             id: table.id,
             tableNo: table.tableNo,
             status: canonicalStatus,
-            cleaningStatus: table.cleaningStatus || "CLEAN",
             isOccupied: true,
             isReserved: false,
             isBlocked: false,
@@ -1726,7 +1684,7 @@ export default async function ownerRoutes(app, deps = {}) {
           restaurantId,
           tableNo,
           seats: Number(seats || 4),
-          section: section ? String(section).trim() : null,
+          section: section ? String(section) : "Main Floor",
           positionX: positionX !== undefined && positionX !== null ? Number(positionX) : null,
           positionY: positionY !== undefined && positionY !== null ? Number(positionY) : null,
           width: width ? Number(width) : 120,
@@ -1783,7 +1741,7 @@ export default async function ownerRoutes(app, deps = {}) {
         data: {
           tableNo: nextTableNo,
           seats: seats === undefined ? existing.seats : Number(seats),
-          section: section !== undefined ? (section ? String(section).trim() : null) : existing.section,
+          section: section !== undefined ? String(section) : existing.section,
           positionX: positionX !== undefined ? (positionX === null ? null : Number(positionX)) : existing.positionX,
           positionY: positionY !== undefined ? (positionY === null ? null : Number(positionY)) : existing.positionY,
           width: width !== undefined ? Number(width) : existing.width,
@@ -2029,7 +1987,7 @@ export default async function ownerRoutes(app, deps = {}) {
         }).then((rows) =>
           rows.map((t) => ({
             ...t,
-            groupName: t.section || null,
+            groupName: t.section || "Main Floor",
             isOccupied: Boolean(t.tableSessions && t.tableSessions.length > 0),
           }))
         ).catch((err) => {
@@ -3218,6 +3176,24 @@ export default async function ownerRoutes(app, deps = {}) {
         }
       }
 
+      // Invalidate existing pending unconsumed login links for this staff member upon edit
+      try {
+        await prisma.staffLoginToken.updateMany({
+          where: {
+            staffId,
+            restaurantId,
+            usedAt: null,
+          },
+          data: {
+            usedAt: new Date(),
+          },
+        });
+      } catch (tokenErr) {
+        if (!isMissingTableError(tokenErr)) {
+          console.error("Failed to invalidate old login links on staff edit:", tokenErr);
+        }
+      }
+
       if (nextRole !== staff.role) {
         await logAuditEvent({
           prisma,
@@ -4140,8 +4116,6 @@ export default async function ownerRoutes(app, deps = {}) {
   app.post("/api/owner/:restaurantId/kitchen/kots/:kotId/assign", assignKotController);
   app.post("/owner/:restaurantId/kitchen/items/:itemId/reassign", reassignItemController);
   app.post("/api/owner/:restaurantId/kitchen/items/:itemId/reassign", reassignItemController);
-  app.post("/owner/:restaurantId/kitchen/items/:itemId/unassign", unassignItemController);
-  app.post("/api/owner/:restaurantId/kitchen/items/:itemId/unassign", unassignItemController);
 
   app.post("/owner/:restaurantId/kitchen/items/:itemId/self-pick", selfPickItemController);
   app.post("/api/owner/:restaurantId/kitchen/items/:itemId/self-pick", selfPickItemController);
@@ -4151,8 +4125,10 @@ export default async function ownerRoutes(app, deps = {}) {
   app.put("/owner/:restaurantId/kitchen/items/:itemId/status", updateKotItemStatusController);
   app.put("/api/owner/:restaurantId/kitchen/items/:itemId/status", updateKotItemStatusController);
 
-  app.get("/owner/:restaurantId/kitchen/ready-items", getReadyKitchenItemsController);
-  app.get("/api/owner/:restaurantId/kitchen/ready-items", getReadyKitchenItemsController);
+  // Authoritative Ready-to-Distribute Items for Service Queue
+  app.get("/owner/:restaurantId/kitchen/ready-items", getReadyItemsController);
+  app.get("/api/owner/:restaurantId/kitchen/ready-items", getReadyItemsController);
+  app.get("/api/v1/kitchen/ready-items", getReadyItemsController);
 
   // ==========================================
   // FEATURE 20 — STAFF MANAGEMENT, WAITER WORKSPACE, RBAC & MANAGER APPROVALS

@@ -416,4 +416,143 @@ describe("Staff Passwordless Login Link UI & Flow", () => {
             );
         });
     });
+
+    it("Owner edits staff -> saving clears previous login link state -> generating new link requests fresh token", async () => {
+        axios.get.mockResolvedValueOnce({
+            data: { users: mockStaffUsers, modules: ["dashboard", "orders", "tables"] },
+        });
+
+        // First link generation
+        axios.post.mockResolvedValueOnce({
+            data: {
+                message: "Staff login link generated successfully",
+                loginUrl: "http://localhost:5173/login?mode=staff&token=firstToken111",
+                token: "firstToken111",
+                expiresAt: new Date(Date.now() + 600000).toISOString(),
+                expiresInMinutes: 10,
+                singleUse: true,
+            },
+        });
+
+        // Edit PUT
+        axios.put.mockResolvedValueOnce({
+            data: {
+                message: "Staff updated successfully",
+                user: { ...mockStaffUsers[0], name: "John Waiter Updated" },
+            },
+        });
+
+        // Reload staff after save
+        axios.get.mockResolvedValueOnce({
+            data: { users: [{ ...mockStaffUsers[0], name: "John Waiter Updated" }, ...mockStaffUsers.slice(1)], modules: ["dashboard", "orders", "tables"] },
+        });
+
+        // Second link generation after edit
+        axios.post.mockResolvedValueOnce({
+            data: {
+                message: "Staff login link generated successfully",
+                loginUrl: "http://localhost:5173/login?mode=staff&token=freshToken222",
+                token: "freshToken222",
+                expiresAt: new Date(Date.now() + 600000).toISOString(),
+                expiresInMinutes: 10,
+                singleUse: true,
+            },
+        });
+
+        render(
+            <MemoryRouter>
+                <OwnerStaff />
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("John Waiter")).toBeInTheDocument();
+        });
+
+        // Generate first link
+        const genBtn1 = screen.getByTestId("generate-login-link-101");
+        fireEvent.click(genBtn1);
+
+        await waitFor(() => {
+            expect(screen.getByText("http://localhost:5173/login?mode=staff&token=firstToken111")).toBeInTheDocument();
+        });
+
+        // Click Edit on John Waiter
+        const editBtns = screen.getAllByRole("button", { name: /^Edit$/i });
+        fireEvent.click(editBtns[0]);
+
+        // Edit state immediately clears previous link
+        expect(screen.queryByText("http://localhost:5173/login?mode=staff&token=firstToken111")).not.toBeInTheDocument();
+
+        // Save edit
+        const saveBtn = screen.getByRole("button", { name: /save staff updates/i });
+        fireEvent.click(saveBtn);
+
+        await waitFor(() => {
+            expect(axios.put).toHaveBeenCalledWith(
+                expect.stringContaining("/owner/10/staff/101"),
+                expect.anything()
+            );
+        });
+
+        // Stale link must still not be displayed
+        expect(screen.queryByText("http://localhost:5173/login?mode=staff&token=firstToken111")).not.toBeInTheDocument();
+
+        // Generate new link after edit
+        const genBtn2 = screen.getByTestId("generate-login-link-101");
+        fireEvent.click(genBtn2);
+
+        await waitFor(() => {
+            expect(screen.getByText("http://localhost:5173/login?mode=staff&token=freshToken222")).toBeInTheDocument();
+        });
+
+        // Copy new link copies the FRESH URL
+        const copyBtn = screen.getByTestId("copy-login-link-101");
+        fireEvent.click(copyBtn);
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith("http://localhost:5173/login?mode=staff&token=freshToken222");
+    });
+
+    it("Login displays accurate error messages for expired, already used, and inactive tokens", async () => {
+        // Expired error
+        api.post.mockRejectedValueOnce({
+            response: {
+                status: 400,
+                data: { message: "This staff login link has expired. Generate a new link." },
+            },
+        });
+
+        const { unmount } = render(
+            <MemoryRouter initialEntries={["/login?mode=staff&token=expiredToken"]}>
+                <Routes>
+                    <Route path="/login" element={<Login />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("This staff login link has expired. Generate a new link.")).toBeInTheDocument();
+        });
+
+        unmount();
+
+        // Inactive error
+        api.post.mockRejectedValueOnce({
+            response: {
+                status: 403,
+                data: { message: "This staff account is inactive." },
+            },
+        });
+
+        render(
+            <MemoryRouter initialEntries={["/login?mode=staff&token=inactiveToken"]}>
+                <Routes>
+                    <Route path="/login" element={<Login />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("This staff account is inactive.")).toBeInTheDocument();
+        });
+    });
 });

@@ -322,27 +322,33 @@ test("Secure Passwordless Staff Login Link System — Complete Scenarios (A - P)
     });
     const { token } = JSON.parse(genRes.body);
 
-    // Deactivate staff
-    await prisma.user.update({
-      where: { id: chefA.id },
-      data: { isActive: false },
-    });
+    try {
+      // Deactivate staff
+      await prisma.user.update({
+        where: { id: chefA.id },
+        data: { isActive: false },
+      });
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/auth/staff-login-link",
-      payload: { token },
-    });
+      const res = await app.inject({
+        method: "POST",
+        url: "/auth/staff-login-link",
+        payload: { token },
+      });
 
-    assert.equal(res.statusCode, 403);
-    const body = JSON.parse(res.body);
-    assert.ok(body.message.toLowerCase().includes("disabled") || body.message.toLowerCase().includes("contact owner"));
-
-    // Reactivate for further tests
-    await prisma.user.update({
-      where: { id: chefA.id },
-      data: { isActive: true },
-    });
+      assert.equal(res.statusCode, 403);
+      const body = JSON.parse(res.body);
+      assert.ok(
+        body.message.toLowerCase().includes("inactive") ||
+          body.message.toLowerCase().includes("disabled") ||
+          body.message.toLowerCase().includes("contact owner")
+      );
+    } finally {
+      // Reactivate for further tests
+      await prisma.user.update({
+        where: { id: chefA.id },
+        data: { isActive: true },
+      });
+    }
   });
 
   // Scenario H: Restaurant isolation
@@ -544,3 +550,417 @@ test("Secure Passwordless Staff Login Link System — Complete Scenarios (A - P)
     assert.equal(JSON.parse(ownerRes.body).redirectPath, "/owner/staff");
   });
 });
+
+test("Staff Edit + Login Link Lifecycle & Regression Tests (Section 15: Tests 1 - 12)", async (t) => {
+  const app = Fastify();
+  app.register(fastifyJwt, { secret: process.env.JWT_SECRET || "test-jwt-secret-key-1234567890" });
+  await routes(app, { prisma });
+  await app.ready();
+
+  const rand = Math.floor(Math.random() * 1000000);
+
+  const restA = await prisma.restaurant.create({
+    data: { name: `Regression Rest A ${rand}`, slug: `reg-rest-a-${rand}`, currency: "INR" },
+  });
+
+  const restB = await prisma.restaurant.create({
+    data: { name: `Regression Rest B ${rand}`, slug: `reg-rest-b-${rand}`, currency: "INR" },
+  });
+
+  const ownerA = await prisma.user.create({
+    data: {
+      name: "Owner A",
+      email: `reg_owner_${rand}@test.com`,
+      phone: `+9197${rand}1`,
+      role: "OWNER",
+      restaurantId: restA.id,
+      password: bcrypt.hashSync("OwnerPass123!", 10),
+      sessionVersion: 1,
+    },
+  });
+  const ownerAToken = app.jwt.sign({ id: ownerA.id, role: "OWNER", restaurantId: restA.id, sessionVersion: 1 });
+
+  const staffUser = await prisma.user.create({
+    data: {
+      name: "Server Staff",
+      email: `reg_server_${rand}@test.com`,
+      phone: `+9197${rand}2`,
+      role: "WAITER",
+      designation: "Server",
+      restaurantId: restA.id,
+      password: bcrypt.hashSync("StaffPass123!", 10),
+      sessionVersion: 1,
+      isActive: true,
+    },
+  });
+
+  let sharedToken = null;
+
+  // TEST 1: Create staff -> Generate login link
+  await t.test("TEST 1: Create staff and generate login link (token exists, usedAt = null, expires in 10 mins)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: `/owner/${restA.id}/staff/${staffUser.id}/login-link`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    });
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.ok(body.token, "Raw token must be returned");
+    assert.ok(body.loginUrl.includes(`token=${body.token}`));
+    assert.equal(body.singleUse, true);
+    assert.equal(body.expiresInMinutes, 10);
+
+    const tokenHash = hashStaffLoginToken(body.token);
+    const record = await prisma.staffLoginToken.findUnique({ where: { tokenHash } });
+    assert.ok(record, "Token record must exist in DB");
+    assert.equal(record.usedAt, null, "usedAt must be null on creation");
+    assert.equal(record.staffId, staffUser.id);
+    assert.equal(record.restaurantId, restA.id);
+
+    const now = Date.now();
+    const expiry = new Date(record.expiresAt).getTime();
+    const diffMins = (expiry - now) / (1000 * 60);
+    assert.ok(diffMins >= 9.5 && diffMins <= 10.5, "Expires approximately 10 minutes in the future");
+
+    sharedToken = body.token;
+  });
+
+  // TEST 2: Copy URL does NOT consume token
+  await t.test("TEST 2: Generating link and copying URL does NOT consume token", async () => {
+    const tokenHash = hashStaffLoginToken(sharedToken);
+    const record = await prisma.staffLoginToken.findUnique({ where: { tokenHash } });
+    assert.equal(record.usedAt, null, "Token must remain unused without consumption API call");
+  });
+
+  // TEST 3: Open generated link -> Token is still valid before authentication
+  await t.test("TEST 3: Opening generated link leaves token valid before authentication", async () => {
+    const tokenHash = hashStaffLoginToken(sharedToken);
+    const record = await prisma.staffLoginToken.findUnique({ where: { tokenHash } });
+    assert.equal(record.usedAt, null);
+    assert.ok(new Date(record.expiresAt) > new Date());
+  });
+
+  // TEST 4: Successfully authenticate using generated link
+  await t.test("TEST 4: Successfully authenticate using generated link consumes token once", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/auth/staff-login-link",
+      payload: { token: sharedToken },
+    });
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.message, "Login success");
+    assert.ok(body.token, "Session token issued");
+    assert.equal(body.user.id, staffUser.id);
+
+    const tokenHash = hashStaffLoginToken(sharedToken);
+    const record = await prisma.staffLoginToken.findUnique({ where: { tokenHash } });
+    assert.ok(record.usedAt !== null, "usedAt must be populated after successful login");
+  });
+
+  // TEST 5: Try same link again -> Rejected as already used
+  await t.test("TEST 5: Try same link again -> rejected as already used", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/auth/staff-login-link",
+      payload: { token: sharedToken },
+    });
+    assert.equal(res.statusCode, 401);
+    const body = JSON.parse(res.body);
+    assert.ok(
+      body.message.includes("already been used"),
+      `Must report already used: ${body.message}`
+    );
+  });
+
+  // TEST 6: Generate link -> Edit staff -> Generate NEW link -> NEW link works, OLD invalidated
+  await t.test("TEST 6: Generate link -> edit staff -> generate NEW link -> NEW link works, OLD link invalidated", async () => {
+    // Generate initial link
+    const gen1 = await app.inject({
+      method: "POST",
+      url: `/owner/${restA.id}/staff/${staffUser.id}/login-link`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    });
+    const token1 = JSON.parse(gen1.body).token;
+
+    // Edit staff member
+    const editRes = await app.inject({
+      method: "PUT",
+      url: `/owner/${restA.id}/staff/${staffUser.id}`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: {
+        name: "Server Staff Updated",
+        email: staffUser.email,
+        phone: "+919700000099",
+        role: "WAITER",
+        designation: "Head Server",
+        isActive: true,
+      },
+    });
+    assert.equal(editRes.statusCode, 200);
+
+    // Old token must be invalidated
+    const hash1 = hashStaffLoginToken(token1);
+    const oldRecord = await prisma.staffLoginToken.findUnique({ where: { tokenHash: hash1 } });
+    assert.ok(oldRecord.usedAt !== null, "Old pending link must be invalidated upon staff edit");
+
+    // Attempting old token must fail
+    const oldUse = await app.inject({
+      method: "POST",
+      url: "/auth/staff-login-link",
+      payload: { token: token1 },
+    });
+    assert.equal(oldUse.statusCode, 401);
+
+    // Generate NEW link after edit
+    const gen2 = await app.inject({
+      method: "POST",
+      url: `/owner/${restA.id}/staff/${staffUser.id}/login-link`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    });
+    assert.equal(gen2.statusCode, 200);
+    const token2 = JSON.parse(gen2.body).token;
+    assert.notEqual(token1, token2, "New token must be distinct from old token");
+
+    // NEW link must NOT be marked used
+    const hash2 = hashStaffLoginToken(token2);
+    const newRecord = await prisma.staffLoginToken.findUnique({ where: { tokenHash: hash2 } });
+    assert.equal(newRecord.usedAt, null, "New token must be unused");
+
+    // NEW link works
+    const use2 = await app.inject({
+      method: "POST",
+      url: "/auth/staff-login-link",
+      payload: { token: token2 },
+    });
+    assert.equal(use2.statusCode, 200, "Newly generated link after edit must succeed");
+    const use2Body = JSON.parse(use2.body);
+    assert.equal(use2Body.user.name, "Server Staff Updated");
+    assert.equal(use2Body.user.designation, "Head Server");
+  });
+
+  // TEST 7: Edit staff -> Generate link -> Copy -> Open in fresh browser
+  await t.test("TEST 7: Edit staff -> generate link -> copy -> open -> works correctly", async () => {
+    // Edit
+    await app.inject({
+      method: "PUT",
+      url: `/owner/${restA.id}/staff/${staffUser.id}`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: {
+        name: "Server Staff Final",
+        email: staffUser.email,
+        role: "WAITER",
+        designation: "Server",
+        isActive: true,
+      },
+    });
+
+    // Generate
+    const gen = await app.inject({
+      method: "POST",
+      url: `/owner/${restA.id}/staff/${staffUser.id}/login-link`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    });
+    const freshToken = JSON.parse(gen.body).token;
+
+    // Simulate opening and authenticating in a fresh browser session
+    const auth = await app.inject({
+      method: "POST",
+      url: "/auth/staff-login-link",
+      payload: { token: freshToken },
+    });
+    assert.equal(auth.statusCode, 200);
+    const authBody = JSON.parse(auth.body);
+    assert.equal(authBody.user.id, staffUser.id);
+    assert.equal(authBody.user.name, "Server Staff Final");
+    assert.equal(authBody.redirectPath, "/server");
+  });
+
+  // TEST 8: Generate two links -> Newest works, previous invalidated
+  await t.test("TEST 8: Generate two links -> newest works, previous invalidated", async () => {
+    const genA = await app.inject({
+      method: "POST",
+      url: `/owner/${restA.id}/staff/${staffUser.id}/login-link`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    });
+    const tokA = JSON.parse(genA.body).token;
+
+    const genB = await app.inject({
+      method: "POST",
+      url: `/owner/${restA.id}/staff/${staffUser.id}/login-link`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    });
+    const tokB = JSON.parse(genB.body).token;
+
+    // Previous link fails
+    const useA = await app.inject({
+      method: "POST",
+      url: "/auth/staff-login-link",
+      payload: { token: tokA },
+    });
+    assert.equal(useA.statusCode, 401);
+
+    // Newest link succeeds
+    const useB = await app.inject({
+      method: "POST",
+      url: "/auth/staff-login-link",
+      payload: { token: tokB },
+    });
+    assert.equal(useB.statusCode, 200);
+  });
+
+  // TEST 9: Expired token returns "expired", NOT "already used"
+  await t.test("TEST 9: Expired token returns 'expired', NOT 'already used'", async () => {
+    const gen = await app.inject({
+      method: "POST",
+      url: `/owner/${restA.id}/staff/${staffUser.id}/login-link`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    });
+    const tok = JSON.parse(gen.body).token;
+
+    // Manually expire the token in DB
+    const tokenHash = hashStaffLoginToken(tok);
+    await prisma.staffLoginToken.update({
+      where: { tokenHash },
+      data: { expiresAt: new Date(Date.now() - 60000), usedAt: null },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/auth/staff-login-link",
+      payload: { token: tok },
+    });
+    assert.equal(res.statusCode, 401);
+    const body = JSON.parse(res.body);
+    assert.ok(
+      body.message.toLowerCase().includes("expired"),
+      `Must report expired: ${body.message}`
+    );
+    assert.ok(
+      !body.message.toLowerCase().includes("already been used"),
+      `Must not report already used for expired token: ${body.message}`
+    );
+  });
+
+  // TEST 10: Restaurant A token against Restaurant B
+  await t.test("TEST 10: Restaurant A token against Restaurant B rejected", async () => {
+    // Create staff in Restaurant B
+    const staffB = await prisma.user.create({
+      data: {
+        name: "Staff in Rest B",
+        email: `staff_b_${rand}@test.com`,
+        phone: `+9197${rand}9`,
+        role: "WAITER",
+        designation: "Server",
+        restaurantId: restB.id,
+        password: bcrypt.hashSync("PassB123!", 10),
+        sessionVersion: 1,
+        isActive: true,
+      },
+    });
+
+    // Owner B generates link for Staff B
+    const ownerB = await prisma.user.create({
+      data: {
+        name: "Owner B",
+        email: `reg_owner_b_${rand}@test.com`,
+        phone: `+9197${rand}8`,
+        role: "OWNER",
+        restaurantId: restB.id,
+        password: bcrypt.hashSync("OwnerPass123!", 10),
+        sessionVersion: 1,
+      },
+    });
+    const ownerBToken = app.jwt.sign({ id: ownerB.id, role: "OWNER", restaurantId: restB.id, sessionVersion: 1 });
+
+    // Owner A cannot generate link for Staff B
+    const crossGen = await app.inject({
+      method: "POST",
+      url: `/owner/${restA.id}/staff/${staffB.id}/login-link`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    });
+    assert.equal(crossGen.statusCode, 404, "Owner A cannot generate link for Staff B in Restaurant B");
+
+    // Owner B generates link for Staff B
+    const genB = await app.inject({
+      method: "POST",
+      url: `/owner/${restB.id}/staff/${staffB.id}/login-link`,
+      headers: { authorization: `Bearer ${ownerBToken}` },
+    });
+    assert.equal(genB.statusCode, 200);
+    const tokB = JSON.parse(genB.body).token;
+
+    // Tamper restaurantId of token record to restA -> must be rejected with 403
+    const hashB = hashStaffLoginToken(tokB);
+    await prisma.staffLoginToken.update({
+      where: { tokenHash: hashB },
+      data: { restaurantId: restA.id },
+    });
+
+    const crossUse = await app.inject({
+      method: "POST",
+      url: "/auth/staff-login-link",
+      payload: { token: tokB },
+    });
+    assert.equal(crossUse.statusCode, 403, "Cross-restaurant token usage must be rejected with 403");
+  });
+
+  // TEST 11: Inactive staff login link rejected
+  await t.test("TEST 11: Inactive staff login link rejected with 'This staff account is inactive.'", async () => {
+    // Generate link while active
+    const gen = await app.inject({
+      method: "POST",
+      url: `/owner/${restA.id}/staff/${staffUser.id}/login-link`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    });
+    const tok = JSON.parse(gen.body).token;
+
+    // Deactivate staff member
+    await prisma.user.update({
+      where: { id: staffUser.id },
+      data: { isActive: false },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/auth/staff-login-link",
+      payload: { token: tok },
+    });
+    assert.equal(res.statusCode, 403, "Inactive staff must be rejected with 403");
+    const body = JSON.parse(res.body);
+    assert.equal(body.message, "This staff account is inactive.");
+
+    // Restore active status
+    await prisma.user.update({
+      where: { id: staffUser.id },
+      data: { isActive: true },
+    });
+  });
+
+  // TEST 12: Two simultaneous consumption requests -> exactly one succeeds
+  await t.test("TEST 12: Two simultaneous consumption requests: exactly one succeeds, second fails as already used", async () => {
+    const gen = await app.inject({
+      method: "POST",
+      url: `/owner/${restA.id}/staff/${staffUser.id}/login-link`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    });
+    const tok = JSON.parse(gen.body).token;
+
+    // Fire two requests concurrently
+    const [req1, req2] = await Promise.all([
+      app.inject({ method: "POST", url: "/auth/staff-login-link", payload: { token: tok } }),
+      app.inject({ method: "POST", url: "/auth/staff-login-link", payload: { token: tok } }),
+    ]);
+
+    const statusCodes = [req1.statusCode, req2.statusCode].sort();
+    assert.deepEqual(statusCodes, [200, 401], "Exactly one concurrent request must succeed (200) and one must fail (401)");
+
+    const failedReq = req1.statusCode === 401 ? req1 : req2;
+    const failedBody = JSON.parse(failedReq.body);
+    assert.ok(
+      failedBody.message.includes("already been used"),
+      `Second concurrent request must fail as already used: ${failedBody.message}`
+    );
+  });
+});
+
