@@ -4,9 +4,11 @@ import {
     AlertTriangle,
     Bell,
     Calendar,
+    CalendarPlus,
     Check,
     ChefHat,
     Clock,
+    ConciergeBell,
     Filter,
     Grid,
     History as HistoryIcon,
@@ -16,6 +18,7 @@ import {
     LogOut,
     MapPin,
     Minus,
+    PackageCheck,
     Plus,
     RefreshCw,
     Search,
@@ -1352,6 +1355,7 @@ export default function Server() {
                     {/* Ready to Distribute Trigger Button */}
                     <button
                         type="button"
+                        data-testid="server-ready-distribute-nav-btn"
                         onClick={() => {
                             const el = document.getElementById("ready-distribution-section");
                             if (el) {
@@ -1364,16 +1368,16 @@ export default function Server() {
                                 });
                             }
                         }}
-                        className={`relative flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-extrabold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                        className={`relative flex items-center justify-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-extrabold transition cursor-pointer whitespace-nowrap shadow-xs ${
                             readyItemsToDistribute.length > 0
                                 ? "border-emerald-500 bg-emerald-500 text-white shadow-emerald-500/25 animate-pulse"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                         }`}
-                        title="Kitchen Pass / Ready to Distribute"
-                        aria-label="Kitchen Pass / Ready to Distribute"
+                        title="Ready to Distribute"
+                        aria-label="Ready to Distribute"
                     >
-                        <Bell className={`h-3.5 w-3.5 ${readyItemsToDistribute.length > 0 ? "animate-bounce" : ""}`} />
-                        <span>Ready to Distribute</span>
+                        <PackageCheck className={`h-4 w-4 sm:h-4.5 sm:w-4.5 ${readyItemsToDistribute.length > 0 ? "animate-bounce" : ""}`} />
+                        <span className="sr-only">Ready to Distribute</span>
                         <span className={`rounded-full px-1.5 py-0.2 text-[9px] sm:text-[10px] font-black ${
                             readyItemsToDistribute.length > 0 ? "bg-white text-emerald-700" : "bg-black/10 dark:bg-white/10"
                         }`}>
@@ -1384,14 +1388,16 @@ export default function Server() {
                     {/* Waitlist Drawer Trigger */}
                     <button
                         type="button"
+                        data-testid="server-waitlist-nav-btn"
                         onClick={() => setIsWaitlistOpen(true)}
-                        className="relative flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border border-orange-500/30 bg-orange-500/10 px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 transition cursor-pointer whitespace-nowrap"
+                        className="relative flex items-center justify-center rounded-lg sm:rounded-xl border border-orange-500/30 bg-orange-500/10 w-8 h-8 sm:w-9 sm:h-9 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 transition cursor-pointer shrink-0 shadow-xs"
+                        title="Waitlist"
                         aria-label="Waitlist"
                     >
-                        <Users className="h-3.5 w-3.5" />
-                        <span className="hidden min-[450px]:inline">Waitlist</span>
+                        <Users className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+                        <span className="sr-only">Waitlist</span>
                         {waitlistSummary.waitingCount > 0 && (
-                            <span className="rounded-full bg-orange-500 text-white px-1.5 py-0.2 text-[9px] sm:text-[10px]">
+                            <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-orange-500 text-[9px] sm:text-[10px] font-black text-white shadow-xs">
                                 {waitlistSummary.waitingCount}
                             </span>
                         )}
@@ -1400,15 +1406,17 @@ export default function Server() {
                     {/* New Reservation Trigger */}
                     <button
                         type="button"
+                        data-testid="server-new-reservation-nav-btn"
                         onClick={() => {
                             setEditingReservation(null);
                             setIsReservationModalOpen(true);
                         }}
-                        className="flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl bg-orange-500 px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold text-white hover:bg-orange-600 transition shadow-xs cursor-pointer whitespace-nowrap"
+                        className="flex items-center justify-center rounded-lg sm:rounded-xl bg-orange-500 w-8 h-8 sm:w-9 sm:h-9 text-white hover:bg-orange-600 transition shadow-xs cursor-pointer shrink-0"
+                        title="New Reservation"
                         aria-label="New Reservation"
                     >
-                        <Plus className="h-3.5 w-3.5" />
-                        <span><span className="hidden min-[400px]:inline">New </span>Reservation</span>
+                        <CalendarPlus className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+                        <span className="sr-only">New Reservation</span>
                     </button>
 
                     {/* Active Service Tab/Button */}
@@ -1419,16 +1427,16 @@ export default function Server() {
                             setViewMode("FLOOR_PLAN");
                             navigate("/server");
                         }}
-                        className={`flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border px-2 sm:px-2.5 h-8 sm:h-9 text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs ${
+                        className={`flex items-center justify-center rounded-lg sm:rounded-xl border w-8 h-8 sm:w-9 sm:h-9 transition cursor-pointer shrink-0 shadow-xs ${
                             viewMode === "FLOOR_PLAN" || viewMode === "ORDERING"
                                 ? "border-orange-500 bg-orange-500 text-white shadow-xs shadow-orange-500/20"
                                 : "border-[color:var(--app-border)]/40 bg-white/60 dark:bg-slate-900/60 theme-muted hover:text-[color:var(--app-text)]"
                         }`}
-                        title="Active Service Floor Plan"
-                        aria-label="Active Service Floor Plan"
+                        title="Active Service"
+                        aria-label="Active Service"
                     >
-                        <LayoutGrid className="h-3.5 w-3.5" />
-                        <span className="hidden xl:inline">Active Service</span>
+                        <ConciergeBell className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+                        <span className="sr-only">Active Service</span>
                     </button>
 
                     {/* History Button */}

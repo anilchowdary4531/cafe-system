@@ -154,6 +154,7 @@ export default function StaffShell({
                         {/* Profile button */}
                         <button
                             type="button"
+                            data-testid="staff-profile-btn"
                             onClick={() => navigate("/staff/profile")}
                             className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] rounded-xl bg-white hover:bg-[#FFF7ED] text-[#57534E] hover:text-[#171717] flex items-center justify-center transition-colors border border-[#E7E5E4] shadow-xs"
                             title="My Profile"
